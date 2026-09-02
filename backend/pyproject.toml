@@ -1,0 +1,54 @@
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "DJ", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"apps/*/models.py" = ["DJ001", "RUF012"]
+"apps/*/views.py" = ["RUF012"]
+"apps/common/api/views.py" = ["RUF012"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.14"
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+strict = true
+explicit_package_bases = true
+exclude = "migrations/"
+
+[tool.django-stubs]
+django_settings_module = "config.settings.test"
+
+[[tool.mypy.overrides]]
+module = ["apps.*.models"]
+disable_error_code = ["misc", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = ["apps.common.api.exceptions"]
+disable_error_code = ["assignment"]
+
+[[tool.mypy.overrides]]
+module = ["apps.users.serializers"]
+disable_error_code = ["type-arg"]
+
+[[tool.mypy.overrides]]
+module = [
+  "apps.common.api.middleware",
+  "apps.users.authentication",
+  "apps.users.views",
+]
+disable_error_code = ["arg-type", "assignment", "attr-defined", "misc", "union-attr"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+pythonpath = ["."]
+python_files = ["test_*.py"]
+markers = [
+  "postgresql: requires a real PostgreSQL database and runtime/migration roles",
+]
+addopts = "--strict-markers"
