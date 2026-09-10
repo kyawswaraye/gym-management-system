@@ -1,5 +1,7 @@
 # Project Structure
 
+> Part of the Phase 0 contract set indexed in [`README.md`](./README.md). Related: [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`DATABASE.md`](./DATABASE.md), [`API.md`](./API.md), [`SECURITY.md`](./SECURITY.md), [`DEVELOPMENT_PLAN.md`](./DEVELOPMENT_PLAN.md), [`HOW_IT_WORKS.md`](./HOW_IT_WORKS.md).
+
 ## 1. Repository strategy
 
 A single repository coordinates API contracts, local development, documentation, and CI while keeping deployable applications independent.
@@ -12,6 +14,7 @@ gym-management-platform/
 │       ├── deploy-staging.yml
 │       └── deploy-production.yml
 ├── docs/
+│   ├── README.md                   # documentation index and authority map
 │   ├── ARCHITECTURE.md
 │   ├── DATABASE.md
 │   ├── API.md
@@ -19,6 +22,7 @@ gym-management-platform/
 │   ├── PROJECT_STRUCTURE.md
 │   ├── DEVELOPMENT_PLAN.md
 │   ├── HOW_IT_WORKS.md
+│   ├── *.pdf                       # superseded reference material only
 │   └── adr/
 │       ├── 0001-single-vps-production-topology.md
 │       ├── 0002-nextjs-bff-browser-authentication.md
@@ -37,6 +41,8 @@ gym-management-platform/
 ```
 
 Phase 0 is documentation-only. At the end of Phase 0, no repository scaffold, backend, web application, mobile application, infrastructure code, workflow, container, or application configuration is assumed to exist beyond the files under `/docs`. Every other path shown in this document is a target structure to be created only in its approved roadmap phase.
+
+The seven Markdown contracts plus `docs/adr/` are authoritative. The PDFs under `docs/` are pre-Phase-0 reference input retained for history; they are indexed in [`README.md`](./README.md) and are superseded by the Markdown contracts wherever they disagree. No implementation decision may cite them as authority.
 
 ## 2. Backend
 
@@ -73,10 +79,14 @@ backend/
 │   ├── expenses/
 │   ├── salaries/
 │   ├── trainers/
+│   ├── classes/
+│   ├── inventory/
+│   ├── sales/
 │   ├── commissions/
 │   ├── cashbook/
 │   ├── receipts/
 │   ├── reports/
+│   ├── announcements/
 │   ├── notifications/
 │   ├── files/
 │   └── audit/
@@ -97,7 +107,7 @@ backend/
 
 ### Domain app convention
 
-The backend remains domain-based. `tenants`, `users`, `members`, `memberships`, `checkins`, `payments`, `expenses`, `salaries`, `trainers`, `commissions`, `cashbook`, `receipts`, `reports`, `notifications`, `files`, and `audit` are the approved domain apps. `common` is shared infrastructure for cross-cutting API, database-context, money, time, and validation primitives; it is not a catch-all business domain.
+The backend remains domain-based. `tenants`, `users`, `members`, `memberships`, `checkins`, `payments`, `expenses`, `salaries`, `trainers`, `classes`, `inventory`, `sales`, `commissions`, `cashbook`, `receipts`, `reports`, `announcements`, `notifications`, `files`, and `audit` are the approved domain apps. `common` is shared infrastructure for cross-cutting API, database-context, money, time, and validation primitives; it is not a catch-all business domain.
 
 Each substantial app follows a predictable shape:
 
@@ -158,10 +168,18 @@ web/
 │   │   │   ├── approvals/
 │   │   │   ├── salaries/
 │   │   │   ├── cash-book/
+│   │   │   ├── inventory/
+│   │   │   │   ├── products/
+│   │   │   │   ├── stock/
+│   │   │   │   └── sales/
 │   │   │   ├── pt/
 │   │   │   │   ├── trainers/
+│   │   │   │   ├── schedule/
+│   │   │   │   ├── packages/
 │   │   │   │   ├── sales/
 │   │   │   │   └── commissions/
+│   │   │   ├── classes/
+│   │   │   ├── announcements/
 │   │   │   ├── reports/
 │   │   │   ├── staff/
 │   │   │   └── settings/
@@ -189,9 +207,13 @@ web/
 │   │   ├── salaries/
 │   │   ├── checkins/
 │   │   ├── trainers/
+│   │   ├── classes/
 │   │   ├── pt/
+│   │   ├── inventory/
+│   │   ├── sales/
 │   │   ├── commissions/
 │   │   ├── reports/
+│   │   ├── announcements/
 │   │   └── staff/
 │   ├── lib/
 │   │   ├── api/
@@ -222,9 +244,10 @@ web/
 - Next.js is the browser BFF. Only server-side route handlers read the host-scoped `HttpOnly`, `SameSite=Lax` authentication cookies; `Secure` is mandatory outside isolated `http://localhost` development. The multi-gym pre-session ticket uses a separate cookie with the same protections and a maximum 5-minute lifetime. Browser JavaScript never receives JWT/refresh/ticket values and never stores them in `localStorage` or `sessionStorage`.
 - The `(auth)/select-gym` page renders only safe membership choices. It submits `gym_membership_id` to the same-origin auth route; the route handler supplies the protected ticket to Django, stores normal credentials only after atomic ticket consumption succeeds, and clears the ticket cookie on success or terminal failure. Tenant layouts and tenant-keyed caches are unavailable until Django has issued selected-gym credentials.
 - Every cookie-mutating auth route applies the shared CSRF token/header and strict Origin/Referer guard. The server API client permits only one controlled refresh and one original-request retry on the recognized access-expiry response. Django remains authoritative for ticket issue/hash/state/attempts, membership bootstrap validation, token issuance, selected gym, refresh rotation/reuse revocation, logout, and authorization.
-- Payment, expense, PT-sale, and salary forms create drafts and submit them; the manager approval queue is a separate feature boundary and never performs client-side posting calculations.
+- Payment, expense, retail-sale, PT-sale, and salary forms create drafts and submit them; the manager approval queue is a separate feature boundary and never performs client-side posting, stock, cost, session-balance, or profit calculations.
 - Salary period/line UI remains separate from PT commission UI. No fixed staff or PT amount is inferred in the frontend.
 - PT sales, trainer workflows, and commission accrual/payout UI remain separate feature boundaries even when composed under the tenant `pt` route.
+- Class/PT calendars, package/session balances, product inventory, retail sales, and announcement publishing each remain explicit feature boundaries with tenant-scoped API types.
 - API functions are centralized; components do not construct ad hoc URLs.
 - Generated or checked API types prevent contract drift.
 - Formatting utilities receive currency and timezone explicitly.
@@ -246,7 +269,9 @@ mobile/
 │   │   ├── membership/
 │   │   ├── payments/
 │   │   ├── checkins/
-│   │   ├── qr/
+│   │   ├── schedule/
+│   │   ├── service-packages/
+│   │   ├── qr-scanner/
 │   │   └── notifications/
 │   ├── components/
 │   │   └── ui/
@@ -267,7 +292,7 @@ mobile/
 └── .env.example
 ```
 
-The framework choice between Expo and bare React Native is deferred to Phase 7 based on notification, QR, biometric/device integration, build, and team constraints. This is an architectural decision requiring approval; API contracts remain framework-neutral.
+The framework choice between Expo and bare React Native is deferred to Phase 7 based on push notifications, camera-based onsite QR scanning, biometric/device integration, build, and team constraints. This is an architectural decision requiring approval; API contracts remain framework-neutral. Mobile has no tenant selector in ordinary member requests: the authenticated member session supplies the gym and member, and schedule, package, announcement, notification, and scan responses remain both gym- and self-scoped.
 
 ## 5. Infrastructure
 
@@ -368,11 +393,11 @@ This target structure is introduced incrementally:
 1. **Phase 1A — Foundation:** repository/tooling, Django and database foundation, authentication, tenant isolation, permissions, CI, and the minimal Next.js web shells. It includes no members, check-in, finance, PT, reports, or mobile implementation.
 2. **Phase 1B — Administration:** Super Admin, gym management, staff, roles and permissions, and gym settings.
 3. **Phase 2 — Membership:** members, plans, membership lifecycle, and related web features.
-4. **Phase 3 — Check-in:** check-in/check-out workflows and eligibility.
-5. **Phase 4 — Finance:** payment/expense/salary drafts, manager approval queue, receipts, cash book, and reconciliation.
-6. **Phase 5 — PT:** trainers, submitted PT sales, manager approval, commission accruals, payouts, and their explicit web feature boundaries.
-7. **Phase 6 — Reporting:** operational dashboards, explicit owner financial metrics, reports, and bounded exports.
-8. **Phase 7 — Mobile:** the separate React Native member workspace and mobile delivery.
+4. **Phase 3 — Check-in:** manual check-in/check-out, eligibility, rotating onsite QR challenges, and unattended authenticated mobile scanning.
+5. **Phase 4 — Finance and inventory:** payment/expense/salary/retail drafts, product and stock ledgers, manager approval queue, receipts, cash book, and reconciliation.
+6. **Phase 5 — PT and classes:** trainers, schedules, service packages, remaining-session ledger, class/PT bookings, attendance, submitted PT sales, manager approval, commission accruals, payouts, and their explicit web feature boundaries.
+7. **Phase 6 — Reporting:** operational dashboards, exact owner attendance/expiry/pending-payment/revenue-source/product metrics, reports, and bounded exports.
+8. **Phase 7 — Mobile:** the separate React Native member workspace, unattended onsite QR scan, PT/class schedule and remaining sessions, reminders, event/promotion announcements, and push delivery.
 9. **Phase 8 — Hardening and production deployment:** security and quality hardening, single-VPS Docker Compose infrastructure, GHCR deployment workflows, bounded observability, encrypted offsite backups, restore validation, and production rollout.
 
 Phase labels outside this sequence are stale and must not be used to justify creating target paths early.

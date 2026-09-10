@@ -1,8 +1,11 @@
 # Gym Management Platform
 
-Phase 1A security foundation for a multi-tenant gym management SaaS.
+Multi-tenant gym management SaaS under phased development.
 
-The current implementation scope is intentionally limited to:
+The repository contains the Phase 1A security foundation plus an initial,
+incomplete slice of member, membership, payment, and owner-dashboard
+operations. Passing tests for that slice does not mean the full roadmap is
+implemented.
 
 - Django REST Framework API foundations;
 - staff authentication and rotating sessions;
@@ -10,10 +13,15 @@ The current implementation scope is intentionally limited to:
 - explicit Django tenant scoping and PostgreSQL forced RLS;
 - permission and entitlement foundations;
 - a Next.js browser BFF and application shell;
+- initial tenant-scoped member, membership, payment, and dashboard paths;
 - automated security and contract checks.
 
-Members, check-ins, finance, PT, reports, production infrastructure, and the
-member mobile application are not part of Phase 1A.
+The target product additionally includes administration, attendance and
+unattended onsite QR check-in, trainer/PT and classes with remaining sessions,
+product inventory and retail sales, reports, announcements/reminders, and a
+member mobile application. These remain incomplete until their
+`docs/DEVELOPMENT_PLAN.md` phase exit criteria pass. Documentation describes
+the approved target contract, not proof that a feature exists at runtime.
 
 ## Approved runtimes
 
@@ -55,5 +63,15 @@ development. Browser JavaScript never receives authentication tokens.
 
 ## Documentation
 
-The architecture contracts are under [`docs/`](docs/). Accepted material
-decisions are recorded under [`docs/adr/`](docs/adr/).
+Start at the documentation index, [`docs/README.md`](docs/README.md). It lists the
+seven authoritative contracts and states which document owns each rule.
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — boundaries, tenancy, deployment
+- [`docs/DATABASE.md`](docs/DATABASE.md) — schema, constraints, RLS, transactions
+- [`docs/API.md`](docs/API.md) — versioned HTTP contracts and required permissions
+- [`docs/SECURITY.md`](docs/SECURITY.md) — threat model, permission matrices, gates
+- [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md) — repository layout
+- [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) — phases, exit criteria, open decisions
+- [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md) — Burmese operational walkthrough
+
+Accepted material decisions are recorded under [`docs/adr/`](docs/adr/).

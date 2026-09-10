@@ -1,5 +1,7 @@
 # Security Architecture
 
+> Part of the Phase 0 contract set indexed in [`README.md`](./README.md). Related: [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`DATABASE.md`](./DATABASE.md), [`API.md`](./API.md), [`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md), [`DEVELOPMENT_PLAN.md`](./DEVELOPMENT_PLAN.md), [`HOW_IT_WORKS.md`](./HOW_IT_WORKS.md).
+
 ## 1. Security objectives
 
 The highest-priority property is tenant confidentiality and integrity: a gym must not read, modify, delete, reference, aggregate, infer, or download another gym's data.
@@ -30,6 +32,10 @@ Relevant threats include:
 - XSS, CSRF, credential theft, and brute force;
 - signed URL reuse and cross-tenant file access;
 - replayed payment or reconciliation requests;
+- static, photographed, expired, replayed, or cross-gym check-in QR challenges;
+- forged class/PT attendance, double booking, capacity races, or repeated session consumption;
+- negative-stock races, forged product cost/profit, and cross-gym retail line substitution;
+- announcement audience expansion, push-token reassignment, and cross-gym notification delivery;
 - malicious uploads;
 - accidental logging of secrets or personal data;
 - excessive platform administrator access;
@@ -75,13 +81,18 @@ Explicit Django tenant scoping and forced PostgreSQL RLS are independent mandato
 
 ## 4. PostgreSQL context safety
 
-All tenant work runs inside `transaction.atomic()`. After entering that transaction and before the first tenant query, the application sets parameterized, transaction-local context:
+All tenant work runs inside `transaction.atomic()`. After entering that transaction and before the first tenant query, the application sets parameterized, transaction-local context in two ordered steps. Identity and request context come first; `app.gym_id` is installed only after global session validation has authoritatively selected the gym, so no tenant context exists while the selection itself is still unproven:
 
 ```sql
+-- Step 1: immediately after BEGIN, before any tenant query.
+SELECT set_config('app.user_id', :user_id, true),
+       set_config('app.request_id', :request_id, true);
+
+-- Step 2: only after global session, selected-gym, user, and gym lifecycle checks.
 SELECT set_config('app.gym_id', :gym_id, true);
-SELECT set_config('app.user_id', :user_id, true);
-SELECT set_config('app.request_id', :request_id, true);
 ```
+
+The same two-step order is mandatory in `ARCHITECTURE.md` section 6, the staff token validation sequence in `API.md` section 4, and the RLS contract in `DATABASE.md` section 6. Setting `app.gym_id` before the selection is validated is a fail-open defect, not an optimization.
 
 Rules:
 
@@ -153,18 +164,18 @@ Matrix values are defaults:
 
 Platform permissions use the `platform.*` namespace and are evaluated outside ordinary tenant-role permissions.
 
-| Stable permission code | SUPER_ADMIN | Scope and condition |
-|---|---:|---|
-| `platform.dashboard.view` | A | View bounded platform operational summaries; not tenant business records. |
-| `platform.gyms.view` | A | View gym identity, lifecycle, and subscription metadata; not tenant business records. |
-| `platform.gyms.create` | A | Create a gym through the audited provisioning workflow. |
-| `platform.gyms.update` | A | Update gym identity and approved lifecycle metadata. |
-| `platform.gyms.activate` | A | Activate an eligible gym with reason and policy checks. |
-| `platform.gyms.suspend` | A | Suspend a gym with reason, impact checks, and audit. |
-| `platform.owners.create` | C | Create/link the initial or an additional owner only within the audited gym-provisioning or approved owner workflow. |
-| `platform.subscriptions.manage` | A | Manage plans and tenant entitlements. |
-| `platform.settings.manage` | A | Manage platform-wide configuration, never tenant-owned settings through a tenant bypass. |
-| `platform.audit.view` | A | View platform audit events and support-access events. |
+| Stable permission code          | SUPER_ADMIN | Scope and condition                                                                                                 |
+| ------------------------------- | ----------: | ------------------------------------------------------------------------------------------------------------------- |
+| `platform.dashboard.view`       |           A | View bounded platform operational summaries; not tenant business records.                                           |
+| `platform.gyms.view`            |           A | View gym identity, lifecycle, and subscription metadata; not tenant business records.                               |
+| `platform.gyms.create`          |           A | Create a gym through the audited provisioning workflow.                                                             |
+| `platform.gyms.update`          |           A | Update gym identity and approved lifecycle metadata.                                                                |
+| `platform.gyms.activate`        |           A | Activate an eligible gym with reason and policy checks.                                                             |
+| `platform.gyms.suspend`         |           A | Suspend a gym with reason, impact checks, and audit.                                                                |
+| `platform.owners.create`        |           C | Create/link the initial or an additional owner only within the audited gym-provisioning or approved owner workflow. |
+| `platform.subscriptions.manage` |           A | Manage plans and tenant entitlements.                                                                               |
+| `platform.settings.manage`      |           A | Manage platform-wide configuration, never tenant-owned settings through a tenant bypass.                            |
+| `platform.audit.view`           |           A | View platform audit events and support-access events.                                                               |
 
 Platform status does not grant any tenant permission. Time-limited support and break-glass access are governed workflows, not additional stable permission codes: a support session receives only explicitly approved canonical tenant permissions, while refunds, voids, cash adjustments, commission payments, role changes, and OWNER-reserved controls remain denied unless incident policy separately approves each exact action.
 
@@ -172,82 +183,101 @@ Platform status does not grant any tenant permission. Time-limited support and b
 
 Tenant permissions use canonical `module.action` codes with no `tenant.` prefix. This matrix defines protected template defaults for tenant staff roles.
 
-| Stable permission code | OWNER | MANAGER | RECEPTIONIST | ACCOUNTANT | TRAINER |
-|---|---:|---:|---:|---:|---:|
-| `gym.view` | A | A | A | C | C |
-| `gym.update` | A | C | D | D | D |
-| `members.view` | A | A | A | C | C |
-| `members.create` | A | A | A | D | D |
-| `members.update` | A | A | A | D | C |
-| `members.archive` | A | C | D | D | D |
-| `memberships.view` | A | A | A | A | C |
-| `memberships.create` | A | A | A | D | D |
-| `memberships.update` | A | A | A | D | D |
-| `memberships.cancel` | A | C | C | D | D |
-| `checkins.view` | A | A | A | D | C |
-| `checkins.create` | A | A | A | D | C |
-| `checkins.update` | A | C | C | D | D |
-| `payments.view` | A | A | A | A | D |
-| `payments.create` | A | A | A | A | D |
-| `payments.update` | A | A | A | A | D |
-| `payments.submit` | A | A | A | A | D |
-| `payments.approve` | A | A | D | D | D |
-| `payments.void` | A | C | D | C | D |
-| `payments.refund` | A | C | D | C | D |
-| `receipts.view` | A | A | A | A | D |
-| `receipts.void` | A | C | D | C | D |
-| `expenses.view` | A | A | C | A | D |
-| `expenses.create` | A | A | C | A | D |
-| `expenses.update` | A | A | C | A | D |
-| `expenses.submit` | A | A | C | A | D |
-| `expenses.approve` | A | A | D | D | D |
-| `expenses.void` | A | C | D | C | D |
-| `cashbook.view` | A | A | C | A | D |
-| `cashbook.open` | A | C | C | A | D |
-| `cashbook.reconcile` | A | C | C | A | D |
-| `cashbook.adjust` | A | C | D | C | D |
-| `pt.assignments.view` | A | A | C | D | C |
-| `pt.assignments.manage` | A | A | D | D | C |
-| `pt.sales.view` | A | A | C | A | C |
-| `pt.sales.create` | A | A | C | A | C |
-| `pt.sales.update` | A | A | C | A | C |
-| `pt.sales.submit` | A | A | C | A | C |
-| `pt.sales.approve` | A | A | D | D | D |
-| `pt.sales.void` | A | C | D | C | D |
-| `pt.commissions.view` | A | A | D | A | C |
-| `pt.commissions.pay` | A | C | D | A | D |
-| `salaries.view` | A | A | C | A | D |
-| `salaries.create` | A | A | C | A | D |
-| `salaries.update` | A | A | C | A | D |
-| `salaries.submit` | A | A | C | A | D |
-| `salaries.approve` | A | A | D | D | D |
-| `salaries.void` | A | C | D | C | D |
-| `reports.view` | A | A | C | C | C |
-| `reports.financial` | A | C | D | A | D |
-| `reports.export` | A | C | D | C | D |
-| `staff.view` | A | A | D | D | D |
-| `staff.manage` | A | C | D | D | D |
-| `roles.view` | A | A | D | C | D |
-| `roles.manage` | A | C | D | D | D |
-| `settings.view` | A | A | D | C | D |
-| `settings.manage` | A | D | D | D | D |
-| `files.view` | A | A | C | C | C |
-| `files.upload` | A | A | A | A | C |
-| `files.delete` | A | C | D | D | D |
-| `audit.view` | A | C | D | C | D |
-| `notifications.view` | A | A | A | A | A |
-| `notifications.manage` | A | C | D | D | D |
+| Stable permission code     | OWNER | MANAGER | RECEPTIONIST | ACCOUNTANT | TRAINER |
+| -------------------------- | ----: | ------: | -----------: | ---------: | ------: |
+| `gym.view`                 |     A |       A |            A |          C |       C |
+| `gym.update`               |     A |       C |            D |          D |       D |
+| `members.view`             |     A |       A |            A |          C |       C |
+| `members.create`           |     A |       A |            A |          D |       D |
+| `members.update`           |     A |       A |            A |          D |       C |
+| `members.archive`          |     A |       C |            D |          D |       D |
+| `memberships.view`         |     A |       A |            A |          A |       C |
+| `memberships.create`       |     A |       A |            A |          D |       D |
+| `memberships.update`       |     A |       A |            A |          D |       D |
+| `memberships.cancel`       |     A |       C |            C |          D |       D |
+| `checkins.view`            |     A |       A |            A |          D |       C |
+| `checkins.create`          |     A |       A |            A |          D |       C |
+| `checkins.update`          |     A |       C |            C |          D |       D |
+| `checkins.challenge.issue` |     A |       A |            C |          D |       C |
+| `payments.view`            |     A |       A |            A |          A |       D |
+| `payments.create`          |     A |       A |            A |          A |       D |
+| `payments.update`          |     A |       A |            A |          A |       D |
+| `payments.submit`          |     A |       A |            A |          A |       D |
+| `payments.approve`         |     A |       A |            D |          D |       D |
+| `payments.void`            |     A |       C |            D |          C |       D |
+| `payments.refund`          |     A |       C |            D |          C |       D |
+| `receipts.view`            |     A |       A |            A |          A |       D |
+| `receipts.void`            |     A |       C |            D |          C |       D |
+| `expenses.view`            |     A |       A |            C |          A |       D |
+| `expenses.create`          |     A |       A |            C |          A |       D |
+| `expenses.update`          |     A |       A |            C |          A |       D |
+| `expenses.submit`          |     A |       A |            C |          A |       D |
+| `expenses.approve`         |     A |       A |            D |          D |       D |
+| `expenses.void`            |     A |       C |            D |          C |       D |
+| `cashbook.view`            |     A |       A |            C |          A |       D |
+| `cashbook.open`            |     A |       C |            C |          A |       D |
+| `cashbook.reconcile`       |     A |       C |            C |          A |       D |
+| `cashbook.adjust`          |     A |       C |            D |          C |       D |
+| `inventory.view`           |     A |       A |            A |          A |       D |
+| `inventory.manage`         |     A |       A |            C |          D |       D |
+| `inventory.adjust`         |     A |       C |            D |          C |       D |
+| `retail.view`              |     A |       A |            A |          A |       D |
+| `retail.create`            |     A |       A |            A |          A |       D |
+| `retail.update`            |     A |       A |            A |          A |       D |
+| `retail.submit`            |     A |       A |            A |          A |       D |
+| `retail.approve`           |     A |       A |            D |          D |       D |
+| `retail.void`              |     A |       C |            D |          C |       D |
+| `pt.assignments.view`      |     A |       A |            C |          D |       C |
+| `pt.assignments.manage`    |     A |       A |            D |          D |       C |
+| `pt.schedule.view`         |     A |       A |            A |          C |       C |
+| `pt.schedule.manage`       |     A |       A |            C |          D |       C |
+| `pt.sessions.adjust`       |     A |       C |            D |          D |       D |
+| `pt.sales.view`            |     A |       A |            C |          A |       C |
+| `pt.sales.create`          |     A |       A |            C |          A |       C |
+| `pt.sales.update`          |     A |       A |            C |          A |       C |
+| `pt.sales.submit`          |     A |       A |            C |          A |       C |
+| `pt.sales.approve`         |     A |       A |            D |          D |       D |
+| `pt.sales.void`            |     A |       C |            D |          C |       D |
+| `pt.commissions.view`      |     A |       A |            D |          A |       C |
+| `pt.commissions.pay`       |     A |       C |            D |          A |       D |
+| `classes.view`             |     A |       A |            A |          C |       C |
+| `classes.manage`           |     A |       A |            C |          D |       C |
+| `classes.book`             |     A |       A |            A |          D |       C |
+| `classes.attendance`       |     A |       A |            C |          D |       C |
+| `salaries.view`            |     A |       A |            C |          A |       D |
+| `salaries.create`          |     A |       A |            C |          A |       D |
+| `salaries.update`          |     A |       A |            C |          A |       D |
+| `salaries.submit`          |     A |       A |            C |          A |       D |
+| `salaries.approve`         |     A |       A |            D |          D |       D |
+| `salaries.void`            |     A |       C |            D |          C |       D |
+| `reports.view`             |     A |       A |            C |          C |       C |
+| `reports.financial`        |     A |       C |            D |          A |       D |
+| `reports.export`           |     A |       C |            D |          C |       D |
+| `staff.view`               |     A |       A |            D |          D |       D |
+| `staff.manage`             |     A |       C |            D |          D |       D |
+| `roles.view`               |     A |       A |            D |          C |       D |
+| `roles.manage`             |     A |       C |            D |          D |       D |
+| `settings.view`            |     A |       A |            D |          C |       D |
+| `settings.manage`          |     A |       D |            D |          D |       D |
+| `files.view`               |     A |       A |            C |          C |       C |
+| `files.upload`             |     A |       A |            A |          A |       C |
+| `files.delete`             |     A |       C |            D |          D |       D |
+| `audit.view`               |     A |       C |            D |          C |       D |
+| `notifications.view`       |     A |       A |            A |          A |       A |
+| `notifications.manage`     |     A |       C |            D |          D |       D |
+| `announcements.view`       |     A |       A |            A |          A |       A |
+| `announcements.manage`     |     A |       A |            D |          D |       D |
 
-High-risk conditional actions require the relevant permission plus valid record state, a reason, idempotency protection where applicable, and an audit event. Payment, expense, PT-sale, and salary approval is mandatory for every record before posting. The approver must be a different active Manager or Owner gym membership from both creator and submitter; permissions cannot authorize self-approval. A permission never overrides immutable posted records, tenant scope, object scope, or database constraints.
+High-risk conditional actions require the relevant permission plus valid record state, a reason, idempotency protection where applicable, and an audit event. Payment, expense, retail-sale, PT-sale, and salary approval is mandatory for every record before posting. The approver must be a different active Manager or Owner gym membership from both creator and submitter; permissions cannot authorize self-approval. A permission never overrides immutable posted records, stock/session capacity, tenant scope, object scope, or database constraints.
 
 Role-specific conditional defaults are:
 
-- MANAGER owns the standard approval queue for submitted payments, expenses, PT sales, and salary periods. Approval is allowed only for records the manager did not create or submit, after revalidation of amounts, evidence, source state, and any cash session. Other conditional financial, cancellation, correction, archive, export, deletion, staff, audit, and commission actions remain limited to OWNER-enabled thresholds. Staff management is limited to non-OWNER accounts and roles within the manager's authority.
+- MANAGER owns the standard approval queue for submitted payments, expenses, retail sales, PT sales, and salary periods. Approval is allowed only for records the manager did not create or submit, after revalidation of amounts, stock, evidence, source state, and any cash session. Other conditional financial, cancellation, correction, archive, export, deletion, staff, audit, and commission actions remain limited to OWNER-enabled thresholds. Staff management is limited to non-OWNER accounts and roles within the manager's authority.
 - RECEPTIONIST may create, edit, and submit front-desk payment, expense, PT-sale, and salary drafts but cannot approve or post them. Reception's `cashbook.view`, `cashbook.open`, and `cashbook.reconcile` defaults are conditional: a Reception membership may view, operate, reconcile, and close only a same-gym session whose `opened_by_membership_id` equals that current `GymMembership`. Another Reception membership's session and every cross-gym session are denied. Ordinary operation means selecting that open session during draft preparation and allowing a later authorized posting service to append its automatic movement; it never permits a manual adjustment, approval, or posting. `cashbook.adjust` remains denied. Conditional expense and salary reads are limited to the receptionist's own drafts/submissions and minimum staff identity fields; posted salary totals, other staff payroll history, and protected category internals are hidden. PT views/sales are limited to the member transaction being served; operational reports exclude financial measures; file downloads require access to the related member or transaction.
 - ACCOUNTANT conditional member access exposes only identity and contact fields needed for a financial workflow. The accountant may prepare and submit finance records but cannot approve them under the protected template; cash adjustments and corrections follow separation-of-duties rules. Operational reports, settings, files, and audit events are limited to finance-relevant scope.
 - TRAINER conditional permissions are governed by the assignment and own-commission restrictions below. Trainer operational reports aggregate only records the trainer is authorized to see.
 
-The four `*.approve` permissions for payments, expenses, PT sales, and salaries are hard-reserved to the protected MANAGER and OWNER roles in Phase 0. They are not in the delegable set and cannot be added to ACCOUNTANT, RECEPTIONIST, TRAINER, or a custom role.
+The five `*.approve` permissions for payments, expenses, retail sales, PT sales, and salaries are hard-reserved to the protected MANAGER and OWNER roles in Phase 0. They are not in the delegable set and cannot be added to ACCOUNTANT, RECEPTIONIST, TRAINER, or a custom role.
 
 ### Delegation and custom roles
 
@@ -310,7 +340,9 @@ Authorization state is authoritative in PostgreSQL. Tokens carry an `authz_versi
 - Cache only data required for the current screen.
 - Do not persist sensitive reports or tokens in browser storage.
 - Navigation hiding mirrors permissions for usability only.
-- QR codes contain short-lived opaque or signed references, not member personal data.
+- QR codes contain short-lived opaque or signed references, not member personal data, permanent gym credentials, or authoritative admission decisions.
+- Unattended check-in requires an authenticated same-gym member-self or authorized trainer principal plus an active onsite challenge. A static reusable poster QR is prohibited.
+- Challenge verification and consumption are atomic with eligibility and duplicate-window checks. Expired, replayed, cross-gym, principal-substituted, and oversized/malformed scans fail without creating attendance.
 
 ## 9. File security
 
@@ -344,8 +376,10 @@ An object key containing a gym prefix is organization, not authorization.
 - Raw card data and CVV are never stored.
 - Payment provider callbacks require signature verification, timestamp tolerance, event deduplication, and idempotent processing.
 - Reconciliation, refunds, voids, and manual cash adjustments require elevated capabilities and audit.
-- Payments, expenses, PT sales, and salary periods create no receipt, settlement, commission, expense, or cash effect until a different authorized Manager or Owner approves them. Approval is the immutable posting boundary; rejected submissions retain audit evidence and no economic side effects.
+- Payments, expenses, retail sales, PT sales, and salary periods create no stock, receipt, settlement, commission, expense, or cash effect until a different authorized Manager or Owner approves them. Approval is the immutable posting boundary; rejected submissions retain audit evidence and no economic side effects.
 - Database constraints assert valid ranges and tenant-consistent relationships.
+- Retail clients cannot submit quantity on hand, unit-cost snapshots, cost of goods sold, gross profit, or dashboard totals. Approved sale posting locks stock, snapshots authoritative cost, prevents negative inventory, and creates stock/finance effects in one idempotent transaction.
+- PT/class remaining sessions come from an append-only ledger. Booking and attendance lock capacity and balance state so one session cannot be consumed twice; corrections append reversals rather than rewriting history.
 
 ## 11. Audit and privacy
 
@@ -364,6 +398,8 @@ Audit storage is append-only to the application. Critical events are exported to
 Privacy requirements include purpose limitation, retention schedules, controlled exports, deletion/anonymization workflows, and backup expiry. Applicable jurisdiction and retention periods must be confirmed before production.
 
 Membership-expiry email is sent only to the member's current normalized email when the gym setting is enabled. The scheduler and sender re-check tenant, membership eligibility, warning date, and the current address; they do not trust an address copied into a queued payload. A missing or removed address is a normal skip/cancellation and never falls back to phone or another member's contact details. Templates expose only the member display name, plan display name, expiry date, and necessary gym contact/display fields. Deterministic database deduplication, bounded retries, redacted provider errors, and audited configuration changes prevent duplicate delivery and accidental personal-data leakage.
+
+Push reminders and event/promotion announcements require member consent and a current same-gym device binding. Publishing resolves a fixed allowlisted audience into explicit tenant-scoped recipients; request bodies cannot supply foreign recipient IDs. Push tokens are encrypted or stored as provider-safe references, never logged, and become ineligible after logout, consent withdrawal, member/gym suspension, or device revocation. Announcement content is size/type constrained and active media passes normal file security.
 
 ## 12. Infrastructure and secrets
 
@@ -434,6 +470,10 @@ For every tenant resource and HTTP action:
 - Manager approval fails for a record created or submitted by that same manager membership, including concurrent role or actor changes.
 - Trainer sees only assigned members, assignment-related files, and the trainer's own private commission.
 - Member self endpoints require both the authenticated gym and authenticated member; changing either path/body identifier fails.
+- Member/trainer QR scan tests cover expired/replayed challenges, static-token rejection, Gym A challenge with Gym B principal, principal substitution, concurrent scans, duplicate windows, and no PII or permanent secret in the QR payload.
+- PT/class tests cover cross-gym trainer/member/package/occurrence IDs, schedule overlap, capacity races, duplicate attendance, no-show policy, session-ledger correction, and concurrent last-session consumption.
+- Inventory tests cover cross-gym product/category/sale IDs, client-forged price/cost/profit/stock fields, concurrent last-item sales, negative stock, duplicate posting, return/void reversal, and dashboard reconciliation.
+- Notification tests cover cross-gym announcement audiences, revoked or reassigned devices, consent withdrawal, duplicate provider delivery, unsafe content/media, and recipient-count non-disclosure.
 - Custom role create, update, replacement, and assignment cannot grant permissions absent from the caller or outside the delegable set.
 - MANAGER cannot modify protected templates, OWNER accounts, OWNER-reserved controls, or construct an equivalent custom role.
 - Multiple Owners can authenticate independently within the same gym; duplicate invitation/link attempts are idempotent, and no ordinary staff or role mutation can create an Owner.
@@ -502,4 +542,4 @@ Before production:
 14. replay and concurrency tests pass for finance approval, payments, receipts, expenses, salaries, cashbook, refunds, voids, PT sales/commissions, and provider callbacks;
 15. firewall, SSH, private Docker networks, container limits, disk/log rotation, external uptime, backup freshness, and offsite-restore controls pass the single-VPS production checklist.
 
-The browser boundary is accepted in [ADR 0002](./adr/0002-nextjs-bff-browser-authentication.md), and Reception cash-session object authority is accepted in [ADR 0003](./adr/0003-reception-cash-session-authority.md). Provider and broader MFA policy remains a nonblocking Phase 1B decision; jurisdiction is required before production; device design remains Phase 3; and Expo versus bare React Native remains Phase 7.
+The single-VPS production topology that sections 12 and 15 harden — including its accepted single point of failure and its mandatory encrypted offsite backup and restore-drill controls — is accepted in [ADR 0001](./adr/0001-single-vps-production-topology.md). The browser boundary is accepted in [ADR 0002](./adr/0002-nextjs-bff-browser-authentication.md), and Reception cash-session object authority is accepted in [ADR 0003](./adr/0003-reception-cash-session-authority.md). Provider and broader MFA policy remains a nonblocking Phase 1B decision; jurisdiction is required before production; device design remains Phase 3; and Expo versus bare React Native remains Phase 7.

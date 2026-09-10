@@ -1,5 +1,7 @@
 # Phase 0 REST API Contract
 
+> Part of the Phase 0 contract set indexed in [`README.md`](./README.md). Related: [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`DATABASE.md`](./DATABASE.md), [`SECURITY.md`](./SECURITY.md), [`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md), [`DEVELOPMENT_PLAN.md`](./DEVELOPMENT_PLAN.md), [`HOW_IT_WORKS.md`](./HOW_IT_WORKS.md).
+
 This document is the authoritative public HTTP contract for the planned API. Phase 0 is documentation only: no endpoint or feature described here is implemented by this contract. Later implementation, OpenAPI schemas, serializers, generated client types, and contract tests must conform to it.
 
 Phase 1A delivers foundation contracts only. Members, check-in, finance, PT, reports, and mobile endpoints remain unimplemented until their later annotated phases.
@@ -74,20 +76,20 @@ Internal exceptions and database details are never returned.
 
 ## 3. HTTP behavior
 
-| Status | Meaning |
-|---|---|
-| `200` | Successful read or command |
-| `201` | Resource created |
-| `204` | Successful command with no body |
-| `400` | Malformed request/query |
-| `401` | Missing, invalid, or expired authentication |
-| `403` | Authenticated but capability denied |
-| `404` | Resource absent or inaccessible in active gym |
-| `409` | State, uniqueness, or idempotency conflict |
-| `412` | Optimistic concurrency failure |
-| `422` | Semantically invalid input |
-| `429` | Rate limit exceeded |
-| `5xx` | Server failure with safe message and request ID |
+| Status | Meaning                                         |
+| ------ | ----------------------------------------------- |
+| `200`  | Successful read or command                      |
+| `201`  | Resource created                                |
+| `204`  | Successful command with no body                 |
+| `400`  | Malformed request/query                         |
+| `401`  | Missing, invalid, or expired authentication     |
+| `403`  | Authenticated but capability denied             |
+| `404`  | Resource absent or inaccessible in active gym   |
+| `409`  | State, uniqueness, or idempotency conflict      |
+| `412`  | Optimistic concurrency failure                  |
+| `422`  | Semantically invalid input                      |
+| `429`  | Rate limit exceeded                             |
+| `5xx`  | Server failure with safe message and request ID |
 
 Validation codes are stable, for example `INVALID_DATE_RANGE`, `MEMBERSHIP_EXPIRED`, `CASH_DIFFERENCE_REASON_REQUIRED`, `APPROVAL_REQUIRED`, `INVALID_APPROVAL_STATE`, `SELF_APPROVAL_FORBIDDEN`, `PROTECTED_EXPENSE_CATEGORY`, and `CROSS_TENANT_REFERENCE`.
 
@@ -152,6 +154,9 @@ Staff authentication field contracts:
 - `POST /auth/logout/` request: current refresh credential/session; response `204`. `logout-all` revokes all of the user's refresh sessions and increments/revokes authorization state as required.
 - `GET /auth/me/` response: `user` (`id`, `email`, `first_name`, `last_name`), selected `gym` display fields, selected `gym_membership` (`id`, `status`, `is_owner`, `roles`), effective permission codes, effective feature codes/limits, and `authz_version`; all are read-only.
 - `GET /auth/gyms/` returns only active memberships belonging to the authenticated user.
+- `POST /auth/password/forgot/` request: `email` only. The response is a constant `200` envelope that never reveals whether an account exists, whether the address is verified, or when a previous request was made. Any reset token is high-entropy, single-use, hash-only at rest, short-lived, and delivered out of band; it is never returned in the response body.
+- `POST /auth/password/reset/` request: `reset_token`, `password`, and `password_confirmation`. The command verifies token hash, user binding, expiry, and unconsumed state under lock, enforces password policy, consumes the token, revokes every existing `RefreshSession` for that user, and increments authorization state. Response is `204`; it issues no access or refresh credential, so the user must log in again through the normal selection path.
+- `POST /auth/mfa/challenge/` request: the pending login correlation reference plus optional `device_name`. It re-sends or re-issues an MFA challenge for a password-verified login attempt only, is throttled per account and source, and never confirms account existence, enrollment state, or the challenge destination. It returns no MFA secret, ticket, access JWT, or refresh credential, and it creates no gym authority or tenant context.
 - Trusted BFF-to-Django `POST /auth/select-gym/` request during login: `gym_membership_id` plus plaintext `gym_selection_ticket`; neither field selects authority by itself. Django atomically locks the hashed ticket record, verifies its user binding, exact 5-minute expiry, unconsumed/unrevoked state, bounded attempts, and that the chosen currently active membership is in the immutable authoritative bootstrap list, then consumes it and returns newly scoped access/refresh credentials and selected context.
 - Browser-to-BFF select request: `gym_membership_id` only. Browser JavaScript cannot supply or read the ticket; the BFF reads it from the protected cookie, forwards it to Django, strips credentials from the response, stores normal auth cookies only on success, and clears the ticket cookie on success or terminal failure. Expiry, replay, user mismatch, substituted membership, exhausted attempts, or revoked/consumed state never issues credentials. A failed terminal state revokes the ticket.
 
@@ -215,7 +220,9 @@ Member validation therefore runs the full sequence explicitly: parse canonical J
 
 All routes require platform permissions and produce audit events.
 
-Canonical requirements are: dashboard `platform.dashboard.view`; gym list/detail `platform.gyms.view`; gym update `platform.gyms.update`; activate `platform.gyms.activate`; suspend `platform.gyms.suspend`; initial or additional owner creation through the protected owner workflow `platform.owners.create`; subscription reads/updates `platform.subscriptions.manage`; and platform audit reads `platform.audit.view`.
+Canonical requirements are: dashboard `platform.dashboard.view`; gym list/detail `platform.gyms.view`; gym provisioning `platform.gyms.create`; gym update `platform.gyms.update`; activate `platform.gyms.activate`; suspend `platform.gyms.suspend`; initial or additional owner creation through the protected owner workflow `platform.owners.create`; subscription reads/updates `platform.subscriptions.manage`; and platform audit reads `platform.audit.view`.
+
+`platform.settings.manage` is in the approved permission catalog but has no route in this Phase 0 contract. Platform-wide configuration routes must be specified and approved before Phase 1B implementation; until then no endpoint may claim that permission, and it must never be accepted as a substitute for a tenant `settings.manage` check.
 
 ```text
 GET  /api/v1/admin/dashboard/
@@ -262,7 +269,7 @@ PATCH /api/v1/settings/
 
 Gym profile read/update requires `gym.view`/`gym.update`; settings read/update requires `settings.view`/`settings.manage`.
 
-`PATCH /settings/` accepts only typed operational settings: `week_starts_on`, `allow_manual_member_numbers`, `member_number_prefix`, `receipt_number_prefix`, `check_in_duplicate_window_seconds`, `membership_expiry_warning_days`, `membership_expiry_email_enabled`, and `require_separate_finance_approval`. The approval flag is read/write only for OWNER policy administration and defaults to `true`; Phase 0 requires every Payment, Expense, PT Sale, and Salary record to be approved by a different authorized Manager or Owner and does not permit disabling this control through the API. The response returns those fields plus read-only `gym_id`, actors, and timestamps from the tenant-owned one-to-one `GymSettings` record. Gym identity, address, timezone, currency, lifecycle, and subscription remain fields of `/gym/`, not `/settings/`. Arbitrary client-defined keys and unbounded JSON settings are rejected.
+`PATCH /settings/` accepts only typed operational settings: `week_starts_on`, `allow_manual_member_numbers`, `member_number_prefix`, `receipt_number_prefix`, `check_in_duplicate_window_seconds`, `check_in_challenge_ttl_seconds`, `check_in_challenge_max_uses`, `membership_expiry_warning_days`, `membership_expiry_email_enabled`, `membership_expiry_push_enabled`, `class_cancellation_cutoff_minutes`, `class_no_show_consumes_session`, and `require_separate_finance_approval`. The approval flag is read/write only for OWNER policy administration and defaults to `true`; Phase 0 requires every Payment, Expense, Retail Sale, PT Sale, and Salary record to be approved by a different authorized Manager or Owner and does not permit disabling this control through the API. The response returns those fields plus read-only `gym_id`, actors, and timestamps from the tenant-owned one-to-one `GymSettings` record. Gym identity, address, timezone, currency, lifecycle, and subscription remain fields of `/gym/`, not `/settings/`. Arbitrary client-defined keys and unbounded JSON settings are rejected.
 
 ### Dashboard — Phase 6
 
@@ -279,40 +286,69 @@ The response has stable `operational` and `financial` blocks. Users lacking `rep
 
 ```json
 {
-  "range": {"date_from": "2026-08-01", "date_to": "2026-08-31"},
+  "range": { "date_from": "2026-08-01", "date_to": "2026-08-31" },
   "operational": {
     "active_members": 128,
     "new_members": 14,
     "expired_memberships": 9,
     "check_ins": 642,
+    "unique_attendees": 311,
+    "currently_checked_in": 23,
+    "expiring_within_3_days": 4,
+    "expiring_within_7_days": 11,
+    "expiring_within_30_days": 29,
     "pending_approvals": 6
   },
   "financial": {
-    "total_revenue": "850000.00",
-    "membership_revenue": "600000.00",
+    "total_revenue": "900000.00",
+    "new_member_revenue": "250000.00",
+    "renewal_revenue": "350000.00",
     "pt_revenue": "200000.00",
-    "other_revenue": "50000.00",
+    "class_revenue": "50000.00",
+    "product_revenue": "40000.00",
+    "other_revenue": "10000.00",
+    "pending_payment_member_count": 7,
+    "pending_payment_amount": "90000.00",
+    "revenue_sources_ranked": [
+      { "source": "RENEWAL", "amount": "350000.00" },
+      { "source": "NEW_MEMBER", "amount": "250000.00" },
+      { "source": "PT", "amount": "200000.00" },
+      { "source": "CLASS", "amount": "50000.00" },
+      { "source": "PRODUCT", "amount": "40000.00" },
+      { "source": "OTHER", "amount": "10000.00" }
+    ],
+    "top_product_items": [
+      {
+        "product_id": "uuid",
+        "name": "Protein drink",
+        "quantity_sold": "15.00",
+        "revenue": "30000.00",
+        "gross_profit": "10500.00"
+      }
+    ],
     "total_expenses": "310000.00",
     "expenses_by_category": [
-      {"system_key": "RENT", "amount": "30000.00"},
-      {"system_key": "UTILITIES", "amount": "15000.00"},
-      {"system_key": "INTERNET", "amount": "5000.00"},
-      {"system_key": "STAFF_SALARY", "amount": "160000.00"},
-      {"system_key": "PT_COMMISSION", "amount": "80000.00"},
-      {"system_key": "CLEANING_SUPPLIES", "amount": "5000.00"},
-      {"system_key": "MAINTENANCE", "amount": "5000.00"},
-      {"system_key": "MARKETING", "amount": "5000.00"},
-      {"system_key": "WATER_DRINKS", "amount": "3000.00"},
-      {"system_key": "OTHER", "amount": "2000.00"}
+      { "system_key": "RENT", "amount": "30000.00" },
+      { "system_key": "UTILITIES", "amount": "15000.00" },
+      { "system_key": "INTERNET", "amount": "5000.00" },
+      { "system_key": "STAFF_SALARY", "amount": "160000.00" },
+      { "system_key": "PT_COMMISSION", "amount": "80000.00" },
+      { "system_key": "CLEANING_SUPPLIES", "amount": "5000.00" },
+      { "system_key": "MAINTENANCE", "amount": "5000.00" },
+      { "system_key": "MARKETING", "amount": "5000.00" },
+      { "system_key": "WATER_DRINKS", "amount": "3000.00" },
+      { "system_key": "OTHER", "amount": "2000.00" }
     ],
     "staff_salary_expense": "160000.00",
     "pt_commission_expense": "80000.00",
-    "net_profit": "540000.00"
+    "net_profit": "590000.00"
   }
 }
 ```
 
-All financial values use posted, non-void source records for the selected gym and business-date range. `total_revenue` is posted charges minus posted refunds/reversals; its membership, PT, and other components are mutually exclusive and reconcile to the total. `total_expenses` is posted expenses net of linked reversals and includes salary and PT commission payouts. `expenses_by_category` always returns all ten protected `system_key` values in canonical display order, using `"0.00"` for a category with no activity. `net_profit = total_revenue - total_expenses`. `active_members` is the end-of-range count with an eligible active membership; `new_members` uses `Member.join_date`; `expired_memberships` counts memberships whose expiry occurs in range; `check_ins` counts gym-local check-ins in range; and `pending_approvals` counts Payment, Expense, PT Sale, and SalaryPeriod records awaiting approval. Draft and rejected records never affect revenue, expenses, or profit. This is the tenant dashboard's owner-focused financial view; any delegated Manager or Accountant access still requires the documented report permissions.
+All financial values use posted, non-void source records for the selected gym and business-date range. `total_revenue` is posted charges minus posted refunds/reversals; its new-member, renewal, PT, class, product, and other components are mutually exclusive and reconcile to the total. `revenue_sources_ranked` is sorted by that net posted revenue, not by profit. Product ranking separately exposes quantity, revenue, and server-calculated gross profit from immutable sale-line cost snapshots. `total_expenses` is posted expenses net of linked reversals and includes salary and PT commission payouts. `expenses_by_category` always returns all ten protected `system_key` values in canonical display order, using `"0.00"` for a category with no activity. `net_profit = total_revenue - total_expenses`.
+
+`pending_payment_member_count` and `pending_payment_amount` cover expired membership/PT/class obligations with an authoritative `UNPAID` or `PARTIAL` balance; they are distinct from `pending_approvals`, which counts submitted Payment, Expense, PT Sale, Retail Sale, and SalaryPeriod records awaiting approval. `active_members` is the end-of-range count with an eligible active membership; `new_members` uses `Member.join_date`; `expired_memberships` counts memberships whose expiry occurs in range. `check_ins` is the number of same-gym check-in events, `unique_attendees` is the distinct member count, and `currently_checked_in` counts open check-ins with no checkout. Expiry buckets use the gym-local date. Draft and rejected records never affect revenue, expenses, stock sold, cost, or profit. This is the tenant dashboard's owner-focused financial view; any delegated Manager or Accountant access still requires the documented report permissions.
 
 ### Staff, roles, and permissions — Phase 1B
 
@@ -370,6 +406,8 @@ GET  /api/v1/members/{id}/check-ins/
 
 Filters include allowlisted `status`, `search`, `joined_from`, `joined_to`, and `is_pt_client=true|false`. The API assigns member ownership from request context. `member_id` is unique only within the active gym.
 
+Member list, detail, summary, and history reads require `members.view`; create requires `members.create`; update requires `members.update`; archive requires `members.archive`. The nested `payments/` and `check-ins/` histories additionally require `payments.view` and `checkins.view` respectively.
+
 Member create request fields: optional client-visible `member_number` only if policy allows manual numbering, `first_name`, `last_name`, optional `phone`, `email`, `gender`, `date_of_birth`, structured address, `join_date`, emergency contact fields, `notes`, and tenant-scoped `profile_photo_asset_id`. Read-only/rejected: `id`, `gym_id`, normalized fields, `linked_user_id`, `is_pt_client`, `status`, `archived_at`, actors, and timestamps. Response uses an explicit member serializer and includes those read-only server fields. `is_pt_client` is server-derived from a same-gym trainer assignment with `status = ACTIVE` whose effective date range contains the gym-local as-of date; it is returned by list/detail/summary and cannot be set directly. The service requires `members.create`, any required member-management feature, same-gym clean file asset, date validity, and per-gym uniqueness.
 
 ### Membership plans and memberships — Phase 2
@@ -393,6 +431,8 @@ GET  /api/v1/memberships/expiry/?bucket=within_7_days
 
 The create request supplies member, plan, start date, and discount—not expiry or trusted totals. The backend calculates expiry and final amount and returns them. Membership-plan reads use `memberships.view`; plan creation uses `memberships.create`; plan update and archive use `memberships.update`.
 
+Membership list, detail, and the expiry-bucket route require `memberships.view`; create requires `memberships.create`; update, suspend, and resume require `memberships.update`; cancel requires `memberships.cancel`.
+
 Membership create request fields: `member_id`, `plan_id`, `start_date`, optional `discount_amount`, and optional non-financial note. Read-only/rejected: `gym_id`, plan snapshots, `expiry_date`, `list_price`, `final_amount`, `currency`, `payment_status`, lifecycle `status`, cancellation data, and actors. Response explicitly returns IDs, immutable plan/duration snapshots, start/expiry dates, list/discount/final totals, currency, payment/lifecycle statuses, creator, and timestamps. The service requires `memberships.create`, membership feature entitlement, active same-gym member/plan, discount authority, calendar-aware expiry calculation in gym timezone, exact decimal totals, and no overlapping pending/active membership.
 
 Expiry buckets are `expired`, `today`, `within_3_days`, `within_7_days`, and `within_30_days`.
@@ -406,11 +446,17 @@ GET  /api/v1/check-ins/
 POST /api/v1/check-ins/
 GET  /api/v1/check-ins/{id}/
 POST /api/v1/check-ins/{id}/check-out/
+POST /api/v1/check-in-challenges/
+POST /api/v1/check-ins/scan/
 ```
 
 Manual check-in is implemented first. `method` remains extensible. The exact integration credential/device model is deferred to the Phase 3 approved integration design; any future integration credential or device is gym-owned and RLS-protected and uses a dedicated ingestion contract rather than staff tokens.
 
 Manual check-in request fields: `member_id`, optional `occurred_at` only for callers with `checkins.update`, and optional note. `method` is fixed server-side to `MANUAL`. Read-only/rejected: `gym_id`, selected `membership_id`, `check_in_at` when not explicitly backdated, `check_out_at`, method override, recorder/actors, device/source metadata, eligibility result, and status. Response returns the check-in plus an explicit eligibility snapshot. Requires `checkins.create`, check-in entitlement, active same-gym member, an eligible active membership selected by the service, bounded backdating, and duplicate-window validation under lock. Check-out/correction requires `checkins.update`; cross-tenant member/membership identifiers return `404`.
+
+Check-in list and detail require `checkins.view`.
+
+`POST /check-in-challenges/` requires `checkins.challenge.issue` and creates a short-lived onsite challenge for an authorized same-gym display device or staff actor; the plaintext challenge is returned once for QR rendering and only its hash/state is stored. `POST /check-ins/scan/` requires no staff permission because it is authorized by the scanning principal itself: an authenticated member-self mobile session, or a trainer session holding `checkins.create` within its assignment scope. It does not accept a caller-selected member or gym. The server atomically validates challenge gym, expiry, state/use bound, principal scope, membership eligibility, and duplicate window before creating a `QR` check-in. Expired, replayed, photographed-old, cross-gym, or principal-substituted challenges fail safely.
 
 ### Payments, sales, and receipts — Phase 4
 
@@ -435,15 +481,45 @@ GET  /api/v1/receipts/{id}/download/
 
 Payment creation returns a `DRAFT`; it creates no receipt, cash movement, or membership settlement. The creator submits the draft and a different authorized Manager or Owner approves it. Approval is the posting boundary and atomically returns the immutable posted payment, generated receipt, source settlement update, and cash transaction where applicable. Clients cannot submit a receipt number. Submit, approve, reject, cancel, void, and refund commands require an `Idempotency-Key` header.
 
-Payment create/update fields while `DRAFT`: `member_id`, exactly one supported source reference such as optional `membership_id` or `pt_sale_id`, `purpose`, `description`, positive decimal-string `amount`, `currency`, `method`, `business_date`, optional `received_at`, and optional `reference_number`. Read-only/rejected: `gym_id`, `entry_type`, `status`, submission/approval/posting/actor fields, settlement totals, original/reversal IDs, cash transaction ID, receipt ID/number/snapshots, and all timestamps not explicitly accepted. A successful `201` returns the editable draft. Submit has no writable business fields and freezes the draft. Approve accepts optional `cash_session_id` when the payment method is cash; reject requires `rejection_reason`; cancel requires `reason` and is valid only from `DRAFT`. Approval revalidates all source, amount, currency, and cash-session state before posting.
+Payment create/update fields while `DRAFT`: optional same-gym `member_id`, exactly one supported source reference such as `membership_id`, `member_service_package_id`, `pt_sale_id`, or `retail_sale_id`, `purpose` (`MEMBERSHIP`, `PT`, `CLASS`, `PRODUCT`, `OTHER`), `description`, positive decimal-string `amount`, `currency`, `method`, `business_date`, optional `received_at`, and optional `reference_number`. Member is required for member-owned sources and optional for walk-in retail. Read-only/rejected: `gym_id`, `entry_type`, `status`, submission/approval/posting/actor fields, settlement totals, original/reversal IDs, cash transaction ID, receipt ID/number/snapshots, and all timestamps not explicitly accepted. A successful `201` returns the editable draft. Submit has no writable business fields and freezes the draft. Approve accepts optional `cash_session_id` when the payment method is cash; reject requires `rejection_reason`; cancel requires `reason` and is valid only from `DRAFT`. Approval revalidates all source, amount, currency, and cash-session state before posting.
 
 Void request fields: required `reason`, optional `business_date`, and optional `cash_session_id`. Refund request fields: positive decimal-string `amount`, `reason`, `method`, `business_date`, optional `reference_number`, and optional cash session. Original payment amount/status, refundable balance, entry type, reversal/refund IDs, receipt number, actors, and derived settlement state are read-only. Both responses include original and corrective payment entries, receipt documents, cash effects, and updated refundable/settlement totals.
 
-Payment create/update/submit/approve/void/refund require `payments.create`/`payments.update`/`payments.submit`/`payments.approve`/`payments.void`/`payments.refund` respectively; reject requires `payments.approve` and cancel requires `payments.update`. Every action additionally requires finance entitlement, same-gym source/member/session, exact currency/scale, valid source and cash-session state, and `Idempotency-Key` on commands. Approval or rejection requires an actor different from the creator and submitter; RECEPTIONIST never receives `payments.approve`. Posted facts are never edited. Refunds lock the original and cannot exceed authoritative refundable balance.
+Payment list and detail require `payments.view`. Payment create/update/submit/approve/void/refund require `payments.create`/`payments.update`/`payments.submit`/`payments.approve`/`payments.void`/`payments.refund` respectively; reject requires `payments.approve` and cancel requires `payments.update`. Every action additionally requires finance entitlement, same-gym source/member/session, exact currency/scale, valid source and cash-session state, and `Idempotency-Key` on commands. Approval or rejection requires an actor different from the creator and submitter; RECEPTIONIST never receives `payments.approve`. Posted facts are never edited. Refunds lock the original and cannot exceed authoritative refundable balance.
 
-`GET /sales/daily/?date=` requires `reports.financial` and returns posted, non-void payments for one gym-local business date grouped by purpose and method, with membership/PT/other revenue, refunds/reversals, and net total. Pending, rejected, cancelled, and draft records are excluded. Before Phase 5, PT totals are `"0.00"`; after Phase 5 they use the same posted PT payments as dashboard/report selectors.
+`GET /sales/daily/?date=` requires `reports.financial` and returns posted, non-void payments for one gym-local business date grouped by purpose and method, with new-member/renewal/PT/class/product/other revenue, refunds/reversals, and net total. Product output also reconciles sold quantity, cost of goods sold, and gross profit from posted retail sale lines. Pending, rejected, cancelled, and draft records are excluded. Before Phase 5, PT/class totals are `"0.00"`; after Phase 5 they use the same posted service-package/PT payments as dashboard/report selectors.
 
 Receipt list/detail/download requires `receipts.view`. `POST /receipts/{id}/void/` requires `receipts.void`, a reason, same-gym issued receipt, finance entitlement, and `Idempotency-Key`; it never relies on `payments.void`.
+
+### Product inventory and retail sales — Phase 4
+
+```text
+GET  /api/v1/product-categories/
+POST /api/v1/product-categories/
+GET  /api/v1/products/
+POST /api/v1/products/
+GET  /api/v1/products/{id}/
+PATCH /api/v1/products/{id}/
+GET  /api/v1/products/low-stock/
+GET  /api/v1/stock-movements/
+POST /api/v1/stock-movements/adjust/
+
+GET  /api/v1/retail-sales/
+POST /api/v1/retail-sales/
+GET  /api/v1/retail-sales/{id}/
+PATCH /api/v1/retail-sales/{id}/
+POST /api/v1/retail-sales/{id}/submit/
+POST /api/v1/retail-sales/{id}/approve/
+POST /api/v1/retail-sales/{id}/reject/
+POST /api/v1/retail-sales/{id}/cancel/
+POST /api/v1/retail-sales/{id}/void/
+```
+
+Products, categories, stock, sales, and every line are selected only from the active gym. Product create/update accepts gym-local SKU/barcode, name, category, unit, sale price, default/current unit cost, low-stock threshold, and active state; `gym_id`, quantity on hand, sold quantity, revenue, cost of goods sold, and profit are read-only. Manual stock adjustment accepts product, signed quantity, movement reason, business date, and required explanation; it requires `inventory.adjust`, idempotency, and audit.
+
+Product-category, product, low-stock, and stock-movement reads require `inventory.view`; category and product create/update require `inventory.manage`. Retail-sale list and detail require `retail.view`; draft create requires `retail.create`; draft update requires `retail.update`; submit requires `retail.submit`; approve requires `retail.approve`; reject requires `retail.approve` and cancel requires `retail.update`; void requires `retail.void`. Every retail and stock command additionally requires inventory/retail feature entitlement, same-gym product/member/session references, exact decimal and currency checks, valid state, and `Idempotency-Key`. Approval or rejection requires an actor different from the creator and submitter; RECEPTIONIST never receives `retail.approve`.
+
+A retail-sale draft accepts an optional same-gym member, business date, payment method/reference, and one or more unique product lines with positive quantity and allowed discount. The server resolves current prices/costs and returns calculated totals. Submission freezes input. Approval by a different Manager/Owner locks products in deterministic order, revalidates available stock and price/cost policy, posts immutable sale-line snapshots, deducts stock, and creates Payment/Receipt/Cash effects atomically. Returns and voids create linked reversing records. Negative stock, cross-gym products, client totals/cost/profit, duplicate posting, and self-approval are rejected.
 
 ### Expenses — Phase 4
 
@@ -464,6 +540,8 @@ POST /api/v1/expenses/{id}/void/
 ```
 
 Only drafts are editable. A receipt uses the file upload flow and a tenant-scoped file asset ID. Reception may create and submit drafts but cannot approve them.
+
+Expense-category and expense list/detail reads require `expenses.view`. Protected `system_key` categories can never be created, renamed, or deleted through these routes. The stable permission code governing custom expense-category create/update is not yet assigned in the Phase 0 catalog; it is an open decision that must be resolved before Phase 4 implementation, and until then no route may fall back to a broader finance permission.
 
 Expense draft create/update fields: `category_id`, `business_date`, `description`, positive decimal-string `amount`, `currency`, `payment_method`, optional `receipt_file_asset_id`, and optional policy note. Read-only/rejected: `gym_id`, `status`, posting/void/cancel/reversal fields, actors, cash effects, and calculated totals. Only `DRAFT` is mutable.
 
@@ -529,9 +607,35 @@ POST /api/v1/pt-sales/{id}/void/
 GET  /api/v1/pt-commissions/
 GET  /api/v1/pt-commissions/{id}/
 POST /api/v1/pt-commissions/{id}/record-payment/
+
+GET  /api/v1/service-packages/
+POST /api/v1/service-packages/
+GET  /api/v1/member-service-packages/
+GET  /api/v1/member-service-packages/{id}/ledger/
+
+GET  /api/v1/class-types/
+POST /api/v1/class-types/
+GET  /api/v1/class-schedules/
+POST /api/v1/class-schedules/
+GET  /api/v1/class-occurrences/
+GET  /api/v1/class-bookings/
+POST /api/v1/class-bookings/
+POST /api/v1/class-bookings/{id}/attend/
+POST /api/v1/class-bookings/{id}/cancel/
+
+GET  /api/v1/pt-bookings/
+POST /api/v1/pt-bookings/
+POST /api/v1/pt-bookings/{id}/attend/
+POST /api/v1/pt-bookings/{id}/cancel/
 ```
 
 Commission values are calculated from the trainer percentage snapshot. A trainer's queryset is additionally scoped to their own assignments and commission data.
+
+PT/class packages expose granted, consumed, and remaining sessions calculated from the append-only session ledger. Clients cannot set remaining sessions. Class scheduling validates trainer, location, capacity, recurrence, and time conflicts. Booking requires a same-gym active member and eligible package with remaining sessions; attendance or a policy-applicable no-show atomically appends one idempotent consumption entry. Cancellation/correction follows gym policy and uses reversal entries rather than editing consumed history. Concurrent booking cannot exceed class capacity, double-book a trainer/member/location, or consume one remaining session twice.
+
+Service-package, member-service-package, ledger, PT-schedule, and PT-booking reads require `pt.schedule.view`; service-package definition and PT-booking create/cancel require `pt.schedule.manage`. Authorized session-ledger corrections require `pt.sessions.adjust`; no other route may append a correcting ledger entry.
+
+Class-type, schedule, occurrence, and booking reads require `classes.view`; class-type and schedule create/update require `classes.manage`; booking create requires `classes.book`; attendance and no-show marking require `classes.attendance`; booking cancellation requires `classes.book` for the booking's own member scope and `classes.manage` otherwise.
 
 Trainer and assignment list/detail routes require `pt.assignments.view`. Trainer assignment create/end/cancel requires `pt.assignments.manage`, PT entitlement, same-gym active trainer/member, valid dates, and no overlapping assignment. Create fields are `trainer_staff_profile_id`, `member_id`, `effective_from`, optional `effective_until`, and optional `reason`; end/cancel fields are `effective_until` where applicable and required `reason`. Read-only/rejected fields are `gym_id`, status, ended timestamp, actors, and assignment-derived member/trainer details.
 
@@ -584,9 +688,15 @@ Complete request fields: `sha256` and `byte_size` confirmation plus any provider
 GET  /api/v1/audit-logs/
 GET  /api/v1/notifications/
 POST /api/v1/notifications/{id}/read/
+GET  /api/v1/announcements/
+POST /api/v1/announcements/
+GET  /api/v1/announcements/{id}/
+PATCH /api/v1/announcements/{id}/
+POST /api/v1/announcements/{id}/publish/
+POST /api/v1/announcements/{id}/cancel/
 ```
 
-Audit reads require `audit.view`. Notification list/read requires `notifications.view`; future notification configuration or lifecycle commands require `notifications.manage`. Audit records have no update/delete endpoint.
+Audit reads require `audit.view`. Notification list/read requires `notifications.view`; delivery configuration or lifecycle commands require `notifications.manage`. Announcement reads require `announcements.view`; create/update/publish/cancel requires `announcements.manage`. Announcement input accepts an allowlisted type, title/body, optional schedule/media, and a fixed tenant-scoped audience selector; recipient IDs, delivery counts, status, publisher, and provider fields are server-owned. Audit records have no update/delete endpoint.
 
 ## 7. Member mobile API — Phase 7
 
@@ -602,14 +712,22 @@ GET  /api/v1/member/dashboard/
 GET  /api/v1/member/membership/
 GET  /api/v1/member/payments/
 GET  /api/v1/member/check-ins/
-GET  /api/v1/member/qr-token/
+GET  /api/v1/member/service-packages/
+GET  /api/v1/member/schedule/
+POST /api/v1/member/class-bookings/
+POST /api/v1/member/check-ins/scan/
 GET  /api/v1/member/notifications/
 POST /api/v1/member/notifications/{id}/read/
+POST /api/v1/member/devices/
+PATCH /api/v1/member/devices/{id}/
+DELETE /api/v1/member/devices/{id}/
 ```
 
-The QR endpoint returns a short-lived signed or opaque token. It does not encode personal information or authoritative permissions.
+The mobile scan endpoint accepts a short-lived onsite gym challenge and derives member and gym exclusively from the authenticated member session. It does not encode or accept personal information or authoritative permissions. Authorized trainer mobile check-in uses the staff/trainer principal contract and cannot impersonate an arbitrary member.
 
 Member auth request/response fields mirror the staff rotation contract but use member-specific serializers, audience, token types, sessions, and rate limits. Every response resource is selected from token `gym_id` plus token `member_id`; endpoints do not accept another member selector. Profile update accepts only the allowlisted self-service contact/profile fields and never `gym_id`, `member_id`, `linked_user_id`, status, membership/payment totals, or actors.
+
+Member package and schedule responses include PT/class package expiry, granted/used/remaining sessions, trainer/class display details, and gym-local booking times. Announcement notifications contain only published same-gym event/promotion content. Device registration and push-consent management are authenticated member-self operations; notification delivery never accepts a caller-selected recipient or gym.
 
 ## 8. Pagination, filtering, and concurrency
 
@@ -671,11 +789,11 @@ The implementation baseline for Phase 1A is pinned to Python 3.14.7, Django 5.2.
 - **Phase 1A — foundation:** envelopes, errors, request IDs, cursor pagination, staff JWT/refresh/session contracts, the 5-minute single-use multi-gym login-selection bridge, selected tenant context, strict serializers, permission/entitlement framework, and tenant-isolation behavior.
 - **Phase 1B — Super Admin, gym, staff, roles, settings:** platform administration, transactional gym/owner provisioning, staff invitation/acceptance, role and permission management, membership-role assignment, gym profile/settings, audit reads, and foundational files.
 - **Phase 2 — membership:** members, membership plans, memberships, expiry, derived PT-client badge/filter, member summaries/history, and membership-owned files.
-- **Phase 3 — check-in:** manual check-in/check-out and eligibility/duplicate rules.
-- **Phase 4 — finance:** payment and expense draft/manager-approval workflows, receipts, void/refund, salary periods/lines, cash sessions/transactions/reconciliation, and signed financial evidence files.
-- **Phase 5 — PT:** trainer reads, trainer assignment writes/lifecycle, PT sale draft/manager approval, commission accruals, and commission payments.
-- **Phase 6 — reporting:** explicit owner dashboard metrics, daily/monthly/cash-book/profit-loss reports, and bounded exports.
-- **Phase 7 — mobile:** member authentication, strict tenant+self API, QR token, member notifications, and mobile file/profile boundaries.
+- **Phase 3 — check-in:** manual check-in/check-out, eligibility/duplicate rules, rotating onsite gym challenges, and authenticated unattended mobile scanning.
+- **Phase 4 — finance and inventory:** payment, expense, and retail-sale draft/manager-approval workflows; products and append-only stock movements; receipts, void/refund/returns, salary periods/lines, cash sessions/transactions/reconciliation, and signed financial evidence files.
+- **Phase 5 — PT and classes:** trainer reads, assignments, service packages and remaining-session ledger, trainer/class schedules and bookings, attendance/no-show/correction, PT sale approval, commission accruals, and commission payments.
+- **Phase 6 — reporting:** explicit owner attendance/expiry/pending-payment/ranked-revenue/product metrics, daily/monthly/cash-book/profit-loss/inventory/class/PT reports, and bounded exports.
+- **Phase 7 — mobile:** member authentication, strict tenant+self API, onsite QR scanner, PT/class schedule and remaining sessions, expiry reminders, event/promotion announcements, push notifications, and mobile file/profile boundaries.
 - **Phase 8 — hardening and deployment:** compatibility/schema gates, attack and isolation tests, rate/load limits, observability, key rotation, file security, deployment checks, and production operational controls. Phase 8 adds no undocumented business API.
 
 A delivery annotation never means implementation exists. Each phase remains unimplemented until its approved development work, migrations, tests, security review, and schema publication are complete.

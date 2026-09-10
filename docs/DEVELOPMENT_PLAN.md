@@ -1,5 +1,7 @@
 # Development Plan
 
+> Part of the Phase 0 contract set indexed in [`README.md`](./README.md).
+
 ## 1. Authority and delivery policy
 
 This is the authoritative implementation roadmap. It must remain consistent with the complete Phase 0 document set:
@@ -241,19 +243,19 @@ The seven documents together with accepted ADRs must define and cross-reference 
 ### Dependencies
 
 - Phase 2 exit criteria.
-- Approved eligibility, duplicate window, backdating/correction, checkout, device identity, and QR lifetime policies.
+- Approved eligibility, duplicate window, backdating/correction, checkout, onsite display/device identity, rotating challenge lifetime/use bounds, and attended/unattended QR policies.
 
 ### Scope
 
 - Implement `CheckIn`, manual check-in/check-out, eligibility snapshots, duplicate handling, corrections, search/history, and front-desk web flow.
-- Implement short-lived opaque/signed QR token validation without personal data in the payload.
+- Implement both front-desk QR and unattended mobile scan: an authenticated same-gym member or authorized trainer scans a short-lived rotating onsite gym challenge, and the server validates principal scope, challenge gym/expiry/replay, eligibility, and duplicate rules atomically without personal data or permanent secrets in the payload.
 - Define scoped device/service credential and ingestion interfaces for NFC and biometric devices.
 - Store only check-in evidence and bounded source metadata. Do not store biometric templates, raw biometric captures, or vendor secrets.
 - Vendor-specific NFC/biometric integration is optional behind the approved abstraction and cannot weaken manual/QR controls.
 
 ### Migrations and data
 
-- Add `CheckIn`, device metadata/credential records only if approved, idempotency indexes, same-gym composite FKs, tenant-leading indexes, and forced RLS.
+- Add `CheckIn`, `CheckInChallenge`, approved display-device metadata/credential records, challenge hashes/state/use bounds, idempotency indexes, same-gym composite FKs, tenant-leading indexes, and forced RLS.
 - Device enrollment/import requires tenant ownership, key rotation, revocation, and audit records.
 
 ### Required tests
@@ -262,7 +264,7 @@ The seven documents together with accepted ADRs must define and cross-reference 
 - Permission: create/view/correct/backdate/checkout actions, trainer object scope where enabled, and device credential scope.
 - Financial: check-in never mutates payment state or accepts financial totals; eligibility uses authoritative membership state.
 - Concurrency: simultaneous check-ins, repeated QR/NFC/device events, idempotency, duplicate-window locking, and checkout races create one valid result.
-- Security/device: expired/replayed/modified QR, no PII payload, revoked device, malformed/oversized metadata, biometric-data rejection, rate limits, and audit.
+- Security/device: expired/replayed/modified/photographed-old or cross-gym QR challenge, static-token rejection, principal substitution, concurrent scans, no PII/permanent-secret payload, revoked display device, malformed/oversized metadata, biometric-data rejection, rate limits, and audit.
 
 ### Checks
 
@@ -274,7 +276,7 @@ The seven documents together with accepted ADRs must define and cross-reference 
 - NFC/biometric vendors can integrate only through the approved abstraction with no biometric template stored.
 - Peak baseline, concurrency, permission, tenant/RLS, and security checks pass.
 
-## 6. Phase 4 — Core finance, approvals, salaries, receipts, expenses, and cash
+## 6. Phase 4 — Core finance, inventory, retail sales, approvals, salaries, receipts, expenses, and cash
 
 ### Dependencies
 
@@ -283,8 +285,9 @@ The seven documents together with accepted ADRs must define and cross-reference 
 
 ### Scope
 
-- Implement `Payment`, `Receipt`, `ExpenseCategory`, `Expense`, `SalaryPeriod`, `StaffSalaryLine`, `CashSession`, `CashTransaction`, `TenantSequence`, and finance `IdempotencyRecord` workflows.
+- Implement `Payment`, `Receipt`, `ExpenseCategory`, `Expense`, `SalaryPeriod`, `StaffSalaryLine`, `ProductCategory`, `Product`, `StockMovement`, `RetailSale`, `RetailSaleLine`, `CashSession`, `CashTransaction`, `TenantSequence`, and finance `IdempotencyRecord` workflows.
 - Deliver membership/other non-PT payment and expense `DRAFT → PENDING_APPROVAL → POSTED/REJECTED` workflows, daily sales, atomic receipt allocation/rendering, void/refund/reversal, private expense evidence, salary periods with manually entered per-period lines, cash open/manual adjustment/automatic movement/reconciliation/close, and finance web flows.
+- Deliver per-gym product catalog, SKU/barcode, purchase/opening/adjustment/return stock movements, low-stock view, multi-line retail sale, immutable unit-price/unit-cost snapshots, item quantity/revenue/gross-profit selectors, and retail web flows. Retail approval atomically posts payment/receipt/cash and stock deduction; concurrent sales cannot make stock negative.
 - Reception and authorized finance staff may create/edit/submit Payment, Expense, and Salary drafts. Every record requires approval by a different Manager or Owner before posting; approval atomically creates all receipt, settlement, protected salary-expense, and cash effects. Rejection creates none of those effects. Reception may view/open/operate/reconcile/close only the same-gym CashSession whose `opened_by_membership_id` equals the current Reception `GymMembership`; it cannot manually adjust, approve, or post.
 - Posted records are immutable; corrections are linked records with actor, reason, and time.
 - Every financial command uses exact `Decimal`, authoritative server calculations, one transaction, permissions, same-gym validation, idempotency, locks, audit, and cash/receipt side effects.
@@ -292,16 +295,16 @@ The seven documents together with accepted ADRs must define and cross-reference 
 
 ### Migrations and data
 
-- Add all listed models, approval actor/state constraints, append-only/immutability enforcement, sequence allocator, exact checks, same-gym composite FKs, tenant-leading indexes, forced RLS, and restricted runtime grants.
+- Add all listed models, approval actor/state constraints, append-only/immutability enforcement, sequence allocator, product/stock/sale-line cost snapshots, exact revenue/cost/gross-profit checks, same-gym composite FKs, tenant-leading indexes, forced RLS, and restricted runtime grants.
 - Seed the canonical protected expense categories and tenant sequences idempotently for existing gyms. Salary posting may use only `STAFF_SALARY`; commission payout may use only `PT_COMMISSION`.
 - Financial imports/backfills require reconciliation totals, immutable source references, dry run, rollback, and finance approval.
 
 ### Required tests
 
-- Tenant/RLS: two-gym matrix for all finance resources, relationships, files, lists, totals, exports, and custom actions; runtime cannot bypass RLS.
+- Tenant/RLS: two-gym matrix for all finance, product, stock, and retail-sale resources, relationships, files, lists, totals, exports, and custom actions; runtime cannot bypass RLS.
 - Permission: create/update/submit/view/approve/void/refund/reconcile/adjust separation; Reception's own-opened cash session allows view/operation/reconcile/close while another Reception session and every cross-gym session are denied; Reception cannot adjust, approve, or post; creator/submitter cannot self-approve; high-risk reasons, Super Admin denial, restricted salary visibility, and mass-assignment rejection.
-- Financial: exact decimal/rounding/currency; immutable posts; valid approval/rejection/void/refund/reversal links; rejected submissions have no economic effects; salary expense linkage; refundable limits; receipt snapshots; cash in/out; expected/actual/difference formulas calculated by the server under lock; immutable closed sessions; audit completeness.
-- Concurrency: duplicate idempotency keys, simultaneous submit/approve/reject, payment/refund/void/expense/salary approval, atomic receipt sequences, one open cash session, transaction-versus-close races, reconciliation races, deadlock retry bounds, rollback with no partial side effects.
+- Financial: exact decimal/rounding/currency; immutable posts; valid approval/rejection/void/refund/reversal links; rejected submissions have no economic or stock effects; salary expense linkage; refundable limits; receipt snapshots; cash in/out; retail line revenue/cost/gross-profit snapshots; stock movement reconciliation; expected/actual/difference formulas calculated by the server under lock; immutable closed sessions; audit completeness.
+- Concurrency: duplicate idempotency keys, simultaneous submit/approve/reject, payment/refund/void/expense/salary/retail approval, concurrent last-item sale and stock adjustment, deterministic product locking, atomic receipt sequences, one open cash session, transaction-versus-close races, reconciliation races, deadlock retry bounds, rollback with no partial side effects.
 - Files/UI: private receipt evidence, safe generated receipts, timezone business-day boundaries, accessibility, and end-to-end payment-to-reconciliation workflows.
 
 ### Checks
@@ -310,38 +313,40 @@ The seven documents together with accepted ADRs must define and cross-reference 
 
 ### Exit criteria
 
-- Core non-PT finance and salaries reconcile exactly from posted, non-void source records through receipts, expenses, and cash.
+- Core non-PT finance, salaries, and retail inventory reconcile exactly from posted, non-void source records through sale lines, stock movements, receipts, expenses, and cash.
 - No financial record can post without approval by a different Manager or Owner.
 - Retry, race, rollback, refund, void, and close paths preserve one valid immutable history.
 - No PT model, endpoint, calculation, or UI is represented as Phase 4 scope.
 - All checks pass and finance/security evidence is approved.
 
-## 7. Phase 5 — Personal training
+## 7. Phase 5 — Personal training, classes, schedules, and remaining sessions
 
 ### Dependencies
 
 - Phase 4 exit criteria.
-- Approved trainer eligibility/object scope, assignment overlap, PT sale/payment approval, commission snapshot/accrual/payout/reversal, and separation-of-duties policies.
+- Approved trainer eligibility/object scope, assignment overlap, PT/class package validity and session-consumption rules, booking/cancellation/no-show/capacity policy, schedule timezone/recurrence rules, PT sale/payment approval, commission snapshot/accrual/payout/reversal, and separation-of-duties policies.
 
 ### Scope
 
 - Implement `TrainerAssignment`, trainer views, assignment lifecycle, and assigned-member restrictions.
+- Implement `ServicePackage`, `MemberServicePackage`, append-only `ServiceSessionLedger`, `PTBooking`, `ClassType`, `ClassSchedule`, `ClassOccurrence`, and `ClassBooking`; expose gym-local trainer/class calendars and authoritative granted/used/remaining session counts.
+- Enforce trainer/member/location conflict prevention, class capacity, eligible package/balance checks, attendance/no-show consumption, cancellation policy, and reversal-based corrections under concurrency.
 - Implement PT-sale draft/submission with approval by a different Manager or Owner and optional atomic payment/receipt/cash effects through Phase 4 services.
 - Implement `PTCommission` accrual, exact trainer/gym split, partial/full payout, linked expense/cash effects, outstanding balance, reversal, and trainer-own views.
 - Deliver staff and trainer web workflows; do not duplicate finance posting logic.
 
 ### Migrations and data
 
-- Add assignment, PT sale, and commission models with snapshots, exclusions, exact checks, same-gym composite FKs, tenant-leading indexes, forced RLS, immutable states, and restricted grants.
+- Add assignment, service-package/balance-ledger, PT/class scheduling/booking, PT sale, and commission models with snapshots, capacity/balance constraints, exclusions, exact checks, same-gym composite FKs, tenant-leading indexes, forced RLS, immutable states, and restricted grants.
 - Existing trainer data migration requires explicit staff-profile mapping and reconciliation of all opening commission balances.
 
 ### Required tests
 
-- Tenant/RLS: assignments, sales, payments, receipts, commissions, expenses, and trainer views cannot cross gyms.
+- Tenant/RLS: assignments, packages, session ledgers, PT/class schedules/bookings, sales, payments, receipts, commissions, expenses, and trainer views cannot cross gyms.
 - Permission/object scope: trainer sees only assigned members and own commissions; payout is denied; Reception can submit but cannot approve; creator/submitter cannot self-approve; assignment/sale/pay permissions and protected financial actions follow the matrix.
 - Financial: exact percentage snapshot, `ROUND_HALF_UP`, gym share, paid/outstanding totals, atomic linked payment/receipt/expense/cash records, and valid reversal ordering.
-- Concurrency: overlapping assignments, duplicate PT submit/approve/reject, one commission per approved sale, concurrent partial payouts, payout-versus-void, idempotent retries, and rollback without partial finance.
-- UI/API: assignment date boundaries, trainer dashboard privacy, safe errors, accessibility, and end-to-end PT sale-to-payout reconciliation.
+- Concurrency: overlapping assignments/bookings, class capacity races, concurrent last-session consumption, duplicate attendance/no-show/correction, duplicate PT submit/approve/reject, one commission per approved sale, concurrent partial payouts, payout-versus-void, idempotent retries, and rollback without partial finance.
+- UI/API: assignment/package date boundaries, trainer and member gym-local calendars, remaining-session accuracy, class capacity, trainer dashboard privacy, safe errors, accessibility, and end-to-end PT/class booking plus PT sale-to-payout reconciliation.
 
 ### Checks
 
@@ -362,8 +367,8 @@ The seven documents together with accepted ADRs must define and cross-reference 
 
 ### Scope
 
-- Implement gym operational, owner financial, and trainer-scoped dashboards. The owner contract includes active/new/expired members, check-ins, pending approvals, membership/PT/other/total revenue, expenses by protected category, staff salary expense, PT commission expense, total expenses, and net profit.
-- Implement daily, monthly, cash-book, profit/loss, membership/expiry, check-in, and PT reports from authoritative records.
+- Implement gym operational, owner financial, inventory, and trainer-scoped dashboards. The owner contract includes active/new/expired and 3/7/30-day expiring members; total and unique check-ins; currently checked-in members; overdue unpaid/partial member count and amount; pending approvals; ranked new-member/renewal/PT/class/product/other posted net revenue; top product items by quantity/revenue/gross profit; expenses by protected category; staff salary and PT commission expense; total expenses; and net profit.
+- Implement daily, monthly, cash-book, profit/loss, membership/expiry, check-in/current-occupancy, PT/class schedule/session, and product/stock/sales/gross-profit reports from authoritative records.
 - Use bounded filters, stable pagination, server-calculated totals, explicit timezone/currency, and tenant-leading selectors.
 - Keep exports synchronous and bounded initially. Background exports, Redis, Celery, caches, aggregates, replicas, or warehouses require measured evidence and approval.
 
@@ -376,7 +381,7 @@ The seven documents together with accepted ADRs must define and cross-reference 
 
 - Tenant/RLS: all counts, sums, joins, annotations, filters, empty/adversarial ranges, dashboard cards, and exports exclude other gyms.
 - Permission/object scope: operational versus financial reports, receptionist denial, owner/accountant rules, trainer-assigned-only aggregates, and export permissions.
-- Financial: posted/void/refund/reversal policy and all dashboard/report formulas reconcile exactly to Phase 4/5 source records; drafts, pending submissions, and rejections affect only `pending_approvals`, never revenue, expense, or profit.
+- Financial: posted/void/refund/reversal policy and all dashboard/report formulas reconcile exactly to Phase 4/5 source records; revenue ranking is explicitly distinct from product gross-profit ranking; drafts, pending submissions, and rejections affect only `pending_approvals`, never revenue, stock sold, expense, or profit.
 - Concurrency: reports remain transactionally coherent during posting/refund/close/payout; duplicate export requests and cache/aggregate refresh, if approved, are safe.
 - Performance/UI: timezone boundaries, bounded ranges, realistic volumes, query plans, N+1 limits, accessibility, loading/error states, and downloadable output safety.
 
@@ -401,21 +406,21 @@ The seven documents together with accepted ADRs must define and cross-reference 
 ### Scope
 
 - Create the separate TypeScript React Native application and environment/build documentation.
-- Implement member-specific login/refresh/logout, secure credential storage, profile, member dashboard, current membership/days remaining, payment/check-in histories, short-lived QR display, notifications/read state, and safe offline/loading/error behavior.
+- Implement member-specific login/refresh/logout, secure credential storage, profile, member dashboard, current membership/days remaining, payment/check-in histories, PT/class calendar and remaining sessions, onsite QR scanning for unattended check-in, event/promotion announcements, membership-expiry push reminders, notification consent/read state, and safe offline/loading/error behavior.
 - Every member API enforces both tenant and immutable member-self scope; staff roles are never inherited.
 - Device biometric unlock may protect local credentials through platform APIs, but the application does not collect or store biometric templates.
 
 ### Migrations and data
 
-- Add only approved member-auth/session, notification, device-registration, or push-token records, each with ownership, retention, revocation, RLS, and privacy controls.
+- Add only approved member-auth/session, `Announcement`, notification, device-registration, or push-token records, each with ownership, audience/consent, retention, revocation, RLS, and privacy controls.
 - No local mobile database becomes a system of record; migrations clear or transform cached sensitive data safely.
 
 ### Required tests
 
-- Tenant/RLS/self: changing gym/member/path/body IDs cannot expose another member; lists, files, QR, and notifications remain self-scoped.
+- Tenant/RLS/self: changing gym/member/path/body IDs cannot expose another member; lists, files, schedule/packages, QR challenges, announcements, and notifications remain gym-and-self scoped.
 - Permission/auth: member token audience/type, refresh/revocation, suspended member/gym, staff-token rejection, and profile field allowlists.
 - Financial: payment history and totals are read-only and match authoritative server records; no client-side recalculation is trusted.
-- Concurrency: refresh races, repeated notification reads, QR rotation/replay, multi-device logout/revocation, and cache invalidation.
+- Concurrency: refresh races, repeated notification reads/delivery, QR challenge rotation/replay/parallel scan, multi-device logout/revocation, announcement publication deduplication, and cache invalidation.
 - Mobile: Keychain/Keystore storage, logout cleanup, no sensitive logs/screenshots where controlled, offline/error/loading states, accessibility, supported devices, deep-link safety, and Android/iOS builds.
 
 ### Checks
@@ -536,12 +541,12 @@ This is a planning budget, not a vendor quote. Actual prices vary by provider, r
 
 ### Approved monthly target
 
-| Cost area | Planning range | Included assumption |
-|---|---:|---|
-| Production VPS | About $50 | 4–8 vCPU, 8–16 GiB RAM, 80–160 GiB NVMe, Linux, Docker Compose |
-| Encrypted offsite backup/object storage | About $10 | PostgreSQL base/logical backup, WAL archive, MinIO object copy, bounded retention |
-| Edge, domain, monitoring, and email allowance | About $20 | Cloudflare free baseline, domain allocation, external uptime/alerting, limited transactional email |
-| **Estimated monthly production cost** | **About $80** | One production VPS; no high availability or permanent hosted staging |
+| Cost area                                     | Planning range | Included assumption                                                                                |
+| --------------------------------------------- | -------------: | -------------------------------------------------------------------------------------------------- |
+| Production VPS                                |      About $50 | 4–8 vCPU, 8–16 GiB RAM, 80–160 GiB NVMe, Linux, Docker Compose                                     |
+| Encrypted offsite backup/object storage       |      About $10 | PostgreSQL base/logical backup, WAL archive, MinIO object copy, bounded retention                  |
+| Edge, domain, monitoring, and email allowance |      About $20 | Cloudflare free baseline, domain allocation, external uptime/alerting, limited transactional email |
+| **Estimated monthly production cost**         |  **About $80** | One production VPS; no high availability or permanent hosted staging                               |
 
 The target initially supports a small rollout, planned around up to 10 gyms, approximately 1,000 monthly active users, bounded file retention, and up to roughly one million API requests per month. These are planning limits, not guarantees; production load tests and monitoring determine the actual safe capacity.
 
@@ -572,13 +577,15 @@ Track each decision with owner, due phase, options, security/data/migration/cost
 3. **Resolved for Phase 0:** Next.js is the browser BFF under [ADR 0002](./adr/0002-nextjs-bff-browser-authentication.md); Django remains authoritative and browser JavaScript never receives JWT/refresh values or the 5-minute single-use multi-gym selection ticket. The ticket grants no authority before atomic membership selection.
 4. **Deferred, nonblocking until Phase 1B:** Email/invitation/recovery/file-scan/notification provider selection and the broader provider policy.
 5. **Deferred, nonblocking until Phase 1B:** MFA provider and rollout policy beyond the already documented protected-role requirements.
-6. Local-development and single-VPS production runtime/migration/reporting database role strategy; any future managed database requires a new approved architecture decision.
-7. **Resolved for Phase 0:** Every Payment, Expense, PT Sale, and Salary record uses mandatory `DRAFT → PENDING_APPROVAL → POSTED/REJECTED`; a different MANAGER or OWNER approves and approval is the posting boundary. Approval permissions are hard-reserved to those protected roles. Threshold-based auto-posting and self-approval are not allowed. Future policy changes require an approved migration and security review.
+6. **Deferred, nonblocking until Phase 1A:** Local-development and single-VPS production runtime/migration/reporting database role strategy; any future managed database requires a new approved architecture decision.
+7. **Resolved for Phase 0:** Every Payment, Expense, Retail Sale, PT Sale, and Salary record uses mandatory `DRAFT → PENDING_APPROVAL → POSTED/REJECTED`; a different MANAGER or OWNER approves and approval is the posting boundary. Approval permissions are hard-reserved to those protected roles. Threshold-based auto-posting and self-approval are not allowed. Future policy changes require an approved migration and security review.
 8. **Deferred but blocking before production:** Jurisdiction, tax/receipt behavior, privacy, retention, RPO/RTO approval evidence, and data residency.
 9. **Deferred, nonblocking until Phase 7:** Expo versus bare React Native.
 10. **Resolved baseline:** Cloudflare edge plus single-VPS Docker Compose production topology with Caddy, PostgreSQL forced RLS, private MinIO, GHCR deployment, encrypted offsite backup, and bounded observability. Provider/region and final sizing remain Phase 8 evidence.
 11. **Resolved baseline:** estimated production infrastructure cost is **about $80/month** with the documented single-point-of-failure trade-off and mandatory restore controls. A managed database or high-availability topology requires a new approved budget.
 12. **Resolved for Phase 0:** Under [ADR 0003](./adr/0003-reception-cash-session-authority.md), Reception has conditional `cashbook.view/open/reconcile` only for a session opened by the current Reception `GymMembership`; `cashbook.adjust` and all finance approval/posting remain denied.
 13. **Deferred, nonblocking until Phase 3:** Exact integration credential/device model and vendor policy.
+14. **Deferred but blocking before Phase 1B:** The HTTP routes governed by `platform.settings.manage`. The permission is in the approved catalog and the `SECURITY.md` platform matrix, but `API.md` defines no platform-configuration endpoint. Either specify the routes or retire the code before Phase 1B implementation; no endpoint may claim the permission meanwhile.
+15. **Deferred but blocking before Phase 4:** The stable permission code governing custom `ExpenseCategory` create/update. The protected `system_key` catalog is fixed and immutable, but tenant-defined category mutation currently maps to no code in the catalog. It must not fall back to a broader finance permission.
 
 A blocker remains a blocker until explicitly resolved. Major architecture changes and progression to every next phase require approval.

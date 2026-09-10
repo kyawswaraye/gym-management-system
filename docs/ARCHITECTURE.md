@@ -1,13 +1,15 @@
 # System Architecture
 
+> Part of the Phase 0 contract set indexed in [`README.md`](./README.md). Related: [`DATABASE.md`](./DATABASE.md), [`API.md`](./API.md), [`SECURITY.md`](./SECURITY.md), [`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md), [`DEVELOPMENT_PLAN.md`](./DEVELOPMENT_PLAN.md), [`HOW_IT_WORKS.md`](./HOW_IT_WORKS.md).
+
 ## 1. Purpose and scope
 
 This document defines the Phase 0 target architecture for a multi-tenant gym management SaaS. Phase 0 produces design documentation only; it does not implement application features, infrastructure, migrations, or policies.
 
-The system has three clients:
+The system has three deployable applications — one authoritative server and two clients:
 
-- A Next.js 16.3.3 web application using the App Router, TypeScript 7.0.2, Tailwind CSS, and React Server Components (RSC) for platform and gym staff.
-- A Django REST Framework (DRF) API under `/api/v1` containing all authorization and business rules.
+- A Django REST Framework (DRF) API under `/api/v1` containing all authorization and business rules. This is the server, not a client.
+- A Next.js 16.3.3 web application using the App Router, TypeScript 7.0.2, Tailwind CSS, and React Server Components (RSC) for platform and gym staff. It is also the browser backend-for-frontend (BFF).
 - A separate React Native member application using the same versioned API.
 
 The primary design goal is fail-closed tenant isolation. UI filtering is never a security control.
@@ -82,11 +84,11 @@ Next.js is the browser backend-for-frontend (BFF) for authentication cookies and
 - Access tokens are short-lived; refresh credentials use Keychain/Keystore-backed storage.
 - API, authentication, feature, navigation, and UI layers are separated.
 - Offline caching is limited to non-sensitive display data with explicit invalidation.
-- QR payloads use opaque, rotatable identifiers rather than member details.
+- QR payloads use opaque, short-lived, rotatable identifiers rather than member or gym secrets. The mobile client supports both staff-scanned member QR and authenticated member/trainer scanning of an onsite rotating gym check-in challenge.
 
 ## 5. Multi-tenant architecture
 
-The platform uses one PostgreSQL database and shared tables. `Gym` is the tenant root. Every tenant-owned table has `gym_id UUID NOT NULL`, including members, plans, memberships, check-ins, payments, expenses, salary periods/lines, commissions, cash records, receipts, files, notifications, staff assignments, and tenant audit events.
+The platform uses one PostgreSQL database and shared tables. `Gym` is the tenant root. Every tenant-owned table has `gym_id UUID NOT NULL`, including members, plans, memberships, check-ins, onsite QR challenges, payments, expenses, salary periods/lines, trainers, PT/class schedules and session balances, products, stock movements, retail sales, commissions, cash records, receipts, announcements, device registrations, files, notifications, staff assignments, and tenant audit events.
 
 Tenant context is established as follows:
 
@@ -141,7 +143,7 @@ The shared PostgreSQL schema separates platform-global data from tenant-owned da
 
 - **Platform-global:** `User`, authentication credentials, pre-session `GymSelectionTicket` records, refresh-session/token-family records, platform roles, platform audit events, system permission definitions, deployment metadata, and other records whose meaning is independent of a gym. These records do not acquire a nullable `gym_id` merely for convenience.
 - **Tenant root:** `Gym` identifies a tenant. Its lifecycle is managed through a tightly controlled platform path.
-- **Tenant-owned:** `GymMembership`, gym settings, staff profiles and assignments, members, plans, member memberships, check-ins, payments, refunds, expenses, salary periods/lines, commissions, cash sessions and transactions, receipts, tenant files, notifications, and tenant audit events. Every such table has a physical `gym_id UUID NOT NULL`, including join, history, and derived tables. A transactional outbox remains deferred; if introduced after measured need, it will also be gym-owned and RLS-protected.
+- **Tenant-owned:** `GymMembership`, gym settings, staff profiles and assignments, members, plans, member memberships, check-ins and onsite QR challenges, payments, refunds, expenses, salary periods/lines, trainer/PT/class schedules and session ledgers, products and stock movements, retail sales and lines, commissions, cash sessions and transactions, receipts, announcements, device registrations, tenant files, notifications, and tenant audit events. Every such table has a physical `gym_id UUID NOT NULL`, including join, history, and derived tables. A transactional outbox remains deferred; if introduced after measured need, it will also be gym-owned and RLS-protected.
 
 Tenant ownership is explicit rather than inferred through a join. Foreign keys and uniqueness constraints include `gym_id` where necessary to prevent same-tenant relationships from crossing gyms. Platform-global operations are separated from tenant request paths and never turn a tenant table into globally readable data.
 
@@ -242,7 +244,7 @@ Role changes, suspension, password reset, and session revocation increment `auth
 
 ## 9. Data and domain architecture
 
-Apps are organized by domain: tenants, users, members, memberships, check-ins, payments, expenses, salaries, trainers, commissions, cashbook, receipts, reports, notifications, files, and audit.
+Apps are organized by domain: tenants, users, members, memberships, check-ins, payments, expenses, salaries, trainers, classes, inventory, sales, commissions, cashbook, receipts, reports, announcements, notifications, files, and audit.
 
 Views coordinate HTTP concerns. Serializers validate API input/output. Services perform commands and transactions. Selectors build optimized reads. Models enforce local invariants, while database constraints enforce durable integrity.
 
@@ -250,7 +252,15 @@ Cross-domain financial writes are atomic and occur only after the pre-post appro
 
 The member PT badge is a selector result, not client-owned member state: `is_pt_client` is derived from a same-gym `TrainerAssignment` with `status = ACTIVE` whose effective range contains the requested gym-local date. Ending or cancelling the assignment removes the badge without rewriting the member.
 
+PT and class remaining sessions are derived from an immutable tenant-owned session ledger, not a client-maintained counter. A package purchase grants sessions; completed attendance and policy-approved no-shows consume them; authorized corrections append reversing ledger entries. Booking services lock the relevant trainer, member, class occurrence, capacity, and balance rows so concurrent requests cannot oversell capacity, double-book time, or consume one remaining session twice.
+
+Inventory uses an append-only stock-movement ledger. Approved retail sale posting atomically creates immutable sale lines with unit-price and unit-cost snapshots, posts the payment/receipt/cash effects, and deducts stock under product-row locks. Quantity on hand and gross profit are server-derived; clients cannot set stock balances, cost of goods sold, or profit totals.
+
+Unattended mobile check-in uses an authenticated member or authorized trainer principal plus a short-lived, single-use or tightly replay-bounded onsite challenge for exactly one gym. The challenge is not authority by itself. The server verifies challenge gym/expiry/state, principal gym/self or trainer scope, membership eligibility, and duplicate-window rules in one transaction before writing a check-in. A static reusable poster QR is not sufficient for unattended admission.
+
 Membership-expiry email runs as two bounded, idempotent Django management commands scheduled on the VPS: one creates due `Notification` rows from each gym's local date and configured warning days, and one delivers pending email rows through the approved transactional-email provider. A notification is created only when expiry email is enabled and the member currently has a nonblank email address; missing email is a normal skip with no SMS/phone fallback. The delivery command resolves the current member email again, cancels safely if it was removed or the membership is no longer eligible, records provider outcomes, and retries transient failures with a strict attempt limit. A deterministic database uniqueness key prevents duplicate warning emails across repeated scheduler runs, retries, or restarts. This limited durable notification queue does not require Celery; Celery remains deferred until measured workload justifies it.
+
+Member push reminders and gym event/promotion announcements reuse the tenant-owned notification boundary. Announcement audience selection resolves to explicit same-gym recipients; device push tokens are scoped to a member, gym, device, and revocable session. Delivery failure never changes authoritative membership, booking, or payment state.
 
 All persisted timestamps are UTC. Gym-local business dates, reporting cutoffs, receipt dates, and cash-day boundaries are derived using the gym's validated IANA timezone. Legacy `Asia/Rangoon` input is normalized to canonical `Asia/Yangon` before storage and comparison; both names must produce identical historical offset behavior. Clients may format local time but do not define business-day boundaries.
 
@@ -259,7 +269,7 @@ All persisted timestamps are UTC. Gym-local business dates, reporting cutoffs, r
 - Monetary model fields use Django `DecimalField(max_digits=18, decimal_places=2)`, PostgreSQL `NUMERIC(18,2)`, and Python `Decimal` end to end. Binary floating point is prohibited for money.
 - Each financial row stores a three-letter currency copied from the gym or source document. New gyms default to `THB`.
 - A transaction cannot mix currencies.
-- Drafts may be edited; submission freezes their business fields. Submitted payments, expenses, PT sales, and salary periods require approval by a different authorized Manager or Owner before posting. Posted payments, expenses, salary records, commissions, receipts, cash transactions, and cash closes are immutable. Even privileged users cannot update or delete posted economic facts.
+- Drafts may be edited; submission freezes their business fields. Submitted payments, expenses, retail sales, PT sales, and salary periods require approval by a different authorized Manager or Owner before posting. Posted payments, retail sale lines and stock movements, expenses, salary records, commissions, receipts, cash transactions, and cash closes are immutable. Even privileged users cannot update or delete posted economic facts.
 - Corrections use `VOID`, `CANCEL`, `REFUND`, or reversing records linked to the original.
 - Derived totals are calculated in backend services or database aggregates, never trusted from clients.
 - Idempotency keys protect retryable financial commands.
