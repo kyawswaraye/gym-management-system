@@ -105,6 +105,26 @@ describe("browser credential boundary", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("allows only approved tenant operation paths", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ success: true, data: [] }));
+    const request = new NextRequest(
+      "https://app.example.com/api/operations/members",
+      { headers: { cookie: "gms_access=access" } },
+    );
+
+    expect(
+      (await authenticatedGet(request, "/api/v1/members/?search=approved"))
+        .status,
+    ).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const rejected = await authenticatedGet(request, "/api/v1/admin/secrets/");
+    expect(rejected.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("stores the gym-selection ticket only in an HttpOnly cookie", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       Response.json({

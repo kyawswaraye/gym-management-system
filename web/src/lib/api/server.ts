@@ -23,6 +23,14 @@ const ALLOWED_PATHS = new Set([
   "/api/v1/auth/select-gym/",
 ]);
 
+const ALLOWED_TENANT_PATHS = [
+  /^\/api\/v1\/members\/(?:[0-9a-f-]+\/(?:summary\/|archive\/)?)?$/,
+  /^\/api\/v1\/membership-plans\/(?:[0-9a-f-]+\/(?:archive\/)?)?$/,
+  /^\/api\/v1\/memberships\/(?:expiry\/|[0-9a-f-]+\/(?:cancel|suspend|resume)\/)?$/,
+  /^\/api\/v1\/payments\/(?:[0-9a-f-]+\/(?:submit|approve|reject|cancel|void|refund)\/)?$/,
+  /^\/api\/v1\/dashboard\/$/,
+];
+
 const SECRET_KEYS = new Set([
   "access_token",
   "refresh_token",
@@ -97,7 +105,11 @@ async function parseJson(response: Response): Promise<unknown> {
 }
 
 async function callDjango(path: string, init: RequestInit): Promise<Response> {
-  if (!ALLOWED_PATHS.has(path)) throw new Error("Django route is not allowed.");
+  const pathname = new URL(path, "http://internal").pathname;
+  const allowed =
+    ALLOWED_PATHS.has(pathname) ||
+    ALLOWED_TENANT_PATHS.some((pattern) => pattern.test(pathname));
+  if (!allowed) throw new Error("Django route is not allowed.");
   const { djangoApiUrl, bffSharedSecret } = getServerEnv();
   return fetch(`${djangoApiUrl}${path}`, {
     ...init,
@@ -324,7 +336,7 @@ function errorCode(body: unknown): string | undefined {
 
 export async function authenticatedGet(
   request: NextRequest,
-  path: "/api/v1/auth/me/" | "/api/v1/auth/gyms/",
+  path: string,
 ): Promise<NextResponse> {
   const access = request.cookies.get(AUTH_COOKIES.access)?.value;
   if (!access) {
@@ -378,6 +390,54 @@ export async function authenticatedGet(
         message: "The service is temporarily unavailable. Please try again.",
       },
     } satisfies ApiErrorBody);
+  }
+}
+
+export async function authenticatedMutation(
+  request: NextRequest,
+  path: string,
+  method: "POST" | "PATCH" = "POST",
+): Promise<NextResponse> {
+  const body = await parseRequestBody(request);
+  if (body === null) {
+    return responseFromUpstream(400, {
+      success: false,
+      error: { code: "INVALID_REQUEST", message: "Invalid request body." },
+    });
+  }
+  const env = getServerEnv();
+  const verified = verifyMutationRequest(request, env.allowedOrigins);
+  if (!verified.ok) {
+    return responseFromUpstream(403, {
+      success: false,
+      error: { code: "CSRF_FAILED", message: verified.message },
+    });
+  }
+  const access = request.cookies.get(AUTH_COOKIES.access)?.value;
+  if (!access) {
+    return responseFromUpstream(401, {
+      success: false,
+      error: { code: "AUTHENTICATION_REQUIRED", message: "Please sign in." },
+    });
+  }
+  try {
+    const upstream = await callDjango(path, {
+      method,
+      headers: {
+        Authorization: `Bearer ${access}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    return responseFromUpstream(upstream.status, await parseJson(upstream));
+  } catch {
+    return responseFromUpstream(503, {
+      success: false,
+      error: {
+        code: "UPSTREAM_UNAVAILABLE",
+        message: "The service is temporarily unavailable. Please try again.",
+      },
+    });
   }
 }
 

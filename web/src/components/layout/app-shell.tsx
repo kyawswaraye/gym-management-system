@@ -38,6 +38,30 @@ export function AppShell({
           >
             Dashboard
           </Link>
+          {!platform && session.permissions.includes("members.view") && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/members"
+            >
+              Members
+            </Link>
+          )}
+          {!platform && session.permissions.includes("memberships.view") && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/memberships"
+            >
+              Memberships
+            </Link>
+          )}
+          {!platform && session.permissions.includes("payments.view") && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/payments"
+            >
+              Payments
+            </Link>
+          )}
           {!platform && canUsePlatform && (
             <Link
               className="rounded-md px-3 py-2 hover:bg-slate-800"

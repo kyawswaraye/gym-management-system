@@ -246,3 +246,25 @@ class GymFeatureEntitlement(TenantModel):
             models.UniqueConstraint(fields=["gym", "feature"], name="entitlement_gym_feature_uniq"),
         ]
         indexes = [models.Index(fields=["gym", "enabled"], name="entitlement_gym_enabled_idx")]
+
+
+class GymSettings(TenantModel):
+    """Tenant-owned operational defaults used by all business modules."""
+
+    membership_expiry_warning_days = models.JSONField(default=list)
+    membership_expiry_email_enabled = models.BooleanField(default=False)
+    member_number_prefix = models.CharField(max_length=12, default="MEM")
+    next_member_number = models.PositiveBigIntegerField(default=1)
+    created_by_membership_id = models.UUIDField(null=True, blank=True)
+    updated_by_membership_id = models.UUIDField(null=True, blank=True)
+
+    class Meta:
+        db_table = "tenants_gym_settings"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="settings_gym_id_uniq"),
+            models.UniqueConstraint(fields=["gym"], name="settings_one_per_gym_uniq"),
+            models.CheckConstraint(
+                condition=models.Q(next_member_number__gt=0),
+                name="settings_next_member_number_gt_0_ck",
+            ),
+        ]

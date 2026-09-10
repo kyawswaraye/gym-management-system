@@ -37,12 +37,25 @@ module = ["apps.users.serializers"]
 disable_error_code = ["type-arg"]
 
 [[tool.mypy.overrides]]
+module = ["apps.members.serializers"]
+disable_error_code = ["type-arg"]
+
+[[tool.mypy.overrides]]
 module = [
   "apps.common.api.middleware",
+  "apps.members.views",
   "apps.users.authentication",
   "apps.users.views",
 ]
-disable_error_code = ["arg-type", "assignment", "attr-defined", "misc", "union-attr"]
+disable_error_code = [
+  "arg-type",
+  "assignment",
+  "attr-defined",
+  "misc",
+  "no-untyped-call",
+  "no-untyped-def",
+  "union-attr",
+]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"

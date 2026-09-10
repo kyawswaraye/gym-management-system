@@ -39,6 +39,8 @@ ALTER TABLE {table} DISABLE ROW LEVEL SECURITY;
 )
 
 FORWARD_SQL = f"""
+SET LOCAL check_function_bodies = off;
+
 CREATE OR REPLACE FUNCTION app_current_gym_id()
 RETURNS uuid LANGUAGE sql STABLE
 SET search_path = pg_catalog
@@ -84,7 +86,9 @@ AS $$
     AND g.subscription_status IN ('TRIAL', 'ACTIVE')
   ORDER BY g.name, m.id
 $$;
+GRANT USAGE, CREATE ON SCHEMA public TO gym_auth_bootstrap;
 ALTER FUNCTION app_staff_memberships() OWNER TO gym_auth_bootstrap;
+REVOKE CREATE ON SCHEMA public FROM gym_auth_bootstrap;
 
 REVOKE ALL ON FUNCTION app_current_gym_id() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app_staff_memberships() FROM PUBLIC;

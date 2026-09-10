@@ -39,7 +39,7 @@ backend-check: check-python
 	cd backend && .venv/bin/ruff check .
 	cd backend && .venv/bin/ruff format --check .
 	cd backend && .venv/bin/mypy apps config
-	cd backend && .venv/bin/python manage.py makemigrations --check --dry-run
+	cd backend && DATABASE_ROLE_MODE=MIGRATION .venv/bin/python manage.py makemigrations --check --dry-run
 
 backend-test: check-python
 	cd backend && .venv/bin/pytest -m "not postgresql"

@@ -261,6 +261,8 @@ class MeView(APIView):
                     "id": str(request.gym.id),
                     "code": request.gym.code,
                     "name": request.gym.name,
+                    "currency": request.gym.currency,
+                    "timezone": request.gym.timezone,
                 },
                 "gym_membership": {
                     "id": str(membership.id),

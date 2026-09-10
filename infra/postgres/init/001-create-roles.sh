@@ -12,9 +12,11 @@ CREATE ROLE gym_runtime LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBY
 ALTER ROLE gym_runtime PASSWORD :'runtime_password';
 
 CREATE ROLE gym_auth_bootstrap NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE BYPASSRLS;
+GRANT gym_auth_bootstrap TO gym_migration;
 
 ALTER DATABASE :"db_name" OWNER TO gym_migration;
 ALTER SCHEMA public OWNER TO gym_migration;
+GRANT USAGE, CREATE ON SCHEMA public TO gym_auth_bootstrap;
 GRANT CONNECT ON DATABASE :"db_name" TO gym_runtime;
 GRANT USAGE ON SCHEMA public TO gym_runtime;
 SQL
