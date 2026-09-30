@@ -51,6 +51,7 @@ from .services import (
     revoke_refresh_token,
     rotate_refresh_token,
 )
+from .throttling import GymSelectionIssueThrottle, GymSelectionThrottle
 
 BFF_HEADER_PARAMETER = OpenApiParameter(
     name="X-Gym-BFF-Secret",
@@ -110,7 +111,7 @@ def _token_data(pair: TokenPair) -> dict[str, Any]:
 class LoginView(APIView):
     authentication_classes: list[type] = []
     permission_classes = [AllowAny]
-    throttle_classes = [AnonRateThrottle]
+    throttle_classes = [AnonRateThrottle, GymSelectionIssueThrottle]
 
     @extend_schema(
         operation_id="auth_login",
@@ -125,6 +126,7 @@ class LoginView(APIView):
             400: ErrorEnvelopeSerializer,
             401: ErrorEnvelopeSerializer,
             403: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
             501: ErrorEnvelopeSerializer,
         },
         auth=[],
@@ -270,7 +272,7 @@ class GymsView(APIView):
 class SelectGymView(APIView):
     authentication_classes: list[type] = []
     permission_classes = [AllowAny]
-    throttle_classes = [AnonRateThrottle]
+    throttle_classes = [AnonRateThrottle, GymSelectionThrottle]
 
     @extend_schema(
         operation_id="auth_select_gym",
@@ -281,6 +283,7 @@ class SelectGymView(APIView):
             400: ErrorEnvelopeSerializer,
             401: ErrorEnvelopeSerializer,
             403: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
         },
         auth=[],
         description=(

@@ -9,6 +9,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from django.conf import settings
 from django.core.cache import cache
 from django.db import connections, transaction
 from django.test import override_settings
@@ -98,6 +99,17 @@ def login(api: APIClient, email: str) -> dict:
         "/api/v1/auth/login/", {"email": email, "password": PASSWORD}, format="json"
     )
     return {"status": response.status_code, "body": response.json()}
+
+
+def throttle_settings(*, issue: str = "5/min", select: str = "10/min") -> dict:
+    return {
+        **settings.REST_FRAMEWORK,
+        "DEFAULT_THROTTLE_RATES": {
+            **settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"],
+            "gym_selection_issue": issue,
+            "gym_selection_select": select,
+        },
+    }
 
 
 @override_settings(**JWT_SETTINGS)
@@ -242,6 +254,83 @@ def test_ticket_invalid_attempt_limit_is_terminal() -> None:
         target_id=record.id,
         new_values={"reason": "MEMBERSHIP_SUBSTITUTION"},
     ).exists()
+
+
+@override_settings(**JWT_SETTINGS)
+def test_ticket_issue_rate_limit_is_audited_without_plaintext() -> None:
+    user = User.objects.create_user("issue-limit@example.test", PASSWORD)
+    create_membership(user, create_gym("ISSUE-LIMIT-A"))
+    create_membership(user, create_gym("ISSUE-LIMIT-B"))
+
+    with override_settings(REST_FRAMEWORK=throttle_settings(issue="2/min")):
+        first = login(client(), user.email)
+        second = login(client(), user.email)
+        blocked = login(client(), user.email)
+
+    assert first["status"] == 200
+    assert second["status"] == 200
+    assert blocked["status"] == 429
+    assert RefreshSession.objects.filter(user=user).count() == 0
+    audit = PlatformAuditLog.objects.get(
+        action="TICKET_ISSUE_RATE_LIMITED",
+        actor_user=user,
+    )
+    assert audit.target_type == "User"
+    assert audit.outcome == "DENIED"
+    assert audit.new_values == {"reason": "RATE_LIMITED"}
+    assert second["body"]["data"]["gym_selection_ticket"] not in str(audit.new_values)
+
+
+@override_settings(**JWT_SETTINGS)
+def test_ticket_selection_rate_limit_is_audited_and_uses_hash_only_cache_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = User.objects.create_user("select-limit@example.test", PASSWORD)
+    create_membership(user, create_gym("SELECT-LIMIT-A"))
+    create_membership(user, create_gym("SELECT-LIMIT-B"))
+    ticket = login(client(), user.email)["body"]["data"]["gym_selection_ticket"]
+    recorded_keys: list[str] = []
+    original_set = cache.set
+
+    def record_cache_key(key: str, *args: object, **kwargs: object) -> object:
+        recorded_keys.append(key)
+        return original_set(key, *args, **kwargs)
+
+    monkeypatch.setattr(cache, "set", record_cache_key)
+    api = client()
+    with override_settings(REST_FRAMEWORK=throttle_settings(select="2/min")):
+        first = api.post(
+            "/api/v1/auth/select-gym/",
+            {"gym_membership_id": str(uuid4()), "gym_selection_ticket": ticket},
+            format="json",
+        )
+        second = api.post(
+            "/api/v1/auth/select-gym/",
+            {"gym_membership_id": str(uuid4()), "gym_selection_ticket": ticket},
+            format="json",
+        )
+        blocked = api.post(
+            "/api/v1/auth/select-gym/",
+            {"gym_membership_id": str(uuid4()), "gym_selection_ticket": ticket},
+            format="json",
+        )
+
+    record = GymSelectionTicket.objects.get(user=user)
+    assert first.status_code == 401
+    assert second.status_code == 401
+    assert blocked.status_code == 429
+    assert record.attempt_count == 2
+    assert record.revoked_at is None
+    assert recorded_keys
+    assert all(ticket not in key for key in recorded_keys)
+    audit = PlatformAuditLog.objects.get(
+        action="TICKET_RATE_LIMITED",
+        actor_user=user,
+        target_id=record.id,
+    )
+    assert audit.outcome == "DENIED"
+    assert audit.new_values == {"reason": "RATE_LIMITED"}
+    assert ticket not in str(audit.new_values)
 
 
 @override_settings(**JWT_SETTINGS)

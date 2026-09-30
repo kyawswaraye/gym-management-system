@@ -71,7 +71,12 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "apps.common.api.exceptions.api_exception_handler",
     "UNAUTHENTICATED_USER": None,
-    "DEFAULT_THROTTLE_RATES": {"anon": "30/min", "user": "120/min"},
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "30/min",
+        "user": "120/min",
+        "gym_selection_issue": "5/min",
+        "gym_selection_select": "10/min",
+    },
 }
 
 SPECTACULAR_SETTINGS = {
