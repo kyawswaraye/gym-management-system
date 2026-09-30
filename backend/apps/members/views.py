@@ -35,14 +35,30 @@ from apps.members.services import (
     submit_payment,
     void_payment,
 )
-from apps.users.permissions import RequiresPermission
+from apps.users.permissions import RequiresEntitlement, RequiresPermission
 
 
 class TenantAPIView(APIView):
-    permission_classes = [IsAuthenticated, RequiresPermission]
+    permission_classes = [IsAuthenticated, RequiresPermission, RequiresEntitlement]
 
 
-class MemberListCreateView(TenantAPIView):
+class MemberFeatureAPIView(TenantAPIView):
+    required_feature = "members"
+
+
+class MembershipFeatureAPIView(TenantAPIView):
+    required_feature = "memberships"
+
+
+class FinanceFeatureAPIView(TenantAPIView):
+    required_feature = "finance"
+
+
+class ReportsFeatureAPIView(TenantAPIView):
+    required_feature = "reports"
+
+
+class MemberListCreateView(MemberFeatureAPIView):
     required_permission = "members.view"
 
     def get_permissions(self):
@@ -79,7 +95,7 @@ class MemberListCreateView(TenantAPIView):
         )
 
 
-class MemberDetailView(TenantAPIView):
+class MemberDetailView(MemberFeatureAPIView):
     required_permission = "members.view"
 
     def get_permissions(self):
@@ -101,7 +117,7 @@ class MemberDetailView(TenantAPIView):
         return success_response(serializer.data, message="Member updated")
 
 
-class MemberArchiveView(TenantAPIView):
+class MemberArchiveView(MemberFeatureAPIView):
     required_permission = "members.archive"
 
     def post(self, request, member_id):
@@ -115,7 +131,7 @@ class MemberArchiveView(TenantAPIView):
         return success_response(MemberSerializer(member).data, message="Member archived")
 
 
-class MemberSummaryView(TenantAPIView):
+class MemberSummaryView(MemberFeatureAPIView):
     required_permission = "members.view"
 
     def get(self, request, member_id):
@@ -134,7 +150,7 @@ class MemberSummaryView(TenantAPIView):
         )
 
 
-class PlanListCreateView(TenantAPIView):
+class PlanListCreateView(MembershipFeatureAPIView):
     required_permission = "memberships.view"
 
     def get_permissions(self):
@@ -160,7 +176,7 @@ class PlanListCreateView(TenantAPIView):
         )
 
 
-class PlanDetailView(TenantAPIView):
+class PlanDetailView(MembershipFeatureAPIView):
     required_permission = "memberships.view"
 
     def get_permissions(self):
@@ -182,7 +198,7 @@ class PlanDetailView(TenantAPIView):
         return success_response(serializer.data, message="Membership plan updated")
 
 
-class PlanArchiveView(TenantAPIView):
+class PlanArchiveView(MembershipFeatureAPIView):
     required_permission = "memberships.update"
 
     def post(self, request, plan_id):
@@ -201,7 +217,7 @@ class PlanArchiveView(TenantAPIView):
         return success_response(MembershipPlanSerializer(plan).data, message="Plan archived")
 
 
-class MembershipListCreateView(TenantAPIView):
+class MembershipListCreateView(MembershipFeatureAPIView):
     required_permission = "memberships.view"
 
     def get_permissions(self):
@@ -254,7 +270,7 @@ class MembershipListCreateView(TenantAPIView):
         )
 
 
-class MembershipActionView(TenantAPIView):
+class MembershipActionView(MembershipFeatureAPIView):
     @property
     def required_permission(self):
         return (
@@ -282,7 +298,7 @@ class MembershipActionView(TenantAPIView):
         return success_response(MembershipSerializer(membership).data, message="Membership updated")
 
 
-class PaymentListCreateView(TenantAPIView):
+class PaymentListCreateView(FinanceFeatureAPIView):
     required_permission = "payments.view"
 
     def get_permissions(self):
@@ -330,7 +346,7 @@ class PaymentListCreateView(TenantAPIView):
         )
 
 
-class PaymentActionView(TenantAPIView):
+class PaymentActionView(FinanceFeatureAPIView):
     action_permissions = {
         "submit": "payments.submit",
         "approve": "payments.approve",
@@ -412,7 +428,7 @@ class PaymentActionView(TenantAPIView):
         return success_response(PaymentSerializer(payment).data, message="Payment updated")
 
 
-class DashboardView(TenantAPIView):
+class DashboardView(ReportsFeatureAPIView):
     required_permission = "reports.view"
 
     def get(self, request):

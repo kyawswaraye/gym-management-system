@@ -4,6 +4,7 @@ import uuid
 from typing import Any
 
 from django.db import connection, transaction
+from django.db.models import Q
 from django.db.transaction import non_atomic_requests
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -349,13 +350,19 @@ class MeView(APIView):
     )
     def get(self, request: Request) -> Response:
         membership = request.gym_membership
+        now = timezone.now()
         roles = list(
             membership.gymmembershiprole_set.filter(gym=request.gym, role__is_active=True)
             .values_list("role__key", flat=True)
             .order_by("role__key")
         )
         entitlements = list(
-            GymFeatureEntitlement.objects.filter(gym=request.gym, enabled=True)
+            GymFeatureEntitlement.objects.filter(
+                Q(effective_from__isnull=True) | Q(effective_from__lte=now),
+                Q(effective_until__isnull=True) | Q(effective_until__gt=now),
+                gym=request.gym,
+                enabled=True,
+            )
             .values("feature__code", "limit_value")
             .order_by("feature__code")
         )

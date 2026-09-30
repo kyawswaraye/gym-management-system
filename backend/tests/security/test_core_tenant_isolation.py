@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -15,7 +15,7 @@ from rest_framework.test import APIClient
 
 from apps.common.db.tenant_context import set_gym_context
 from apps.members.models import Member, Membership, MembershipPlan, Payment
-from apps.tenants.models import Permission, SystemRoleTemplate
+from apps.tenants.models import GymFeatureEntitlement, Permission, SystemRoleTemplate
 from apps.tenants.services import provision_gym
 from apps.users.models import User
 
@@ -307,3 +307,68 @@ def test_tenant_cannot_mass_assign_or_switch_gym_context() -> None:
     with transaction.atomic():
         set_gym_context(gym_id=tenant_b.gym.id)
         assert not Member.objects.filter(gym=tenant_b.gym).exists()
+
+
+@override_settings(**JWT_SETTINGS)
+def test_feature_entitlement_controls_access_independently_of_permissions() -> None:
+    _ensure_owner_permission_catalog()
+    owner = User.objects.create_user("entitlement-owner@example.test", PASSWORD)
+    tenant = provision_gym(
+        code="ENTITLEMENT",
+        name="Entitlement Gym",
+        owner_email=owner.email,
+    )
+    token = _token(owner.email)
+    api = _client()
+
+    def feature_codes() -> set[str]:
+        response = _auth_get(api, "/api/v1/auth/me/", token)
+        assert response.status_code == 200, response.json()
+        data = response.json()["data"]
+        assert "members.view" in data["permissions"]
+        return {feature["feature__code"] for feature in data["features"]}
+
+    assert "members" in feature_codes()
+    assert _auth_get(api, "/api/v1/members/", token).status_code == 200
+
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        entitlement = GymFeatureEntitlement.objects.get(
+            gym=tenant.gym,
+            feature__code="members",
+        )
+        entitlement.enabled = False
+        entitlement.save(update_fields=["enabled", "updated_at"])
+
+    assert "members" not in feature_codes()
+    assert _auth_get(api, "/api/v1/members/", token).status_code == 403
+
+    now = timezone.now()
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        entitlement.enabled = True
+        entitlement.effective_from = now + timedelta(days=1)
+        entitlement.effective_until = None
+        entitlement.save(
+            update_fields=["enabled", "effective_from", "effective_until", "updated_at"]
+        )
+
+    assert "members" not in feature_codes()
+    assert _auth_get(api, "/api/v1/members/", token).status_code == 403
+
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        entitlement.effective_from = now - timedelta(days=2)
+        entitlement.effective_until = now - timedelta(days=1)
+        entitlement.save(update_fields=["effective_from", "effective_until", "updated_at"])
+
+    assert "members" not in feature_codes()
+    assert _auth_get(api, "/api/v1/members/", token).status_code == 403
+
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        entitlement.effective_until = now + timedelta(days=1)
+        entitlement.save(update_fields=["effective_until", "updated_at"])
+
+    assert "members" in feature_codes()
+    assert _auth_get(api, "/api/v1/members/", token).status_code == 200
