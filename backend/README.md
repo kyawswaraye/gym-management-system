@@ -1,7 +1,9 @@
-# Phase 1A Django backend
+# Django backend
 
-This directory contains only the Phase 1A identity, tenancy, authorization, session,
-audit, RLS, and API foundation.
+This directory contains the Phase 1A identity, tenancy, authorization, session,
+audit, RLS, and API foundation plus incomplete later-phase member, membership,
+payment, receipt, dashboard, and provisioning slices. Those later slices are not
+complete until their development-plan exit criteria pass.
 
 ## Runtime
 
@@ -29,6 +31,16 @@ require the BFF shared secret. Migrations fail if required roles are missing.
 PostgreSQL-only tests use `make backend-test-pg` (`RUN_POSTGRESQL_TESTS=1` and
 `TEST_DB_USER=gym_admin`). Runtime RLS proofs `SET LOCAL ROLE gym_runtime`.
 
+Terminal gym-selection tickets are retained for 30 days. A privileged maintenance
+database identity can inspect and purge eligible rows in bounded batches:
+
+```text
+python manage.py purge_gym_selection_tickets --dry-run
+python manage.py purge_gym_selection_tickets --batch-size=1000
+```
+
+The runtime database role has no `DELETE` grant for this maintenance path.
+
 ## Checks
 
 ```text
@@ -52,5 +64,5 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   selected-gym session. Browser JavaScript never receives the ticket.
 - Member authentication is configuration-only in Phase 1A; member models/routes
   belong to later phases.
-- No Phase 1B provisioning/admin API and no member, staff-profile, check-in,
-  finance, receipt, cash, PT, report, notification, file, or mobile model exists.
+- No Phase 1B provisioning/admin API, staff-profile, check-in, cash, PT,
+  notification, file, or mobile implementation is complete.

@@ -11,6 +11,7 @@ from typing import Any
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.audit.models import Outcome
@@ -152,6 +153,31 @@ def revoke_all_user_sessions(user_id: uuid.UUID) -> None:
 
 def hash_selection_ticket(token: str) -> str:
     return hash_refresh_token(token)
+
+
+@transaction.atomic
+def purge_terminal_gym_selection_tickets(
+    *,
+    batch_size: int = 1000,
+    dry_run: bool = False,
+    now: datetime | None = None,
+) -> int:
+    """Purge one bounded batch after the mandatory terminal retention window."""
+
+    if not 1 <= batch_size <= 10_000:
+        raise ValueError("batch_size must be between 1 and 10000")
+    cutoff = (now or timezone.now()) - timedelta(days=settings.GYM_SELECTION_TICKET_RETENTION_DAYS)
+    eligible = GymSelectionTicket.objects.filter(
+        Q(consumed_at__lte=cutoff) | Q(revoked_at__lte=cutoff)
+    )
+    if dry_run:
+        return eligible.count()
+    ticket_ids = list(
+        eligible.order_by("updated_at", "id").values_list("id", flat=True)[:batch_size]
+    )
+    if ticket_ids:
+        GymSelectionTicket.objects.filter(id__in=ticket_ids).delete()
+    return len(ticket_ids)
 
 
 def _selection_membership_ids(memberships: list[dict[str, object]]) -> list[uuid.UUID]:
