@@ -4,14 +4,20 @@ import calendar
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
+from uuid import UUID
+from zoneinfo import ZoneInfo
 
-from django.db import transaction
-from django.db.models import Sum
+from django.db import IntegrityError, transaction
+from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.members.models import Member, Membership, MembershipPlan, Payment, Receipt
 from apps.tenants.models import Gym, GymMembership, GymSettings
+
+
+def gym_today(gym: Gym) -> date:
+    return timezone.localdate(timezone=ZoneInfo(gym.timezone))
 
 
 def _add_duration(start: date, value: int, unit: str) -> date:
@@ -69,12 +75,18 @@ def create_membership(
     start_date: date,
     discount_amount: Decimal,
 ) -> Membership:
-    Member.objects.select_for_update().get(gym=gym, id=member.id)
+    member = Member.objects.select_for_update().get(gym=gym, id=member.id)
+    if member.status == Member.Status.ARCHIVED:
+        raise ValidationError({"member_id": ["Archived members cannot receive memberships."]})
     expiry_date = _add_duration(start_date, plan.duration_value, plan.duration_unit)
     overlap = Membership.objects.filter(
         gym=gym,
         member=member,
-        status__in=[Membership.Status.PENDING, Membership.Status.ACTIVE],
+        status__in=[
+            Membership.Status.PENDING,
+            Membership.Status.ACTIVE,
+            Membership.Status.SUSPENDED,
+        ],
         start_date__lte=expiry_date,
         expiry_date__gte=start_date,
     ).exists()
@@ -89,23 +101,166 @@ def create_membership(
         if Membership.objects.filter(gym=gym, member=member).exists()
         else Membership.RevenueSource.NEW_MEMBER
     )
-    return Membership.objects.create(
-        gym=gym,
-        member=member,
-        plan=plan,
-        plan_code=plan.code,
-        plan_name=plan.name,
-        duration_value=plan.duration_value,
-        duration_unit=plan.duration_unit,
-        start_date=start_date,
-        expiry_date=expiry_date,
-        list_price=plan.price,
-        discount_amount=discount_amount,
-        final_amount=plan.price - discount_amount,
-        currency=plan.currency,
-        revenue_source=source,
-        created_by_membership_id=actor.id,
+    today = gym_today(gym)
+    membership_status = Membership.Status.ACTIVE
+    if start_date > today:
+        membership_status = Membership.Status.PENDING
+    elif expiry_date < today:
+        membership_status = Membership.Status.EXPIRED
+    try:
+        return Membership.objects.create(
+            gym=gym,
+            member=member,
+            plan=plan,
+            plan_code=plan.code,
+            plan_name=plan.name,
+            duration_value=plan.duration_value,
+            duration_unit=plan.duration_unit,
+            start_date=start_date,
+            expiry_date=expiry_date,
+            list_price=plan.price,
+            discount_amount=discount_amount,
+            final_amount=plan.price - discount_amount,
+            currency=plan.currency,
+            status=membership_status,
+            revenue_source=source,
+            created_by_membership_id=actor.id,
+        )
+    except IntegrityError as exc:
+        raise ValidationError(
+            {"start_date": ["Membership dates overlap an existing membership."]}
+        ) from exc
+
+
+def _locked_membership(*, gym: Gym, membership_id: UUID) -> Membership:
+    return (
+        Membership.objects.select_for_update()
+        .select_related("member")
+        .get(gym=gym, id=membership_id)
     )
+
+
+@transaction.atomic
+def suspend_membership(*, gym: Gym, membership_id: UUID) -> Membership:
+    membership = _locked_membership(gym=gym, membership_id=membership_id)
+    if membership.status != Membership.Status.ACTIVE:
+        raise ValidationError({"status": ["Only active memberships can be suspended."]})
+    today = gym_today(gym)
+    if membership.start_date > today or membership.expiry_date < today:
+        raise ValidationError({"status": ["Membership is outside its active date range."]})
+    membership.status = Membership.Status.SUSPENDED
+    membership.save(update_fields=["status", "updated_at"])
+    return membership
+
+
+@transaction.atomic
+def resume_membership(*, gym: Gym, membership_id: UUID) -> Membership:
+    membership = _locked_membership(gym=gym, membership_id=membership_id)
+    if membership.status != Membership.Status.SUSPENDED:
+        raise ValidationError({"status": ["Only suspended memberships can be resumed."]})
+    today = gym_today(gym)
+    if membership.start_date > today or membership.expiry_date < today:
+        raise ValidationError({"status": ["Membership is outside its active date range."]})
+    Member.objects.select_for_update().get(gym=gym, id=membership.member_id)
+    overlap = (
+        Membership.objects.filter(
+            gym=gym,
+            member_id=membership.member_id,
+            status__in=[Membership.Status.PENDING, Membership.Status.ACTIVE],
+            start_date__lte=membership.expiry_date,
+            expiry_date__gte=membership.start_date,
+        )
+        .exclude(id=membership.id)
+        .exists()
+    )
+    if overlap:
+        raise ValidationError({"status": ["Membership overlaps another active membership."]})
+    membership.status = Membership.Status.ACTIVE
+    try:
+        membership.save(update_fields=["status", "updated_at"])
+    except IntegrityError as exc:
+        raise ValidationError(
+            {"status": ["Membership overlaps another active membership."]}
+        ) from exc
+    return membership
+
+
+@transaction.atomic
+def cancel_membership(
+    *,
+    gym: Gym,
+    membership_id: UUID,
+    reason: str,
+) -> Membership:
+    membership = _locked_membership(gym=gym, membership_id=membership_id)
+    allowed = {
+        Membership.Status.PENDING,
+        Membership.Status.ACTIVE,
+        Membership.Status.SUSPENDED,
+    }
+    if membership.status not in allowed:
+        raise ValidationError(
+            {"status": ["Membership cannot be cancelled from its current state."]}
+        )
+    membership.status = Membership.Status.CANCELLED
+    membership.cancelled_at = timezone.now()
+    membership.cancellation_reason = reason
+    membership.save(
+        update_fields=[
+            "status",
+            "cancelled_at",
+            "cancellation_reason",
+            "updated_at",
+        ]
+    )
+    return membership
+
+
+@transaction.atomic
+def refresh_due_memberships(*, gym: Gym, today: date, batch_size: int = 500) -> tuple[int, int]:
+    if batch_size < 1 or batch_size > 5000:
+        raise ValueError("batch_size must be between 1 and 5000")
+    due_ids = list(
+        Membership.objects.select_for_update(skip_locked=True)
+        .filter(gym=gym)
+        .filter(
+            Q(
+                status__in=[
+                    Membership.Status.ACTIVE,
+                    Membership.Status.PENDING,
+                    Membership.Status.SUSPENDED,
+                ],
+                expiry_date__lt=today,
+            )
+            | Q(
+                status=Membership.Status.PENDING,
+                start_date__lte=today,
+                expiry_date__gte=today,
+            )
+        )
+        .order_by("expiry_date", "id")
+        .values_list("id", flat=True)[:batch_size]
+    )
+    if not due_ids:
+        return 0, 0
+    expired = Membership.objects.filter(
+        gym=gym,
+        id__in=due_ids,
+        status__in=[
+            Membership.Status.ACTIVE,
+            Membership.Status.PENDING,
+            Membership.Status.SUSPENDED,
+        ],
+        expiry_date__lt=today,
+    ).update(status=Membership.Status.EXPIRED)
+    activated = Membership.objects.filter(
+        gym=gym,
+        id__in=due_ids,
+        status=Membership.Status.PENDING,
+        start_date__lte=today,
+        expiry_date__gte=today,
+    ).update(status=Membership.Status.ACTIVE)
+    return activated, expired
 
 
 def refresh_membership_payment_status(membership: Membership) -> None:

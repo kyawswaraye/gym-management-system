@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   hasFeature,
   hasTenantCapability,
+  sessionHomePath,
   tenantHomePath,
 } from "@/lib/auth/authorization";
 import type { CurrentUser } from "@/types/api";
@@ -45,5 +46,20 @@ describe("tenant authorization helpers", () => {
 
   it("keeps an account with no capabilities on the safe empty dashboard", () => {
     expect(tenantHomePath(session(["members.view"], []))).toBe("/dashboard");
+  });
+
+  it("routes authenticated users to their authorized workspace", () => {
+    const platform = session(["platform.gyms.view"], []);
+    expect(sessionHomePath(platform)).toBe("/super-admin/dashboard");
+
+    const needsGym = session(["members.view"], ["members"]);
+    expect(sessionHomePath(needsGym)).toBe("/select-gym");
+
+    const tenant = {
+      ...session(["members.view"], ["members"]),
+      gym: { id: "gym-1" },
+      gym_membership: { id: "membership-1" },
+    } as CurrentUser;
+    expect(sessionHomePath(tenant)).toBe("/members");
   });
 });

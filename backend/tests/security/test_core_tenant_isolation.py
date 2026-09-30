@@ -3,18 +3,29 @@ from __future__ import annotations
 import os
 from datetime import date, timedelta
 from decimal import Decimal
+from importlib import import_module
+from types import SimpleNamespace
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from django.apps import apps
 from django.core.cache import cache
 from django.db import DatabaseError, connection, transaction
 from django.test import override_settings
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
 from apps.common.db.tenant_context import set_gym_context
 from apps.members.models import Member, Membership, MembershipPlan, Payment
+from apps.members.services import (
+    cancel_membership,
+    create_membership,
+    gym_today,
+    resume_membership,
+    suspend_membership,
+)
 from apps.tenants.models import GymFeatureEntitlement, Permission, SystemRoleTemplate
 from apps.tenants.services import provision_gym
 from apps.users.models import User
@@ -372,3 +383,181 @@ def test_feature_entitlement_controls_access_independently_of_permissions() -> N
 
     assert "members" in feature_codes()
     assert _auth_get(api, "/api/v1/members/", token).status_code == 200
+
+
+def test_membership_lifecycle_rejects_suspended_overlap() -> None:
+    owner = User.objects.create_user("lifecycle-owner@example.test", PASSWORD)
+    tenant = provision_gym(
+        code="LIFECYCLE",
+        name="Lifecycle Gym",
+        owner_email=owner.email,
+    )
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        today = gym_today(tenant.gym)
+        member = Member.objects.create(
+            gym=tenant.gym,
+            member_number="LIFE-000001",
+            first_name="Lifecycle",
+            join_date=today,
+            created_by_membership_id=tenant.owner_membership.id,
+            updated_by_membership_id=tenant.owner_membership.id,
+        )
+        plan = MembershipPlan.objects.create(
+            gym=tenant.gym,
+            code="LIFE-30",
+            name="Lifecycle 30",
+            duration_value=30,
+            duration_unit=MembershipPlan.DurationUnit.DAY,
+            price=Decimal("100.00"),
+            currency=tenant.gym.currency,
+            created_by_membership_id=tenant.owner_membership.id,
+            updated_by_membership_id=tenant.owner_membership.id,
+        )
+        membership = create_membership(
+            gym=tenant.gym,
+            actor=tenant.owner_membership,
+            member=member,
+            plan=plan,
+            start_date=today,
+            discount_amount=Decimal("0"),
+        )
+        suspended = suspend_membership(
+            gym=tenant.gym,
+            membership_id=membership.id,
+        )
+        assert suspended.status == Membership.Status.SUSPENDED
+
+        with pytest.raises(ValidationError, match="overlap"):
+            create_membership(
+                gym=tenant.gym,
+                actor=tenant.owner_membership,
+                member=member,
+                plan=plan,
+                start_date=today,
+                discount_amount=Decimal("0"),
+            )
+
+        resumed = resume_membership(gym=tenant.gym, membership_id=membership.id)
+        assert resumed.status == Membership.Status.ACTIVE
+
+
+def test_future_membership_and_cancel_are_state_safe() -> None:
+    owner = User.objects.create_user("future-owner@example.test", PASSWORD)
+    tenant = provision_gym(
+        code="FUTURE-LIFECYCLE",
+        name="Future Lifecycle Gym",
+        owner_email=owner.email,
+    )
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        today = gym_today(tenant.gym)
+        member = Member.objects.create(
+            gym=tenant.gym,
+            member_number="FUTURE-000001",
+            first_name="Future",
+            join_date=today,
+            created_by_membership_id=tenant.owner_membership.id,
+            updated_by_membership_id=tenant.owner_membership.id,
+        )
+        plan = MembershipPlan.objects.create(
+            gym=tenant.gym,
+            code="FUTURE-30",
+            name="Future 30",
+            duration_value=30,
+            duration_unit=MembershipPlan.DurationUnit.DAY,
+            price=Decimal("100.00"),
+            currency=tenant.gym.currency,
+            created_by_membership_id=tenant.owner_membership.id,
+            updated_by_membership_id=tenant.owner_membership.id,
+        )
+        membership = create_membership(
+            gym=tenant.gym,
+            actor=tenant.owner_membership,
+            member=member,
+            plan=plan,
+            start_date=today + timedelta(days=5),
+            discount_amount=Decimal("0"),
+        )
+        assert membership.status == Membership.Status.PENDING
+
+        cancelled = cancel_membership(
+            gym=tenant.gym,
+            membership_id=membership.id,
+            reason="Changed plans",
+        )
+        original_cancelled_at = cancelled.cancelled_at
+        with pytest.raises(ValidationError, match="cannot be cancelled"):
+            cancel_membership(
+                gym=tenant.gym,
+                membership_id=membership.id,
+                reason="Overwrite attempt",
+            )
+        cancelled.refresh_from_db()
+        assert cancelled.cancelled_at == original_cancelled_at
+        assert cancelled.cancellation_reason == "Changed plans"
+
+
+def test_membership_status_migration_sets_rls_context() -> None:
+    owner = User.objects.create_user("migration-owner@example.test", PASSWORD)
+    tenant = provision_gym(
+        code="MIGRATION-LIFECYCLE",
+        name="Migration Lifecycle Gym",
+        owner_email=owner.email,
+    )
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        today = gym_today(tenant.gym)
+        member = Member.objects.create(
+            gym=tenant.gym,
+            member_number="MIGRATION-000001",
+            first_name="Migration",
+            join_date=today,
+            created_by_membership_id=tenant.owner_membership.id,
+            updated_by_membership_id=tenant.owner_membership.id,
+        )
+        plan = MembershipPlan.objects.create(
+            gym=tenant.gym,
+            code="MIGRATION-30",
+            name="Migration 30",
+            duration_value=30,
+            duration_unit=MembershipPlan.DurationUnit.DAY,
+            price=Decimal("100.00"),
+            currency=tenant.gym.currency,
+            created_by_membership_id=tenant.owner_membership.id,
+            updated_by_membership_id=tenant.owner_membership.id,
+        )
+        membership = Membership.objects.create(
+            gym=tenant.gym,
+            member=member,
+            plan=plan,
+            plan_code=plan.code,
+            plan_name=plan.name,
+            duration_value=plan.duration_value,
+            duration_unit=plan.duration_unit,
+            start_date=today + timedelta(days=5),
+            expiry_date=today + timedelta(days=34),
+            list_price=plan.price,
+            discount_amount=Decimal("0"),
+            final_amount=plan.price,
+            currency=plan.currency,
+            status=Membership.Status.ACTIVE,
+            revenue_source=Membership.RevenueSource.NEW_MEMBER,
+            created_by_membership_id=tenant.owner_membership.id,
+        )
+
+        with connection.cursor() as cursor:
+            cursor.execute("GRANT SELECT ON tenants_gym TO gym_migration")
+            cursor.execute("GRANT SELECT, UPDATE ON members_membership TO gym_migration")
+            cursor.execute("GRANT EXECUTE ON FUNCTION app_current_gym_id() TO gym_migration")
+            cursor.execute("SET LOCAL ROLE gym_migration")
+        migration = import_module("apps.members.migrations.0006_membership_suspended_overlap")
+        migration.normalize_statuses_and_check_overlaps(
+            apps,
+            SimpleNamespace(connection=connection),
+        )
+        with connection.cursor() as cursor:
+            cursor.execute("RESET ROLE")
+        set_gym_context(gym_id=tenant.gym.id)
+        membership.refresh_from_db()
+        assert membership.status == Membership.Status.PENDING

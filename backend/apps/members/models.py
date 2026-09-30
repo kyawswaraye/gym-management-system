@@ -151,7 +151,7 @@ class Membership(TenantModel):
                         RangeOperators.OVERLAPS,
                     ),
                 ],
-                condition=models.Q(status__in=["PENDING", "ACTIVE"]),
+                condition=models.Q(status__in=["PENDING", "ACTIVE", "SUSPENDED"]),
             ),
         ]
         indexes = [

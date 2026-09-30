@@ -16,6 +16,10 @@ export function hasTenantCapability(
   return hasPermission(session, permission) && hasFeature(session, feature);
 }
 
+export function hasPlatformAccess(session: CurrentUser): boolean {
+  return session.permissions.some((code) => code.startsWith("platform."));
+}
+
 export function tenantHomePath(session: CurrentUser): string {
   if (hasTenantCapability(session, "reports.view", "reports")) {
     return "/dashboard";
@@ -30,4 +34,14 @@ export function tenantHomePath(session: CurrentUser): string {
     return "/payments";
   }
   return "/dashboard";
+}
+
+export function sessionHomePath(session: CurrentUser): string {
+  if (hasPlatformAccess(session)) {
+    return "/super-admin/dashboard";
+  }
+  if (!session.gym || !session.gym_membership) {
+    return "/select-gym";
+  }
+  return tenantHomePath(session);
 }

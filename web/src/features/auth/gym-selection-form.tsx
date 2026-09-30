@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  authenticatedHomePath,
   errorMessage,
   getCsrfToken,
   mutationHeaders,
@@ -49,7 +50,7 @@ export function GymSelectionForm({ gyms }: { gyms: GymSummary[] }) {
         setError(await errorMessage(response, "Unable to select this gym."));
         return;
       }
-      router.replace("/dashboard");
+      router.replace(await authenticatedHomePath());
       router.refresh();
     } catch {
       setError("The network is unavailable. Please try again.");

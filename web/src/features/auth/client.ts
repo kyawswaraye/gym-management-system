@@ -1,3 +1,6 @@
+import { sessionHomePath } from "@/lib/auth/authorization";
+import type { ApiEnvelope, CurrentUser } from "@/types/api";
+
 type ErrorEnvelope = {
   error?: { message?: string };
 };
@@ -34,4 +37,16 @@ export function mutationHeaders(csrfToken: string): HeadersInit {
     "Content-Type": "application/json",
     "X-CSRF-Token": csrfToken,
   };
+}
+
+export async function authenticatedHomePath(): Promise<string> {
+  const response = await fetch("/api/auth/me", {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error("Unable to load the authenticated workspace.");
+  }
+  const body = (await response.json()) as ApiEnvelope<CurrentUser>;
+  return sessionHomePath(body.data);
 }

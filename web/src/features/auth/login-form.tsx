@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  authenticatedHomePath,
   errorMessage,
   getCsrfToken,
   mutationHeaders,
@@ -47,9 +48,10 @@ export function LoginForm({
       const body = (await response.json()) as {
         data?: { requires_gym_selection?: boolean };
       };
-      router.replace(
-        body.data?.requires_gym_selection ? "/select-gym" : "/dashboard",
-      );
+      const destination = body.data?.requires_gym_selection
+        ? "/select-gym"
+        : await authenticatedHomePath();
+      router.replace(destination);
       router.refresh();
     } catch {
       setError("The network is unavailable. Please try again.");

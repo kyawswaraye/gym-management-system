@@ -28,11 +28,15 @@ from apps.members.serializers import (
 )
 from apps.members.services import (
     approve_payment,
+    cancel_membership,
     create_member,
     create_membership,
     create_plan,
+    gym_today,
     refund_payment,
+    resume_membership,
     submit_payment,
+    suspend_membership,
     void_payment,
 )
 from apps.users.permissions import RequiresEntitlement, RequiresPermission
@@ -229,16 +233,35 @@ class MembershipListCreateView(MembershipFeatureAPIView):
     def get(self, request):
         memberships = Membership.objects.filter(gym=request.gym).select_related("member", "plan")
         if bucket := request.query_params.get("bucket"):
-            today = timezone.localdate()
+            today = gym_today(request.gym)
             ranges = {
-                "expired": Q(expiry_date__lt=today),
-                "today": Q(expiry_date=today),
-                "within_3_days": Q(expiry_date__range=(today, today + timedelta(days=3))),
-                "within_7_days": Q(expiry_date__range=(today, today + timedelta(days=7))),
-                "within_30_days": Q(expiry_date__range=(today, today + timedelta(days=30))),
+                "expired": Q(
+                    status__in=[
+                        Membership.Status.ACTIVE,
+                        Membership.Status.SUSPENDED,
+                        Membership.Status.EXPIRED,
+                    ],
+                    expiry_date__lt=today,
+                ),
+                "today": Q(status=Membership.Status.ACTIVE, expiry_date=today),
+                "within_3_days": Q(
+                    status=Membership.Status.ACTIVE,
+                    expiry_date__range=(today, today + timedelta(days=3)),
+                ),
+                "within_7_days": Q(
+                    status=Membership.Status.ACTIVE,
+                    expiry_date__range=(today, today + timedelta(days=7)),
+                ),
+                "within_30_days": Q(
+                    status=Membership.Status.ACTIVE,
+                    expiry_date__range=(today, today + timedelta(days=30)),
+                ),
             }
-            if bucket in ranges:
-                memberships = memberships.filter(ranges[bucket])
+            if bucket not in ranges:
+                from rest_framework.exceptions import ValidationError
+
+                raise ValidationError({"bucket": ["Unknown membership expiry bucket."]})
+            memberships = memberships.filter(ranges[bucket])
         return success_response(
             MembershipSerializer(memberships.order_by("-start_date")[:200], many=True).data
         )
@@ -278,23 +301,23 @@ class MembershipActionView(MembershipFeatureAPIView):
         )
 
     def post(self, request, membership_id, action):
-        membership = get_object_or_404(Membership, gym=request.gym, id=membership_id)
+        get_object_or_404(Membership, gym=request.gym, id=membership_id)
         if action == "cancel":
             serializer = ReasonSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-            membership.status = Membership.Status.CANCELLED
-            membership.cancelled_at = timezone.now()
-            membership.cancellation_reason = serializer.validated_data["reason"]
-        elif action == "suspend" and membership.status == Membership.Status.ACTIVE:
-            membership.status = Membership.Status.SUSPENDED
-        elif action == "resume" and membership.status == Membership.Status.SUSPENDED:
-            membership.status = Membership.Status.ACTIVE
-        else:
-            return success_response(
-                MembershipSerializer(membership).data,
-                message="Membership state was not changed",
+            membership = cancel_membership(
+                gym=request.gym,
+                membership_id=membership_id,
+                reason=serializer.validated_data["reason"],
             )
-        membership.save()
+        elif action == "suspend":
+            membership = suspend_membership(gym=request.gym, membership_id=membership_id)
+        elif action == "resume":
+            membership = resume_membership(gym=request.gym, membership_id=membership_id)
+        else:
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError({"action": ["Unknown membership action."]})
         return success_response(MembershipSerializer(membership).data, message="Membership updated")
 
 
@@ -432,7 +455,7 @@ class DashboardView(ReportsFeatureAPIView):
     required_permission = "reports.view"
 
     def get(self, request):
-        today = timezone.localdate()
+        today = gym_today(request.gym)
         range_name = request.query_params.get("range", "today")
         start = today.replace(day=1) if range_name == "month" else today
         payments = Payment.objects.filter(

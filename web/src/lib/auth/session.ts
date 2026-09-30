@@ -4,10 +4,11 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { serverAuthMe } from "@/lib/api/server";
+import { hasPlatformAccess, tenantHomePath } from "@/lib/auth/authorization";
 import { AUTH_COOKIES } from "@/lib/auth/cookies";
 import type { ApiEnvelope, CurrentUser } from "@/types/api";
 
-async function readCurrentUser(): Promise<CurrentUser | null> {
+export async function readCurrentUser(): Promise<CurrentUser | null> {
   const token = (await cookies()).get(AUTH_COOKIES.access)?.value;
   if (!token) return null;
 
@@ -29,8 +30,9 @@ export async function requireTenantSession(): Promise<CurrentUser> {
 export async function requirePlatformSession(): Promise<CurrentUser> {
   const session = await readCurrentUser();
   if (!session) redirect("/login?reason=expired");
-  if (!session.permissions.some((code) => code.startsWith("platform."))) {
-    redirect("/dashboard");
+  if (!hasPlatformAccess(session)) {
+    if (!session.gym || !session.gym_membership) redirect("/select-gym");
+    redirect(tenantHomePath(session));
   }
   return session;
 }
