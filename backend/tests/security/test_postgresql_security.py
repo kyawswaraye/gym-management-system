@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
-from uuid import uuid4
+from threading import Barrier
+from uuid import UUID, uuid4
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from django.db import DatabaseError, connection, transaction
+from django.db import DatabaseError, connection, connections, transaction
 from django.test import override_settings
 from django.utils import timezone
 
@@ -105,6 +107,101 @@ def test_context_is_transaction_local_on_reused_connection() -> None:
     with connection.cursor() as cursor:
         cursor.execute("SELECT current_setting('app.gym_id', true)")
         assert cursor.fetchone()[0] in ("", None)
+
+
+def test_context_is_cleared_after_transaction_rollback() -> None:
+    gym_id = uuid4()
+    with pytest.raises(RuntimeError, match="force rollback"):
+        with transaction.atomic():
+            set_gym_context(gym_id=gym_id)
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT current_setting('app.gym_id', true)")
+                assert cursor.fetchone()[0] == str(gym_id)
+            raise RuntimeError("force rollback")
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT current_setting('app.gym_id', true)")
+        assert cursor.fetchone()[0] in ("", None)
+
+
+def test_nested_transaction_rollback_restores_outer_context() -> None:
+    outer_gym_id = uuid4()
+    inner_gym_id = uuid4()
+    with transaction.atomic():
+        set_gym_context(gym_id=outer_gym_id)
+        with pytest.raises(RuntimeError, match="rollback savepoint"):
+            with transaction.atomic():
+                set_gym_context(gym_id=inner_gym_id)
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT current_setting('app.gym_id', true)")
+                    assert cursor.fetchone()[0] == str(inner_gym_id)
+                raise RuntimeError("rollback savepoint")
+
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_setting('app.gym_id', true)")
+            assert cursor.fetchone()[0] == str(outer_gym_id)
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT current_setting('app.gym_id', true)")
+        assert cursor.fetchone()[0] in ("", None)
+
+
+def test_concurrent_different_gym_contexts_never_cross() -> None:
+    user = User.objects.create_user(
+        "concurrent-context@example.test",
+        "correct horse battery staple",
+    )
+    gym_a = Gym.objects.create(code="CTX-A", name="Context A", status=Gym.Status.ACTIVE)
+    gym_b = Gym.objects.create(code="CTX-B", name="Context B", status=Gym.Status.ACTIVE)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym_a.id)
+        membership_a = GymMembership.objects.create(
+            gym=gym_a,
+            user=user,
+            status=GymMembership.Status.ACTIVE,
+            joined_date=date.today(),
+            activated_at=timezone.now(),
+        )
+    with transaction.atomic():
+        set_gym_context(gym_id=gym_b.id)
+        membership_b = GymMembership.objects.create(
+            gym=gym_b,
+            user=user,
+            status=GymMembership.Status.ACTIVE,
+            joined_date=date.today(),
+            activated_at=timezone.now(),
+        )
+
+    barrier = Barrier(2, timeout=10)
+
+    def visible_memberships(gym_id: UUID) -> list[str]:
+        connections.close_all()
+        try:
+            with transaction.atomic(), connection.cursor() as cursor:
+                set_gym_context(gym_id=gym_id)
+                cursor.execute("SET LOCAL ROLE gym_runtime")
+                barrier.wait()
+                cursor.execute(
+                    """
+                    SELECT id
+                    FROM tenants_gym_membership
+                    WHERE id IN (%s, %s)
+                    ORDER BY id
+                    """,
+                    [membership_a.id, membership_b.id],
+                )
+                return [str(row[0]) for row in cursor.fetchall()]
+        finally:
+            connections.close_all()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        future_a = pool.submit(visible_memberships, gym_a.id)
+        future_b = pool.submit(visible_memberships, gym_b.id)
+        visible_a = future_a.result()
+        visible_b = future_b.result()
+
+    assert visible_a == [str(membership_a.id)]
+    assert visible_b == [str(membership_b.id)]
 
 
 def test_missing_context_exposes_no_tenant_rows() -> None:
