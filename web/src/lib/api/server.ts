@@ -358,6 +358,60 @@ function errorCode(body: unknown): string | undefined {
   return typeof body.error.code === "string" ? body.error.code : undefined;
 }
 
+async function refreshAndRetry(
+  request: NextRequest,
+  expiredBody: unknown,
+  retry: (accessToken: string) => Promise<Response>,
+): Promise<NextResponse> {
+  const env = getServerEnv();
+  const verified = verifyMutationRequest(request, env.allowedOrigins);
+  const refresh = request.cookies.get(AUTH_COOKIES.refresh)?.value;
+  if (!verified.ok || !refresh) return responseFromUpstream(401, expiredBody);
+
+  const refreshed = await callDjango("/api/v1/auth/refresh/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refresh }),
+  });
+  const refreshedBody = await parseJson(refreshed);
+  if (!refreshed.ok) {
+    const failed = responseFromUpstream(refreshed.status, refreshedBody);
+    clearAuthCookies(failed);
+    return failed;
+  }
+
+  const newAccess = findString(refreshedBody, "access_token");
+  if (!newAccess) {
+    const invalid = responseFromUpstream(502, null);
+    clearAuthCookies(invalid);
+    return invalid;
+  }
+
+  try {
+    const upstream = await retry(newAccess);
+    const response = responseFromUpstream(
+      upstream.status,
+      await parseJson(upstream),
+    );
+    if (upstream.status === 401) {
+      clearAuthCookies(response);
+    } else {
+      setTokenCookies(response, refreshedBody);
+    }
+    return response;
+  } catch {
+    const unavailable = responseFromUpstream(503, {
+      success: false,
+      error: {
+        code: "UPSTREAM_UNAVAILABLE",
+        message: "The service is temporarily unavailable. Please try again.",
+      },
+    } satisfies ApiErrorBody);
+    setTokenCookies(unavailable, refreshedBody);
+    return unavailable;
+  }
+}
+
 export async function authenticatedGet(
   request: NextRequest,
   path: string,
@@ -371,39 +425,19 @@ export async function authenticatedGet(
   }
 
   try {
-    let upstream = await callDjango(path, {
+    const upstream = await callDjango(path, {
       method: "GET",
       headers: { Authorization: `Bearer ${access}` },
     });
-    let body = await parseJson(upstream);
+    const body = await parseJson(upstream);
     const env = getServerEnv();
     if (upstream.status === 401 && errorCode(body) === env.accessExpiredCode) {
-      const verified = verifyMutationRequest(request, env.allowedOrigins);
-      const refresh = request.cookies.get(AUTH_COOKIES.refresh)?.value;
-      if (!verified.ok || !refresh) return responseFromUpstream(401, body);
-
-      const refreshed = await callDjango("/api/v1/auth/refresh/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refresh }),
-      });
-      const refreshedBody = await parseJson(refreshed);
-      if (!refreshed.ok) {
-        const failed = responseFromUpstream(refreshed.status, refreshedBody);
-        clearAuthCookies(failed);
-        return failed;
-      }
-      const newAccess = findString(refreshedBody, "access_token");
-      if (!newAccess) return responseFromUpstream(502, null);
-
-      upstream = await callDjango(path, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${newAccess}` },
-      });
-      body = await parseJson(upstream);
-      const response = responseFromUpstream(upstream.status, body);
-      setTokenCookies(response, refreshedBody);
-      return response;
+      return refreshAndRetry(request, body, (newAccess) =>
+        callDjango(path, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${newAccess}` },
+        }),
+      );
     }
     return responseFromUpstream(upstream.status, body);
   } catch {
@@ -445,15 +479,24 @@ export async function authenticatedMutation(
     });
   }
   try {
-    const upstream = await callDjango(path, {
-      method,
-      headers: {
-        Authorization: `Bearer ${access}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    return responseFromUpstream(upstream.status, await parseJson(upstream));
+    const perform = (accessToken: string) =>
+      callDjango(path, {
+        method,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    const upstream = await perform(access);
+    const upstreamBody = await parseJson(upstream);
+    if (
+      upstream.status === 401 &&
+      errorCode(upstreamBody) === env.accessExpiredCode
+    ) {
+      return refreshAndRetry(request, upstreamBody, perform);
+    }
+    return responseFromUpstream(upstream.status, upstreamBody);
   } catch {
     return responseFromUpstream(503, {
       success: false,

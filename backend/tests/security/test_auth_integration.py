@@ -195,6 +195,55 @@ def test_ticket_replay_is_rejected() -> None:
     assert PlatformAuditLog.objects.filter(action="TICKET_REJECTED", actor_user=user).exists()
 
 
+@override_settings(**JWT_SETTINGS, GYM_SELECTION_TICKET_MAX_ATTEMPTS=2)
+def test_ticket_invalid_attempt_limit_is_terminal() -> None:
+    user = User.objects.create_user("attempts@example.test", PASSWORD)
+    membership = create_membership(user, create_gym("ATTEMPT-A"))
+    create_membership(user, create_gym("ATTEMPT-B"))
+    ticket = login(client(), user.email)["body"]["data"]["gym_selection_ticket"]
+    api = client()
+
+    first = api.post(
+        "/api/v1/auth/select-gym/",
+        {"gym_membership_id": str(uuid4()), "gym_selection_ticket": ticket},
+        format="json",
+    )
+    record = GymSelectionTicket.objects.get(user=user)
+    assert first.status_code == 401
+    assert record.attempt_count == 1
+    assert record.revoked_at is None
+
+    second = api.post(
+        "/api/v1/auth/select-gym/",
+        {"gym_membership_id": str(uuid4()), "gym_selection_ticket": ticket},
+        format="json",
+    )
+    record.refresh_from_db()
+    assert second.status_code == 401
+    assert record.attempt_count == record.max_attempts == 2
+    assert record.revoked_at is not None
+    assert record.revocation_reason == "MEMBERSHIP_SUBSTITUTION"
+
+    replay = api.post(
+        "/api/v1/auth/select-gym/",
+        {
+            "gym_membership_id": str(membership.id),
+            "gym_selection_ticket": ticket,
+        },
+        format="json",
+    )
+    record.refresh_from_db()
+    assert replay.status_code == 401
+    assert record.attempt_count == 2
+    assert not RefreshSession.objects.filter(user=user).exists()
+    assert PlatformAuditLog.objects.filter(
+        action="TICKET_REVOKED",
+        actor_user=user,
+        target_id=record.id,
+        new_values={"reason": "MEMBERSHIP_SUBSTITUTION"},
+    ).exists()
+
+
 @override_settings(**JWT_SETTINGS)
 def test_concurrent_ticket_consume_creates_one_session() -> None:
     user = User.objects.create_user("race@example.test", PASSWORD)

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   authenticatedGet,
+  authenticatedMutation,
   authMutation,
   stripCredentials,
 } from "@/lib/api/server";
@@ -103,6 +104,97 @@ describe("browser credential boundary", () => {
       401,
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes and retries an authenticated mutation exactly once", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            success: false,
+            error: { code: "ACCESS_TOKEN_EXPIRED", message: "Expired" },
+          },
+          { status: 401 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          success: true,
+          data: {
+            access_token: "new-mutation-access",
+            refresh_token: "new-mutation-refresh",
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ success: true, data: { id: "member-1" } }),
+      );
+    const csrf = "x".repeat(43);
+    const request = new NextRequest(
+      "https://app.example.com/api/operations/members",
+      {
+        method: "POST",
+        headers: {
+          cookie: `gms_access=old; gms_refresh=refresh; gms_csrf=${csrf}`,
+          origin: "https://app.example.com",
+          "x-csrf-token": csrf,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ first_name: "Moe" }),
+      },
+    );
+
+    const response = await authenticatedMutation(request, "/api/v1/members/");
+    const [, retryInit] = fetchMock.mock.calls[2] as [string, RequestInit];
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(new Headers(retryInit.headers).get("authorization")).toBe(
+      "Bearer new-mutation-access",
+    );
+    expect(JSON.parse(String(retryInit.body))).toEqual({ first_name: "Moe" });
+    expect(response.headers.get("set-cookie")).toContain(
+      "new-mutation-refresh",
+    );
+    expect(await response.text()).not.toContain("new-mutation-access");
+  });
+
+  it("preserves rotated cookies when the retry is unavailable", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            success: false,
+            error: { code: "ACCESS_TOKEN_EXPIRED", message: "Expired" },
+          },
+          { status: 401 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          success: true,
+          data: {
+            access_token: "rotated-access",
+            refresh_token: "rotated-refresh",
+          },
+        }),
+      )
+      .mockRejectedValueOnce(new Error("retry unavailable"));
+    const csrf = "x".repeat(43);
+    const request = new NextRequest("https://app.example.com/api/auth/me", {
+      headers: {
+        cookie: `gms_access=old; gms_refresh=refresh; gms_csrf=${csrf}`,
+        origin: "https://app.example.com",
+        "x-csrf-token": csrf,
+      },
+    });
+
+    const response = await authenticatedGet(request, "/api/v1/auth/me/");
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("set-cookie")).toContain("rotated-refresh");
+    expect(await response.text()).not.toContain("rotated-access");
   });
 
   it("allows only approved tenant operation paths", async () => {
