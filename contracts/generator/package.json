@@ -1,0 +1,16 @@
+{
+  "name": "gym-api-contract-generator",
+  "private": true,
+  "version": "1.0.0",
+  "engines": {
+    "node": "24.20.0"
+  },
+  "scripts": {
+    "generate": "openapi-typescript ../openapi.v1.json -o ../../web/src/types/api.generated.ts && prettier --write ../../web/src/types/api.generated.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3"
+  }
+}

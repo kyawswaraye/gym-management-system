@@ -16,6 +16,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "rest_framework",
+    "drf_spectacular",
     "apps.users",
     "apps.tenants",
     "apps.audit",
@@ -67,9 +68,19 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["apps.users.authentication.StaffJWTAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "apps.common.api.exceptions.api_exception_handler",
     "UNAUTHENTICATED_USER": None,
     "DEFAULT_THROTTLE_RATES": {"anon": "30/min", "user": "120/min"},
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Gym Management Platform API",
+    "DESCRIPTION": "Implemented Phase 1A foundation API contract.",
+    "VERSION": "1.0.0",
+    "SCHEMA_PATH_PREFIX": r"/api/v1",
+    "COMPONENT_SPLIT_REQUEST": True,
+    "PREPROCESSING_HOOKS": ["apps.common.api.schema.phase_1a_endpoints"],
 }
 
 JWT_ISSUER = os.environ.get("JWT_ISSUER", "gym-platform-api")

@@ -7,6 +7,13 @@ from django.db import connection, transaction
 from django.db.transaction import non_atomic_requests
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    PolymorphicProxySerializer,
+    extend_schema,
+)
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -16,11 +23,19 @@ from rest_framework.views import APIView
 
 from apps.common.api.exceptions import AuthenticationFailed, CodedAPIException
 from apps.common.api.responses import success_response
+from apps.common.api.schema import ErrorEnvelopeSerializer
 from apps.common.db.tenant_context import set_gym_context, set_identity_context
 from apps.tenants.models import GymFeatureEntitlement, GymMembership
 
 from .authentication import StaffJWTAuthentication
 from .models import RefreshSession, User
+from .schema import (
+    CurrentUserEnvelopeSerializer,
+    DirectLoginEnvelopeSerializer,
+    GymMembershipListEnvelopeSerializer,
+    SelectionLoginEnvelopeSerializer,
+    TokenEnvelopeSerializer,
+)
 from .serializers import (
     LoginInputSerializer,
     LogoutInputSerializer,
@@ -35,6 +50,14 @@ from .services import (
     revoke_all_user_sessions,
     revoke_refresh_token,
     rotate_refresh_token,
+)
+
+BFF_HEADER_PARAMETER = OpenApiParameter(
+    name="X-Gym-BFF-Secret",
+    type=OpenApiTypes.STR,
+    location=OpenApiParameter.HEADER,
+    required=True,
+    description="Shared secret presented only by the trusted browser BFF.",
 )
 
 
@@ -89,6 +112,23 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [AnonRateThrottle]
 
+    @extend_schema(
+        operation_id="auth_login",
+        request=LoginInputSerializer,
+        parameters=[BFF_HEADER_PARAMETER],
+        responses={
+            200: PolymorphicProxySerializer(
+                component_name="LoginEnvelope",
+                serializers=[DirectLoginEnvelopeSerializer, SelectionLoginEnvelopeSerializer],
+                resource_type_field_name=None,
+            ),
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            501: ErrorEnvelopeSerializer,
+        },
+        auth=[],
+    )
     def post(self, request: Request) -> Response:
         # Request-level ATOMIC_REQUESTS is disabled so ticket/refresh denials can
         # persist. Tenant GUCs still require an explicit transaction.
@@ -152,6 +192,18 @@ class RefreshView(APIView):
     authentication_classes: list[type] = []
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        operation_id="auth_refresh",
+        request=RefreshInputSerializer,
+        parameters=[BFF_HEADER_PARAMETER],
+        responses={
+            200: TokenEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+        },
+        auth=[],
+    )
     def post(self, request: Request) -> Response:
         serializer = RefreshInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -166,6 +218,17 @@ class LogoutView(APIView):
     authentication_classes: list[type] = []
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        operation_id="auth_logout",
+        request=LogoutInputSerializer,
+        parameters=[BFF_HEADER_PARAMETER],
+        responses={
+            204: OpenApiResponse(response=None, description="Session revoked."),
+            400: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+        },
+        auth=[],
+    )
     def post(self, request: Request) -> Response:
         serializer = LogoutInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -174,12 +237,31 @@ class LogoutView(APIView):
 
 
 class LogoutAllView(APIView):
+    @extend_schema(
+        operation_id="auth_logout_all",
+        request=None,
+        parameters=[BFF_HEADER_PARAMETER],
+        responses={
+            204: OpenApiResponse(response=None, description="All user sessions revoked."),
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+        },
+    )
     def post(self, request: Request) -> Response:
         revoke_all_user_sessions(request.user.id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class GymsView(APIView):
+    @extend_schema(
+        operation_id="auth_gyms",
+        parameters=[BFF_HEADER_PARAMETER],
+        responses={
+            200: GymMembershipListEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+        },
+    )
     def get(self, request: Request) -> Response:
         return success_response(_membership_rows(request.user.id))
 
@@ -190,6 +272,22 @@ class SelectGymView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [AnonRateThrottle]
 
+    @extend_schema(
+        operation_id="auth_select_gym",
+        request=SelectGymInputSerializer,
+        parameters=[BFF_HEADER_PARAMETER],
+        responses={
+            200: TokenEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+        },
+        auth=[],
+        description=(
+            "Consumes a protected gym-selection ticket, or switches gyms when a staff "
+            "Bearer token is supplied by the trusted BFF."
+        ),
+    )
     def post(self, request: Request) -> Response:
         serializer = SelectGymInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -237,6 +335,15 @@ class SelectGymView(APIView):
 
 
 class MeView(APIView):
+    @extend_schema(
+        operation_id="auth_me",
+        parameters=[BFF_HEADER_PARAMETER],
+        responses={
+            200: CurrentUserEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+        },
+    )
     def get(self, request: Request) -> Response:
         membership = request.gym_membership
         roles = list(
@@ -281,5 +388,14 @@ class ProviderNeutralUnavailableView(APIView):
     authentication_classes: list[type] = []
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=OpenApiTypes.OBJECT,
+        parameters=[BFF_HEADER_PARAMETER],
+        responses={
+            403: ErrorEnvelopeSerializer,
+            501: ErrorEnvelopeSerializer,
+        },
+        auth=[],
+    )
     def post(self, request: Request) -> Response:
         raise ProviderNotConfigured()

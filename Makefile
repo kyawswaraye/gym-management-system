@@ -1,4 +1,4 @@
-.PHONY: check-python check-node db-up db-down db-logs migrate backend-install backend-check backend-test backend-test-pg web-install web-check web-test check
+.PHONY: check-python check-node db-up db-down db-logs migrate backend-install backend-check backend-test backend-test-pg web-install web-check web-test openapi-export openapi-generate openapi-check check
 
 ifneq ($(wildcard .env),)
 include .env
@@ -64,4 +64,17 @@ web-check: check-node
 web-test: check-node
 	npm --prefix web test -- --run
 
-check: backend-check backend-test web-check web-test
+openapi-export: check-python
+	cd backend && .venv/bin/python manage.py spectacular \
+		--file ../contracts/openapi.v1.json \
+		--format openapi-json \
+		--validate
+
+openapi-generate: openapi-export check-node
+	npm --prefix contracts/generator ci
+	npm --prefix contracts/generator run generate
+
+openapi-check: openapi-generate
+	git diff --exit-code -- contracts/openapi.v1.json web/src/types/api.generated.ts
+
+check: backend-check backend-test web-check web-test openapi-check

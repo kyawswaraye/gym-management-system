@@ -16,8 +16,7 @@ export function AppShell({
   const canUsePlatform = session.permissions.some((code) =>
     code.startsWith("platform."),
   );
-  const gymName =
-    session.gym?.display_name ?? session.gym?.name ?? "Selected gym";
+  const gymName = session.gym?.name ?? "Selected gym";
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[15rem_1fr]">

@@ -1,3 +1,5 @@
+import type { components } from "@/types/api.generated";
+
 export type ApiErrorBody = {
   success: false;
   error: {
@@ -20,24 +22,7 @@ export type GymSummary = {
   gym?: { code?: string; name?: string };
 };
 
-export type CurrentUser = {
-  user: {
-    id: string;
-    email: string;
-    first_name: string;
-    last_name: string;
-  };
-  gym: GymSummary | null;
-  gym_membership: {
-    id: string;
-    status: string;
-    is_owner: boolean;
-    roles: Array<{ key?: string; name?: string }>;
-  } | null;
-  permissions: string[];
-  feature_codes?: string[];
-  authz_version: number;
-};
+export type CurrentUser = components["schemas"]["CurrentUserData"];
 
 export type Member = {
   id: string;

@@ -1,0 +1,1316 @@
+{
+    "openapi": "3.0.3",
+    "info": {
+        "title": "Gym Management Platform API",
+        "version": "1.0.0",
+        "description": "Implemented Phase 1A foundation API contract."
+    },
+    "paths": {
+        "/api/v1/auth/gyms/": {
+            "get": {
+                "operationId": "auth_gyms",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Gym-BFF-Secret",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Shared secret presented only by the trusted browser BFF.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GymMembershipListEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/login/": {
+            "post": {
+                "operationId": "auth_login",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Gym-BFF-Secret",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Shared secret presented only by the trusted browser BFF.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LoginInputRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LoginInputRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LoginInputRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LoginEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "501": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/logout/": {
+            "post": {
+                "operationId": "auth_logout",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Gym-BFF-Secret",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Shared secret presented only by the trusted browser BFF.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LogoutInputRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LogoutInputRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LogoutInputRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "Session revoked."
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/logout-all/": {
+            "post": {
+                "operationId": "auth_logout_all",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Gym-BFF-Secret",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Shared secret presented only by the trusted browser BFF.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "All user sessions revoked."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/me/": {
+            "get": {
+                "operationId": "auth_me",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Gym-BFF-Secret",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Shared secret presented only by the trusted browser BFF.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CurrentUserEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/mfa/challenge/": {
+            "post": {
+                "operationId": "auth_mfa_challenge_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Gym-BFF-Secret",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Shared secret presented only by the trusted browser BFF.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {}
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {}
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {}
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "501": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/password/forgot/": {
+            "post": {
+                "operationId": "auth_password_forgot_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Gym-BFF-Secret",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Shared secret presented only by the trusted browser BFF.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {}
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {}
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {}
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "501": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/password/reset/": {
+            "post": {
+                "operationId": "auth_password_reset_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Gym-BFF-Secret",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Shared secret presented only by the trusted browser BFF.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {}
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {}
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {}
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "501": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/refresh/": {
+            "post": {
+                "operationId": "auth_refresh",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Gym-BFF-Secret",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Shared secret presented only by the trusted browser BFF.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RefreshInputRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RefreshInputRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RefreshInputRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TokenEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/select-gym/": {
+            "post": {
+                "operationId": "auth_select_gym",
+                "description": "Consumes a protected gym-selection ticket, or switches gyms when a staff Bearer token is supplied by the trusted BFF.",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Gym-BFF-Secret",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Shared secret presented only by the trusted browser BFF.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SelectGymInputRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SelectGymInputRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SelectGymInputRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TokenEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/health/": {
+            "get": {
+                "operationId": "health",
+                "tags": [
+                    "health"
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HealthEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/readiness/": {
+            "get": {
+                "operationId": "readiness",
+                "tags": [
+                    "readiness"
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReadinessEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "CurrentUserData": {
+                "type": "object",
+                "properties": {
+                    "user": {
+                        "$ref": "#/components/schemas/CurrentUserIdentity"
+                    },
+                    "gym": {
+                        "$ref": "#/components/schemas/SelectedGym"
+                    },
+                    "gym_membership": {
+                        "$ref": "#/components/schemas/SelectedMembership"
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "features": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/FeatureEntitlement"
+                        }
+                    },
+                    "authz_version": {
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "authz_version",
+                    "features",
+                    "gym",
+                    "gym_membership",
+                    "permissions",
+                    "user"
+                ]
+            },
+            "CurrentUserEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/CurrentUserData"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message"
+                ]
+            },
+            "CurrentUserIdentity": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "first_name": {
+                        "type": "string"
+                    },
+                    "last_name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "email",
+                    "first_name",
+                    "id",
+                    "last_name"
+                ]
+            },
+            "DirectLoginData": {
+                "type": "object",
+                "properties": {
+                    "access_token": {
+                        "type": "string"
+                    },
+                    "access_expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "refresh_token": {
+                        "type": "string"
+                    },
+                    "refresh_expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "requires_gym_selection": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "available_gym_memberships": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/GymMembershipChoice"
+                        }
+                    }
+                },
+                "required": [
+                    "access_expires_at",
+                    "access_token",
+                    "available_gym_memberships",
+                    "refresh_expires_at",
+                    "refresh_token"
+                ]
+            },
+            "DirectLoginEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/DirectLoginData"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message"
+                ]
+            },
+            "ErrorDetail": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "fields": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    }
+                },
+                "required": [
+                    "code",
+                    "message"
+                ]
+            },
+            "ErrorEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "error": {
+                        "$ref": "#/components/schemas/ErrorDetail"
+                    },
+                    "request_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "error",
+                    "request_id"
+                ]
+            },
+            "FeatureEntitlement": {
+                "type": "object",
+                "properties": {
+                    "feature__code": {
+                        "type": "string"
+                    },
+                    "limit_value": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "feature__code",
+                    "limit_value"
+                ]
+            },
+            "GymDisplay": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "name"
+                ]
+            },
+            "GymMembershipChoice": {
+                "type": "object",
+                "properties": {
+                    "gym_membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "gym_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "gym": {
+                        "$ref": "#/components/schemas/GymDisplay"
+                    }
+                },
+                "required": [
+                    "gym",
+                    "gym_id",
+                    "gym_membership_id"
+                ]
+            },
+            "GymMembershipListEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/GymMembershipRow"
+                        }
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message"
+                ]
+            },
+            "GymMembershipRow": {
+                "type": "object",
+                "properties": {
+                    "gym_membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "gym_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "gym": {
+                        "$ref": "#/components/schemas/GymDisplay"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "is_owner": {
+                        "type": "boolean"
+                    },
+                    "authz_version": {
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "authz_version",
+                    "gym",
+                    "gym_id",
+                    "gym_membership_id",
+                    "is_owner",
+                    "status"
+                ]
+            },
+            "HealthData": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "status"
+                ]
+            },
+            "HealthEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/HealthData"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message"
+                ]
+            },
+            "LoginEnvelope": {
+                "oneOf": [
+                    {
+                        "$ref": "#/components/schemas/DirectLoginEnvelope"
+                    },
+                    {
+                        "$ref": "#/components/schemas/SelectionLoginEnvelope"
+                    }
+                ]
+            },
+            "LoginInputRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "minLength": 1
+                    },
+                    "password": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "minLength": 1
+                    },
+                    "mfa_code": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "minLength": 1
+                    },
+                    "device_name": {
+                        "type": "string",
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "email",
+                    "password"
+                ]
+            },
+            "LogoutInputRequest": {
+                "type": "object",
+                "properties": {
+                    "refresh_token": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "minLength": 1
+                    }
+                },
+                "required": [
+                    "refresh_token"
+                ]
+            },
+            "ReadinessData": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string"
+                    },
+                    "database": {
+                        "type": "string"
+                    },
+                    "jwt_keys": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "database",
+                    "jwt_keys",
+                    "status"
+                ]
+            },
+            "ReadinessEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/ReadinessData"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message"
+                ]
+            },
+            "RefreshInputRequest": {
+                "type": "object",
+                "properties": {
+                    "refresh_token": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "minLength": 1
+                    }
+                },
+                "required": [
+                    "refresh_token"
+                ]
+            },
+            "SelectGymInputRequest": {
+                "type": "object",
+                "properties": {
+                    "gym_membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "gym_selection_ticket": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "minLength": 1
+                    }
+                },
+                "required": [
+                    "gym_membership_id"
+                ]
+            },
+            "SelectedGym": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "timezone": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "currency",
+                    "id",
+                    "name",
+                    "timezone"
+                ]
+            },
+            "SelectedMembership": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "is_owner": {
+                        "type": "boolean"
+                    },
+                    "roles": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "is_owner",
+                    "roles",
+                    "status"
+                ]
+            },
+            "SelectionLoginData": {
+                "type": "object",
+                "properties": {
+                    "requires_gym_selection": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "gym_selection_ticket": {
+                        "type": "string"
+                    },
+                    "gym_selection_expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "available_gym_memberships": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/GymMembershipChoice"
+                        }
+                    }
+                },
+                "required": [
+                    "available_gym_memberships",
+                    "gym_selection_expires_at",
+                    "gym_selection_ticket"
+                ]
+            },
+            "SelectionLoginEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/SelectionLoginData"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message"
+                ]
+            },
+            "TokenEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/TokenPair"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message"
+                ]
+            },
+            "TokenPair": {
+                "type": "object",
+                "properties": {
+                    "access_token": {
+                        "type": "string"
+                    },
+                    "access_expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "refresh_token": {
+                        "type": "string"
+                    },
+                    "refresh_expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "access_expires_at",
+                    "access_token",
+                    "refresh_expires_at",
+                    "refresh_token"
+                ]
+            }
+        },
+        "securitySchemes": {
+            "staffBearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT"
+            }
+        }
+    }
+}

@@ -90,6 +90,14 @@ jobs:
           python manage.py makemigrations --check --dry-run
       - name: Audit Python dependencies
         run: pip-audit --strict -r backend/requirements/base.txt
+      - name: Check API schema
+        working-directory: backend
+        run: |
+          python manage.py spectacular \
+            --file /tmp/openapi.v1.json \
+            --format openapi-json \
+            --validate
+          diff -u ../contracts/openapi.v1.json /tmp/openapi.v1.json
       - name: Test
         working-directory: backend
         run: pytest
@@ -115,6 +123,12 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npm audit --audit-level=high
+      - name: Check generated API types
+        run: |
+          npm --prefix ../contracts/generator ci
+          npm --prefix ../contracts/generator audit --audit-level=high
+          npm --prefix ../contracts/generator run generate
+          git diff --exit-code -- src/types/api.generated.ts
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck

@@ -61,6 +61,15 @@ Django listens on loopback and requires `BFF_SHARED_SECRET`.
 `Secure` authentication cookies are mandatory outside isolated localhost
 development. Browser JavaScript never receives authentication tokens.
 
+## API contract
+
+The implemented Phase 1A foundation contract is committed at
+`contracts/openapi.v1.json`. Its generated TypeScript definitions are committed
+at `web/src/types/api.generated.ts`. Run `make openapi-check` with the approved
+Python and Node versions to regenerate both artifacts and fail on contract drift.
+Later-phase business routes remain excluded until their contracts and exit
+criteria are approved.
+
 ## Documentation
 
 Start at the documentation index, [`docs/README.md`](docs/README.md). It lists the
