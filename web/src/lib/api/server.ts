@@ -104,14 +104,38 @@ async function parseJson(response: Response): Promise<unknown> {
   }
 }
 
+function canonicalDjangoPath(path: string): string {
+  const queryIndex = path.indexOf("?");
+  const rawPathname = queryIndex === -1 ? path : path.slice(0, queryIndex);
+  if (
+    !rawPathname.startsWith("/api/v1/") ||
+    rawPathname.includes("%") ||
+    rawPathname.includes("\\") ||
+    rawPathname.includes("#")
+  ) {
+    throw new Error("Django route is not allowed.");
+  }
+
+  const parsed = new URL(path, "http://internal");
+  if (
+    parsed.origin !== "http://internal" ||
+    parsed.pathname !== rawPathname ||
+    parsed.hash
+  ) {
+    throw new Error("Django route is not allowed.");
+  }
+  return `${parsed.pathname}${parsed.search}`;
+}
+
 async function callDjango(path: string, init: RequestInit): Promise<Response> {
-  const pathname = new URL(path, "http://internal").pathname;
+  const canonicalPath = canonicalDjangoPath(path);
+  const pathname = new URL(canonicalPath, "http://internal").pathname;
   const allowed =
     ALLOWED_PATHS.has(pathname) ||
     ALLOWED_TENANT_PATHS.some((pattern) => pattern.test(pathname));
   if (!allowed) throw new Error("Django route is not allowed.");
   const { djangoApiUrl, bffSharedSecret } = getServerEnv();
-  return fetch(`${djangoApiUrl}${path}`, {
+  return fetch(`${djangoApiUrl}${canonicalPath}`, {
     ...init,
     cache: "no-store",
     headers: {

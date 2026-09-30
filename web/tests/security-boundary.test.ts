@@ -125,6 +125,22 @@ describe("browser credential boundary", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects encoded traversal before it can reach an auth route", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const request = new NextRequest(
+      "https://app.example.com/api/operations/members/%2e%2e/auth/me",
+      { headers: { cookie: "gms_access=access" } },
+    );
+
+    const response = await authenticatedGet(
+      request,
+      "/api/v1/members/%2e%2e/auth/me/",
+    );
+
+    expect(response.status).toBe(503);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("stores the gym-selection ticket only in an HttpOnly cookie", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       Response.json({
