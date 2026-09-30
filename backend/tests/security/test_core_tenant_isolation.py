@@ -26,7 +26,14 @@ from apps.members.services import (
     resume_membership,
     suspend_membership,
 )
-from apps.tenants.models import GymFeatureEntitlement, Permission, SystemRoleTemplate
+from apps.notifications.models import Notification
+from apps.notifications.services import schedule_membership_expiry_notifications
+from apps.tenants.models import (
+    GymFeatureEntitlement,
+    GymSettings,
+    Permission,
+    SystemRoleTemplate,
+)
 from apps.tenants.services import provision_gym
 from apps.users.models import User
 
@@ -569,3 +576,120 @@ def test_membership_status_migration_sets_rls_context() -> None:
         set_gym_context(gym_id=tenant.gym.id)
         membership.refresh_from_db()
         assert membership.status == Membership.Status.PENDING
+
+
+def test_membership_expiry_notifications_are_deduplicated_and_email_only() -> None:
+    owner = User.objects.create_user("expiry-owner@example.test", PASSWORD)
+    tenant = provision_gym(
+        code="EXPIRY-NOTICE",
+        name="Expiry Notice Gym",
+        owner_email=owner.email,
+    )
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        today = gym_today(tenant.gym)
+        settings = GymSettings.objects.get(gym=tenant.gym)
+        settings.membership_expiry_email_enabled = True
+        settings.membership_expiry_warning_days = [7]
+        settings.save(
+            update_fields=[
+                "membership_expiry_email_enabled",
+                "membership_expiry_warning_days",
+                "updated_at",
+            ]
+        )
+        plan = MembershipPlan.objects.create(
+            gym=tenant.gym,
+            code="NOTICE-8",
+            name="Notice 8",
+            duration_value=8,
+            duration_unit=MembershipPlan.DurationUnit.DAY,
+            price=Decimal("100.00"),
+            currency=tenant.gym.currency,
+            created_by_membership_id=tenant.owner_membership.id,
+            updated_by_membership_id=tenant.owner_membership.id,
+        )
+        member = Member.objects.create(
+            gym=tenant.gym,
+            member_number="NOTICE-000001",
+            first_name="Notice",
+            email="notice@example.test",
+            join_date=today,
+            created_by_membership_id=tenant.owner_membership.id,
+            updated_by_membership_id=tenant.owner_membership.id,
+        )
+        create_membership(
+            gym=tenant.gym,
+            actor=tenant.owner_membership,
+            member=member,
+            plan=plan,
+            start_date=today,
+            discount_amount=Decimal("0"),
+        )
+        second_member = Member.objects.create(
+            gym=tenant.gym,
+            member_number="NOTICE-000002",
+            first_name="Second Notice",
+            email="second-notice@example.test",
+            join_date=today,
+            created_by_membership_id=tenant.owner_membership.id,
+            updated_by_membership_id=tenant.owner_membership.id,
+        )
+        create_membership(
+            gym=tenant.gym,
+            actor=tenant.owner_membership,
+            member=second_member,
+            plan=plan,
+            start_date=today,
+            discount_amount=Decimal("0"),
+        )
+        no_email = Member.objects.create(
+            gym=tenant.gym,
+            member_number="NOTICE-000003",
+            first_name="No Email",
+            join_date=today,
+            created_by_membership_id=tenant.owner_membership.id,
+            updated_by_membership_id=tenant.owner_membership.id,
+        )
+        create_membership(
+            gym=tenant.gym,
+            actor=tenant.owner_membership,
+            member=no_email,
+            plan=plan,
+            start_date=today,
+            discount_amount=Decimal("0"),
+        )
+
+        assert (
+            schedule_membership_expiry_notifications(
+                gym=tenant.gym,
+                today=today,
+                batch_size=1,
+            )
+            == 1
+        )
+        assert (
+            schedule_membership_expiry_notifications(
+                gym=tenant.gym,
+                today=today,
+                batch_size=1,
+            )
+            == 1
+        )
+        assert (
+            schedule_membership_expiry_notifications(
+                gym=tenant.gym,
+                today=today,
+                batch_size=1,
+            )
+            == 0
+        )
+        assert Notification.objects.filter(gym=tenant.gym).count() == 2
+        notification = Notification.objects.get(
+            gym=tenant.gym,
+            recipient_member=member,
+        )
+        assert notification.recipient_member_id == member.id
+        assert notification.status == Notification.Status.PENDING
+        assert notification.payload["warning_day"] == 7
+        assert "email" not in notification.payload

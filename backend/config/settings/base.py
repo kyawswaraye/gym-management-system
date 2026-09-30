@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     "apps.tenants",
     "apps.audit",
     "apps.members",
+    "apps.notifications",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

@@ -41,6 +41,7 @@ TENANT_TABLES = {
     "members_membership",
     "members_payment",
     "members_receipt",
+    "notifications_notification",
     "audit_audit_log",
 }
 
