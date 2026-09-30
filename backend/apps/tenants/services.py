@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from datetime import date
 
@@ -24,6 +25,19 @@ from apps.tenants.models import (
 class ProvisionedGym:
     gym: Gym
     owner_membership: GymMembership
+
+
+@transaction.atomic
+def increment_membership_authz_version(*, gym_id: uuid.UUID, membership_id: uuid.UUID) -> int:
+    """Atomically invalidate access tokens issued for one gym membership."""
+
+    membership = GymMembership.objects.select_for_update().get(
+        gym_id=gym_id,
+        id=membership_id,
+    )
+    membership.authz_version += 1
+    membership.save(update_fields=["authz_version", "updated_at"])
+    return membership.authz_version
 
 
 @transaction.atomic

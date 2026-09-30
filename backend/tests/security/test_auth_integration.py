@@ -9,6 +9,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from django.core.cache import cache
 from django.db import connections, transaction
 from django.test import override_settings
 from django.utils import timezone
@@ -17,6 +18,7 @@ from rest_framework.test import APIClient
 from apps.audit.models import PlatformAuditLog
 from apps.common.db.tenant_context import set_gym_context
 from apps.tenants.models import Gym, GymMembership
+from apps.tenants.services import increment_membership_authz_version
 from apps.users.models import GymSelectionTicket, RefreshSession, User
 from apps.users.services import issue_gym_selection_ticket
 from apps.users.tokens import decode_access_token
@@ -32,6 +34,11 @@ pytestmark = [
 
 PASSWORD = "correct horse battery staple"
 BFF_SECRET = "test-bff-shared-secret-32-chars-min"
+
+
+@pytest.fixture(autouse=True)
+def clear_throttle_cache() -> None:
+    cache.clear()
 
 
 def _keys() -> tuple[str, str]:
@@ -412,3 +419,87 @@ def test_select_gym_jwt_path_switches_membership_inside_atomic() -> None:
     me = client().get("/api/v1/auth/me/", HTTP_AUTHORIZATION=f"Bearer {data['access_token']}")
     assert me.status_code == 200
     assert me.json()["data"]["gym"]["id"] == str(gym_b.id)
+
+
+@override_settings(**JWT_SETTINGS)
+def test_stale_authz_version_rejects_existing_access_token() -> None:
+    user = User.objects.create_user("stale-authz@example.test", PASSWORD)
+    gym = create_gym("STALE-AUTHZ")
+    membership = create_membership(user, gym)
+    access_token = login(client(), user.email)["body"]["data"]["access_token"]
+
+    before = client().get(
+        "/api/v1/auth/me/",
+        HTTP_AUTHORIZATION=f"Bearer {access_token}",
+    )
+    assert before.status_code == 200
+
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        new_version = increment_membership_authz_version(
+            gym_id=gym.id,
+            membership_id=membership.id,
+        )
+
+    assert new_version == 2
+    after = client().get(
+        "/api/v1/auth/me/",
+        HTTP_AUTHORIZATION=f"Bearer {access_token}",
+    )
+    assert after.status_code == 401
+    assert after.json()["error"]["code"] == "AUTHENTICATION_FAILED"
+
+
+def test_concurrent_authz_version_increments_are_not_lost() -> None:
+    user = User.objects.create_user("authz-race@example.test", PASSWORD)
+    gym = create_gym("AUTHZ-RACE")
+    membership = create_membership(user, gym)
+
+    def increment() -> int:
+        connections.close_all()
+        with transaction.atomic():
+            set_gym_context(gym_id=gym.id)
+            version = increment_membership_authz_version(
+                gym_id=gym.id,
+                membership_id=membership.id,
+            )
+        connections.close_all()
+        return version
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        versions = list(pool.map(lambda _: increment(), range(2)))
+
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        membership.refresh_from_db()
+
+    assert sorted(versions) == [2, 3]
+    assert membership.authz_version == 3
+
+
+@override_settings(**JWT_SETTINGS)
+def test_logout_all_revokes_every_session_and_access_token() -> None:
+    user = User.objects.create_user("logout-all@example.test", PASSWORD)
+    create_membership(user, create_gym("LOGOUT-ALL"))
+    first = login(client(), user.email)["body"]["data"]
+    second = login(client(), user.email)["body"]["data"]
+
+    response = client().post(
+        "/api/v1/auth/logout-all/",
+        HTTP_AUTHORIZATION=f"Bearer {first['access_token']}",
+    )
+
+    assert response.status_code == 204
+    assert not RefreshSession.objects.filter(user=user, revoked_at__isnull=True).exists()
+    for token_data in (first, second):
+        me = client().get(
+            "/api/v1/auth/me/",
+            HTTP_AUTHORIZATION=f"Bearer {token_data['access_token']}",
+        )
+        refresh = client().post(
+            "/api/v1/auth/refresh/",
+            {"refresh_token": token_data["refresh_token"]},
+            format="json",
+        )
+        assert me.status_code == 401
+        assert refresh.status_code == 401
