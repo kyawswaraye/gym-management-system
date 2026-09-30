@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 
 import { MembersManager } from "@/features/operations/members-manager";
+import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
 
 export default async function MembersPage() {
   const session = await requireTenantSession();
-  if (!session.permissions.includes("members.view")) redirect("/dashboard");
+  if (!hasTenantCapability(session, "members.view", "members")) {
+    redirect(tenantHomePath(session));
+  }
 
   return (
     <section aria-labelledby="members-title">

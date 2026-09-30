@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 
 import { PaymentsManager } from "@/features/operations/payments-manager";
+import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
 
 export default async function PaymentsPage() {
   const session = await requireTenantSession();
-  if (!session.permissions.includes("payments.view")) redirect("/dashboard");
+  if (!hasTenantCapability(session, "payments.view", "finance")) {
+    redirect(tenantHomePath(session));
+  }
 
   return (
     <section aria-labelledby="payments-title">

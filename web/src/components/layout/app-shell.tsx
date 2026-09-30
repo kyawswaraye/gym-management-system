@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { LogoutButton } from "@/features/auth/logout-button";
+import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import type { CurrentUser } from "@/types/api";
 
 export function AppShell({
@@ -17,27 +18,49 @@ export function AppShell({
     code.startsWith("platform."),
   );
   const gymName = session.gym?.name ?? "Selected gym";
+  const homePath = platform
+    ? "/super-admin/dashboard"
+    : tenantHomePath(session);
+  const canViewDashboard = hasTenantCapability(
+    session,
+    "reports.view",
+    "reports",
+  );
+  const canViewMembers = hasTenantCapability(
+    session,
+    "members.view",
+    "members",
+  );
+  const canViewMemberships = hasTenantCapability(
+    session,
+    "memberships.view",
+    "memberships",
+  );
+  const canViewPayments = hasTenantCapability(
+    session,
+    "payments.view",
+    "finance",
+  );
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[15rem_1fr]">
       <aside className="border-b border-slate-200 bg-slate-950 p-5 text-white md:min-h-screen md:border-b-0">
-        <Link
-          className="text-xl font-bold"
-          href={platform ? "/super-admin/dashboard" : "/dashboard"}
-        >
+        <Link className="text-xl font-bold" href={homePath}>
           Gym Management
         </Link>
         <p className="mt-2 text-sm text-slate-300">
           {platform ? "Platform workspace" : gymName}
         </p>
         <nav className="mt-6 flex flex-wrap gap-2 md:grid" aria-label="Primary">
-          <Link
-            className="rounded-md px-3 py-2 hover:bg-slate-800"
-            href={platform ? "/super-admin/dashboard" : "/dashboard"}
-          >
-            Dashboard
-          </Link>
-          {!platform && session.permissions.includes("members.view") && (
+          {(platform || canViewDashboard) && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href={platform ? "/super-admin/dashboard" : "/dashboard"}
+            >
+              Dashboard
+            </Link>
+          )}
+          {!platform && canViewMembers && (
             <Link
               className="rounded-md px-3 py-2 hover:bg-slate-800"
               href="/members"
@@ -45,7 +68,7 @@ export function AppShell({
               Members
             </Link>
           )}
-          {!platform && session.permissions.includes("memberships.view") && (
+          {!platform && canViewMemberships && (
             <Link
               className="rounded-md px-3 py-2 hover:bg-slate-800"
               href="/memberships"
@@ -53,7 +76,7 @@ export function AppShell({
               Memberships
             </Link>
           )}
-          {!platform && session.permissions.includes("payments.view") && (
+          {!platform && canViewPayments && (
             <Link
               className="rounded-md px-3 py-2 hover:bg-slate-800"
               href="/payments"
@@ -72,7 +95,7 @@ export function AppShell({
           {platform && session.gym && (
             <Link
               className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/dashboard"
+              href={tenantHomePath(session)}
             >
               Tenant workspace
             </Link>

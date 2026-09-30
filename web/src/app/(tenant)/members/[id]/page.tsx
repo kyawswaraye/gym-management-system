@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { MemberDetail } from "@/features/operations/member-detail";
+import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
 
 export default async function MemberDetailPage({
@@ -9,7 +10,9 @@ export default async function MemberDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const session = await requireTenantSession();
-  if (!session.permissions.includes("members.view")) redirect("/dashboard");
+  if (!hasTenantCapability(session, "members.view", "members")) {
+    redirect(tenantHomePath(session));
+  }
   const { id } = await params;
   return (
     <section aria-labelledby="member-title">

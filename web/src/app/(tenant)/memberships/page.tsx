@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 
 import { MembershipsManager } from "@/features/operations/memberships-manager";
+import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
 
 export default async function MembershipsPage() {
   const session = await requireTenantSession();
-  if (!session.permissions.includes("memberships.view")) redirect("/dashboard");
+  if (!hasTenantCapability(session, "memberships.view", "memberships")) {
+    redirect(tenantHomePath(session));
+  }
 
   return (
     <section aria-labelledby="memberships-title">
