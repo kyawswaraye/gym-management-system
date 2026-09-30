@@ -1,38 +1,69 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 
 import { operationGet, operationMutation } from "@/features/operations/client";
 import type { Member } from "@/types/api";
 
-export function MembersManager({ canCreate }: { canCreate: boolean }) {
+export function MembersManager({
+  canCreate,
+  defaultDate,
+}: {
+  canCreate: boolean;
+  defaultDate: string;
+}) {
   const [members, setMembers] = useState<Member[]>([]);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [joinedFrom, setJoinedFrom] = useState("");
+  const [joinedTo, setJoinedTo] = useState("");
+  const requestVersion = useRef(0);
 
   const load = useCallback(async () => {
+    const version = ++requestVersion.current;
     try {
-      const query = search ? `?search=${encodeURIComponent(search)}` : "";
-      setMembers(await operationGet<Member[]>(`members/${query}`));
-      setError("");
+      const params = new URLSearchParams();
+      if (search.trim()) params.set("search", search.trim());
+      if (status) params.set("status", status);
+      if (joinedFrom) params.set("joined_from", joinedFrom);
+      if (joinedTo) params.set("joined_to", joinedTo);
+      const query = params.size ? `?${params.toString()}` : "";
+      const rows = await operationGet<Member[]>(`members/${query}`);
+      if (version === requestVersion.current) {
+        setMembers(rows);
+        setError("");
+      }
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Unable to load members.",
-      );
+      if (version === requestVersion.current) {
+        setError(
+          caught instanceof Error ? caught.message : "Unable to load members.",
+        );
+      }
     }
-  }, [search]);
+  }, [joinedFrom, joinedTo, search, status]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
+    const timer = window.setTimeout(() => void load(), 250);
+    return () => {
+      window.clearTimeout(timer);
+      requestVersion.current += 1;
+    };
   }, [load]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       await operationMutation<Member>("members/", {
         first_name: form.get("first_name"),
@@ -41,7 +72,7 @@ export function MembersManager({ canCreate }: { canCreate: boolean }) {
         email: form.get("email"),
         join_date: form.get("join_date"),
       });
-      event.currentTarget.reset();
+      formElement.reset();
       await load();
     } catch (caught) {
       setError(
@@ -77,7 +108,7 @@ export function MembersManager({ canCreate }: { canCreate: boolean }) {
             Join date
             <input
               className="input"
-              defaultValue={new Date().toISOString().slice(0, 10)}
+              defaultValue={defaultDate}
               name="join_date"
               required
               type="date"
@@ -94,8 +125,42 @@ export function MembersManager({ canCreate }: { canCreate: boolean }) {
             aria-label="Search members"
             className="input max-w-sm"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search name, number, phone"
+            maxLength={100}
+            placeholder="Search name, number, phone, email"
             value={search}
+          />
+          <select
+            aria-label="Filter by status"
+            className="input max-w-48"
+            onChange={(event) => setStatus(event.target.value)}
+            value={status}
+          >
+            <option value="">All statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="EXPIRED">Expired</option>
+            <option value="SUSPENDED">Suspended</option>
+            <option value="CANCELLED">Cancelled</option>
+            <option value="ARCHIVED">Archived</option>
+          </select>
+          <input
+            aria-label="Joined from"
+            className="input max-w-44"
+            max={joinedTo || undefined}
+            onChange={(event) => {
+              const value = event.target.value;
+              setJoinedFrom(value);
+              if (joinedTo && value > joinedTo) setJoinedTo("");
+            }}
+            type="date"
+            value={joinedFrom}
+          />
+          <input
+            aria-label="Joined to"
+            className="input max-w-44"
+            min={joinedFrom || undefined}
+            onChange={(event) => setJoinedTo(event.target.value)}
+            type="date"
+            value={joinedTo}
           />
         </div>
         {error && (
@@ -122,6 +187,11 @@ export function MembersManager({ canCreate }: { canCreate: boolean }) {
                       href={`/members/${member.id}`}
                     >
                       {member.display_name}
+                      {member.is_pt_client && (
+                        <span className="ml-2 rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
+                          PT
+                        </span>
+                      )}
                     </Link>
                     <span className="muted block">{member.member_number}</span>
                   </td>

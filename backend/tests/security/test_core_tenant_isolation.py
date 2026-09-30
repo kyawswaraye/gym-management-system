@@ -207,16 +207,24 @@ def test_tenant_a_api_cannot_access_tenant_b_core_operations() -> None:
     token_b = _token(owner_b.email)
     api = _client()
 
-    # List and dashboard selectors remain bound to the signed token even when
-    # the caller supplies a forged tenant header or query parameter.
+    # List selectors reject caller-supplied tenant parameters, and every other
+    # selector remains bound to the signed token despite a forged tenant header.
     members_a = _auth_get(
         api,
         f"/api/v1/members/?gym_id={tenant_b.gym.id}",
         token_a,
         HTTP_X_GYM_ID=str(tenant_b.gym.id),
     )
-    assert members_a.status_code == 200, members_a.json()
-    assert members_a.json()["data"] == []
+    assert members_a.status_code == 400, members_a.json()
+    assert "gym_id" in members_a.json()["error"]["fields"]
+    members_a_with_forged_header = _auth_get(
+        api,
+        "/api/v1/members/",
+        token_a,
+        HTTP_X_GYM_ID=str(tenant_b.gym.id),
+    )
+    assert members_a_with_forged_header.status_code == 200
+    assert members_a_with_forged_header.json()["data"] == []
     assert _auth_get(api, "/api/v1/memberships/", token_a).json()["data"] == []
     assert _auth_get(api, "/api/v1/payments/", token_a).json()["data"] == []
     assert _auth_get(api, "/api/v1/members/", token_b).json()["data"][0]["id"] == str(member_b.id)

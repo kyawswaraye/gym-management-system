@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { MembersManager } from "@/features/operations/members-manager";
 import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
+import { todayInTimezone } from "@/lib/date";
 
 export default async function MembersPage() {
   const session = await requireTenantSession();
@@ -20,6 +21,7 @@ export default async function MembersPage() {
       </p>
       <MembersManager
         canCreate={session.permissions.includes("members.create")}
+        defaultDate={todayInTimezone(session.gym?.timezone ?? "UTC")}
       />
     </section>
   );

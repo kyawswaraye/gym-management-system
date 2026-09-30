@@ -16,6 +16,7 @@ from apps.common.api.responses import success_response
 from apps.members.models import Member, Membership, MembershipPlan, Payment
 from apps.members.serializers import (
     MemberCreateSerializer,
+    MemberListQuerySerializer,
     MemberSerializer,
     MembershipCreateSerializer,
     MembershipPlanCreateSerializer,
@@ -84,15 +85,25 @@ class MemberListCreateView(MemberFeatureAPIView):
         return super().get_permissions()
 
     def get(self, request):
+        query = MemberListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        filters = query.validated_data
         queryset = Member.objects.filter(gym=request.gym).order_by("-created_at")
-        if value := request.query_params.get("status"):
+        if value := filters.get("status"):
             queryset = queryset.filter(status=value)
-        if search := request.query_params.get("search"):
+        if joined_from := filters.get("joined_from"):
+            queryset = queryset.filter(join_date__gte=joined_from)
+        if joined_to := filters.get("joined_to"):
+            queryset = queryset.filter(join_date__lte=joined_to)
+        if filters.get("is_pt_client") is True:
+            queryset = queryset.none()
+        if search := filters.get("search"):
             queryset = queryset.filter(
                 Q(member_number__icontains=search)
                 | Q(first_name__icontains=search)
                 | Q(last_name__icontains=search)
                 | Q(phone__icontains=search)
+                | Q(email__icontains=search)
             )
         return success_response(MemberSerializer(queryset[:200], many=True).data)
 

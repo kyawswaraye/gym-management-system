@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import date
 from decimal import Decimal
 from typing import cast
 
@@ -12,6 +13,10 @@ from apps.users.serializers import StrictSerializer
 
 class MemberSerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(read_only=True)
+    is_pt_client = serializers.SerializerMethodField()
+
+    def get_is_pt_client(self, obj: Member) -> bool:
+        return False
 
     class Meta:
         model = Member
@@ -32,6 +37,27 @@ class MemberCreateSerializer(StrictSerializer):
     emergency_contact_name = serializers.CharField(required=False, allow_blank=True)
     emergency_contact_phone = serializers.CharField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class MemberListQuerySerializer(StrictSerializer):
+    status = serializers.ChoiceField(choices=Member.Status.choices, required=False)
+    search = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=100,
+        trim_whitespace=True,
+    )
+    joined_from = serializers.DateField(required=False)
+    joined_to = serializers.DateField(required=False)
+    is_pt_client = serializers.BooleanField(required=False)
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        attrs = super().validate(attrs)
+        joined_from = cast(date | None, attrs.get("joined_from"))
+        joined_to = cast(date | None, attrs.get("joined_to"))
+        if joined_from and joined_to and joined_from > joined_to:
+            raise serializers.ValidationError({"joined_to": ["Must be on or after joined_from."]})
+        return attrs
 
 
 class MembershipPlanSerializer(serializers.ModelSerializer):

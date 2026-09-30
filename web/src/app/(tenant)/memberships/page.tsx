@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { MembershipsManager } from "@/features/operations/memberships-manager";
 import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
+import { todayInTimezone } from "@/lib/date";
 
 export default async function MembershipsPage() {
   const session = await requireTenantSession();
@@ -23,7 +24,7 @@ export default async function MembershipsPage() {
         canCreate={session.permissions.includes("memberships.create")}
         canUpdate={session.permissions.includes("memberships.update")}
         currency={session.gym?.currency ?? "THB"}
-        timezone={session.gym?.timezone ?? "UTC"}
+        defaultDate={todayInTimezone(session.gym?.timezone ?? "UTC")}
       />
     </section>
   );

@@ -35,6 +35,7 @@ export type Member = {
   join_date: string;
   notes?: string;
   status: string;
+  is_pt_client: boolean;
 };
 
 export type MembershipPlan = {

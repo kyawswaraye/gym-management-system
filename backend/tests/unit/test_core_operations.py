@@ -1,7 +1,11 @@
 from datetime import date
 
 from apps.members.models import MembershipPlan
-from apps.members.serializers import MemberCreateSerializer, PaymentCreateSerializer
+from apps.members.serializers import (
+    MemberCreateSerializer,
+    MemberListQuerySerializer,
+    PaymentCreateSerializer,
+)
 from apps.members.services import _add_duration
 
 
@@ -44,3 +48,32 @@ def test_payment_input_rejects_server_owned_status_and_totals() -> None:
     )
     assert not serializer.is_valid()
     assert set(serializer.errors) == {"gym_id", "status"}
+
+
+def test_member_filters_validate_status_and_joined_date_range() -> None:
+    valid = MemberListQuerySerializer(
+        data={
+            "status": "ACTIVE",
+            "joined_from": "2026-09-01",
+            "joined_to": "2026-09-30",
+            "is_pt_client": "false",
+        }
+    )
+    assert valid.is_valid(), valid.errors
+
+    reversed_range = MemberListQuerySerializer(
+        data={
+            "joined_from": "2026-09-30",
+            "joined_to": "2026-09-01",
+        }
+    )
+    assert not reversed_range.is_valid()
+    assert set(reversed_range.errors) == {"joined_to"}
+
+    invalid_status = MemberListQuerySerializer(data={"status": "UNKNOWN"})
+    assert not invalid_status.is_valid()
+    assert set(invalid_status.errors) == {"status"}
+
+    unknown_filter = MemberListQuerySerializer(data={"joinedFrom": "2026-09-01"})
+    assert not unknown_filter.is_valid()
+    assert set(unknown_filter.errors) == {"joinedFrom"}

@@ -32,7 +32,18 @@ function readError(body: unknown): string {
   if (typeof body !== "object" || body === null || !("error" in body)) {
     return "The request could not be completed.";
   }
-  const error = (body as { error?: { message?: unknown } }).error;
+  const error = (
+    body as {
+      error?: { message?: unknown; fields?: Record<string, unknown> };
+    }
+  ).error;
+  for (const value of Object.values(error?.fields ?? {})) {
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) {
+      const message = value.find((item) => typeof item === "string");
+      if (typeof message === "string") return message;
+    }
+  }
   return typeof error?.message === "string"
     ? error.message
     : "The request could not be completed.";
