@@ -5,16 +5,31 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { operationGet, operationMutation } from "@/features/operations/client";
 import type { Member, Membership, MembershipPlan } from "@/types/api";
 
+function localDateInTimezone(timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 export function MembershipsManager({
   canCreate,
   canUpdate,
   canCancel,
   currency,
+  timezone,
 }: {
   canCreate: boolean;
   canUpdate: boolean;
   canCancel: boolean;
   currency: string;
+  timezone: string;
 }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
@@ -50,7 +65,8 @@ export function MembershipsManager({
   async function createPlan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       await operationMutation<MembershipPlan>("membership-plans/", {
         code: form.get("code"),
@@ -60,7 +76,7 @@ export function MembershipsManager({
         price: form.get("price"),
         currency: form.get("currency"),
       });
-      event.currentTarget.reset();
+      formElement.reset();
       await load();
     } catch (caught) {
       setError(
@@ -173,6 +189,7 @@ export function MembershipsManager({
                   defaultValue={currency}
                   maxLength={3}
                   name="currency"
+                  readOnly
                   required
                 />
               </label>
@@ -211,7 +228,7 @@ export function MembershipsManager({
               Start date
               <input
                 className="input"
-                defaultValue={new Date().toISOString().slice(0, 10)}
+                defaultValue={localDateInTimezone(timezone)}
                 name="start_date"
                 required
                 type="date"
@@ -284,7 +301,9 @@ export function MembershipsManager({
                     </button>
                   )}
                   {canCancel &&
-                    !["CANCELLED", "EXPIRED"].includes(membership.status) && (
+                    ["PENDING", "ACTIVE", "SUSPENDED"].includes(
+                      membership.status,
+                    ) && (
                       <button
                         className="ml-3 underline"
                         onClick={() =>

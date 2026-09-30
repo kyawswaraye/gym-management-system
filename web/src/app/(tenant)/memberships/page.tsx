@@ -23,6 +23,7 @@ export default async function MembershipsPage() {
         canCreate={session.permissions.includes("memberships.create")}
         canUpdate={session.permissions.includes("memberships.update")}
         currency={session.gym?.currency ?? "THB"}
+        timezone={session.gym?.timezone ?? "UTC"}
       />
     </section>
   );

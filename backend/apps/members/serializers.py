@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from decimal import Decimal
+from typing import cast
 
 from rest_framework import serializers
 
@@ -33,6 +35,15 @@ class MemberCreateSerializer(StrictSerializer):
 
 
 class MembershipPlanSerializer(serializers.ModelSerializer):
+    def validate_currency(self, value: str) -> str:
+        if self.instance is None:
+            return value
+        gym = self.context.get("gym")
+        expected_currency = gym.currency if gym is not None else self.instance.gym.currency
+        if value != expected_currency:
+            raise serializers.ValidationError("Currency must match the selected gym.")
+        return value
+
     class Meta:
         model = MembershipPlan
         exclude = ("gym", "created_by_membership_id", "updated_by_membership_id")
@@ -60,17 +71,22 @@ class MembershipSerializer(serializers.ModelSerializer):
         read_only_fields = "__all__"
 
     def _paid(self, obj: Membership) -> Decimal:
-        return sum(
+        prefetched = getattr(obj, "_balance_payments", None)
+        payments: Iterable[Payment]
+        if prefetched is None:
+            payments = obj.payments.filter(status__in=[Payment.Status.POSTED, Payment.Status.VOID])
+        else:
+            payments = cast(list[Payment], prefetched)
+        paid = sum(
             (
                 -payment.amount
                 if payment.entry_type in [Payment.EntryType.REFUND, Payment.EntryType.REVERSAL]
                 else payment.amount
-                for payment in obj.payments.filter(
-                    status__in=[Payment.Status.POSTED, Payment.Status.VOID]
-                )
+                for payment in payments
             ),
             Decimal("0"),
         )
+        return paid
 
     def get_paid_amount(self, obj: Membership) -> Decimal:
         return self._paid(obj)

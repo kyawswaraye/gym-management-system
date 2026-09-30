@@ -8,8 +8,11 @@ import type { Member, Membership, Payment } from "@/types/api";
 type Summary = {
   member: Member;
   current_membership: Membership | null;
+  days_remaining: number | null;
+  is_pt_client: boolean;
   membership_history: Membership[];
   payment_history: Payment[];
+  check_in_summary: { available: boolean };
 };
 
 export function MemberDetail({
@@ -125,12 +128,19 @@ export function MemberDetail({
         <section className="card p-5">
           <h2 className="font-bold">Current membership</h2>
           {summary.current_membership ? (
-            <p className="mt-3">
-              {summary.current_membership.plan_name}:{" "}
-              {summary.current_membership.start_date} –{" "}
-              {summary.current_membership.expiry_date} (
-              {summary.current_membership.payment_status})
-            </p>
+            <div className="mt-3 grid gap-1">
+              <p>
+                {summary.current_membership.plan_name}:{" "}
+                {summary.current_membership.start_date} –{" "}
+                {summary.current_membership.expiry_date} (
+                {summary.current_membership.payment_status})
+              </p>
+              <p className="muted">
+                {summary.days_remaining} day
+                {summary.days_remaining === 1 ? "" : "s"} remaining
+                {summary.is_pt_client ? " · PT client" : ""}
+              </p>
+            </div>
           ) : (
             <p className="muted mt-3">No membership yet.</p>
           )}

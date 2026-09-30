@@ -5,7 +5,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -60,6 +60,18 @@ class FinanceFeatureAPIView(TenantAPIView):
 
 class ReportsFeatureAPIView(TenantAPIView):
     required_feature = "reports"
+
+
+def _with_balance_payments(queryset):
+    return queryset.prefetch_related(
+        Prefetch(
+            "payments",
+            queryset=Payment.objects.filter(
+                status__in=[Payment.Status.POSTED, Payment.Status.VOID]
+            ).only("membership_id", "amount", "entry_type"),
+            to_attr="_balance_payments",
+        )
+    )
 
 
 class MemberListCreateView(MemberFeatureAPIView):
@@ -140,16 +152,40 @@ class MemberSummaryView(MemberFeatureAPIView):
 
     def get(self, request, member_id):
         member = get_object_or_404(Member, gym=request.gym, id=member_id)
-        memberships = member.memberships.select_related("plan").order_by("-start_date")
-        payments = member.payments.order_by("-received_at")
+        today = gym_today(request.gym)
+        memberships = _with_balance_payments(
+            member.memberships.select_related("plan").order_by("-start_date")
+        )
+        current_membership = memberships.filter(
+            status__in=[
+                Membership.Status.PENDING,
+                Membership.Status.ACTIVE,
+                Membership.Status.SUSPENDED,
+            ],
+            start_date__lte=today,
+            expiry_date__gte=today,
+        ).first()
+        membership_history = list(memberships[:20])
+        payments = member.payments.select_related("receipt").order_by("-received_at")
         return success_response(
             {
                 "member": MemberSerializer(member).data,
-                "current_membership": MembershipSerializer(memberships.first()).data
-                if memberships.exists()
+                "current_membership": MembershipSerializer(current_membership).data
+                if current_membership
                 else None,
-                "membership_history": MembershipSerializer(memberships[:20], many=True).data,
+                "days_remaining": max(
+                    0,
+                    (current_membership.expiry_date - today).days + 1,
+                )
+                if current_membership
+                else None,
+                "is_pt_client": False,
+                "membership_history": MembershipSerializer(
+                    membership_history,
+                    many=True,
+                ).data,
                 "payment_history": PaymentSerializer(payments[:20], many=True).data,
+                "check_in_summary": {"available": False},
             }
         )
 
@@ -196,7 +232,12 @@ class PlanDetailView(MembershipFeatureAPIView):
 
     def patch(self, request, plan_id):
         plan = self.get_object()
-        serializer = MembershipPlanSerializer(plan, data=request.data, partial=True)
+        serializer = MembershipPlanSerializer(
+            plan,
+            data=request.data,
+            partial=True,
+            context={"gym": request.gym},
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save(updated_by_membership_id=request.gym_membership.id)
         return success_response(serializer.data, message="Membership plan updated")
@@ -231,7 +272,9 @@ class MembershipListCreateView(MembershipFeatureAPIView):
         return super().get_permissions()
 
     def get(self, request):
-        memberships = Membership.objects.filter(gym=request.gym).select_related("member", "plan")
+        memberships = _with_balance_payments(
+            Membership.objects.filter(gym=request.gym).select_related("member", "plan")
+        )
         if bucket := request.query_params.get("bucket"):
             today = gym_today(request.gym)
             ranges = {
@@ -331,7 +374,11 @@ class PaymentListCreateView(FinanceFeatureAPIView):
         return super().get_permissions()
 
     def get(self, request):
-        payments = Payment.objects.filter(gym=request.gym).select_related("member", "membership")
+        payments = Payment.objects.filter(gym=request.gym).select_related(
+            "member",
+            "membership",
+            "receipt",
+        )
         if value := request.query_params.get("status"):
             payments = payments.filter(status=value)
         return success_response(
