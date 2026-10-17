@@ -12,8 +12,18 @@ import type {
   GymProfileUpdate,
   GymSettings,
   GymSettingsUpdate,
+  Member,
+  MemberListPage,
+  MemberListQuery,
   MemberPaymentHistoryItem,
   MemberPaymentHistoryMeta,
+  Membership,
+  MembershipExpiryQuery,
+  MembershipListPage,
+  MembershipListQuery,
+  MembershipPlan,
+  MembershipPlanListPage,
+  MembershipPlanListQuery,
   MembershipRole,
   Permission,
   Role,
@@ -219,35 +229,144 @@ function assertResourceId(value: string, label: string): string {
   return id;
 }
 
-function collectionSuffix(query: CollectionQuery): string {
-  const params = new URLSearchParams();
-  if (query.limit !== undefined) {
-    if (
-      !Number.isInteger(query.limit) ||
-      query.limit < 1 ||
-      query.limit > 100
-    ) {
-      throw new OperationError("Limit must be from 1 to 100.", {
-        limit: "Limit must be from 1 to 100.",
-      });
-    }
-    params.set("limit", String(query.limit));
+const OPAQUE_CURSOR = /^[A-Za-z0-9._:~+=-]{1,2048}$/;
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+const MEMBER_STATUSES = Object.values({
+  ACTIVE: "ACTIVE",
+  EXPIRED: "EXPIRED",
+  SUSPENDED: "SUSPENDED",
+  CANCELLED: "CANCELLED",
+  ARCHIVED: "ARCHIVED",
+} as const satisfies Record<
+  NonNullable<MemberListQuery["status"]>,
+  NonNullable<MemberListQuery["status"]>
+>);
+const MEMBERSHIP_STATUSES = Object.values({
+  PENDING: "PENDING",
+  ACTIVE: "ACTIVE",
+  EXPIRED: "EXPIRED",
+  SUSPENDED: "SUSPENDED",
+  CANCELLED: "CANCELLED",
+} as const satisfies Record<
+  NonNullable<MembershipListQuery["status"]>,
+  NonNullable<MembershipListQuery["status"]>
+>);
+const MEMBERSHIP_PAYMENT_STATUSES = Object.values({
+  UNPAID: "UNPAID",
+  PARTIAL: "PARTIAL",
+  PAID: "PAID",
+  PARTIALLY_REFUNDED: "PARTIALLY_REFUNDED",
+  REFUNDED: "REFUNDED",
+} as const satisfies Record<
+  NonNullable<MembershipListQuery["payment_status"]>,
+  NonNullable<MembershipListQuery["payment_status"]>
+>);
+const EXPIRY_BUCKETS = Object.values({
+  expired: "expired",
+  today: "today",
+  within_3_days: "within_3_days",
+  within_7_days: "within_7_days",
+  within_30_days: "within_30_days",
+} as const satisfies Record<
+  MembershipExpiryQuery["bucket"],
+  MembershipExpiryQuery["bucket"]
+>);
+
+function assertLimit(limit: number | undefined): void {
+  if (limit === undefined) return;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new OperationError("Limit must be from 1 to 100.", {
+      limit: "Limit must be from 1 to 100.",
+    });
   }
-  if (query.after) params.set("after", query.after);
-  return params.size ? `?${params.toString()}` : "";
+}
+
+function assertCursor(after: string | undefined): void {
+  if (after === undefined) return;
+  if (!OPAQUE_CURSOR.test(after)) {
+    throw new OperationError("Invalid cursor.", {
+      after: "Invalid cursor.",
+    });
+  }
+}
+
+function isOneOf<T extends string>(
+  value: string,
+  allowed: readonly T[],
+): value is T {
+  return (allowed as readonly string[]).includes(value);
+}
+
+function assertEnum<T extends string>(
+  value: string | undefined,
+  allowed: readonly T[],
+  field: string,
+  message: string,
+): T | undefined {
+  if (value === undefined) return undefined;
+  if (!isOneOf(value, allowed)) {
+    throw new OperationError(message, { [field]: message });
+  }
+  return value;
+}
+
+function assertSearch(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > 100) {
+    throw new OperationError("Search must be from 1 to 100 characters.", {
+      search: "Search must be from 1 to 100 characters.",
+    });
+  }
+  return trimmed;
+}
+
+function isIsoDate(value: string): boolean {
+  const match = ISO_DATE.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+function assertIsoDate(
+  value: string | undefined,
+  field: string,
+): string | undefined {
+  if (value === undefined) return undefined;
+  if (!isIsoDate(value)) {
+    throw new OperationError("Enter a valid date.", {
+      [field]: "Enter a valid date.",
+    });
+  }
+  return value;
+}
+
+function collectionParams(query: CollectionQuery): URLSearchParams {
+  assertLimit(query.limit);
+  assertCursor(query.after);
+  const params = new URLSearchParams();
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  if (query.after !== undefined) params.set("after", query.after);
+  return params;
 }
 
 async function collectionGet<T>(
   path: string,
-  query: CollectionQuery = {},
+  params: URLSearchParams,
 ): Promise<CollectionPage<T>> {
-  const response = await fetch(
-    `/api/operations/${path}${collectionSuffix(query)}`,
-    {
-      credentials: "same-origin",
-      cache: "no-store",
-    },
-  );
+  const suffix = params.size ? `?${params.toString()}` : "";
+  const response = await fetch(`/api/operations/${path}${suffix}`, {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
   const body: unknown = await response.json();
   if (!response.ok) throw readOperationError(body);
   return readCollection<T>(body);
@@ -282,10 +401,122 @@ async function listAllCollection<T extends { id: string }>(
   throw new OperationError(`The ${label} list is too large to load.`);
 }
 
-export function listRoles(
+export async function listMembers(
+  query: MemberListQuery = {},
+): Promise<MemberListPage> {
+  const status = assertEnum(
+    query.status,
+    MEMBER_STATUSES,
+    "status",
+    "Status is invalid.",
+  );
+  const search = assertSearch(query.search);
+  const joinedFrom = assertIsoDate(query.joined_from, "joined_from");
+  const joinedTo = assertIsoDate(query.joined_to, "joined_to");
+  if (joinedFrom && joinedTo && joinedFrom > joinedTo) {
+    throw new OperationError("Joined to must be on or after joined from.", {
+      joined_to: "Joined to must be on or after joined from.",
+    });
+  }
+  if (
+    query.is_pt_client !== undefined &&
+    query.is_pt_client !== null &&
+    typeof query.is_pt_client !== "boolean"
+  ) {
+    throw new OperationError("PT client filter is invalid.", {
+      is_pt_client: "PT client filter is invalid.",
+    });
+  }
+  assertLimit(query.limit);
+  assertCursor(query.after);
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (search) params.set("search", search);
+  if (joinedFrom) params.set("joined_from", joinedFrom);
+  if (joinedTo) params.set("joined_to", joinedTo);
+  if (typeof query.is_pt_client === "boolean") {
+    params.set("is_pt_client", query.is_pt_client ? "true" : "false");
+  }
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  if (query.after !== undefined) params.set("after", query.after);
+  return collectionGet<Member>("members", params);
+}
+
+export async function listMembershipPlans(
+  query: MembershipPlanListQuery = {},
+): Promise<MembershipPlanListPage> {
+  return collectionGet<MembershipPlan>(
+    "membership-plans",
+    collectionParams(query),
+  );
+}
+
+export function listAllMembershipPlans(): Promise<MembershipPlan[]> {
+  return listAllCollection(listMembershipPlans, "membership plan");
+}
+
+export async function listMemberships(
+  query: MembershipListQuery = {},
+): Promise<MembershipListPage> {
+  const status = assertEnum(
+    query.status,
+    MEMBERSHIP_STATUSES,
+    "status",
+    "Status is invalid.",
+  );
+  const paymentStatus = assertEnum(
+    query.payment_status,
+    MEMBERSHIP_PAYMENT_STATUSES,
+    "payment_status",
+    "Payment status is invalid.",
+  );
+  let memberId: string | undefined;
+  if (query.member_id !== undefined) {
+    memberId = query.member_id.toLowerCase();
+    if (!RESOURCE_ID.test(memberId)) {
+      throw new OperationError("Enter a valid member id.", {
+        member_id: "Enter a valid member id.",
+      });
+    }
+  }
+  assertLimit(query.limit);
+  assertCursor(query.after);
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (memberId) params.set("member_id", memberId);
+  if (paymentStatus) params.set("payment_status", paymentStatus);
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  if (query.after !== undefined) params.set("after", query.after);
+  return collectionGet<Membership>("memberships", params);
+}
+
+export async function listMembershipExpiry(
+  query: MembershipExpiryQuery,
+): Promise<MembershipListPage> {
+  const bucket = assertEnum(
+    query.bucket,
+    EXPIRY_BUCKETS,
+    "bucket",
+    "Expiry bucket is invalid.",
+  );
+  if (!bucket) {
+    throw new OperationError("Expiry bucket is invalid.", {
+      bucket: "Expiry bucket is invalid.",
+    });
+  }
+  assertLimit(query.limit);
+  assertCursor(query.after);
+  const params = new URLSearchParams();
+  params.set("bucket", bucket);
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  if (query.after !== undefined) params.set("after", query.after);
+  return collectionGet<Membership>("memberships/expiry", params);
+}
+
+export async function listRoles(
   query: CollectionQuery = {},
 ): Promise<CollectionPage<Role>> {
-  return collectionGet<Role>("roles", query);
+  return collectionGet<Role>("roles", collectionParams(query));
 }
 
 export function listAllRoles(): Promise<Role[]> {
@@ -361,10 +592,10 @@ export async function listAuditLogs(
   return readTenantAuditPage(body);
 }
 
-export function listPermissions(
+export async function listPermissions(
   query: CollectionQuery = {},
 ): Promise<CollectionPage<Permission>> {
-  return collectionGet<Permission>("permissions", query);
+  return collectionGet<Permission>("permissions", collectionParams(query));
 }
 
 export function listAllPermissions(): Promise<Permission[]> {
@@ -405,14 +636,29 @@ function readTenantAuditPage(body: unknown): TenantAuditPage {
   if (scope !== "GYM" && scope !== "SELF") {
     throw new OperationError("The audit list could not be loaded.");
   }
-  const nextAfter = envelope.meta?.next_after;
+  const cursor = readCursorMeta(envelope.meta);
   return {
     data: envelope.data.map(readTenantAuditItem),
     meta: {
-      has_more: envelope.meta?.has_more === true,
-      next_after: typeof nextAfter === "string" && nextAfter ? nextAfter : null,
+      has_more: cursor.has_more,
+      next_after: cursor.next_after,
       scope,
     },
+  };
+}
+
+function readCursorMeta(
+  meta:
+    | {
+        has_more?: unknown;
+        next_after?: unknown;
+      }
+    | undefined,
+): CollectionMeta {
+  const nextAfter = meta?.next_after;
+  return {
+    has_more: meta?.has_more === true,
+    next_after: typeof nextAfter === "string" && nextAfter ? nextAfter : null,
   };
 }
 
@@ -472,13 +718,9 @@ function readCollection<T>(body: unknown): CollectionPage<T> {
   if (!Array.isArray(envelope.data)) {
     throw new OperationError("The request could not be completed.");
   }
-  const nextAfter = envelope.meta?.next_after;
   return {
     data: envelope.data as T[],
-    meta: {
-      has_more: envelope.meta?.has_more === true,
-      next_after: typeof nextAfter === "string" && nextAfter ? nextAfter : null,
-    },
+    meta: readCursorMeta(envelope.meta),
   };
 }
 
@@ -493,13 +735,9 @@ function readMemberPaymentPage(body: unknown): MemberPaymentHistoryPage {
   if (!Array.isArray(envelope.data)) {
     throw new OperationError("Unable to load payment history.");
   }
-  const nextAfter = envelope.meta?.next_after;
   return {
     data: envelope.data as MemberPaymentHistoryItem[],
-    meta: {
-      has_more: envelope.meta?.has_more === true,
-      next_after: typeof nextAfter === "string" && nextAfter ? nextAfter : null,
-    },
+    meta: readCursorMeta(envelope.meta),
   };
 }
 
@@ -514,13 +752,9 @@ function readStaffPage(body: unknown): StaffListPage {
   if (!Array.isArray(envelope.data)) {
     throw new OperationError("The request could not be completed.");
   }
-  const nextAfter = envelope.meta?.next_after;
   return {
     data: envelope.data as StaffRecord[],
-    meta: {
-      has_more: envelope.meta?.has_more === true,
-      next_after: typeof nextAfter === "string" && nextAfter ? nextAfter : null,
-    },
+    meta: readCursorMeta(envelope.meta),
   };
 }
 

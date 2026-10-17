@@ -1,4 +1,4 @@
-import type { components } from "@/types/api.generated";
+import type { components, operations } from "@/types/api.generated";
 
 export type ApiErrorBody = {
   success: false;
@@ -68,6 +68,29 @@ export type MemberPaymentHistoryMeta =
   components["schemas"]["MemberPaymentHistoryMeta"];
 export type MembershipPlan = components["schemas"]["MembershipPlan"];
 export type Membership = components["schemas"]["Membership"];
+export type MemberListQuery = NonNullable<
+  operations["members_list"]["parameters"]["query"]
+>;
+export type MemberListPage = {
+  data: components["schemas"]["MemberListEnvelope"]["data"];
+  meta: components["schemas"]["MemberListEnvelope"]["meta"];
+};
+export type MembershipPlanListQuery = NonNullable<
+  operations["membership_plans_list"]["parameters"]["query"]
+>;
+export type MembershipPlanListPage = {
+  data: components["schemas"]["MembershipPlanListEnvelope"]["data"];
+  meta: components["schemas"]["MembershipPlanListEnvelope"]["meta"];
+};
+export type MembershipListQuery = NonNullable<
+  operations["memberships_list"]["parameters"]["query"]
+>;
+export type MembershipListPage = {
+  data: components["schemas"]["MembershipListEnvelope"]["data"];
+  meta: components["schemas"]["MembershipListEnvelope"]["meta"];
+};
+export type MembershipExpiryQuery =
+  operations["memberships_expiry"]["parameters"]["query"];
 
 export type Payment = {
   id: string;

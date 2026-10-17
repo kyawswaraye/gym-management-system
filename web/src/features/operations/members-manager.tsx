@@ -1,16 +1,76 @@
 "use client";
 
-import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-import { operationGet, operationMutation } from "@/features/operations/client";
-import type { Member } from "@/types/api";
+import { listMembers, operationMutation } from "@/features/operations/client";
+import type { Member, MemberListPage, MemberListQuery } from "@/types/api";
+
+const PAGE_LIMIT = 25;
+const MEMBER_STATUSES = [
+  "ACTIVE",
+  "EXPIRED",
+  "SUSPENDED",
+  "CANCELLED",
+  "ARCHIVED",
+] as const satisfies readonly NonNullable<MemberListQuery["status"]>[];
+
+type MemberStatus = (typeof MEMBER_STATUSES)[number];
+
+type MemberFilters = {
+  search: string;
+  status: "" | MemberStatus;
+  joinedFrom: string;
+  joinedTo: string;
+};
+
+function isMemberStatus(value: string): value is MemberStatus {
+  return (MEMBER_STATUSES as readonly string[]).includes(value);
+}
+
+function memberQuery(filters: MemberFilters, after?: string): MemberListQuery {
+  const query: MemberListQuery = { limit: PAGE_LIMIT };
+  const search = filters.search.trim();
+  if (search) query.search = search;
+  if (filters.status) query.status = filters.status;
+  if (filters.joinedFrom) query.joined_from = filters.joinedFrom;
+  if (filters.joinedTo) query.joined_to = filters.joinedTo;
+  if (after) query.after = after;
+  return query;
+}
+
+function uniqueMembers(rows: Member[]): Member[] {
+  const seen = new Set<string>();
+  return rows.filter((member) => {
+    if (seen.has(member.id)) return false;
+    seen.add(member.id);
+    return true;
+  });
+}
+
+function appendMembers(current: Member[], incoming: Member[]): Member[] {
+  const seen = new Set(current.map((member) => member.id));
+  const next = incoming.filter((member) => {
+    if (seen.has(member.id)) return false;
+    seen.add(member.id);
+    return true;
+  });
+  return next.length === 0 ? current : [...current, ...next];
+}
+
+function errorText(caught: unknown, fallback: string): string {
+  return caught instanceof Error ? caught.message : fallback;
+}
+
+function applyCursor(
+  meta: MemberListPage["meta"],
+  cursor: string | undefined,
+  applied: Set<string>,
+): { hasMore: boolean; nextAfter: string | null } {
+  const next = meta.next_after;
+  const stop = !meta.has_more || !next || next === cursor || applied.has(next);
+  return { hasMore: !stop, nextAfter: stop ? null : next };
+}
 
 export function MembersManager({
   canCreate,
@@ -20,44 +80,143 @@ export function MembersManager({
   defaultDate: string;
 }) {
   const [members, setMembers] = useState<Member[]>([]);
+  const [nextAfter, setNextAfter] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [paging, setPaging] = useState(false);
   const [error, setError] = useState("");
+  const [errorScope, setErrorScope] = useState<"list" | "page" | null>(null);
   const [pending, setPending] = useState(false);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<"" | MemberStatus>("");
   const [joinedFrom, setJoinedFrom] = useState("");
   const [joinedTo, setJoinedTo] = useState("");
   const requestVersion = useRef(0);
+  const appliedCursors = useRef(new Set<string>());
+  const filters = { search, status, joinedFrom, joinedTo };
 
-  const load = useCallback(async () => {
+  function resetPage() {
+    appliedCursors.current = new Set();
+    requestVersion.current += 1;
+    setMembers([]);
+    setNextAfter(null);
+    setHasMore(false);
+    setLoading(true);
+    setPaging(false);
+    setError("");
+    setErrorScope(null);
+  }
+
+  async function loadFirst() {
     const version = ++requestVersion.current;
+    appliedCursors.current = new Set();
+    setMembers([]);
+    setNextAfter(null);
+    setHasMore(false);
+    setLoading(true);
+    setPaging(false);
+    setError("");
+    setErrorScope(null);
     try {
-      const params = new URLSearchParams();
-      if (search.trim()) params.set("search", search.trim());
-      if (status) params.set("status", status);
-      if (joinedFrom) params.set("joined_from", joinedFrom);
-      if (joinedTo) params.set("joined_to", joinedTo);
-      const query = params.size ? `?${params.toString()}` : "";
-      const rows = await operationGet<Member[]>(`members/${query}`);
-      if (version === requestVersion.current) {
-        setMembers(rows);
-        setError("");
-      }
+      const page = await listMembers(memberQuery(filters));
+      if (version !== requestVersion.current) return;
+      setMembers(uniqueMembers(page.data));
+      const cursor = applyCursor(page.meta, undefined, appliedCursors.current);
+      setHasMore(cursor.hasMore);
+      setNextAfter(cursor.nextAfter);
     } catch (caught) {
-      if (version === requestVersion.current) {
-        setError(
-          caught instanceof Error ? caught.message : "Unable to load members.",
-        );
-      }
+      if (version !== requestVersion.current) return;
+      setMembers([]);
+      setNextAfter(null);
+      setHasMore(false);
+      setError(errorText(caught, "Unable to load members."));
+      setErrorScope("list");
+    } finally {
+      if (version === requestVersion.current) setLoading(false);
     }
-  }, [joinedFrom, joinedTo, search, status]);
+  }
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 250);
+    const version = ++requestVersion.current;
+    const currentFilters = { search, status, joinedFrom, joinedTo };
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const page = await listMembers(memberQuery(currentFilters));
+          if (version !== requestVersion.current) return;
+          setMembers(uniqueMembers(page.data));
+          const cursor = applyCursor(
+            page.meta,
+            undefined,
+            appliedCursors.current,
+          );
+          setHasMore(cursor.hasMore);
+          setNextAfter(cursor.nextAfter);
+          setError("");
+          setErrorScope(null);
+        } catch (caught) {
+          if (version !== requestVersion.current) return;
+          setMembers([]);
+          setNextAfter(null);
+          setHasMore(false);
+          setError(errorText(caught, "Unable to load members."));
+          setErrorScope("list");
+        } finally {
+          if (version === requestVersion.current) setLoading(false);
+        }
+      })();
+    }, 250);
     return () => {
       window.clearTimeout(timer);
       requestVersion.current += 1;
     };
-  }, [load]);
+  }, [joinedFrom, joinedTo, search, status]);
+
+  async function loadMore() {
+    const cursor = nextAfter;
+    if (
+      !hasMore ||
+      !cursor ||
+      paging ||
+      loading ||
+      appliedCursors.current.has(cursor)
+    ) {
+      if (cursor && appliedCursors.current.has(cursor)) {
+        setHasMore(false);
+        setNextAfter(null);
+      }
+      return;
+    }
+    const version = ++requestVersion.current;
+    appliedCursors.current.add(cursor);
+    setPaging(true);
+    setError("");
+    setErrorScope(null);
+    try {
+      const page = await listMembers(memberQuery(filters, cursor));
+      if (version !== requestVersion.current) return;
+      setMembers((current) => appendMembers(current, page.data));
+      const next = applyCursor(page.meta, cursor, appliedCursors.current);
+      setHasMore(next.hasMore);
+      setNextAfter(next.nextAfter);
+    } catch (caught) {
+      appliedCursors.current.delete(cursor);
+      if (version === requestVersion.current) {
+        setError(errorText(caught, "Unable to load members."));
+        setErrorScope("page");
+      }
+    } finally {
+      if (version === requestVersion.current) setPaging(false);
+    }
+  }
+
+  function retry() {
+    if (errorScope === "page") {
+      void loadMore();
+      return;
+    }
+    void loadFirst();
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,11 +232,10 @@ export function MembersManager({
         join_date: form.get("join_date"),
       });
       formElement.reset();
-      await load();
+      await loadFirst();
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Unable to create member.",
-      );
+      setError(errorText(caught, "Unable to create member."));
+      setErrorScope(null);
     } finally {
       setPending(false);
     }
@@ -119,20 +277,27 @@ export function MembersManager({
           </button>
         </form>
       )}
-      <section className="card overflow-hidden">
+      <section aria-busy={loading || paging} className="card overflow-hidden">
         <div className="flex flex-wrap gap-3 border-b border-slate-200 p-4">
           <input
             aria-label="Search members"
             className="input max-w-sm"
-            onChange={(event) => setSearch(event.target.value)}
             maxLength={100}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              resetPage();
+            }}
             placeholder="Search name, number, phone, email"
             value={search}
           />
           <select
             aria-label="Filter by status"
             className="input max-w-48"
-            onChange={(event) => setStatus(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setStatus(isMemberStatus(value) ? value : "");
+              resetPage();
+            }}
             value={status}
           >
             <option value="">All statuses</option>
@@ -150,6 +315,7 @@ export function MembersManager({
               const value = event.target.value;
               setJoinedFrom(value);
               if (joinedTo && value > joinedTo) setJoinedTo("");
+              resetPage();
             }}
             type="date"
             value={joinedFrom}
@@ -158,24 +324,47 @@ export function MembersManager({
             aria-label="Joined to"
             className="input max-w-44"
             min={joinedFrom || undefined}
-            onChange={(event) => setJoinedTo(event.target.value)}
+            onChange={(event) => {
+              setJoinedTo(event.target.value);
+              resetPage();
+            }}
             type="date"
             value={joinedTo}
           />
         </div>
-        {error && (
-          <p className="error m-4" role="alert">
-            {error}
+        {loading ? (
+          <p className="muted m-4" role="status">
+            Loading members.
           </p>
-        )}
+        ) : null}
+        {error ? (
+          <div className="m-4 grid gap-3">
+            <p className="error" role="alert">
+              {error}
+            </p>
+            {errorScope ? (
+              <button className="button" onClick={retry} type="button">
+                {errorScope === "page" ? "Retry loading members" : "Retry"}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <th className="p-3">Member</th>
-                <th className="p-3">Phone</th>
-                <th className="p-3">Joined</th>
-                <th className="p-3">Status</th>
+                <th className="p-3" scope="col">
+                  Member
+                </th>
+                <th className="p-3" scope="col">
+                  Phone
+                </th>
+                <th className="p-3" scope="col">
+                  Joined
+                </th>
+                <th className="p-3" scope="col">
+                  Status
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -200,16 +389,33 @@ export function MembersManager({
                   <td className="p-3">{member.status}</td>
                 </tr>
               ))}
-              {!members.length && (
+              {!loading && !error && members.length === 0 ? (
                 <tr>
                   <td className="muted p-6 text-center" colSpan={4}>
                     No members found.
                   </td>
                 </tr>
-              )}
+              ) : null}
             </tbody>
           </table>
         </div>
+        {paging ? (
+          <p className="muted m-4" role="status">
+            Loading more members.
+          </p>
+        ) : null}
+        {hasMore && nextAfter ? (
+          <div className="p-4">
+            <button
+              className="button"
+              disabled={paging}
+              onClick={() => void loadMore()}
+              type="button"
+            >
+              Load more members
+            </button>
+          </div>
+        ) : null}
       </section>
     </div>
   );

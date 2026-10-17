@@ -1,20 +1,41 @@
+import type { ComponentProps } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { operationGet, operationMutation } from "@/features/operations/client";
+import {
+  listAllMembershipPlans,
+  listMembers,
+  listMembershipExpiry,
+  listMembershipPlans,
+  listMemberships,
+  operationMutation,
+} from "@/features/operations/client";
 import { MembershipsManager } from "@/features/operations/memberships-manager";
-import type { Member, Membership, MembershipPlan } from "@/types/api";
+import type {
+  Member,
+  MemberListPage,
+  Membership,
+  MembershipListPage,
+  MembershipPlan,
+} from "@/types/api";
 
 vi.mock("@/features/operations/client", () => ({
-  operationGet: vi.fn(),
+  listAllMembershipPlans: vi.fn(),
+  listMembers: vi.fn(),
+  listMembershipExpiry: vi.fn(),
+  listMembershipPlans: vi.fn(),
+  listMemberships: vi.fn(),
   operationMutation: vi.fn(),
 }));
 
 const MEMBER_ID = "11111111-1111-4111-8111-111111111111";
+const LATER_MEMBER_ID = "55555555-5555-4555-8555-555555555555";
 const PLAN_ID = "22222222-2222-4222-8222-222222222222";
+const LATER_PLAN_ID = "66666666-6666-4666-8666-666666666666";
 const MEMBERSHIP_ID = "33333333-3333-4333-8333-333333333333";
+const LATER_MEMBERSHIP_ID = "77777777-7777-4777-8777-777777777777";
 
-function member(): Member {
+function member(overrides: Partial<Member> = {}): Member {
   return {
     id: MEMBER_ID,
     member_number: "MEM-000001",
@@ -45,10 +66,11 @@ function member(): Member {
     archived_at: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
+    ...overrides,
   };
 }
 
-function plan(): MembershipPlan {
+function plan(overrides: Partial<MembershipPlan> = {}): MembershipPlan {
   return {
     id: PLAN_ID,
     code: "MONTH",
@@ -62,6 +84,7 @@ function plan(): MembershipPlan {
     archived_at: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
+    ...overrides,
   };
 }
 
@@ -93,17 +116,33 @@ function membership(overrides: Partial<Membership> = {}): Membership {
   };
 }
 
-function mockLists(row: Membership = membership()) {
-  vi.mocked(operationGet).mockImplementation(async (path: string) => {
-    if (path === "members/") return [member()];
-    if (path === "membership-plans/") return [plan()];
-    if (path === "memberships/") return [row];
-    throw new Error(path);
-  });
+function membershipPage(
+  rows: Membership[],
+  next: string | null = null,
+): MembershipListPage {
+  return {
+    data: rows,
+    meta: { has_more: next !== null, next_after: next },
+  };
 }
 
-function renderManager(row: Membership = membership()) {
-  mockLists(row);
+function memberPage(rows: Member[]): MemberListPage {
+  return { data: rows, meta: { has_more: false, next_after: null } };
+}
+
+function deferred<T>() {
+  let resolve: (value: T) => void = () => undefined;
+  let reject: (reason?: unknown) => void = () => undefined;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function renderManager(
+  props: Partial<ComponentProps<typeof MembershipsManager>> = {},
+) {
   render(
     <MembershipsManager
       canCancel
@@ -111,6 +150,7 @@ function renderManager(row: Membership = membership()) {
       canUpdate
       currency="THB"
       defaultDate="2026-10-17"
+      {...props}
     />,
   );
 }
@@ -118,32 +158,50 @@ function renderManager(row: Membership = membership()) {
 describe("Memberships manager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(listMemberships).mockResolvedValue(
+      membershipPage([membership()]),
+    );
+    vi.mocked(listMembershipExpiry).mockResolvedValue(membershipPage([]));
+    vi.mocked(listAllMembershipPlans).mockResolvedValue([plan()]);
+    vi.mocked(listMembers).mockResolvedValue(memberPage([member()]));
     vi.mocked(operationMutation).mockResolvedValue({});
-    mockLists();
   });
 
-  it("renders published member, plan, and membership fields", async () => {
+  it("renders published plan and membership fields and the member id until search", async () => {
     renderManager();
 
     expect(
-      await screen.findByRole("option", { name: "MEM-000001 — Ada Lovelace" }),
+      await screen.findByRole("option", { name: "Monthly — 1500.00 THB" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("ada lovelace")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("option", { name: "Monthly — 1500.00 THB" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
-    expect(screen.getByText("Monthly")).toBeInTheDocument();
+    expect(await screen.findByText("ACTIVE / UNPAID")).toBeInTheDocument();
+    expect(screen.getAllByText("Monthly").length).toBeGreaterThan(0);
+    expect(screen.getByText(MEMBER_ID)).toBeInTheDocument();
     expect(screen.getByText("2026-01-31 – 2026-02-27")).toBeInTheDocument();
     expect(screen.getByText("1399.50 THB")).toBeInTheDocument();
     expect(screen.getByText("ACTIVE / UNPAID")).toBeInTheDocument();
     expect(screen.getByLabelText("Currency")).toHaveValue("THB");
     expect(screen.getByLabelText("Currency")).not.toHaveAttribute("name");
+    expect(screen.queryByText("ada lovelace")).not.toBeInTheDocument();
+    expect(listMembers).not.toHaveBeenCalled();
+    expect(listMemberships).toHaveBeenCalledWith({ limit: 25 });
+    expect(listMembershipPlans).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Search members"), {
+      target: { value: "Ada" },
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "MEM-000001 — Ada Lovelace" }),
+    );
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    expect(
+      screen.getByText("Selected member: MEM-000001 — Ada Lovelace"),
+    ).toBeInTheDocument();
   });
 
-  it("creates a plan without sending currency", async () => {
+  it("creates a plan without sending currency and refreshes the catalogs", async () => {
     renderManager();
     await screen.findByRole("option", { name: "Monthly — 1500.00 THB" });
+    expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
 
     fireEvent.change(screen.getByLabelText("Code"), {
       target: { value: "MONTH" },
@@ -168,15 +226,52 @@ describe("Memberships manager", () => {
         price: "1500.00",
       }),
     );
+    await waitFor(() =>
+      expect(listAllMembershipPlans).toHaveBeenCalledTimes(2),
+    );
+    expect(vi.mocked(listMemberships).mock.calls.at(-1)?.[0]).toEqual({
+      limit: 25,
+    });
   });
 
-  it("creates a membership with server-allowed fields", async () => {
-    renderManager();
-    await screen.findByRole("option", { name: "MEM-000001 — Ada Lovelace" });
-
-    fireEvent.change(screen.getByLabelText("Member"), {
-      target: { value: MEMBER_ID },
+  it("searches past the first member page and does not auto-select", async () => {
+    const zara = member({
+      id: LATER_MEMBER_ID,
+      member_number: "MEM-000090",
+      first_name: "Zara",
+      last_name: "Khan",
     });
+    vi.mocked(listMembers).mockImplementation(async (query = {}) => {
+      if (query.search === "Zara") return memberPage([zara]);
+      return memberPage([member()]);
+    });
+    renderManager();
+    await screen.findByRole("option", { name: "Monthly — 1500.00 THB" });
+
+    fireEvent.change(screen.getByLabelText("Search members"), {
+      target: { value: "Zara" },
+    });
+    expect(screen.getByText("No member selected.")).toBeInTheDocument();
+    const choice = await screen.findByRole("button", {
+      name: "MEM-000090 — Zara Khan",
+    });
+    expect(screen.getByText("No member selected.")).toBeInTheDocument();
+    expect(listMembers).toHaveBeenCalledWith({
+      search: "Zara",
+      status: "ACTIVE",
+      limit: 25,
+    });
+
+    fireEvent.change(screen.getByLabelText("Plan"), {
+      target: { value: PLAN_ID },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start membership" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Select a member.",
+    );
+    expect(operationMutation).not.toHaveBeenCalled();
+
+    fireEvent.click(choice);
     fireEvent.change(screen.getByLabelText("Plan"), {
       target: { value: PLAN_ID },
     });
@@ -190,7 +285,7 @@ describe("Memberships manager", () => {
 
     await waitFor(() =>
       expect(operationMutation).toHaveBeenCalledWith("memberships/", {
-        member_id: MEMBER_ID,
+        member_id: LATER_MEMBER_ID,
         plan_id: PLAN_ID,
         start_date: "2026-10-17",
         discount_amount: "10.50",
@@ -198,18 +293,217 @@ describe("Memberships manager", () => {
     );
   });
 
-  it("suspends and resumes through the lifecycle endpoints", async () => {
+  it("keeps the selected member when a stale search response arrives", async () => {
+    const requests: Array<{
+      search: string;
+      pending: ReturnType<typeof deferred<MemberListPage>>;
+    }> = [];
+    vi.mocked(listMembers).mockImplementation(async (query = {}) => {
+      const pending = deferred<MemberListPage>();
+      requests.push({ search: query.search ?? "", pending });
+      return pending.promise;
+    });
     renderManager();
-    fireEvent.click(await screen.findByRole("button", { name: "Suspend" }));
+    await screen.findByRole("option", { name: "Monthly — 1500.00 THB" });
+
+    fireEvent.change(screen.getByLabelText("Search members"), {
+      target: { value: "Ada" },
+    });
+    await waitFor(() => expect(requests).toHaveLength(1));
+    requests[0]?.pending.resolve(memberPage([member()]));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "MEM-000001 — Ada Lovelace" }),
+    );
+
+    fireEvent.change(screen.getByLabelText("Search members"), {
+      target: { value: "G" },
+    });
+    await waitFor(() => expect(requests).toHaveLength(2));
+    fireEvent.change(screen.getByLabelText("Search members"), {
+      target: { value: "Grace" },
+    });
+    await waitFor(() => expect(requests).toHaveLength(3));
+    requests[1]?.pending.resolve(
+      memberPage([
+        member({
+          first_name: "Stale",
+          last_name: "Result",
+          member_number: "MEM-9",
+        }),
+      ]),
+    );
+    expect(
+      screen.queryByRole("button", { name: /Stale Result/ }),
+    ).not.toBeInTheDocument();
+    requests[2]?.pending.resolve(
+      memberPage([
+        member({
+          id: LATER_MEMBER_ID,
+          first_name: "Grace",
+          last_name: "Hopper",
+          member_number: "MEM-000002",
+        }),
+      ]),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "MEM-000002 — Grace Hopper" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Selected member: MEM-000001 — Ada Lovelace"),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Plan"), {
+      target: { value: PLAN_ID },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start membership" }));
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith(
+        "memberships/",
+        expect.objectContaining({ member_id: MEMBER_ID }),
+      ),
+    );
+  });
+
+  it("pages memberships, applies allowlisted filters, and resets onto one expiry bucket", async () => {
+    const later = membership({
+      id: LATER_MEMBERSHIP_ID,
+      member_id: LATER_MEMBER_ID,
+      plan_name: "Annual",
+      status: "EXPIRED",
+    });
+    vi.mocked(listMemberships)
+      .mockResolvedValueOnce(
+        membershipPage([membership(), membership()], "cursor.next"),
+      )
+      .mockResolvedValueOnce(
+        membershipPage([membership(), later], "cursor.next"),
+      );
+    renderManager();
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Loading memberships.",
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Load more memberships" }),
+    );
+    expect(await screen.findByText("Annual")).toBeInTheDocument();
+    expect(screen.getAllByText("Monthly")).toHaveLength(1);
+    expect(
+      screen.queryByRole("button", { name: "Load more memberships" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Filter by status"), {
+      target: { value: "ACTIVE" },
+    });
+    fireEvent.change(screen.getByLabelText("Filter by payment status"), {
+      target: { value: "UNPAID" },
+    });
+    await waitFor(() =>
+      expect(listMemberships).toHaveBeenLastCalledWith({
+        limit: 25,
+        status: "ACTIVE",
+        payment_status: "UNPAID",
+      }),
+    );
+    expect(screen.queryByText("Annual")).not.toBeInTheDocument();
+
+    vi.mocked(listMembershipExpiry).mockResolvedValue(
+      membershipPage([
+        membership({ id: LATER_MEMBERSHIP_ID, plan_name: "Due soon" }),
+      ]),
+    );
+    fireEvent.change(screen.getByLabelText("Membership list"), {
+      target: { value: "within_7_days" },
+    });
+    expect(screen.getByLabelText("Filter by status")).toBeDisabled();
+    expect(screen.getByLabelText("Filter by payment status")).toBeDisabled();
+    await waitFor(() =>
+      expect(listMembershipExpiry).toHaveBeenLastCalledWith({
+        bucket: "within_7_days",
+        limit: 25,
+      }),
+    );
+    expect(listMembershipExpiry).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: expect.anything() }),
+    );
+    expect(await screen.findByText("Due soon")).toBeInTheDocument();
+    expect(screen.queryByText("Annual")).not.toBeInTheDocument();
+  });
+
+  it("shows every active plan from the bounded catalog and a cap failure without a partial list", async () => {
+    vi.mocked(listAllMembershipPlans).mockResolvedValue([
+      plan(),
+      plan({
+        id: LATER_PLAN_ID,
+        code: "YEAR",
+        name: "Annual",
+        price: "9000.00",
+      }),
+      plan({
+        id: "88888888-8888-4888-8888-888888888888",
+        name: "Old",
+        is_active: false,
+      }),
+    ]);
+    renderManager();
+
+    expect(
+      await screen.findByRole("option", { name: "Monthly — 1500.00 THB" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Annual — 9000.00 THB" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /Old/ }),
+    ).not.toBeInTheDocument();
+    expect(listMembershipPlans).not.toHaveBeenCalled();
+
+    vi.mocked(listAllMembershipPlans).mockRejectedValue(
+      new Error("The membership plan list is too large to load."),
+    );
+    fireEvent.change(screen.getByLabelText("Code"), {
+      target: { value: "DAY" },
+    });
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "Daily" },
+    });
+    fireEvent.change(screen.getByLabelText("Duration"), {
+      target: { value: "1" },
+    });
+    fireEvent.change(screen.getByLabelText("Price"), {
+      target: { value: "100.00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
+
+    expect(
+      await screen.findByText("The membership plan list is too large to load."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "Monthly — 1500.00 THB" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "Annual — 9000.00 THB" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("suspends, resumes, and cancels through the lifecycle endpoints", async () => {
+    renderManager();
+    await screen.findByRole("button", { name: "Suspend" });
+    vi.mocked(listMemberships).mockResolvedValue(
+      membershipPage([membership({ status: "SUSPENDED" })]),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Suspend" }));
     await waitFor(() =>
       expect(operationMutation).toHaveBeenCalledWith(
         `memberships/${MEMBERSHIP_ID}/suspend/`,
         {},
       ),
     );
+    expect(
+      vi.mocked(listMemberships).mock.calls.at(-1)?.[0],
+    ).not.toHaveProperty("after");
 
     vi.mocked(operationMutation).mockClear();
-    renderManager(membership({ status: "SUSPENDED" }));
     fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
     await waitFor(() =>
       expect(operationMutation).toHaveBeenCalledWith(
@@ -217,14 +511,11 @@ describe("Memberships manager", () => {
         {},
       ),
     );
-  });
 
-  it("cancels with the trimmed staff reason and aborts a blank reason", async () => {
     const prompt = vi
       .spyOn(window, "prompt")
       .mockReturnValue("  Member moved  ");
-    renderManager();
-    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() =>
       expect(operationMutation).toHaveBeenCalledWith(
         `memberships/${MEMBERSHIP_ID}/cancel/`,
@@ -237,10 +528,53 @@ describe("Memberships manager", () => {
     prompt.mockReturnValue("   ");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(operationMutation).not.toHaveBeenCalled();
-
     prompt.mockReturnValue(null);
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(operationMutation).not.toHaveBeenCalled();
     prompt.mockRestore();
+  });
+
+  it("hides create and lifecycle actions without permission", async () => {
+    renderManager({ canCancel: false, canCreate: false, canUpdate: false });
+
+    expect(await screen.findByText("ACTIVE / UNPAID")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "New plan" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Search members")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Suspend" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Cancel" }),
+    ).not.toBeInTheDocument();
+    expect(listAllMembershipPlans).not.toHaveBeenCalled();
+  });
+
+  it("shows retryable membership errors without dropping the loaded page", async () => {
+    vi.mocked(listMemberships)
+      .mockResolvedValueOnce(membershipPage([membership()], "cursor.next"))
+      .mockRejectedValueOnce(new Error("Membership page unavailable."));
+    renderManager();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Load more memberships" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Membership page unavailable.",
+    );
+    expect(screen.getByText("Monthly")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Loading more memberships."),
+    ).not.toBeInTheDocument();
+    vi.mocked(listMemberships).mockResolvedValueOnce(
+      membershipPage([
+        membership({ id: LATER_MEMBERSHIP_ID, plan_name: "Annual" }),
+      ]),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry loading memberships" }),
+    );
+    expect(await screen.findByText("Annual")).toBeInTheDocument();
   });
 });

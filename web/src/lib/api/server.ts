@@ -87,6 +87,57 @@ const TENANT_AUDIT_FILTERS = new Set([
   "after",
 ]);
 const MEMBER_PAYMENT_HISTORY_FILTERS = new Set(["limit", "after"]);
+const MEMBER_LIST_PATH = "/api/v1/members/";
+const MEMBERSHIP_PLAN_LIST_PATH = "/api/v1/membership-plans/";
+const MEMBERSHIP_LIST_PATH = "/api/v1/memberships/";
+const MEMBERSHIP_EXPIRY_PATH = "/api/v1/memberships/expiry/";
+const MEMBER_LIST_FILTERS = new Set([
+  "status",
+  "search",
+  "joined_from",
+  "joined_to",
+  "is_pt_client",
+  "limit",
+  "after",
+]);
+const MEMBER_LIST_STATUSES = new Set([
+  "ACTIVE",
+  "EXPIRED",
+  "SUSPENDED",
+  "CANCELLED",
+  "ARCHIVED",
+]);
+const MEMBERSHIP_PLAN_LIST_FILTERS = new Set(["limit", "after"]);
+const MEMBERSHIP_LIST_FILTERS = new Set([
+  "status",
+  "member_id",
+  "payment_status",
+  "limit",
+  "after",
+]);
+const MEMBERSHIP_LIST_STATUSES = new Set([
+  "PENDING",
+  "ACTIVE",
+  "EXPIRED",
+  "SUSPENDED",
+  "CANCELLED",
+]);
+const MEMBERSHIP_PAYMENT_STATUSES = new Set([
+  "UNPAID",
+  "PARTIAL",
+  "PAID",
+  "PARTIALLY_REFUNDED",
+  "REFUNDED",
+]);
+const MEMBERSHIP_EXPIRY_FILTERS = new Set(["bucket", "limit", "after"]);
+const MEMBERSHIP_EXPIRY_BUCKETS = new Set([
+  "expired",
+  "today",
+  "within_3_days",
+  "within_7_days",
+  "within_30_days",
+]);
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 const ALLOWED_PLATFORM_PATHS = [
   /^\/api\/v1\/admin\/gyms\/$/,
@@ -283,6 +334,124 @@ function allowsMemberPaymentHistoryQuery(search: string): boolean {
   return true;
 }
 
+function allowsLimitValue(value: string | undefined): boolean {
+  return value === undefined || AUDIT_LIMIT.test(value);
+}
+
+function allowsCursorValue(value: string | undefined): boolean {
+  return value === undefined || AUDIT_CURSOR.test(value);
+}
+
+function hasQueryMeta(value: string): boolean {
+  return /[\u0000-\u001f\u007f&#?]/.test(value);
+}
+
+function allowsIsoDateValue(value: string | undefined): boolean {
+  if (value === undefined) return true;
+  const match = ISO_DATE.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
+}
+
+function allowsCleanValues(values: ReadonlyMap<string, string>): boolean {
+  for (const value of values.values()) {
+    if (hasQueryMeta(value)) return false;
+  }
+  return true;
+}
+
+function allowsGetOnlyQuery(
+  method: string | undefined,
+  search: string,
+  allows: (search: string) => boolean,
+): boolean {
+  if (method !== "GET") return search.length === 0;
+  return allows(search);
+}
+
+function allowsMemberListQuery(search: string): boolean {
+  const values = strictQueryValues(search, MEMBER_LIST_FILTERS);
+  if (!values || !allowsCleanValues(values)) return false;
+  const status = values.get("status");
+  if (status !== undefined && !MEMBER_LIST_STATUSES.has(status)) return false;
+  const text = values.get("search");
+  if (text !== undefined && (text.length > 100 || text.trim().length === 0)) {
+    return false;
+  }
+  const joinedFrom = values.get("joined_from");
+  const joinedTo = values.get("joined_to");
+  if (!allowsIsoDateValue(joinedFrom) || !allowsIsoDateValue(joinedTo)) {
+    return false;
+  }
+  if (
+    joinedFrom !== undefined &&
+    joinedTo !== undefined &&
+    joinedFrom > joinedTo
+  ) {
+    return false;
+  }
+  const ptClient = values.get("is_pt_client");
+  if (ptClient !== undefined && ptClient !== "true" && ptClient !== "false") {
+    return false;
+  }
+  return (
+    allowsLimitValue(values.get("limit")) &&
+    allowsCursorValue(values.get("after"))
+  );
+}
+
+function allowsMembershipPlanListQuery(search: string): boolean {
+  const values = strictQueryValues(search, MEMBERSHIP_PLAN_LIST_FILTERS);
+  if (!values || !allowsCleanValues(values)) return false;
+  return (
+    allowsLimitValue(values.get("limit")) &&
+    allowsCursorValue(values.get("after"))
+  );
+}
+
+function allowsMembershipListQuery(search: string): boolean {
+  const values = strictQueryValues(search, MEMBERSHIP_LIST_FILTERS);
+  if (!values || !allowsCleanValues(values)) return false;
+  const status = values.get("status");
+  if (status !== undefined && !MEMBERSHIP_LIST_STATUSES.has(status)) {
+    return false;
+  }
+  const memberId = values.get("member_id");
+  if (memberId !== undefined && !CANONICAL_UUID.test(memberId)) return false;
+  const paymentStatus = values.get("payment_status");
+  if (
+    paymentStatus !== undefined &&
+    !MEMBERSHIP_PAYMENT_STATUSES.has(paymentStatus)
+  ) {
+    return false;
+  }
+  return (
+    allowsLimitValue(values.get("limit")) &&
+    allowsCursorValue(values.get("after"))
+  );
+}
+
+function allowsMembershipExpiryQuery(search: string): boolean {
+  const values = strictQueryValues(search, MEMBERSHIP_EXPIRY_FILTERS);
+  if (!values || !allowsCleanValues(values)) return false;
+  const bucket = values.get("bucket");
+  if (bucket === undefined || !MEMBERSHIP_EXPIRY_BUCKETS.has(bucket)) {
+    return false;
+  }
+  return (
+    allowsLimitValue(values.get("limit")) &&
+    allowsCursorValue(values.get("after"))
+  );
+}
+
 function allowsTenantAuditListQuery(search: string): boolean {
   const values = strictQueryValues(search, TENANT_AUDIT_FILTERS);
   if (!values) return false;
@@ -310,6 +479,18 @@ function allowsForwardedQuery(
   }
   if (MEMBER_PAYMENT_HISTORY_PATH.test(pathname)) {
     return method === "GET" && allowsMemberPaymentHistoryQuery(search);
+  }
+  if (pathname === MEMBER_LIST_PATH) {
+    return allowsGetOnlyQuery(method, search, allowsMemberListQuery);
+  }
+  if (pathname === MEMBERSHIP_PLAN_LIST_PATH) {
+    return allowsGetOnlyQuery(method, search, allowsMembershipPlanListQuery);
+  }
+  if (pathname === MEMBERSHIP_LIST_PATH) {
+    return allowsGetOnlyQuery(method, search, allowsMembershipListQuery);
+  }
+  if (pathname === MEMBERSHIP_EXPIRY_PATH) {
+    return allowsGetOnlyQuery(method, search, allowsMembershipExpiryQuery);
   }
   return allowsExactPlatformQuery(pathname, search);
 }

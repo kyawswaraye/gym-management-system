@@ -13,9 +13,11 @@ published. Member list, create, detail, update, and archive are published.
 Membership list, create, detail, note update, cancel, suspend, resume, and
 expiry buckets are published. Membership-expiry scheduling and delivery
 commands are implemented. The member summary API is published. Nested member
-payment history is published. Nested check-in history, notification HTTP
-routes, and general payment and receipt HTTP endpoints remain unpublished.
-Production expiry delivery remains
+payment history is published. The member and membership browser workspaces
+follow those cursor pages, and the membership workspace can browse one expiry
+bucket at a time. Nested check-in history, notification HTTP routes, general
+payment and receipt HTTP endpoints, and private member files remain
+unpublished. Production expiry delivery remains
 gated on an idempotency-capable transactional provider. Phase 2 stays open
 until its development-plan exit criteria pass.
 

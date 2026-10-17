@@ -1,16 +1,18 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { operationGet, operationMutation } from "@/features/operations/client";
+import { listMembers, operationMutation } from "@/features/operations/client";
 import { MembersManager } from "@/features/operations/members-manager";
-import type { Member } from "@/types/api";
+import type { Member, MemberListPage, MemberListQuery } from "@/types/api";
 
 vi.mock("@/features/operations/client", () => ({
-  operationGet: vi.fn(),
+  listMembers: vi.fn(),
   operationMutation: vi.fn(),
 }));
 
 const MEMBER_ID = "11111111-1111-4111-8111-111111111111";
+const OTHER_ID = "22222222-2222-4222-8222-222222222222";
+const THIRD_ID = "33333333-3333-4333-8333-333333333333";
 
 function member(overrides: Partial<Member> = {}): Member {
   return {
@@ -47,15 +49,38 @@ function member(overrides: Partial<Member> = {}): Member {
   };
 }
 
+function page(rows: Member[], next: string | null = null): MemberListPage {
+  return {
+    data: rows,
+    meta: { has_more: next !== null, next_after: next },
+  };
+}
+
+function deferred<T>() {
+  let resolve: (value: T) => void = () => undefined;
+  let reject: (reason?: unknown) => void = () => undefined;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 describe("Members manager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(operationGet).mockResolvedValue([member()]);
+    vi.mocked(listMembers).mockResolvedValue(page([member()]));
     vi.mocked(operationMutation).mockResolvedValue(member());
   });
 
-  it("renders the published first and last name", async () => {
+  it("shows a loading state and then the published member fields", async () => {
+    const pending = deferred<MemberListPage>();
+    vi.mocked(listMembers).mockReturnValue(pending.promise);
     render(<MembersManager canCreate defaultDate="2026-10-17" />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading members.");
+    expect(screen.queryByText("No members found.")).not.toBeInTheDocument();
+    pending.resolve(page([member()]));
 
     expect(
       await screen.findByRole("link", { name: "Ada Lovelace" }),
@@ -65,12 +90,217 @@ describe("Members manager", () => {
     expect(screen.getByText("2026-01-01")).toBeInTheDocument();
     expect(screen.getByText("ACTIVE")).toBeInTheDocument();
     expect(screen.queryByText("ada lovelace")).not.toBeInTheDocument();
+    expect(listMembers).toHaveBeenCalledWith({ limit: 25 });
   });
 
-  it("creates a member with the published name fields", async () => {
+  it("loads the next page, dedupes ids, and stops a repeated cursor", async () => {
+    const grace = member({
+      id: OTHER_ID,
+      first_name: "Grace",
+      last_name: "Hopper",
+      member_number: "MEM-000002",
+    });
+    vi.mocked(listMembers)
+      .mockResolvedValueOnce(page([member(), member()], "cursor.next"))
+      .mockResolvedValueOnce(page([member(), grace], "cursor.next"));
     render(<MembersManager canCreate defaultDate="2026-10-17" />);
-    await screen.findByRole("link", { name: "Ada Lovelace" });
 
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Load more members" }),
+    );
+
+    expect(
+      await screen.findByRole("link", { name: "Grace Hopper" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Ada Lovelace" })).toHaveLength(
+      1,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Load more members" }),
+    ).not.toBeInTheDocument();
+    expect(listMembers).toHaveBeenNthCalledWith(2, {
+      limit: 25,
+      after: "cursor.next",
+    });
+    expect(listMembers).toHaveBeenCalledTimes(2);
+  });
+
+  it("resets the page when filters change and ignores a stale response", async () => {
+    const requests: Array<ReturnType<typeof deferred<MemberListPage>>> = [];
+    vi.mocked(listMembers).mockImplementation(
+      async (query: MemberListQuery = {}) => {
+        const pending = deferred<MemberListPage>();
+        requests.push(pending);
+        pending.promise.then(
+          () => undefined,
+          () => undefined,
+        );
+        void query;
+        return pending.promise;
+      },
+    );
+    render(<MembersManager canCreate defaultDate="2026-10-17" />);
+    await waitFor(() => expect(requests).toHaveLength(1));
+    requests[0]?.resolve(page([member()], "cursor.old"));
+    expect(
+      await screen.findByRole("link", { name: "Ada Lovelace" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Load more members" }));
+    await waitFor(() => expect(requests).toHaveLength(2));
+    fireEvent.change(screen.getByLabelText("Search members"), {
+      target: { value: "A" },
+    });
+    fireEvent.change(screen.getByLabelText("Search members"), {
+      target: { value: "Grace" },
+    });
+    fireEvent.change(screen.getByLabelText("Filter by status"), {
+      target: { value: "ACTIVE" },
+    });
+    fireEvent.change(screen.getByLabelText("Joined from"), {
+      target: { value: "2026-01-01" },
+    });
+    fireEvent.change(screen.getByLabelText("Joined to"), {
+      target: { value: "2026-10-17" },
+    });
+
+    expect(
+      screen.queryByRole("link", { name: "Ada Lovelace" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading members.");
+    requests[1]?.resolve(
+      page([
+        member({
+          id: THIRD_ID,
+          first_name: "Stale",
+          last_name: "Page",
+        }),
+      ]),
+    );
+    await waitFor(() => expect(requests.length).toBeGreaterThan(2));
+    const staleList = requests[requests.length - 2];
+    const current = requests[requests.length - 1];
+    staleList?.resolve(
+      page([member({ id: OTHER_ID, first_name: "Old", last_name: "Filter" })]),
+    );
+    expect(
+      screen.queryByRole("link", { name: "Old Filter" }),
+    ).not.toBeInTheDocument();
+    current?.resolve(
+      page([
+        member({
+          id: THIRD_ID,
+          first_name: "Grace",
+          last_name: "Hopper",
+          member_number: "MEM-000099",
+        }),
+      ]),
+    );
+
+    expect(
+      await screen.findByRole("link", { name: "Grace Hopper" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Old Filter" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Stale Page" }),
+    ).not.toBeInTheDocument();
+    expect(listMembers).toHaveBeenLastCalledWith({
+      limit: 25,
+      search: "Grace",
+      status: "ACTIVE",
+      joined_from: "2026-01-01",
+      joined_to: "2026-10-17",
+    });
+  });
+
+  it("shows an empty page, a retryable load error, and a retryable paging error", async () => {
+    vi.mocked(listMembers).mockRejectedValueOnce(
+      new Error("Members unavailable."),
+    );
+    render(<MembersManager canCreate defaultDate="2026-10-17" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Members unavailable.",
+    );
+    expect(screen.queryByText("No members found.")).not.toBeInTheDocument();
+    vi.mocked(listMembers).mockResolvedValueOnce(page([]));
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("No members found.")).toBeInTheDocument();
+
+    vi.mocked(listMembers).mockResolvedValueOnce(
+      page([member()], "cursor.next"),
+    );
+    fireEvent.change(screen.getByLabelText("Search members"), {
+      target: { value: "Ada" },
+    });
+    const loadMore = await screen.findByRole("button", {
+      name: "Load more members",
+    });
+    vi.mocked(listMembers).mockRejectedValueOnce(
+      new Error("Page unavailable."),
+    );
+    fireEvent.click(loadMore);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Page unavailable.",
+    );
+    expect(
+      screen.getByRole("link", { name: "Ada Lovelace" }),
+    ).toBeInTheDocument();
+    vi.mocked(listMembers).mockResolvedValueOnce(
+      page([
+        member({
+          id: OTHER_ID,
+          first_name: "Grace",
+          last_name: "Hopper",
+        }),
+      ]),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry loading members" }),
+    );
+    expect(
+      await screen.findByRole("link", { name: "Grace Hopper" }),
+    ).toBeInTheDocument();
+  });
+
+  it("creates a member and replaces the loaded pages under the current filters", async () => {
+    const grace = member({
+      id: OTHER_ID,
+      first_name: "Grace",
+      last_name: "Hopper",
+      member_number: "MEM-000002",
+    });
+    const hopper = member({
+      id: THIRD_ID,
+      first_name: "Grace",
+      last_name: "Hopper",
+      member_number: "MEM-000003",
+      phone: "777",
+      email: "grace@example.test",
+    });
+    vi.mocked(listMembers)
+      .mockResolvedValueOnce(page([member()], "cursor.next"))
+      .mockResolvedValueOnce(page([grace]))
+      .mockResolvedValue(page([hopper]));
+    render(<MembersManager canCreate defaultDate="2026-10-17" />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Load more members" }),
+    );
+    expect(
+      await screen.findByRole("link", { name: "Grace Hopper" }),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Filter by status"), {
+      target: { value: "ACTIVE" },
+    });
+    await waitFor(() =>
+      expect(listMembers).toHaveBeenLastCalledWith({
+        limit: 25,
+        status: "ACTIVE",
+      }),
+    );
     fireEvent.change(screen.getByLabelText("First name"), {
       target: { value: "Grace" },
     });
@@ -93,6 +323,16 @@ describe("Members manager", () => {
         email: "grace@example.test",
         join_date: "2026-10-17",
       }),
+    );
+    expect(await screen.findByText("MEM-000003")).toBeInTheDocument();
+    expect(screen.queryByText("MEM-000001")).not.toBeInTheDocument();
+    expect(screen.queryByText("MEM-000002")).not.toBeInTheDocument();
+    expect(listMembers).toHaveBeenLastCalledWith({
+      limit: 25,
+      status: "ACTIVE",
+    });
+    expect(vi.mocked(listMembers).mock.calls.at(-1)?.[0]).not.toHaveProperty(
+      "after",
     );
   });
 });

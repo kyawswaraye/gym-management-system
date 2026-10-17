@@ -2043,6 +2043,257 @@ describe("browser credential boundary", () => {
     expect(mutatedBody).not.toContain("ROLE_CREATED");
     expect(fetchMock).toHaveBeenCalledTimes(accepted.length + 1);
   });
+
+  it("allowlists member and membership collection queries and rejects unsafe ones", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () =>
+        Response.json({
+          success: true,
+          data: [],
+          meta: { has_more: false, next_after: null },
+          message: "Success",
+        }),
+      );
+    const request = new NextRequest(
+      "https://app.example.com/api/operations/members",
+      { headers: { cookie: "gms_access=access" } },
+    );
+    const memberId = "f52030c1-18af-4e18-a1ec-50997d892ef4";
+    const cursor = "a".repeat(2048);
+    const secret = "injected-secret";
+
+    async function expectForwarded(path: string, query: string) {
+      const response = await authenticatedGet(
+        request,
+        query ? `${path}?${query}` : path,
+      );
+      expect(response.status).toBe(200);
+      const upstream = new URL(String(fetchMock.mock.calls.at(-1)?.[0]));
+      expect(upstream.pathname).toBe(path);
+      expect(upstream.searchParams.toString()).toBe(
+        new URLSearchParams(query).toString(),
+      );
+    }
+
+    const memberStatuses = [
+      undefined,
+      "ACTIVE",
+      "EXPIRED",
+      "SUSPENDED",
+      "CANCELLED",
+      "ARCHIVED",
+    ];
+    const memberDates = [
+      {},
+      { joined_from: "2026-01-01" },
+      { joined_to: "2026-12-31" },
+      { joined_from: "2024-02-29", joined_to: "2024-02-29" },
+      { joined_from: "2026-01-01", joined_to: "2026-10-17" },
+    ];
+    for (const status of memberStatuses) {
+      for (const search of [undefined, "Ada Lovelace"]) {
+        for (const dates of memberDates) {
+          for (const pt of [undefined, "true", "false"]) {
+            for (const limit of [undefined, "1", "100"]) {
+              for (const after of [undefined, "cursor.one"]) {
+                const params = new URLSearchParams();
+                if (status) params.set("status", status);
+                if (search) params.set("search", search);
+                if (dates.joined_from)
+                  params.set("joined_from", dates.joined_from);
+                if (dates.joined_to) params.set("joined_to", dates.joined_to);
+                if (pt) params.set("is_pt_client", pt);
+                if (limit) params.set("limit", limit);
+                if (after) params.set("after", after);
+                await expectForwarded("/api/v1/members/", params.toString());
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const membershipStatuses = [
+      undefined,
+      "PENDING",
+      "ACTIVE",
+      "EXPIRED",
+      "SUSPENDED",
+      "CANCELLED",
+    ];
+    const paymentStatuses = [
+      undefined,
+      "UNPAID",
+      "PARTIAL",
+      "PAID",
+      "PARTIALLY_REFUNDED",
+      "REFUNDED",
+    ];
+    for (const status of membershipStatuses) {
+      for (const payment of paymentStatuses) {
+        for (const withMember of [false, true]) {
+          for (const limit of [undefined, "25"]) {
+            for (const after of [undefined, "cursor.one"]) {
+              const params = new URLSearchParams();
+              if (status) params.set("status", status);
+              if (withMember) params.set("member_id", memberId);
+              if (payment) params.set("payment_status", payment);
+              if (limit) params.set("limit", limit);
+              if (after) params.set("after", after);
+              await expectForwarded("/api/v1/memberships/", params.toString());
+            }
+          }
+        }
+      }
+    }
+
+    for (const limit of [undefined, "1", "100"]) {
+      for (const after of [undefined, cursor]) {
+        const params = new URLSearchParams();
+        if (limit) params.set("limit", limit);
+        if (after) params.set("after", after);
+        await expectForwarded("/api/v1/membership-plans/", params.toString());
+      }
+    }
+
+    for (const bucket of [
+      "expired",
+      "today",
+      "within_3_days",
+      "within_7_days",
+      "within_30_days",
+    ]) {
+      for (const limit of [undefined, "25"]) {
+        for (const after of [undefined, "cursor.one"]) {
+          const params = new URLSearchParams();
+          params.set("bucket", bucket);
+          if (limit) params.set("limit", limit);
+          if (after) params.set("after", after);
+          await expectForwarded(
+            "/api/v1/memberships/expiry/",
+            params.toString(),
+          );
+        }
+      }
+    }
+
+    const rejected = [
+      `/api/v1/members/?gym_id=${secret}`,
+      "/api/v1/members/?status=ACTIVE&status=EXPIRED",
+      "/api/v1/members/?search=",
+      "/api/v1/members/?search=%20",
+      `/api/v1/members/?search=${"a".repeat(101)}`,
+      `/api/v1/members/?search=%00${secret}`,
+      `/api/v1/members/?search=ada%26gym_id%3D${secret}`,
+      "/api/v1/members/?status=active",
+      "/api/v1/members/?status=PENDING",
+      "/api/v1/members/?joined_from=2026-02-31",
+      "/api/v1/members/?joined_from=2025-02-29",
+      "/api/v1/members/?joined_from=2026-10-17&joined_to=2026-10-16",
+      "/api/v1/members/?is_pt_client=1",
+      "/api/v1/members/?is_pt_client=TRUE",
+      "/api/v1/members/?limit=0",
+      "/api/v1/members/?limit=101",
+      "/api/v1/members/?limit=01",
+      "/api/v1/members/?limit=25&limit=10",
+      "/api/v1/members/?after=",
+      `/api/v1/members/?after=${"a".repeat(2049)}`,
+      "/api/v1/members/?after=bad%20cursor",
+      "/api/v1/membership-plans/?ordering=code",
+      `/api/v1/membership-plans/?after=%00${secret}`,
+      "/api/v1/memberships/?status=ARCHIVED",
+      `/api/v1/memberships/?member_id=${memberId.toUpperCase()}`,
+      "/api/v1/memberships/?member_id=not-a-uuid",
+      "/api/v1/memberships/?payment_status=VOID",
+      "/api/v1/memberships/?member_id=&status=ACTIVE",
+      `/api/v1/memberships/?gym_id=${secret}`,
+      "/api/v1/memberships/expiry/",
+      "/api/v1/memberships/expiry/?bucket=",
+      "/api/v1/memberships/expiry/?bucket=soon",
+      "/api/v1/memberships/expiry/?bucket=within_7_days&status=ACTIVE",
+      `/api/v1/memberships/expiry/?bucket=today&payment_status=PAID&member_id=${memberId}`,
+      `/api/v1/memberships/expiry/?bucket=expired%00&limit=25`,
+      "/api/v1/memberships/expiry/?bucket=expired&bucket=today",
+    ];
+    const forwarded = fetchMock.mock.calls.length;
+    for (const path of rejected) {
+      const denied = await authenticatedGet(request, path);
+      expect(denied.status).toBe(503);
+      expect(await denied.text()).not.toContain(secret);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(forwarded);
+
+    const csrf = "x".repeat(43);
+    const mutationHeaders = {
+      cookie: `gms_access=access; gms_csrf=${csrf}`,
+      origin: "https://app.example.com",
+      "x-csrf-token": csrf,
+      "content-type": "application/json",
+    };
+    const queriedMutations = [
+      "/api/v1/members/?search=ada",
+      "/api/v1/membership-plans/?limit=1",
+      "/api/v1/memberships/?status=ACTIVE",
+      "/api/v1/memberships/expiry/?bucket=expired",
+    ];
+    for (const path of queriedMutations) {
+      const denied = await authenticatedMutation(
+        new NextRequest("https://app.example.com/api/operations/members", {
+          method: "POST",
+          headers: mutationHeaders,
+          body: JSON.stringify({ first_name: "Moe" }),
+        }),
+        path,
+      );
+      expect(denied.status).toBe(503);
+      expect(await denied.text()).not.toContain(secret);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(forwarded);
+
+    for (const path of [
+      "/api/v1/members/",
+      "/api/v1/membership-plans/",
+      "/api/v1/memberships/",
+      `/api/v1/memberships/${memberId}/cancel/`,
+    ]) {
+      const allowed = await authenticatedMutation(
+        new NextRequest("https://app.example.com/api/operations/members", {
+          method: "POST",
+          headers: mutationHeaders,
+          body: "{}",
+        }),
+        path,
+      );
+      expect(allowed.status).toBe(200);
+    }
+
+    const routed = await operationsGet(
+      new NextRequest(
+        "https://app.example.com/api/operations/members?status=ACTIVE&limit=25",
+        { headers: { cookie: "gms_access=access" } },
+      ),
+      { params: Promise.resolve({ path: ["members"] }) },
+    );
+    expect(routed.status).toBe(200);
+    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toBe(
+      "https://api.example.com/api/v1/members/?status=ACTIVE&limit=25",
+    );
+    const blocked = await operationsGet(
+      new NextRequest(
+        `https://app.example.com/api/operations/memberships/expiry?bucket=today&gym_id=${secret}`,
+        { headers: { cookie: "gms_access=access" } },
+      ),
+      { params: Promise.resolve({ path: ["memberships", "expiry"] }) },
+    );
+    expect(blocked.status).toBe(503);
+    expect(await blocked.text()).not.toContain(secret);
+    const detail = await authenticatedGet(
+      request,
+      `/api/v1/members/${memberId}/`,
+    );
+    expect(detail.status).toBe(200);
+  });
 });
 
 async function sourceFiles(directory: string): Promise<string[]> {
