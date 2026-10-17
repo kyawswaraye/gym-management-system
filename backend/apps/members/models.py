@@ -194,10 +194,20 @@ class MembershipPlan(TenantModel):
 
 
 class Membership(TenantModel):
+    """Sold membership with an immutable plan and price snapshot.
+
+    Migration 0008 adds the same-gym creator and canceller foreign keys and the
+    snapshot guard. Django cannot express those composite references, so they
+    stay in SQL. ``cancelled_by_membership_id`` is nullable and is not a second
+    Django foreign key. Pending, active, and suspended date ranges cannot
+    overlap for one member.
+    """
+
     class PaymentStatus(models.TextChoices):
         UNPAID = "UNPAID"
         PARTIAL = "PARTIAL"
         PAID = "PAID"
+        PARTIALLY_REFUNDED = "PARTIALLY_REFUNDED"
         REFUNDED = "REFUNDED"
 
     class Status(models.TextChoices):
@@ -224,11 +234,13 @@ class Membership(TenantModel):
     final_amount = models.DecimalField(max_digits=18, decimal_places=2)
     currency = models.CharField(max_length=3)
     payment_status = models.CharField(
-        max_length=12, choices=PaymentStatus, default=PaymentStatus.UNPAID
+        max_length=20, choices=PaymentStatus, default=PaymentStatus.UNPAID
     )
     status = models.CharField(max_length=12, choices=Status, default=Status.ACTIVE)
     revenue_source = models.CharField(max_length=12, choices=RevenueSource)
+    note = models.TextField(blank=True, default="")
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by_membership_id = models.UUIDField(null=True, blank=True)
     cancellation_reason = models.TextField(blank=True)
     created_by_membership_id = models.UUIDField()
 
@@ -241,10 +253,79 @@ class Membership(TenantModel):
                 name="membership_dates_valid_ck",
             ),
             models.CheckConstraint(
+                condition=models.Q(list_price__gte=0),
+                name="membership_list_nonnegative_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(discount_amount__gte=0),
+                name="membership_discount_nonnegative_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(final_amount__gte=0),
+                name="membership_final_nonnegative_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(discount_amount__lte=models.F("list_price")),
+                name="membership_discount_within_list_ck",
+            ),
+            models.CheckConstraint(
                 condition=models.Q(
                     final_amount=models.F("list_price") - models.F("discount_amount")
                 ),
                 name="membership_total_exact_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(duration_value__gte=1),
+                name="membership_duration_positive_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(duration_unit__in=["DAY", "WEEK", "MONTH", "YEAR"]),
+                name="membership_duration_unit_ck",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(plan_code="") & ~models.Q(plan_name=""),
+                name="membership_snapshot_nonblank_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(currency__regex=r"^[A-Z]{3}$"),
+                name="membership_currency_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    payment_status__in=[
+                        "UNPAID",
+                        "PARTIAL",
+                        "PAID",
+                        "PARTIALLY_REFUNDED",
+                        "REFUNDED",
+                    ]
+                ),
+                name="membership_payment_status_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=["PENDING", "ACTIVE", "EXPIRED", "SUSPENDED", "CANCELLED"]
+                ),
+                name="membership_status_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status="CANCELLED",
+                        cancelled_at__isnull=False,
+                        cancelled_by_membership_id__isnull=False,
+                        cancellation_reason__regex=r"[^[:space:]]",
+                    )
+                    | (
+                        ~models.Q(status="CANCELLED")
+                        & models.Q(
+                            cancelled_at__isnull=True,
+                            cancelled_by_membership_id__isnull=True,
+                        )
+                        & ~models.Q(cancellation_reason__regex=r"[^[:space:]]")
+                    )
+                ),
+                name="membership_cancellation_state_ck",
             ),
             ExclusionConstraint(
                 name="membership_no_active_overlap_excl",
@@ -267,6 +348,19 @@ class Membership(TenantModel):
         indexes = [
             models.Index(fields=["gym", "status", "expiry_date"], name="membership_gym_expiry_idx"),
             models.Index(fields=["gym", "member", "start_date"], name="membership_member_date_idx"),
+            models.Index(fields=["gym", "member", "status"], name="membership_member_status_idx"),
+            models.Index(
+                fields=["gym", "status", "-created_at"], name="membership_status_created_idx"
+            ),
+            models.Index(fields=["gym", "plan"], name="membership_gym_plan_idx"),
+            models.Index(
+                fields=["gym", "created_by_membership_id"], name="membership_gym_creator_idx"
+            ),
+            models.Index(
+                fields=["gym", "cancelled_by_membership_id"],
+                name="membership_gym_canceller_idx",
+                condition=models.Q(cancelled_by_membership_id__isnull=False),
+            ),
         ]
 
 

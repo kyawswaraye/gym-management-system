@@ -98,7 +98,7 @@ export function MemberDetail({
           Phone
           <input
             className="input"
-            defaultValue={member.phone}
+            defaultValue={member.phone ?? ""}
             disabled={!canUpdate}
             name="phone"
           />
@@ -107,7 +107,7 @@ export function MemberDetail({
           Email
           <input
             className="input"
-            defaultValue={member.email}
+            defaultValue={member.email ?? ""}
             disabled={!canUpdate}
             name="email"
             type="email"

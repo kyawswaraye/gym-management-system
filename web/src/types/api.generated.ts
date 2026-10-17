@@ -501,6 +501,102 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/memberships/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["memberships_list"];
+    put?: never;
+    post: operations["memberships_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/memberships/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["memberships_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["memberships_update"];
+    trace?: never;
+  };
+  "/api/v1/memberships/{id}/cancel/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["memberships_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/memberships/{id}/resume/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["memberships_resume"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/memberships/{id}/suspend/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["memberships_suspend"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/memberships/expiry/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["memberships_expiry"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/owners/": {
     parameters: {
       query?: never;
@@ -1400,6 +1496,78 @@ export interface components {
      */
     MemberStatusEnum:
       "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED" | "ARCHIVED";
+    Membership: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      member_id: string;
+      /** Format: uuid */
+      plan_id: string;
+      plan_code: string;
+      plan_name: string;
+      duration_value: number;
+      duration_unit: components["schemas"]["DurationUnitEnum"];
+      /** Format: date */
+      start_date: string;
+      /** Format: date */
+      expiry_date: string;
+      /** Format: decimal */
+      list_price: string;
+      /** Format: decimal */
+      discount_amount: string;
+      /** Format: decimal */
+      final_amount: string;
+      currency: string;
+      payment_status: components["schemas"]["PaymentStatusEnum"];
+      status: components["schemas"]["MembershipStatusEnum"];
+      note: string;
+      /** Format: date-time */
+      cancelled_at: string | null;
+      /** Format: uuid */
+      cancelled_by_membership_id: string | null;
+      cancellation_reason: string;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    MembershipCancelRequest: {
+      reason: string;
+    };
+    MembershipCollectionMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    MembershipCreateRequest: {
+      /** Format: uuid */
+      member_id: string;
+      /** Format: uuid */
+      plan_id: string;
+      /** Format: date */
+      start_date: string;
+      /**
+       * Format: decimal
+       * @default 0.00
+       */
+      discount_amount: string;
+      /** @default  */
+      note: string;
+    };
+    MembershipEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["Membership"];
+      message: string;
+    };
+    MembershipListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["Membership"][];
+      meta: components["schemas"]["MembershipCollectionMeta"];
+      message: string;
+    };
     MembershipPlan: {
       /** Format: uuid */
       id: string;
@@ -1461,6 +1629,16 @@ export interface components {
     MembershipRoleReplaceRequest: {
       role_ids: string[];
     };
+    /**
+     * @description * `PENDING` - Pending
+     *     * `ACTIVE` - Active
+     *     * `EXPIRED` - Expired
+     *     * `SUSPENDED` - Suspended
+     *     * `CANCELLED` - Cancelled
+     * @enum {string}
+     */
+    MembershipStatusEnum:
+      "PENDING" | "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED";
     /** @enum {unknown} */
     NullEnum: null;
     OwnerAcceptInputRequest: {
@@ -1615,6 +1793,9 @@ export interface components {
       /** Format: decimal */
       price?: string;
     };
+    PatchedMembershipUpdateRequest: {
+      note?: string;
+    };
     PatchedRoleUpdateRequest: {
       key?: string;
       name?: string;
@@ -1631,6 +1812,16 @@ export interface components {
       /** Format: decimal */
       default_commission_percent?: string;
     };
+    /**
+     * @description * `UNPAID` - Unpaid
+     *     * `PARTIAL` - Partial
+     *     * `PAID` - Paid
+     *     * `PARTIALLY_REFUNDED` - Partially Refunded
+     *     * `REFUNDED` - Refunded
+     * @enum {string}
+     */
+    PaymentStatusEnum:
+      "UNPAID" | "PARTIAL" | "PAID" | "PARTIALLY_REFUNDED" | "REFUNDED";
     Permission: {
       /** Format: uuid */
       id: string;
@@ -3983,6 +4174,495 @@ export interface operations {
         };
       };
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  memberships_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+        member_id?: string;
+        /**
+         * @description * `UNPAID` - Unpaid
+         *     * `PARTIAL` - Partial
+         *     * `PAID` - Paid
+         *     * `PARTIALLY_REFUNDED` - Partially Refunded
+         *     * `REFUNDED` - Refunded
+         */
+        payment_status?:
+          "UNPAID" | "PARTIAL" | "PAID" | "PARTIALLY_REFUNDED" | "REFUNDED";
+        /**
+         * @description * `PENDING` - Pending
+         *     * `ACTIVE` - Active
+         *     * `EXPIRED` - Expired
+         *     * `SUSPENDED` - Suspended
+         *     * `CANCELLED` - Cancelled
+         */
+        status?: "PENDING" | "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  memberships_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MembershipCreateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MembershipCreateRequest"];
+        "multipart/form-data": components["schemas"]["MembershipCreateRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  memberships_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  memberships_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedMembershipUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedMembershipUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedMembershipUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  memberships_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MembershipCancelRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MembershipCancelRequest"];
+        "multipart/form-data": components["schemas"]["MembershipCancelRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  memberships_resume: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  memberships_suspend: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  memberships_expiry: {
+    parameters: {
+      query: {
+        after?: string;
+        /**
+         * @description * `expired` - expired
+         *     * `today` - today
+         *     * `within_3_days` - within_3_days
+         *     * `within_7_days` - within_7_days
+         *     * `within_30_days` - within_30_days
+         */
+        bucket:
+          | "expired"
+          | "today"
+          | "within_3_days"
+          | "within_7_days"
+          | "within_30_days";
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
         headers: {
           [name: string]: unknown;
         };

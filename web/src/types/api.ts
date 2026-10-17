@@ -60,47 +60,9 @@ export type RoleUpdate = components["schemas"]["PatchedRoleUpdateRequest"];
 export type Permission = components["schemas"]["Permission"];
 export type MembershipRole = components["schemas"]["MembershipRole"];
 export type CollectionMeta = components["schemas"]["CollectionMeta"];
-
-export type Member = {
-  id: string;
-  member_number: string;
-  first_name: string;
-  last_name: string;
-  display_name: string;
-  phone: string;
-  email: string;
-  join_date: string;
-  notes?: string;
-  status: string;
-  is_pt_client: boolean;
-};
-
-export type MembershipPlan = {
-  id: string;
-  code: string;
-  name: string;
-  duration_value: number;
-  duration_unit: string;
-  price: string;
-  currency: string;
-  is_active: boolean;
-};
-
-export type Membership = {
-  id: string;
-  member: string;
-  member_name: string;
-  plan_name: string;
-  start_date: string;
-  expiry_date: string;
-  final_amount: string;
-  paid_amount: string;
-  outstanding_amount: string;
-  currency: string;
-  payment_status: string;
-  status: string;
-  revenue_source: string;
-};
+export type Member = components["schemas"]["Member"];
+export type MembershipPlan = components["schemas"]["MembershipPlan"];
+export type Membership = components["schemas"]["Membership"];
 
 export type Payment = {
   id: string;

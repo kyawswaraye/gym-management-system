@@ -3159,6 +3159,755 @@
                 }
             }
         },
+        "/api/v1/memberships/": {
+            "get": {
+                "operationId": "memberships_list",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "after",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1,
+                            "default": 25
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "member_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "payment_status",
+                        "schema": {
+                            "enum": [
+                                "UNPAID",
+                                "PARTIAL",
+                                "PAID",
+                                "PARTIALLY_REFUNDED",
+                                "REFUNDED"
+                            ],
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "description": "* `UNPAID` - Unpaid\n* `PARTIAL` - Partial\n* `PAID` - Paid\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `REFUNDED` - Refunded"
+                    },
+                    {
+                        "in": "query",
+                        "name": "status",
+                        "schema": {
+                            "enum": [
+                                "PENDING",
+                                "ACTIVE",
+                                "EXPIRED",
+                                "SUSPENDED",
+                                "CANCELLED"
+                            ],
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "description": "* `PENDING` - Pending\n* `ACTIVE` - Active\n* `EXPIRED` - Expired\n* `SUSPENDED` - Suspended\n* `CANCELLED` - Cancelled"
+                    }
+                ],
+                "tags": [
+                    "memberships"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipListEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "memberships_create",
+                "tags": [
+                    "memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipCreateRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipCreateRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipCreateRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/memberships/{id}/": {
+            "get": {
+                "operationId": "memberships_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "memberships"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "memberships_update",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedMembershipUpdateRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedMembershipUpdateRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedMembershipUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/memberships/{id}/cancel/": {
+            "post": {
+                "operationId": "memberships_cancel",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipCancelRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipCancelRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipCancelRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/memberships/{id}/resume/": {
+            "post": {
+                "operationId": "memberships_resume",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "memberships"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/memberships/{id}/suspend/": {
+            "post": {
+                "operationId": "memberships_suspend",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "memberships"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/memberships/expiry/": {
+            "get": {
+                "operationId": "memberships_expiry",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "after",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "bucket",
+                        "schema": {
+                            "enum": [
+                                "expired",
+                                "today",
+                                "within_3_days",
+                                "within_7_days",
+                                "within_30_days"
+                            ],
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "description": "* `expired` - expired\n* `today` - today\n* `within_3_days` - within_3_days\n* `within_7_days` - within_7_days\n* `within_30_days` - within_30_days",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1,
+                            "default": 25
+                        }
+                    }
+                ],
+                "tags": [
+                    "memberships"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipListEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/owners/": {
             "get": {
                 "operationId": "owners_list",
@@ -7032,6 +7781,226 @@
                 "type": "string",
                 "description": "* `ACTIVE` - Active\n* `EXPIRED` - Expired\n* `SUSPENDED` - Suspended\n* `CANCELLED` - Cancelled\n* `ARCHIVED` - Archived"
             },
+            "Membership": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "member_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "plan_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "plan_code": {
+                        "type": "string"
+                    },
+                    "plan_name": {
+                        "type": "string"
+                    },
+                    "duration_value": {
+                        "type": "integer"
+                    },
+                    "duration_unit": {
+                        "$ref": "#/components/schemas/DurationUnitEnum"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "expiry_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "list_price": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "discount_amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "final_amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "payment_status": {
+                        "$ref": "#/components/schemas/PaymentStatusEnum"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/MembershipStatusEnum"
+                    },
+                    "note": {
+                        "type": "string"
+                    },
+                    "cancelled_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "cancelled_by_membership_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "cancellation_reason": {
+                        "type": "string"
+                    },
+                    "created_by_membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "cancellation_reason",
+                    "cancelled_at",
+                    "cancelled_by_membership_id",
+                    "created_at",
+                    "created_by_membership_id",
+                    "currency",
+                    "discount_amount",
+                    "duration_unit",
+                    "duration_value",
+                    "expiry_date",
+                    "final_amount",
+                    "id",
+                    "list_price",
+                    "member_id",
+                    "note",
+                    "payment_status",
+                    "plan_code",
+                    "plan_id",
+                    "plan_name",
+                    "start_date",
+                    "status",
+                    "updated_at"
+                ]
+            },
+            "MembershipCancelRequest": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                    }
+                },
+                "required": [
+                    "reason"
+                ]
+            },
+            "MembershipCollectionMeta": {
+                "type": "object",
+                "properties": {
+                    "has_more": {
+                        "type": "boolean"
+                    },
+                    "next_after": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "has_more",
+                    "next_after"
+                ]
+            },
+            "MembershipCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "member_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "plan_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "discount_amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$",
+                        "default": "0.00"
+                    },
+                    "note": {
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 4000
+                    }
+                },
+                "required": [
+                    "member_id",
+                    "plan_id",
+                    "start_date"
+                ]
+            },
+            "MembershipEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/Membership"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message"
+                ]
+            },
+            "MembershipListEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Membership"
+                        }
+                    },
+                    "meta": {
+                        "$ref": "#/components/schemas/MembershipCollectionMeta"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "meta"
+                ]
+            },
             "MembershipPlan": {
                 "type": "object",
                 "properties": {
@@ -7255,6 +8224,17 @@
                 "required": [
                     "role_ids"
                 ]
+            },
+            "MembershipStatusEnum": {
+                "enum": [
+                    "PENDING",
+                    "ACTIVE",
+                    "EXPIRED",
+                    "SUSPENDED",
+                    "CANCELLED"
+                ],
+                "type": "string",
+                "description": "* `PENDING` - Pending\n* `ACTIVE` - Active\n* `EXPIRED` - Expired\n* `SUSPENDED` - Suspended\n* `CANCELLED` - Cancelled"
             },
             "NullEnum": {
                 "enum": [
@@ -7837,6 +8817,15 @@
                     }
                 }
             },
+            "PatchedMembershipUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "note": {
+                        "type": "string",
+                        "maxLength": 4000
+                    }
+                }
+            },
             "PatchedRoleUpdateRequest": {
                 "type": "object",
                 "properties": {
@@ -7890,6 +8879,17 @@
                         "pattern": "^-?\\d{0,3}(?:\\.\\d{0,2})?$"
                     }
                 }
+            },
+            "PaymentStatusEnum": {
+                "enum": [
+                    "UNPAID",
+                    "PARTIAL",
+                    "PAID",
+                    "PARTIALLY_REFUNDED",
+                    "REFUNDED"
+                ],
+                "type": "string",
+                "description": "* `UNPAID` - Unpaid\n* `PARTIAL` - Partial\n* `PAID` - Paid\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `REFUNDED` - Refunded"
             },
             "Permission": {
                 "type": "object",

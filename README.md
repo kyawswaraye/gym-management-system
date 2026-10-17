@@ -10,8 +10,9 @@ CI still enforces those check classes on push and pull request.
 Phase 2 prerequisites are approved as the member, membership, expiry, file,
 and dashboard policies already specified in the canonical contracts. Phase 2
 publishes the MembershipPlan and Member list, create, detail, update, and
-archive APIs. Member summary and history, membership, notification, and
-payment endpoints remain unpublished. Earlier persistence
+archive APIs, and the Membership sale, lifecycle, and expiry API. Member
+summary and history, notification delivery, and payment endpoints remain
+unpublished. Earlier persistence
 for those areas stays outside the closed Phase 1B gate.
 
 - Django REST Framework API for the published foundation and Phase 1B contracts;
@@ -111,8 +112,9 @@ the approved Python and Node versions to regenerate both artifacts and fail on
 contract drift.
 
 MembershipPlan and Member list, create, detail, update, and archive are
-published. Member summary and history, membership, notification, payment, and
-receipt endpoints remain unpublished.
+published. Membership list, create, detail, note update, cancel, suspend,
+resume, and expiry buckets are published. Member summary and history,
+notification delivery, payment, and receipt endpoints remain unpublished.
 Check-in, finance, PT, reports, and
 mobile routes stay excluded until their own phases.
 

@@ -16,7 +16,12 @@ from rest_framework.exceptions import ValidationError
 
 from apps.common.db.tenant_context import set_gym_context
 from apps.files.models import FileAsset
-from apps.members.exceptions import MemberConflict, MembershipPlanConflict
+from apps.members.exceptions import (
+    MemberConflict,
+    MembershipOverlap,
+    MembershipPlanConflict,
+    MembershipStateConflict,
+)
 from apps.members.models import Member, Membership, MembershipPlan, Payment, Receipt
 from apps.members.normalization import (
     canonical_address,
@@ -31,6 +36,26 @@ from apps.tenants.models import Gym, GymMembership, GymSettings
 PLAN_LIST_CURSOR_SALT = "membership-plan-list"
 PLAN_LIST_CURSOR_ORDERING = "code,id"
 _PLAN_CURSOR_MAX_AGE = 24 * 60 * 60
+MEMBERSHIP_LIST_CURSOR_SALT = "membership-list"
+MEMBERSHIP_LIST_ORDERING = "start_date DESC,id DESC"
+MEMBERSHIP_EXPIRY_CURSOR_SALT = "membership-expiry"
+MEMBERSHIP_EXPIRY_ORDERING = "expiry_date ASC,id ASC"
+_MEMBERSHIP_CURSOR_MAX_AGE = 24 * 60 * 60
+_MEMBERSHIP_NOTE_LIMIT = 4000
+_MEMBERSHIP_REASON_LIMIT = 500
+_MONEY = Decimal("0.01")
+EXPIRY_BUCKETS = (
+    "expired",
+    "today",
+    "within_3_days",
+    "within_7_days",
+    "within_30_days",
+)
+_OVERLAP_STATUSES = (
+    Membership.Status.PENDING,
+    Membership.Status.ACTIVE,
+    Membership.Status.SUSPENDED,
+)
 _PLAN_MUTABLE_FIELDS = ("code", "name", "description", "duration_value", "duration_unit", "price")
 MEMBER_LIST_CURSOR_SALT = "member-list"
 MEMBER_LIST_CURSOR_ORDERING = "normalized_full_name,id"
@@ -56,7 +81,7 @@ def gym_today(gym: Gym) -> date:
     return timezone.localdate(timezone=ZoneInfo(gym.timezone))
 
 
-def _add_duration(start: date, value: int, unit: str) -> date:
+def inclusive_expiry_date(start: date, value: int, unit: str) -> date:
     if unit == MembershipPlan.DurationUnit.DAY:
         return start + timedelta(days=value - 1)
     if unit == MembershipPlan.DurationUnit.WEEK:
@@ -67,6 +92,10 @@ def _add_duration(start: date, value: int, unit: str) -> date:
     month = month_index % 12 + 1
     day = min(start.day, calendar.monthrange(year, month)[1])
     return date(year, month, day) - timedelta(days=1)
+
+
+def _add_duration(start: date, value: int, unit: str) -> date:
+    return inclusive_expiry_date(start, value, unit)
 
 
 def _validate_member_dates(date_of_birth: date | None, join_date: date) -> None:
@@ -517,6 +546,213 @@ def archive_plan(*, gym: Gym, actor: GymMembership, plan_id: UUID) -> Membership
     return plan
 
 
+def _integrity_text(exc: IntegrityError) -> str:
+    parts = [str(exc)]
+    cause = exc.__cause__
+    if cause is not None:
+        parts.append(str(cause))
+    return " ".join(parts)
+
+
+def _membership_integrity(exc: IntegrityError) -> MembershipOverlap | MembershipStateConflict:
+    if "membership_no_active_overlap_excl" in _integrity_text(exc):
+        return MembershipOverlap()
+    return MembershipStateConflict("The membership could not be saved.")
+
+
+def _membership_list_scope(
+    *,
+    gym_id: UUID,
+    status: str,
+    member_id: UUID | None,
+    payment_status: str,
+) -> dict[str, str]:
+    return {
+        "gym_id": str(gym_id),
+        "status": status,
+        "member_id": "" if member_id is None else str(member_id),
+        "payment_status": payment_status,
+        "ordering": MEMBERSHIP_LIST_ORDERING,
+    }
+
+
+def encode_membership_cursor(
+    *, start_date: date, membership_id: UUID, scope: dict[str, str]
+) -> str:
+    return signing.dumps(
+        {"start_date": start_date.isoformat(), "id": str(membership_id), **scope},
+        salt=MEMBERSHIP_LIST_CURSOR_SALT,
+        compress=True,
+    )
+
+
+def decode_membership_cursor(token: str, *, scope: dict[str, str]) -> tuple[date, UUID]:
+    try:
+        cursor = signing.loads(
+            token, salt=MEMBERSHIP_LIST_CURSOR_SALT, max_age=_MEMBERSHIP_CURSOR_MAX_AGE
+        )
+        if not isinstance(cursor, dict) or any(
+            cursor.get(key) != value for key, value in scope.items()
+        ):
+            raise signing.BadSignature
+        start_date = date.fromisoformat(str(cursor["start_date"]))
+        membership_id = UUID(str(cursor["id"]))
+    except (signing.BadSignature, KeyError, TypeError, ValueError) as exc:
+        raise ValidationError({"after": ["Invalid cursor."]}) from exc
+    return start_date, membership_id
+
+
+def page_memberships(
+    queryset: QuerySet[Membership],
+    *,
+    gym_id: UUID,
+    status: str,
+    member_id: UUID | None,
+    payment_status: str,
+    limit: int,
+    after: str,
+) -> tuple[list[Membership], dict[str, Any]]:
+    scope = _membership_list_scope(
+        gym_id=gym_id,
+        status=status,
+        member_id=member_id,
+        payment_status=payment_status,
+    )
+    queryset = queryset.order_by("-start_date", "-id")
+    if status:
+        queryset = queryset.filter(status=status)
+    if member_id is not None:
+        queryset = queryset.filter(member_id=member_id)
+    if payment_status:
+        queryset = queryset.filter(payment_status=payment_status)
+    if after:
+        cursor_start, cursor_id = decode_membership_cursor(after, scope=scope)
+        queryset = queryset.filter(
+            Q(start_date__lt=cursor_start) | Q(start_date=cursor_start, id__lt=cursor_id)
+        )
+    rows = list(queryset[: limit + 1])
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_after = None
+    if has_more and rows:
+        last = rows[-1]
+        next_after = encode_membership_cursor(
+            start_date=last.start_date, membership_id=last.id, scope=scope
+        )
+    return rows, {"has_more": has_more, "next_after": next_after}
+
+
+def membership_expiry_filter(*, bucket: str, today: date) -> Q:
+    open_statuses = [Membership.Status.ACTIVE, Membership.Status.SUSPENDED]
+    if bucket == "expired":
+        return Q(
+            status__in=[
+                Membership.Status.ACTIVE,
+                Membership.Status.SUSPENDED,
+                Membership.Status.EXPIRED,
+            ],
+            expiry_date__lt=today,
+        )
+    if bucket == "today":
+        return Q(status__in=open_statuses, expiry_date=today)
+    if bucket == "within_3_days":
+        return Q(
+            status__in=open_statuses,
+            expiry_date__gt=today,
+            expiry_date__lte=today + timedelta(days=3),
+        )
+    if bucket == "within_7_days":
+        return Q(
+            status__in=open_statuses,
+            expiry_date__gt=today + timedelta(days=3),
+            expiry_date__lte=today + timedelta(days=7),
+        )
+    if bucket == "within_30_days":
+        return Q(
+            status__in=open_statuses,
+            expiry_date__gt=today + timedelta(days=7),
+            expiry_date__lte=today + timedelta(days=30),
+        )
+    raise ValidationError({"bucket": ["Unknown membership expiry bucket."]})
+
+
+def _expiry_scope(*, gym_id: UUID, bucket: str) -> dict[str, str]:
+    return {
+        "gym_id": str(gym_id),
+        "bucket": bucket,
+        "ordering": MEMBERSHIP_EXPIRY_ORDERING,
+    }
+
+
+def encode_expiry_cursor(*, expiry_date: date, membership_id: UUID, scope: dict[str, str]) -> str:
+    return signing.dumps(
+        {"expiry_date": expiry_date.isoformat(), "id": str(membership_id), **scope},
+        salt=MEMBERSHIP_EXPIRY_CURSOR_SALT,
+        compress=True,
+    )
+
+
+def decode_expiry_cursor(token: str, *, scope: dict[str, str]) -> tuple[date, UUID]:
+    try:
+        cursor = signing.loads(
+            token, salt=MEMBERSHIP_EXPIRY_CURSOR_SALT, max_age=_MEMBERSHIP_CURSOR_MAX_AGE
+        )
+        if not isinstance(cursor, dict) or any(
+            cursor.get(key) != value for key, value in scope.items()
+        ):
+            raise signing.BadSignature
+        expiry_date = date.fromisoformat(str(cursor["expiry_date"]))
+        membership_id = UUID(str(cursor["id"]))
+    except (signing.BadSignature, KeyError, TypeError, ValueError) as exc:
+        raise ValidationError({"after": ["Invalid cursor."]}) from exc
+    return expiry_date, membership_id
+
+
+def page_membership_expiry(
+    queryset: QuerySet[Membership],
+    *,
+    gym_id: UUID,
+    bucket: str,
+    today: date,
+    limit: int,
+    after: str,
+) -> tuple[list[Membership], dict[str, Any]]:
+    scope = _expiry_scope(gym_id=gym_id, bucket=bucket)
+    queryset = queryset.filter(membership_expiry_filter(bucket=bucket, today=today)).order_by(
+        "expiry_date", "id"
+    )
+    if after:
+        cursor_expiry, cursor_id = decode_expiry_cursor(after, scope=scope)
+        queryset = queryset.filter(
+            Q(expiry_date__gt=cursor_expiry) | Q(expiry_date=cursor_expiry, id__gt=cursor_id)
+        )
+    rows = list(queryset[: limit + 1])
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_after = None
+    if has_more and rows:
+        last = rows[-1]
+        next_after = encode_expiry_cursor(
+            expiry_date=last.expiry_date, membership_id=last.id, scope=scope
+        )
+    return rows, {"has_more": has_more, "next_after": next_after}
+
+
+def _dates_cover_today(membership: Membership, today: date) -> bool:
+    return membership.start_date <= today <= membership.expiry_date
+
+
+def _locked_membership(*, gym: Gym, membership_id: UUID) -> Membership:
+    try:
+        member_id = Membership.objects.values_list("member_id", flat=True).get(
+            gym=gym, id=membership_id
+        )
+    except Membership.DoesNotExist as exc:
+        raise Http404 from exc
+    Member.objects.select_for_update().get(gym=gym, id=member_id)
+    return Membership.objects.select_for_update().get(gym=gym, id=membership_id)
+
+
 @transaction.atomic
 def create_membership(
     *,
@@ -526,28 +762,38 @@ def create_membership(
     plan: MembershipPlan,
     start_date: date,
     discount_amount: Decimal,
+    note: str = "",
 ) -> Membership:
-    member = Member.objects.select_for_update().get(gym=gym, id=member.id)
-    if member.status == Member.Status.ARCHIVED:
-        raise ValidationError({"member_id": ["Archived members cannot receive memberships."]})
-    expiry_date = _add_duration(start_date, plan.duration_value, plan.duration_unit)
+    try:
+        member = Member.objects.select_for_update().get(gym=gym, id=member.id)
+    except Member.DoesNotExist as exc:
+        raise Http404 from exc
+    try:
+        plan = MembershipPlan.objects.select_for_update().get(gym=gym, id=plan.id)
+    except MembershipPlan.DoesNotExist as exc:
+        raise Http404 from exc
+    if member.status != Member.Status.ACTIVE:
+        raise MembershipStateConflict("Only an active member can receive a membership.")
+    if not plan.is_active:
+        raise MembershipStateConflict("Only an active plan can be sold.")
+    if len(note) > _MEMBERSHIP_NOTE_LIMIT:
+        raise ValidationError({"note": ["Note is too long."]})
+    discount_amount = discount_amount.quantize(_MONEY)
+    list_price = plan.price.quantize(_MONEY)
+    if discount_amount < 0 or discount_amount > list_price:
+        raise ValidationError(
+            {"discount_amount": ["Discount must be between zero and the plan list price."]}
+        )
+    expiry_date = inclusive_expiry_date(start_date, plan.duration_value, plan.duration_unit)
     overlap = Membership.objects.filter(
         gym=gym,
         member=member,
-        status__in=[
-            Membership.Status.PENDING,
-            Membership.Status.ACTIVE,
-            Membership.Status.SUSPENDED,
-        ],
+        status__in=_OVERLAP_STATUSES,
         start_date__lte=expiry_date,
         expiry_date__gte=start_date,
     ).exists()
     if overlap:
-        raise ValidationError({"start_date": ["Membership dates overlap an active membership."]})
-    if discount_amount < 0 or discount_amount > plan.price:
-        raise ValidationError(
-            {"discount_amount": ["Discount must be between zero and plan price."]}
-        )
+        raise MembershipOverlap()
     source = (
         Membership.RevenueSource.RENEWAL
         if Membership.objects.filter(gym=gym, member=member).exists()
@@ -560,46 +806,55 @@ def create_membership(
     elif expiry_date < today:
         membership_status = Membership.Status.EXPIRED
     try:
-        return Membership.objects.create(
-            gym=gym,
-            member=member,
-            plan=plan,
-            plan_code=plan.code,
-            plan_name=plan.name,
-            duration_value=plan.duration_value,
-            duration_unit=plan.duration_unit,
-            start_date=start_date,
-            expiry_date=expiry_date,
-            list_price=plan.price,
-            discount_amount=discount_amount,
-            final_amount=plan.price - discount_amount,
-            currency=plan.currency,
-            status=membership_status,
-            revenue_source=source,
-            created_by_membership_id=actor.id,
-        )
+        with transaction.atomic():
+            return Membership.objects.create(
+                gym=gym,
+                member=member,
+                plan=plan,
+                plan_code=plan.code,
+                plan_name=plan.name,
+                duration_value=plan.duration_value,
+                duration_unit=plan.duration_unit,
+                start_date=start_date,
+                expiry_date=expiry_date,
+                list_price=list_price,
+                discount_amount=discount_amount,
+                final_amount=(list_price - discount_amount).quantize(_MONEY),
+                currency=plan.currency,
+                status=membership_status,
+                revenue_source=source,
+                note=note,
+                created_by_membership_id=actor.id,
+            )
     except IntegrityError as exc:
-        raise ValidationError(
-            {"start_date": ["Membership dates overlap an existing membership."]}
-        ) from exc
+        raise _membership_integrity(exc) from exc
 
 
-def _locked_membership(*, gym: Gym, membership_id: UUID) -> Membership:
-    return (
-        Membership.objects.select_for_update()
-        .select_related("member")
-        .get(gym=gym, id=membership_id)
-    )
+@transaction.atomic
+def update_membership_note(*, gym: Gym, membership_id: UUID, note: str) -> Membership:
+    if len(note) > _MEMBERSHIP_NOTE_LIMIT:
+        raise ValidationError({"note": ["Note is too long."]})
+    membership = _locked_membership(gym=gym, membership_id=membership_id)
+    if membership.note == note:
+        return membership
+    membership.note = note
+    membership.save(update_fields=["note", "updated_at"])
+    return membership
 
 
 @transaction.atomic
 def suspend_membership(*, gym: Gym, membership_id: UUID) -> Membership:
     membership = _locked_membership(gym=gym, membership_id=membership_id)
-    if membership.status != Membership.Status.ACTIVE:
-        raise ValidationError({"status": ["Only active memberships can be suspended."]})
     today = gym_today(gym)
-    if membership.start_date > today or membership.expiry_date < today:
-        raise ValidationError({"status": ["Membership is outside its active date range."]})
+    eligible = _dates_cover_today(membership, today)
+    if membership.status == Membership.Status.SUSPENDED:
+        if not eligible:
+            raise MembershipStateConflict("Membership is outside its active date range.")
+        return membership
+    if membership.status != Membership.Status.ACTIVE:
+        raise MembershipStateConflict("Only an active membership can be suspended.")
+    if not eligible:
+        raise MembershipStateConflict("Membership is outside its active date range.")
     membership.status = Membership.Status.SUSPENDED
     membership.save(update_fields=["status", "updated_at"])
     return membership
@@ -608,17 +863,21 @@ def suspend_membership(*, gym: Gym, membership_id: UUID) -> Membership:
 @transaction.atomic
 def resume_membership(*, gym: Gym, membership_id: UUID) -> Membership:
     membership = _locked_membership(gym=gym, membership_id=membership_id)
-    if membership.status != Membership.Status.SUSPENDED:
-        raise ValidationError({"status": ["Only suspended memberships can be resumed."]})
     today = gym_today(gym)
-    if membership.start_date > today or membership.expiry_date < today:
-        raise ValidationError({"status": ["Membership is outside its active date range."]})
-    Member.objects.select_for_update().get(gym=gym, id=membership.member_id)
+    eligible = _dates_cover_today(membership, today)
+    if membership.status == Membership.Status.ACTIVE:
+        if not eligible:
+            raise MembershipStateConflict("Membership is outside its active date range.")
+        return membership
+    if membership.status != Membership.Status.SUSPENDED:
+        raise MembershipStateConflict("Only a suspended membership can be resumed.")
+    if not eligible:
+        raise MembershipStateConflict("Membership is outside its active date range.")
     overlap = (
         Membership.objects.filter(
             gym=gym,
             member_id=membership.member_id,
-            status__in=[Membership.Status.PENDING, Membership.Status.ACTIVE],
+            status__in=_OVERLAP_STATUSES,
             start_date__lte=membership.expiry_date,
             expiry_date__gte=membership.start_date,
         )
@@ -626,14 +885,13 @@ def resume_membership(*, gym: Gym, membership_id: UUID) -> Membership:
         .exists()
     )
     if overlap:
-        raise ValidationError({"status": ["Membership overlaps another active membership."]})
+        raise MembershipOverlap()
     membership.status = Membership.Status.ACTIVE
     try:
-        membership.save(update_fields=["status", "updated_at"])
+        with transaction.atomic():
+            membership.save(update_fields=["status", "updated_at"])
     except IntegrityError as exc:
-        raise ValidationError(
-            {"status": ["Membership overlaps another active membership."]}
-        ) from exc
+        raise _membership_integrity(exc) from exc
     return membership
 
 
@@ -641,30 +899,44 @@ def resume_membership(*, gym: Gym, membership_id: UUID) -> Membership:
 def cancel_membership(
     *,
     gym: Gym,
+    actor: GymMembership,
     membership_id: UUID,
     reason: str,
 ) -> Membership:
+    cleaned = reason.strip()
+    if not cleaned or len(cleaned) > _MEMBERSHIP_REASON_LIMIT:
+        raise ValidationError({"reason": ["Enter a cancellation reason."]})
     membership = _locked_membership(gym=gym, membership_id=membership_id)
-    allowed = {
+    if membership.status == Membership.Status.CANCELLED:
+        if (
+            membership.cancellation_reason == cleaned
+            and membership.cancelled_by_membership_id == actor.id
+        ):
+            return membership
+        raise MembershipStateConflict("Membership cannot be cancelled from its current state.")
+    if membership.status not in {
         Membership.Status.PENDING,
         Membership.Status.ACTIVE,
         Membership.Status.SUSPENDED,
-    }
-    if membership.status not in allowed:
-        raise ValidationError(
-            {"status": ["Membership cannot be cancelled from its current state."]}
-        )
+    }:
+        raise MembershipStateConflict("Membership cannot be cancelled from its current state.")
     membership.status = Membership.Status.CANCELLED
     membership.cancelled_at = timezone.now()
-    membership.cancellation_reason = reason
-    membership.save(
-        update_fields=[
-            "status",
-            "cancelled_at",
-            "cancellation_reason",
-            "updated_at",
-        ]
-    )
+    membership.cancelled_by_membership_id = actor.id
+    membership.cancellation_reason = cleaned
+    try:
+        with transaction.atomic():
+            membership.save(
+                update_fields=[
+                    "status",
+                    "cancelled_at",
+                    "cancelled_by_membership_id",
+                    "cancellation_reason",
+                    "updated_at",
+                ]
+            )
+    except IntegrityError as exc:
+        raise _membership_integrity(exc) from exc
     return membership
 
 
@@ -716,10 +988,12 @@ def refresh_due_memberships(*, gym: Gym, today: date, batch_size: int = 500) -> 
 
 
 def refresh_membership_payment_status(membership: Membership) -> None:
-    entries = Payment.objects.filter(
-        gym=membership.gym,
-        membership=membership,
-        status__in=[Payment.Status.POSTED, Payment.Status.VOID],
+    entries = list(
+        Payment.objects.filter(
+            gym=membership.gym,
+            membership=membership,
+            status__in=[Payment.Status.POSTED, Payment.Status.VOID],
+        )
     )
     paid = sum(
         (
@@ -730,8 +1004,16 @@ def refresh_membership_payment_status(membership: Membership) -> None:
         ),
         Decimal("0"),
     )
-    if paid <= 0:
+    has_refund = any(
+        payment.entry_type in [Payment.EntryType.REFUND, Payment.EntryType.REVERSAL]
+        for payment in entries
+    )
+    if paid <= 0 and not has_refund:
         value = Membership.PaymentStatus.UNPAID
+    elif paid <= 0:
+        value = Membership.PaymentStatus.REFUNDED
+    elif has_refund and paid < membership.final_amount:
+        value = Membership.PaymentStatus.PARTIALLY_REFUNDED
     elif paid < membership.final_amount:
         value = Membership.PaymentStatus.PARTIAL
     else:

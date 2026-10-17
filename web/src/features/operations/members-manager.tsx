@@ -186,7 +186,7 @@ export function MembersManager({
                       className="font-semibold underline"
                       href={`/members/${member.id}`}
                     >
-                      {member.display_name}
+                      {`${member.first_name} ${member.last_name}`.trim()}
                       {member.is_pt_client && (
                         <span className="ml-2 rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
                           PT

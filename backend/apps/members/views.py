@@ -6,7 +6,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -26,7 +26,13 @@ from apps.members.serializers import (
     MemberListEnvelopeSerializer,
     MemberListQuerySerializer,
     MemberSerializer,
+    MembershipCancelSerializer,
+    MembershipCommandSerializer,
     MembershipCreateSerializer,
+    MembershipEnvelopeSerializer,
+    MembershipExpiryQuerySerializer,
+    MembershipListEnvelopeSerializer,
+    MembershipListQuerySerializer,
     MembershipPlanArchiveSerializer,
     MembershipPlanCreateSerializer,
     MembershipPlanEnvelopeSerializer,
@@ -35,6 +41,7 @@ from apps.members.serializers import (
     MembershipPlanSerializer,
     MembershipPlanUpdateSerializer,
     MembershipSerializer,
+    MembershipUpdateSerializer,
     MemberUpdateSerializer,
     PaymentCreateSerializer,
     PaymentSerializer,
@@ -51,12 +58,15 @@ from apps.members.services import (
     create_plan,
     gym_today,
     page_members,
+    page_membership_expiry,
     page_membership_plans,
+    page_memberships,
     refund_payment,
     resume_membership,
     submit_payment,
     suspend_membership,
     update_member,
+    update_membership_note,
     update_plan,
     void_payment,
 )
@@ -423,63 +433,61 @@ class MembershipListCreateView(MembershipFeatureAPIView):
         )
         return super().get_permissions()
 
-    def get(self, request):
-        memberships = _with_balance_payments(
-            Membership.objects.filter(gym=request.gym).select_related("member", "plan")
+    @extend_schema(
+        operation_id="memberships_list",
+        parameters=[MembershipListQuerySerializer],
+        responses={
+            200: MembershipListEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request) -> Response:
+        query = MembershipListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        filters = query.validated_data
+        member_id = filters.get("member_id")
+        if member_id is not None:
+            get_object_or_404(Member, gym=request.gym, id=member_id)
+        memberships, meta = page_memberships(
+            Membership.objects.filter(gym=request.gym),
+            gym_id=request.gym.id,
+            status=str(filters.get("status", "")),
+            member_id=member_id,
+            payment_status=str(filters.get("payment_status", "")),
+            limit=int(filters["limit"]),
+            after=str(filters.get("after", "")),
         )
-        if bucket := request.query_params.get("bucket"):
-            today = gym_today(request.gym)
-            ranges = {
-                "expired": Q(
-                    status__in=[
-                        Membership.Status.ACTIVE,
-                        Membership.Status.SUSPENDED,
-                        Membership.Status.EXPIRED,
-                    ],
-                    expiry_date__lt=today,
-                ),
-                "today": Q(status=Membership.Status.ACTIVE, expiry_date=today),
-                "within_3_days": Q(
-                    status=Membership.Status.ACTIVE,
-                    expiry_date__range=(today, today + timedelta(days=3)),
-                ),
-                "within_7_days": Q(
-                    status=Membership.Status.ACTIVE,
-                    expiry_date__range=(today, today + timedelta(days=7)),
-                ),
-                "within_30_days": Q(
-                    status=Membership.Status.ACTIVE,
-                    expiry_date__range=(today, today + timedelta(days=30)),
-                ),
-            }
-            if bucket not in ranges:
-                from rest_framework.exceptions import ValidationError
+        return success_response(MembershipSerializer(memberships, many=True).data, meta=meta)
 
-                raise ValidationError({"bucket": ["Unknown membership expiry bucket."]})
-            memberships = memberships.filter(ranges[bucket])
-        return success_response(
-            MembershipSerializer(memberships.order_by("-start_date")[:200], many=True).data
-        )
-
-    def post(self, request):
+    @extend_schema(
+        operation_id="memberships_create",
+        request=MembershipCreateSerializer,
+        responses={
+            201: MembershipEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request) -> Response:
         serializer = MembershipCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        member = get_object_or_404(
-            Member, gym=request.gym, id=serializer.validated_data["member_id"]
-        )
-        plan = get_object_or_404(
-            MembershipPlan,
-            gym=request.gym,
-            id=serializer.validated_data["plan_id"],
-            is_active=True,
-        )
+        payload = serializer.validated_data
+        member = get_object_or_404(Member, gym=request.gym, id=payload["member_id"])
+        plan = get_object_or_404(MembershipPlan, gym=request.gym, id=payload["plan_id"])
         membership = create_membership(
             gym=request.gym,
             actor=request.gym_membership,
             member=member,
             plan=plan,
-            start_date=serializer.validated_data["start_date"],
-            discount_amount=serializer.validated_data["discount_amount"],
+            start_date=payload["start_date"],
+            discount_amount=payload["discount_amount"],
+            note=str(payload.get("note", "")),
         )
         return success_response(
             MembershipSerializer(membership).data,
@@ -488,32 +496,153 @@ class MembershipListCreateView(MembershipFeatureAPIView):
         )
 
 
-class MembershipActionView(MembershipFeatureAPIView):
-    @property
-    def required_permission(self):
-        return (
-            "memberships.cancel" if self.kwargs.get("action") == "cancel" else "memberships.update"
+class MembershipDetailView(MembershipFeatureAPIView):
+    required_permission = "memberships.view"
+
+    def get_permissions(self):
+        if self.request.method == "PATCH":
+            self.required_permission = "memberships.update"
+        return super().get_permissions()
+
+    def get_object(self) -> Membership:
+        return get_object_or_404(Membership, gym=self.request.gym, id=self.kwargs["id"])
+
+    @extend_schema(
+        operation_id="memberships_retrieve",
+        responses={
+            200: MembershipEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request, id: UUID) -> Response:
+        return success_response(MembershipSerializer(self.get_object()).data)
+
+    @extend_schema(
+        operation_id="memberships_update",
+        request=MembershipUpdateSerializer,
+        responses={
+            200: MembershipEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def patch(self, request: Request, id: UUID) -> Response:
+        serializer = MembershipUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        membership = update_membership_note(
+            gym=request.gym,
+            membership_id=id,
+            note=str(serializer.validated_data["note"]),
+        )
+        return success_response(MembershipSerializer(membership).data, message="Membership updated")
+
+
+class MembershipCancelView(MembershipFeatureAPIView):
+    required_permission = "memberships.cancel"
+
+    @extend_schema(
+        operation_id="memberships_cancel",
+        request=MembershipCancelSerializer,
+        responses={
+            200: MembershipEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, id: UUID) -> Response:
+        serializer = MembershipCancelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        get_object_or_404(Membership, gym=request.gym, id=id)
+        membership = cancel_membership(
+            gym=request.gym,
+            actor=request.gym_membership,
+            membership_id=id,
+            reason=str(serializer.validated_data["reason"]),
+        )
+        return success_response(
+            MembershipSerializer(membership).data, message="Membership cancelled"
         )
 
-    def post(self, request, membership_id, action):
-        get_object_or_404(Membership, gym=request.gym, id=membership_id)
-        if action == "cancel":
-            serializer = ReasonSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            membership = cancel_membership(
-                gym=request.gym,
-                membership_id=membership_id,
-                reason=serializer.validated_data["reason"],
-            )
-        elif action == "suspend":
-            membership = suspend_membership(gym=request.gym, membership_id=membership_id)
-        elif action == "resume":
-            membership = resume_membership(gym=request.gym, membership_id=membership_id)
-        else:
-            from rest_framework.exceptions import ValidationError
 
-            raise ValidationError({"action": ["Unknown membership action."]})
-        return success_response(MembershipSerializer(membership).data, message="Membership updated")
+class MembershipSuspendView(MembershipFeatureAPIView):
+    required_permission = "memberships.update"
+
+    @extend_schema(
+        operation_id="memberships_suspend",
+        request=MembershipCommandSerializer,
+        responses={
+            200: MembershipEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, id: UUID) -> Response:
+        MembershipCommandSerializer(data=request.data).is_valid(raise_exception=True)
+        get_object_or_404(Membership, gym=request.gym, id=id)
+        membership = suspend_membership(gym=request.gym, membership_id=id)
+        return success_response(
+            MembershipSerializer(membership).data, message="Membership suspended"
+        )
+
+
+class MembershipResumeView(MembershipFeatureAPIView):
+    required_permission = "memberships.update"
+
+    @extend_schema(
+        operation_id="memberships_resume",
+        request=MembershipCommandSerializer,
+        responses={
+            200: MembershipEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, id: UUID) -> Response:
+        MembershipCommandSerializer(data=request.data).is_valid(raise_exception=True)
+        get_object_or_404(Membership, gym=request.gym, id=id)
+        membership = resume_membership(gym=request.gym, membership_id=id)
+        return success_response(MembershipSerializer(membership).data, message="Membership resumed")
+
+
+class MembershipExpiryView(MembershipFeatureAPIView):
+    required_permission = "memberships.view"
+
+    @extend_schema(
+        operation_id="memberships_expiry",
+        parameters=[MembershipExpiryQuerySerializer],
+        responses={
+            200: MembershipListEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request) -> Response:
+        query = MembershipExpiryQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        filters = query.validated_data
+        memberships, meta = page_membership_expiry(
+            Membership.objects.filter(gym=request.gym),
+            gym_id=request.gym.id,
+            bucket=str(filters["bucket"]),
+            today=gym_today(request.gym),
+            limit=int(filters["limit"]),
+            after=str(filters.get("after", "")),
+        )
+        return success_response(MembershipSerializer(memberships, many=True).data, meta=meta)
 
 
 class PaymentListCreateView(FinanceFeatureAPIView):

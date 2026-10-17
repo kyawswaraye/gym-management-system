@@ -14,7 +14,7 @@ The system has three deployable applications — one authoritative server and tw
 
 The primary design goal is fail-closed tenant isolation. UI filtering is never a security control.
 
-Phase 1A is foundation only. It creates authentication, tenancy, authorization, RLS, API infrastructure, and minimal web shells; it does not implement members, check-in, finance, PT, reports, or mobile features. Phase 1B platform administration, provisioning, staff, roles, settings, audit reads, and file-metadata persistence are in place and gate-closed. Phase 2 publishes the MembershipPlan and Member list, create, detail, update, and archive APIs. Member summary and history, membership, notification, and payment endpoints remain unpublished.
+Phase 1A is foundation only. It creates authentication, tenancy, authorization, RLS, API infrastructure, and minimal web shells; it does not implement members, check-in, finance, PT, reports, or mobile features. Phase 1B platform administration, provisioning, staff, roles, settings, audit reads, and file-metadata persistence are in place and gate-closed. Phase 2 publishes the MembershipPlan and Member list, create, detail, update, and archive APIs, and the Membership sale, lifecycle, and expiry API. Member summary and history, notification delivery, and payment endpoints remain unpublished.
 
 ## 2. Architecture principles
 

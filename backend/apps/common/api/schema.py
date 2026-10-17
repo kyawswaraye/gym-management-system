@@ -11,7 +11,7 @@ Endpoint = tuple[str, str, str, Callable[..., Any]]
 
 
 def phase_1a_endpoints(endpoints: list[Endpoint]) -> list[Endpoint]:
-    """Publish foundation, Phase 1B, MembershipPlan, and Member CRUD/archive routes."""
+    """Publish foundation, Phase 1B, MembershipPlan, Member, and Membership routes."""
 
     return [
         endpoint
@@ -50,6 +50,12 @@ def phase_1a_endpoints(endpoints: list[Endpoint]) -> list[Endpoint]:
             "/api/v1/membership-plans/",
             "/api/v1/membership-plans/{id}/",
             "/api/v1/membership-plans/{id}/archive/",
+            "/api/v1/memberships/",
+            "/api/v1/memberships/expiry/",
+            "/api/v1/memberships/{id}/",
+            "/api/v1/memberships/{id}/cancel/",
+            "/api/v1/memberships/{id}/resume/",
+            "/api/v1/memberships/{id}/suspend/",
             "/api/v1/roles/",
             "/api/v1/roles/{id}/",
             "/api/v1/roles/{id}/archive/",

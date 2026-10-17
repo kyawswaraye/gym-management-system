@@ -10,8 +10,9 @@ check classes on push and pull request.
 Member, membership, payment, receipt, and notification tables exist from
 earlier work. MembershipPlan list, create, detail, update, and archive are
 published. Member list, create, detail, update, and archive are published.
-Member summary and history, membership, notification, payment, and receipt
-HTTP endpoints remain unpublished. Phase 2 stays open until its development-plan
+Membership list, create, detail, note update, cancel, suspend, resume, and
+expiry buckets are published. Member summary and history, notification
+delivery, payment, and receipt HTTP endpoints remain unpublished. Phase 2 stays open until its development-plan
 exit criteria pass.
 
 ## Runtime

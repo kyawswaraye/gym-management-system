@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
 from typing import Any, cast
@@ -377,48 +376,120 @@ class MembershipPlanListEnvelopeSerializer(serializers.Serializer):
     message = serializers.CharField()
 
 
-class MembershipSerializer(serializers.ModelSerializer):
-    member_name = serializers.CharField(source="member.display_name", read_only=True)
-    paid_amount = serializers.SerializerMethodField()
-    outstanding_amount = serializers.SerializerMethodField()
+class ExactMoneyField(serializers.DecimalField):
+    def __init__(self, **kwargs: Any) -> None:
+        kwargs.setdefault("max_digits", 18)
+        kwargs.setdefault("decimal_places", 2)
+        kwargs.setdefault("min_value", Decimal("0"))
+        super().__init__(**kwargs)
 
-    class Meta:
-        model = Membership
-        exclude = ("gym", "created_by_membership_id")
-        read_only_fields = "__all__"
+    def to_internal_value(self, data: Any) -> Decimal:
+        if isinstance(data, float):
+            raise serializers.ValidationError("Amount must be a decimal string.")
+        if isinstance(data, str) and "." in data and len(data.split(".", 1)[1]) > 2:
+            raise serializers.ValidationError(
+                "Ensure that there are no more than 2 decimal places."
+            )
+        return super().to_internal_value(data)
 
-    def _paid(self, obj: Membership) -> Decimal:
-        prefetched = getattr(obj, "_balance_payments", None)
-        payments: Iterable[Payment]
-        if prefetched is None:
-            payments = obj.payments.filter(status__in=[Payment.Status.POSTED, Payment.Status.VOID])
-        else:
-            payments = cast(list[Payment], prefetched)
-        paid = sum(
-            (
-                -payment.amount
-                if payment.entry_type in [Payment.EntryType.REFUND, Payment.EntryType.REVERSAL]
-                else payment.amount
-                for payment in payments
-            ),
-            Decimal("0"),
-        )
-        return paid
 
-    def get_paid_amount(self, obj: Membership) -> Decimal:
-        return self._paid(obj)
-
-    def get_outstanding_amount(self, obj: Membership) -> Decimal:
-        return max(Decimal("0"), obj.final_amount - self._paid(obj))
+class MembershipSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    member_id = serializers.UUIDField()
+    plan_id = serializers.UUIDField()
+    plan_code = serializers.CharField()
+    plan_name = serializers.CharField()
+    duration_value = serializers.IntegerField()
+    duration_unit = serializers.ChoiceField(choices=MembershipPlan.DurationUnit.choices)
+    start_date = serializers.DateField()
+    expiry_date = serializers.DateField()
+    list_price = serializers.DecimalField(max_digits=18, decimal_places=2)
+    discount_amount = serializers.DecimalField(max_digits=18, decimal_places=2)
+    final_amount = serializers.DecimalField(max_digits=18, decimal_places=2)
+    currency = serializers.CharField()
+    payment_status = serializers.ChoiceField(choices=Membership.PaymentStatus.choices)
+    status = serializers.ChoiceField(choices=Membership.Status.choices)
+    note = serializers.CharField(allow_blank=True)
+    cancelled_at = serializers.DateTimeField(allow_null=True)
+    cancelled_by_membership_id = serializers.UUIDField(allow_null=True)
+    cancellation_reason = serializers.CharField(allow_blank=True)
+    created_by_membership_id = serializers.UUIDField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
 
 
 class MembershipCreateSerializer(StrictSerializer):
     member_id = serializers.UUIDField()
     plan_id = serializers.UUIDField()
     start_date = serializers.DateField()
-    discount_amount = serializers.DecimalField(
-        max_digits=18, decimal_places=2, min_value=Decimal("0"), default=Decimal("0")
+    discount_amount = ExactMoneyField(required=False, default=Decimal("0"))
+    note = serializers.CharField(required=False, allow_blank=True, default="", max_length=4000)
+
+    def validate_note(self, value: str) -> str:
+        return value.strip()
+
+
+class MembershipUpdateSerializer(StrictSerializer):
+    note = serializers.CharField(allow_blank=True, max_length=4000)
+
+    def validate_note(self, value: str) -> str:
+        return value.strip()
+
+
+class MembershipCancelSerializer(StrictSerializer):
+    reason = serializers.CharField(max_length=500)
+
+    def validate_reason(self, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise serializers.ValidationError("This field may not be blank.")
+        return cleaned
+
+
+class MembershipCommandSerializer(StrictSerializer):
+    """Suspend and resume accept no client fields."""
+
+
+class MembershipListQuerySerializer(StrictSerializer):
+    status = serializers.ChoiceField(choices=Membership.Status.choices, required=False)
+    member_id = serializers.UUIDField(required=False)
+    payment_status = serializers.ChoiceField(
+        choices=Membership.PaymentStatus.choices, required=False
     )
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=100, default=25)
+    after = serializers.CharField(required=False, allow_blank=False, max_length=2048)
+
+
+class MembershipExpiryQuerySerializer(StrictSerializer):
+    bucket = serializers.ChoiceField(
+        choices=(
+            "expired",
+            "today",
+            "within_3_days",
+            "within_7_days",
+            "within_30_days",
+        )
+    )
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=100, default=25)
+    after = serializers.CharField(required=False, allow_blank=False, max_length=2048)
+
+
+class MembershipCollectionMetaSerializer(serializers.Serializer):
+    has_more = serializers.BooleanField()
+    next_after = serializers.CharField(allow_null=True)
+
+
+class MembershipEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    data = MembershipSerializer()
+    message = serializers.CharField()
+
+
+class MembershipListEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    data = MembershipSerializer(many=True)
+    meta = MembershipCollectionMetaSerializer()
+    message = serializers.CharField()
 
 
 class ReasonSerializer(StrictSerializer):

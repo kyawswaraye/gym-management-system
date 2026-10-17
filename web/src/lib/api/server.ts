@@ -48,7 +48,7 @@ const ALLOWED_TENANT_PATHS = [
   /^\/api\/v1\/gym-memberships\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/roles\/$/,
   /^\/api\/v1\/members\/(?:[0-9a-f-]+\/(?:summary\/|archive\/)?)?$/,
   /^\/api\/v1\/membership-plans\/(?:[0-9a-f-]+\/(?:archive\/)?)?$/,
-  /^\/api\/v1\/memberships\/(?:expiry\/|[0-9a-f-]+\/(?:cancel|suspend|resume)\/)?$/,
+  /^\/api\/v1\/memberships\/(?:expiry\/|[0-9a-f-]+\/(?:cancel\/|suspend\/|resume\/)?)?$/,
   /^\/api\/v1\/payments\/(?:[0-9a-f-]+\/(?:submit|approve|reject|cancel|void|refund)\/)?$/,
   /^\/api\/v1\/dashboard\/$/,
   /^\/api\/v1\/audit-logs\/$/,

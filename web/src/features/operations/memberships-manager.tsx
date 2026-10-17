@@ -61,7 +61,6 @@ export function MembershipsManager({
         duration_value: Number(form.get("duration_value")),
         duration_unit: form.get("duration_unit"),
         price: form.get("price"),
-        currency: form.get("currency"),
       });
       formElement.reset();
       await load();
@@ -101,12 +100,15 @@ export function MembershipsManager({
     membership: Membership,
     action: "suspend" | "resume" | "cancel",
   ) {
+    const body: { reason?: string } = {};
+    if (action === "cancel") {
+      const reason = window.prompt("Cancellation reason");
+      if (reason === null || reason.trim() === "") return;
+      body.reason = reason.trim();
+    }
     setPending(true);
     try {
-      await operationMutation(
-        `memberships/${membership.id}/${action}/`,
-        action === "cancel" ? { reason: "Cancelled by staff" } : {},
-      );
+      await operationMutation(`memberships/${membership.id}/${action}/`, body);
       await load();
     } catch (caught) {
       setError(
@@ -175,9 +177,7 @@ export function MembershipsManager({
                   className="input"
                   defaultValue={currency}
                   maxLength={3}
-                  name="currency"
                   readOnly
-                  required
                 />
               </label>
             </div>
@@ -193,7 +193,8 @@ export function MembershipsManager({
                 <option value="">Select member</option>
                 {members.map((member) => (
                   <option key={member.id} value={member.id}>
-                    {member.member_number} — {member.display_name}
+                    {member.member_number} — {member.first_name}{" "}
+                    {member.last_name}
                   </option>
                 ))}
               </select>
@@ -245,7 +246,7 @@ export function MembershipsManager({
               <th className="p-3">Member</th>
               <th className="p-3">Plan</th>
               <th className="p-3">Dates</th>
-              <th className="p-3">Balance</th>
+              <th className="p-3">Total</th>
               <th className="p-3">Status</th>
               <th className="p-3">Action</th>
             </tr>
@@ -253,13 +254,22 @@ export function MembershipsManager({
           <tbody>
             {memberships.map((membership) => (
               <tr className="border-t border-slate-100" key={membership.id}>
-                <td className="p-3">{membership.member_name}</td>
+                <td className="p-3">
+                  {(() => {
+                    const member = members.find(
+                      (row) => row.id === membership.member_id,
+                    );
+                    return member
+                      ? `${member.first_name} ${member.last_name}`.trim()
+                      : membership.member_id;
+                  })()}
+                </td>
                 <td className="p-3">{membership.plan_name}</td>
                 <td className="p-3">
                   {membership.start_date} – {membership.expiry_date}
                 </td>
                 <td className="p-3">
-                  {membership.outstanding_amount} {membership.currency}
+                  {membership.final_amount} {membership.currency}
                 </td>
                 <td className="p-3">
                   {membership.status} / {membership.payment_status}

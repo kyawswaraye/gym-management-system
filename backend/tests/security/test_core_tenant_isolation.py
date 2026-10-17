@@ -14,10 +14,10 @@ from django.core.cache import cache
 from django.db import DatabaseError, connection, transaction
 from django.test import override_settings
 from django.utils import timezone
-from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
 from apps.common.db.tenant_context import set_gym_context
+from apps.members.exceptions import MembershipOverlap, MembershipStateConflict
 from apps.members.models import Member, Membership, MembershipPlan, Payment
 from apps.members.services import (
     cancel_membership,
@@ -445,7 +445,7 @@ def test_membership_lifecycle_rejects_suspended_overlap() -> None:
         )
         assert suspended.status == Membership.Status.SUSPENDED
 
-        with pytest.raises(ValidationError, match="overlap"):
+        with pytest.raises(MembershipOverlap, match="overlap"):
             create_membership(
                 gym=tenant.gym,
                 actor=tenant.owner_membership,
@@ -500,13 +500,23 @@ def test_future_membership_and_cancel_are_state_safe() -> None:
 
         cancelled = cancel_membership(
             gym=tenant.gym,
+            actor=tenant.owner_membership,
             membership_id=membership.id,
             reason="Changed plans",
         )
         original_cancelled_at = cancelled.cancelled_at
-        with pytest.raises(ValidationError, match="cannot be cancelled"):
+        repeated = cancel_membership(
+            gym=tenant.gym,
+            actor=tenant.owner_membership,
+            membership_id=membership.id,
+            reason="Changed plans",
+        )
+        assert repeated.cancelled_at == original_cancelled_at
+        assert repeated.cancelled_by_membership_id == tenant.owner_membership.id
+        with pytest.raises(MembershipStateConflict, match="cannot be cancelled"):
             cancel_membership(
                 gym=tenant.gym,
+                actor=tenant.owner_membership,
                 membership_id=membership.id,
                 reason="Overwrite attempt",
             )

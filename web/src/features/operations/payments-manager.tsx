@@ -3,7 +3,14 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { operationGet, operationMutation } from "@/features/operations/client";
-import type { Member, Membership, Payment } from "@/types/api";
+import type { Member, Payment } from "@/types/api";
+
+/** Unpublished payment-screen membership shape. Not the published Membership contract. */
+type UnpublishedPaymentMembership = {
+  id: string;
+  member: string;
+  outstanding_amount: string;
+};
 
 export function PaymentsManager({
   canCreate,
@@ -23,7 +30,9 @@ export function PaymentsManager({
   currency: string;
 }) {
   const [members, setMembers] = useState<Member[]>([]);
-  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [memberships, setMemberships] = useState<
+    UnpublishedPaymentMembership[]
+  >([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -32,7 +41,7 @@ export function PaymentsManager({
     try {
       const [memberRows, membershipRows, paymentRows] = await Promise.all([
         operationGet<Member[]>("members/"),
-        operationGet<Membership[]>("memberships/"),
+        operationGet<UnpublishedPaymentMembership[]>("memberships/"),
         operationGet<Payment[]>("payments/"),
       ]);
       setMembers(memberRows);
@@ -116,7 +125,8 @@ export function PaymentsManager({
               <option value="">Select member</option>
               {members.map((member) => (
                 <option key={member.id} value={member.id}>
-                  {member.member_number} — {member.display_name}
+                  {member.member_number} — {member.first_name}{" "}
+                  {member.last_name}
                 </option>
               ))}
             </select>

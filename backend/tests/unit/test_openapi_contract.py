@@ -38,6 +38,12 @@ PUBLISHED_PATHS = {
     "/api/v1/membership-plans/",
     "/api/v1/membership-plans/{id}/",
     "/api/v1/membership-plans/{id}/archive/",
+    "/api/v1/memberships/",
+    "/api/v1/memberships/expiry/",
+    "/api/v1/memberships/{id}/",
+    "/api/v1/memberships/{id}/cancel/",
+    "/api/v1/memberships/{id}/resume/",
+    "/api/v1/memberships/{id}/suspend/",
     "/api/v1/health/",
     "/api/v1/permissions/",
     "/api/v1/readiness/",
@@ -92,7 +98,6 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
         "/api/v1/members/{id}/summary/",
         "/api/v1/members/{id}/payments/",
         "/api/v1/members/{id}/check-ins/",
-        "/api/v1/memberships/",
         "/api/v1/notifications/",
         "/api/v1/payments/",
         "/api/v1/receipts/",
@@ -100,6 +105,9 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
     assert all(path not in schema["paths"] for path in unpublished)
     assert not any(path.startswith(unpublished) for path in schema["paths"])
     assert not any("summary" in path or "check-ins" in path for path in schema["paths"])
+    assert "/api/v1/payments/" not in schema["paths"]
+    assert "/api/v1/receipts/" not in schema["paths"]
+    assert "/api/v1/dashboard/" not in schema["paths"]
 
 
 def test_openapi_documents_membership_plans() -> None:
@@ -151,6 +159,89 @@ def test_openapi_documents_membership_plans() -> None:
         .get("properties", {})
         == {}
     )
+
+
+def test_openapi_documents_memberships() -> None:
+    document = generated_schema()
+    collection = document["paths"]["/api/v1/memberships/"]
+    detail = document["paths"]["/api/v1/memberships/{id}/"]
+    cancel = document["paths"]["/api/v1/memberships/{id}/cancel/"]["post"]
+    suspend = document["paths"]["/api/v1/memberships/{id}/suspend/"]["post"]
+    resume = document["paths"]["/api/v1/memberships/{id}/resume/"]["post"]
+    expiry = document["paths"]["/api/v1/memberships/expiry/"]["get"]
+    schemas = document["components"]["schemas"]
+    create = schemas["MembershipCreateRequest"]["properties"]
+    update = schemas["PatchedMembershipUpdateRequest"]["properties"]
+    cancel_body = schemas["MembershipCancelRequest"]["properties"]
+    membership = schemas["Membership"]["properties"]
+    query = {parameter["name"]: parameter for parameter in collection["get"]["parameters"]}
+    expiry_query = {parameter["name"]: parameter for parameter in expiry["parameters"]}
+    meta = _resolve_schema(document, schemas["MembershipListEnvelope"]["properties"]["meta"])
+    writable = {"member_id", "plan_id", "start_date", "discount_amount", "note"}
+
+    assert set(create) == writable
+    assert set(update) == {"note"}
+    assert set(cancel_body) == {"reason"}
+    assert set(membership) == writable | {
+        "id",
+        "plan_code",
+        "plan_name",
+        "duration_value",
+        "duration_unit",
+        "expiry_date",
+        "list_price",
+        "final_amount",
+        "currency",
+        "payment_status",
+        "status",
+        "cancelled_at",
+        "cancelled_by_membership_id",
+        "cancellation_reason",
+        "created_by_membership_id",
+        "created_at",
+        "updated_at",
+    }
+    assert "gym_id" not in membership
+    assert "revenue_source" not in membership
+    assert "paid_amount" not in membership
+    assert set(query) == {"after", "limit", "member_id", "payment_status", "status"}
+    assert query["limit"]["schema"]["default"] == 25
+    assert query["limit"]["schema"]["maximum"] == 100
+    assert set(expiry_query) == {"after", "bucket", "limit"}
+    bucket = expiry_query["bucket"]["schema"]
+    assert set(bucket["enum"]) == {
+        "expired",
+        "today",
+        "within_3_days",
+        "within_7_days",
+        "within_30_days",
+    }
+    assert set(meta["properties"]) == {"has_more", "next_after"}
+    for operation in (
+        collection["get"],
+        collection["post"],
+        detail["get"],
+        detail["patch"],
+        cancel,
+        suspend,
+        resume,
+        expiry,
+    ):
+        assert {"staffBearerAuth": []} in operation["security"]
+    assert "201" in collection["post"]["responses"]
+    assert "409" in collection["post"]["responses"]
+    assert "404" in collection["get"]["responses"]
+    assert "404" in detail["get"]["responses"]
+    assert "409" in cancel["responses"]
+    assert (
+        suspend.get("requestBody", {})
+        .get("content", {})
+        .get("application/json", {})
+        .get("schema", {})
+        .get("properties", {})
+        == {}
+    )
+    assert "{action}" not in "".join(document["paths"])
 
 
 def _resolve_schema(document: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
