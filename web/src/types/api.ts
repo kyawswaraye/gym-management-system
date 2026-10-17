@@ -61,13 +61,37 @@ export type Permission = components["schemas"]["Permission"];
 export type MembershipRole = components["schemas"]["MembershipRole"];
 export type CollectionMeta = components["schemas"]["CollectionMeta"];
 export type Member = components["schemas"]["Member"];
+export type MemberCreateRequest = components["schemas"]["MemberCreateRequest"];
+export type MemberUpdateRequest =
+  components["schemas"]["PatchedMemberUpdateRequest"];
+export type MemberAddressRequest =
+  components["schemas"]["MemberAddressRequest"];
+export type Gender = components["schemas"]["GenderEnum"];
 export type MemberSummary = components["schemas"]["MemberSummary"];
+export type UploadIntentRequest = components["schemas"]["UploadIntentRequest"];
+export type UploadIntentData = components["schemas"]["UploadIntentData"];
+export type CompleteUploadRequest =
+  components["schemas"]["CompleteUploadRequest"];
+export type CompletedFile = components["schemas"]["CompletedFile"];
+export type DownloadUrl = components["schemas"]["DownloadUrl"];
+export type DeletedFile = components["schemas"]["DeletedFile"];
+export type ProfilePhotoContentType = "image/jpeg" | "image/png" | "image/webp";
+export type ProfilePhotoDownload = {
+  url: string;
+  contentType: ProfilePhotoContentType;
+};
 export type MemberPaymentHistoryItem =
   components["schemas"]["MemberPaymentHistoryItem"];
 export type MemberPaymentHistoryMeta =
   components["schemas"]["MemberPaymentHistoryMeta"];
 export type MembershipPlan = components["schemas"]["MembershipPlan"];
+export type MembershipPlanUpdate =
+  components["schemas"]["PatchedMembershipPlanUpdateRequest"];
 export type Membership = components["schemas"]["Membership"];
+export type MembershipCreateRequest =
+  components["schemas"]["MembershipCreateRequest"];
+export type MembershipUpdate =
+  components["schemas"]["PatchedMembershipUpdateRequest"];
 export type MemberListQuery = NonNullable<
   operations["members_list"]["parameters"]["query"]
 >;

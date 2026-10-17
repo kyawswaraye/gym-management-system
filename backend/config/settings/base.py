@@ -78,6 +78,10 @@ REST_FRAMEWORK = {
         "user": "120/min",
         "gym_selection_issue": "5/min",
         "gym_selection_select": "10/min",
+        "file_upload_intent": "10/300",
+        "file_complete": "20/300",
+        "file_download_url": "60/60",
+        "file_delete": "10/300",
     },
 }
 
@@ -136,6 +140,19 @@ GYM_SELECTION_TICKET_TTL_SECONDS = 300
 GYM_SELECTION_TICKET_MAX_ATTEMPTS = 5
 GYM_SELECTION_TICKET_RETENTION_DAYS = 30
 REQUEST_ID_MAX_LENGTH = 128
+MINIO_ENDPOINT_URL = os.environ.get("MINIO_ENDPOINT_URL", "")
+MINIO_PUBLIC_URL = os.environ.get("MINIO_PUBLIC_URL", "")
+MINIO_BUCKET = os.environ.get("MINIO_BUCKET", "")
+MINIO_REGION = os.environ.get("MINIO_REGION", "us-east-1")
+MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "")
+MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "")
+MINIO_TIMEOUT_SECONDS = int(os.environ.get("MINIO_TIMEOUT_SECONDS", "5"))
+CLAMAV_HOST = os.environ.get("CLAMAV_HOST", "")
+CLAMAV_PORT = int(os.environ.get("CLAMAV_PORT", "3310"))
+CLAMAV_TIMEOUT_SECONDS = int(os.environ.get("CLAMAV_TIMEOUT_SECONDS", "15"))
+FILE_OBJECT_STORE = os.environ.get("FILE_OBJECT_STORE", "")
+FILE_SCANNER = os.environ.get("FILE_SCANNER", "")
+FILE_IMAGE_PROCESSOR = os.environ.get("FILE_IMAGE_PROCESSOR", "")
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",

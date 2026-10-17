@@ -31,7 +31,12 @@ module = ["apps.*.models"]
 disable_error_code = ["misc", "var-annotated"]
 
 [[tool.mypy.overrides]]
-module = ["apps.common.api.exceptions", "apps.members.exceptions", "apps.tenants.exceptions"]
+module = [
+  "apps.common.api.exceptions",
+  "apps.files.exceptions",
+  "apps.members.exceptions",
+  "apps.tenants.exceptions",
+]
 disable_error_code = ["assignment"]
 
 [[tool.mypy.overrides]]
@@ -43,6 +48,7 @@ module = [
   "apps.tenants.role_serializers",
   "apps.users.schema",
   "apps.users.serializers",
+  "apps.files.serializers",
 ]
 disable_error_code = ["assignment", "no-untyped-call", "type-arg"]
 
@@ -59,6 +65,8 @@ module = [
   "apps.tenants.views",
   "apps.users.authentication",
   "apps.users.views",
+  "apps.files.views",
+  "apps.files.authentication",
 ]
 disable_error_code = [
   "arg-type",

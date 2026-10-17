@@ -1,12 +1,25 @@
 #!/usr/bin/env bash
-# Run the Super Admin and tenant-settings browser smoke tests.
+# Run the browser smoke tests, including the Phase 2 member lifecycle.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 E2E_ENV_ROOT="${ROOT}"
 # shellcheck disable=SC1091
 source "${ROOT}/scripts/e2e-env.sh"
+# shellcheck disable=SC1091
+source "${ROOT}/scripts/e2e-files.sh"
 e2e_prepare_env
+
+e2e_cleanup() {
+  local code=$?
+  if [[ "${E2E_FILE_CLEANUP_DONE:-}" == "1" ]]; then
+    return
+  fi
+  E2E_FILE_CLEANUP_DONE=1
+  e2e_stop_file_services || true
+  exit "${code}"
+}
+trap e2e_cleanup EXIT
 
 bash "${ROOT}/scripts/check-node.sh"
 bash "${ROOT}/scripts/check-python.sh"
@@ -22,5 +35,16 @@ else
   npm --prefix "${ROOT}/web" exec -- playwright install chromium
 fi
 
-npm --prefix "${ROOT}/web" run build
+e2e_start_file_services &
+file_services_pid=$!
+build_code=0
+npm --prefix "${ROOT}/web" run build || build_code=$?
+file_services_code=0
+wait "${file_services_pid}" || file_services_code=$?
+if [[ "${build_code}" -ne 0 ]]; then
+  exit "${build_code}"
+fi
+if [[ "${file_services_code}" -ne 0 ]]; then
+  exit "${file_services_code}"
+fi
 npm --prefix "${ROOT}/web" run test:e2e

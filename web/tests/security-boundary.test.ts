@@ -42,6 +42,7 @@ import { POST as staffInvite } from "@/app/api/operations/staff/invitations/rout
 import { GET as staffList } from "@/app/api/operations/staff/route";
 import * as tenantAuditRoute from "@/app/api/operations/audit-logs/route";
 import {
+  DELETE as operationsDelete,
   GET as operationsGet,
   PATCH as operationsPatch,
   POST as operationsPost,
@@ -2293,6 +2294,101 @@ describe("browser credential boundary", () => {
       `/api/v1/members/${memberId}/`,
     );
     expect(detail.status).toBe(200);
+  });
+
+  it("forwards only the canonical file routes and keeps upload signatures", async () => {
+    const fileId = "11111111-1111-4111-8111-111111111111";
+    const upload = {
+      success: true,
+      data: {
+        file_id: fileId,
+        upload: {
+          url: "https://files.example.com/gym-private",
+          fields: {
+            key: "hidden-object",
+            policy: "cG9saWN5",
+            "x-amz-credential":
+              "local-access/20261017/us-east-1/s3/aws4_request",
+            "x-amz-signature": "ab".repeat(32),
+          },
+        },
+      },
+    };
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => Response.json(upload));
+    const csrf = "x".repeat(43);
+    const headers = {
+      cookie: `gms_access=access; gms_refresh=refresh; gms_csrf=${csrf}`,
+      origin: "https://app.example.com",
+      "x-csrf-token": csrf,
+      "content-type": "application/json",
+    };
+    const intent = await authenticatedMutation(
+      new NextRequest(
+        "https://app.example.com/api/operations/files/upload-intents",
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ purpose: "PROFILE_PHOTO" }),
+        },
+      ),
+      "/api/v1/files/upload-intents/",
+    );
+    expect(intent.status).toBe(200);
+    expect(await intent.json()).toEqual(upload);
+    const download = await authenticatedGet(
+      new NextRequest("https://app.example.com/api/operations/files/download", {
+        headers: { cookie: "gms_access=access" },
+      }),
+      `/api/v1/files/${fileId}/download-url/`,
+    );
+    expect(download.status).toBe(200);
+    const removed = await operationsDelete(
+      new NextRequest(
+        `https://app.example.com/api/operations/files/${fileId}`,
+        {
+          method: "DELETE",
+          headers,
+        },
+      ),
+      { params: Promise.resolve({ path: ["files", fileId] }) },
+    );
+    expect(removed.status).toBe(200);
+    const deleteCall = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    expect(deleteCall[0]).toBe(
+      `https://api.example.com/api/v1/files/${fileId}/`,
+    );
+    expect(deleteCall[1].method).toBe("DELETE");
+    expect(deleteCall[1].body).toBeUndefined();
+    const callsBeforeReject = fetchMock.mock.calls.length;
+    const queried = await authenticatedGet(
+      new NextRequest("https://app.example.com/api/operations/files/download", {
+        headers: { cookie: "gms_access=access" },
+      }),
+      `/api/v1/files/${fileId}/download-url/?gym_id=1`,
+    );
+    const wrongMethod = await authenticatedMutation(
+      new NextRequest("https://app.example.com/api/operations/files/download", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({}),
+      }),
+      `/api/v1/files/${fileId}/download-url/`,
+    );
+    const bodyDelete = await authenticatedMutation(
+      new NextRequest("https://app.example.com/api/operations/files/delete", {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify({ force: true }),
+      }),
+      `/api/v1/files/${fileId}/`,
+      "DELETE",
+    );
+    expect(queried.status).toBe(503);
+    expect(wrongMethod.status).toBe(503);
+    expect(bodyDelete.status).toBe(400);
+    expect(fetchMock.mock.calls.length).toBe(callsBeforeReject);
   });
 });
 

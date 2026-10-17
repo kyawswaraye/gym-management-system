@@ -19,3 +19,9 @@ web/tests/security-boundary.test.ts:generic-api-key:281
 
 # Same idempotency-key fixture UUID in the cross-origin BFF test. Not an API credential.
 web/tests/security-boundary.test.ts:generic-api-key:1629
+
+# Same fixture UUID on the current operations retry test. Not an API credential.
+web/tests/security-boundary.test.ts:generic-api-key:359
+
+# Same fixture UUID on the current cross-origin provision test. Not an API credential.
+web/tests/security-boundary.test.ts:generic-api-key:1707

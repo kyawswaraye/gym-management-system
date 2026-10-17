@@ -4,3 +4,4 @@ PyJWT==2.15.0
 cryptography==50.0.1
 psycopg==3.3.5
 psycopg-binary==3.3.5
+Pillow==13.0.0

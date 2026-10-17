@@ -49,6 +49,23 @@ export function canOpenGymSettings(session: CurrentUser): boolean {
   return access.canViewProfile || access.canViewSettings;
 }
 
+export type MemberPhotoAccess = {
+  canUpload: boolean;
+  canView: boolean;
+  canDelete: boolean;
+};
+
+export function memberPhotoAccess(session: CurrentUser): MemberPhotoAccess {
+  const canUpdateMember = hasPermission(session, "members.update");
+  return {
+    canUpload: canUpdateMember && hasPermission(session, "files.upload"),
+    canView:
+      hasPermission(session, "members.view") &&
+      hasPermission(session, "files.view"),
+    canDelete: canUpdateMember && hasPermission(session, "files.delete"),
+  };
+}
+
 export type StaffAccess = {
   canView: boolean;
   canManage: boolean;

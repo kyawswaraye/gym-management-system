@@ -65,7 +65,27 @@ e2e_apply_app_env() {
   export PYTHONUNBUFFERED="1"
 }
 
+e2e_apply_file_env() {
+  local python_bin exports
+  python_bin="$(command -v python3)"
+  local -a args=(
+    --web-port "${E2E_WEB_PORT}"
+    --proxy-port "${E2E_OBJECT_PROXY_PORT:-18088}"
+    --minio-port "${E2E_MINIO_PORT:-19000}"
+    --clamav-port "${E2E_CLAMAV_PORT:-13310}"
+    --access-key "${E2E_MINIO_ACCESS_KEY:-local-dev-only}"
+    --secret-key "${E2E_MINIO_SECRET_KEY:-local-dev-only-change}"
+  )
+  if [[ -n "${E2E_FILES_LOCALHOST_RESOLVES:-}" ]]; then
+    args+=(--files-localhost-resolves "${E2E_FILES_LOCALHOST_RESOLVES}")
+  fi
+  exports="$("${python_bin}" "${E2E_ENV_ROOT}/backend/apps/tenants/e2e_runtime.py" "${args[@]}")"
+  # shellcheck disable=SC1090
+  eval "${exports}"
+}
+
 e2e_prepare_env() {
   e2e_load_database_env
   e2e_apply_app_env
+  e2e_apply_file_env
 }

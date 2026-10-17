@@ -1,6 +1,6 @@
 # Documentation index
 
-This directory holds the authoritative Phase 0 contracts for the gym management platform. Documentation describes the approved target contract; it is never evidence that a feature exists at runtime. Implementation status is proven only by the phase exit criteria in [`DEVELOPMENT_PLAN.md`](./DEVELOPMENT_PLAN.md).
+This directory holds the authoritative Phase 0 contracts for the gym management platform. Documentation describes the approved target contract; it is never evidence that a feature exists at runtime. Phase scope and exit criteria stay in [`DEVELOPMENT_PLAN.md`](./DEVELOPMENT_PLAN.md). That file is the immutable roadmap and was not edited when the Phase 2 implementation gate closed. The closure record and the remaining production-only gates are in the repository [`README.md`](../README.md) and in [`API.md`](./API.md).
 
 ## The seven authoritative documents
 

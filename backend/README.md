@@ -15,11 +15,17 @@ expiry buckets are published. Membership-expiry scheduling and delivery
 commands are implemented. The member summary API is published. Nested member
 payment history is published. The member and membership browser workspaces
 follow those cursor pages, and the membership workspace can browse one expiry
-bucket at a time. Nested check-in history, notification HTTP routes, general
-payment and receipt HTTP endpoints, and private member files remain
-unpublished. Production expiry delivery remains
-gated on an idempotency-capable transactional provider. Phase 2 stays open
-until its development-plan exit criteria pass.
+bucket at a time. Nested check-in history, notification HTTP routes, and
+general payment and receipt HTTP endpoints remain unpublished. Profile-photo
+upload, complete, download-url, and delete are published. Phase 2
+implementation is complete. `docs/DEVELOPMENT_PLAN.md` was not edited for that
+closure. Production MinIO-compatible storage and ClamAV credentials stay in
+the environment and are not repository secrets. Local and end-to-end Compose
+use digest-pinned `docker.io/pgsty/silo`, a third-party MinIO-compatible fork,
+not official MinIO. Production object-storage image and provider approval
+remains open because official MinIO images are not anonymously distributable.
+Production expiry delivery remains gated on an idempotency-capable
+transactional provider.
 
 ## Runtime
 
@@ -66,6 +72,8 @@ python manage.py purge_gym_selection_tickets --batch-size=1000
 The runtime database role has no `DELETE` grant for this maintenance path.
 
 Browser smoke coverage is started from the repository root with `make e2e`.
+That command also starts loopback MinIO, ClamAV, and the object proxy for the
+Phase 2 member-lifecycle journey.
 `python manage.py seed_e2e` runs only when `E2E_SEED=1`,
 `DJANGO_SETTINGS_MODULE=config.settings.e2e`, and the connected database is
 exactly `gym_platform_e2e`. It deletes prior `E2E*` gyms and `e2e-*@example.test`
@@ -119,8 +127,10 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   Check-in, cash, PT, notification HTTP routes, and mobile are not complete.
   Membership-expiry email commands are implemented and remain gated on the
   production email provider described above.
-  Tenant `FileAsset` metadata, checks, and forced RLS are in place. File HTTP
-  routes, signed URLs, and object-storage integration are not.
+  Tenant `FileAsset` metadata, checks, and forced RLS are in place. Profile-photo
+  upload intent, complete, download URL, and delete routes are published.
+  Pillow 13.0.0 re-encodes those images. MinIO and ClamAV stay private and are
+  configured with environment variables, never repository secrets.
 - `GET /api/v1/audit-logs/` requires a staff access token and active `audit.view`.
   A platform token is rejected. An active owner receives every same-gym tenant
   audit row (`scope=GYM` in the collection metadata). Every other caller

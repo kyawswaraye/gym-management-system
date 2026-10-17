@@ -1986,6 +1986,461 @@
                 }
             }
         },
+        "/api/v1/files/{id}/": {
+            "delete": {
+                "operationId": "files_delete_upload",
+                "description": "Authenticate in a short transaction, then commit each service transaction alone.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "files"
+                ],
+                "security": [
+                    {
+                        "staffFileBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeletedFileEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/files/{id}/complete/": {
+            "post": {
+                "operationId": "files_complete_upload",
+                "description": "Authenticate in a short transaction, then commit each service transaction alone.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "files"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompleteUploadRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompleteUploadRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompleteUploadRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffFileBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CompletedFileEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "integer"
+                                },
+                                "description": "Whole seconds to wait before retrying a 409 FILE_SCAN_IN_PROGRESS response, from 1 through 120. Other 409 responses omit this header."
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/files/{id}/download-url/": {
+            "get": {
+                "operationId": "files_download_url",
+                "description": "Authenticate in a short transaction, then commit each service transaction alone.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "files"
+                ],
+                "security": [
+                    {
+                        "staffFileBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DownloadUrlEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/files/upload-intents/": {
+            "post": {
+                "operationId": "files_upload_intent",
+                "description": "Authenticate in a short transaction, then commit each service transaction alone.",
+                "tags": [
+                    "files"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UploadIntentRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UploadIntentRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UploadIntentRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffFileBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UploadIntentEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/gym/": {
             "get": {
                 "operationId": "gym_profile_retrieve",
@@ -6723,6 +7178,94 @@
                     "next_after"
                 ]
             },
+            "CompleteUploadRequest": {
+                "type": "object",
+                "properties": {
+                    "sha256": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "byte_size": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "byte_size",
+                    "sha256"
+                ]
+            },
+            "CompletedFile": {
+                "type": "object",
+                "properties": {
+                    "file_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "purpose": {
+                        "type": "string"
+                    },
+                    "owner_type": {
+                        "type": "string"
+                    },
+                    "owner_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "original_name": {
+                        "type": "string"
+                    },
+                    "content_type": {
+                        "type": "string"
+                    },
+                    "byte_size": {
+                        "type": "integer"
+                    },
+                    "sha256": {
+                        "type": "string"
+                    },
+                    "scan_status": {
+                        "type": "string"
+                    },
+                    "retention_status": {
+                        "type": "string"
+                    },
+                    "attachable": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "attachable",
+                    "byte_size",
+                    "content_type",
+                    "file_id",
+                    "original_name",
+                    "owner_id",
+                    "owner_type",
+                    "purpose",
+                    "retention_status",
+                    "scan_status",
+                    "sha256"
+                ]
+            },
+            "CompletedFileEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/CompletedFile"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
+                ]
+            },
             "CurrentUserData": {
                 "type": "object",
                 "properties": {
@@ -6828,6 +7371,68 @@
                     "last_name"
                 ]
             },
+            "DeletedFile": {
+                "type": "object",
+                "properties": {
+                    "file_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "purpose": {
+                        "type": "string"
+                    },
+                    "owner_type": {
+                        "type": "string"
+                    },
+                    "owner_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "scan_status": {
+                        "type": "string"
+                    },
+                    "retention_status": {
+                        "type": "string"
+                    },
+                    "rejection_code": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "deleted_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "deleted_at",
+                    "file_id",
+                    "owner_id",
+                    "owner_type",
+                    "purpose",
+                    "rejection_code",
+                    "retention_status",
+                    "scan_status"
+                ]
+            },
+            "DeletedFileEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/DeletedFile"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
+                ]
+            },
             "DirectLoginData": {
                 "type": "object",
                 "properties": {
@@ -6881,6 +7486,60 @@
                 "required": [
                     "data",
                     "message"
+                ]
+            },
+            "DownloadUrl": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string"
+                    },
+                    "method": {
+                        "type": "string"
+                    },
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "filename": {
+                        "type": "string"
+                    },
+                    "content_type": {
+                        "type": "string"
+                    },
+                    "byte_size": {
+                        "type": "integer"
+                    },
+                    "sha256": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "byte_size",
+                    "content_type",
+                    "expires_at",
+                    "filename",
+                    "method",
+                    "sha256",
+                    "url"
+                ]
+            },
+            "DownloadUrlEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/DownloadUrl"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
                 ]
             },
             "DurationUnitEnum": {
@@ -10464,6 +11123,125 @@
                     "refresh_expires_at",
                     "refresh_token"
                 ]
+            },
+            "UploadIntentData": {
+                "type": "object",
+                "properties": {
+                    "file_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "purpose": {
+                        "type": "string"
+                    },
+                    "owner_type": {
+                        "type": "string"
+                    },
+                    "owner_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "upload": {
+                        "$ref": "#/components/schemas/UploadTarget"
+                    }
+                },
+                "required": [
+                    "file_id",
+                    "owner_id",
+                    "owner_type",
+                    "purpose",
+                    "upload"
+                ]
+            },
+            "UploadIntentEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/UploadIntentData"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
+                ]
+            },
+            "UploadIntentRequest": {
+                "type": "object",
+                "properties": {
+                    "original_name": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "content_type": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "byte_size": {
+                        "type": "integer"
+                    },
+                    "sha256": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "purpose": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "owner_type": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "owner_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "byte_size",
+                    "content_type",
+                    "original_name",
+                    "owner_id",
+                    "owner_type",
+                    "purpose",
+                    "sha256"
+                ]
+            },
+            "UploadTarget": {
+                "type": "object",
+                "properties": {
+                    "method": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    },
+                    "file_field": {
+                        "type": "string"
+                    },
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "fields": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "expires_at",
+                    "fields",
+                    "file_field",
+                    "method",
+                    "url"
+                ]
             }
         },
         "securitySchemes": {
@@ -10473,6 +11251,11 @@
                 "bearerFormat": "JWT"
             },
             "staffBearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT"
+            },
+            "staffFileBearerAuth": {
                 "type": "http",
                 "scheme": "bearer",
                 "bearerFormat": "JWT"

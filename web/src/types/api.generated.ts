@@ -357,6 +357,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/files/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** @description Authenticate in a short transaction, then commit each service transaction alone. */
+    delete: operations["files_delete_upload"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/files/{id}/complete/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** @description Authenticate in a short transaction, then commit each service transaction alone. */
+    post: operations["files_complete_upload"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/files/{id}/download-url/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** @description Authenticate in a short transaction, then commit each service transaction alone. */
+    get: operations["files_download_url"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/files/upload-intents/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** @description Authenticate in a short transaction, then commit each service transaction alone. */
+    post: operations["files_upload_intent"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/gym/": {
     parameters: {
       query?: never;
@@ -1154,6 +1222,30 @@ export interface components {
       has_more: boolean;
       next_after: string | null;
     };
+    CompleteUploadRequest: {
+      sha256: string;
+      byte_size: number;
+    };
+    CompletedFile: {
+      /** Format: uuid */
+      file_id: string;
+      purpose: string;
+      owner_type: string;
+      /** Format: uuid */
+      owner_id: string;
+      original_name: string;
+      content_type: string;
+      byte_size: number;
+      sha256: string;
+      scan_status: string;
+      retention_status: string;
+      attachable: boolean;
+    };
+    CompletedFileEnvelope: {
+      success: boolean;
+      data: components["schemas"]["CompletedFile"];
+      message: string;
+    };
     CurrentUserData: {
       principal_type: components["schemas"]["PrincipalTypeEnum"];
       user: components["schemas"]["CurrentUserIdentity"];
@@ -1179,6 +1271,23 @@ export interface components {
       first_name: string;
       last_name: string;
     };
+    DeletedFile: {
+      /** Format: uuid */
+      file_id: string;
+      purpose: string;
+      owner_type: string;
+      /** Format: uuid */
+      owner_id: string;
+      scan_status: string;
+      retention_status: string;
+      rejection_code: string | null;
+      deleted_at: string | null;
+    };
+    DeletedFileEnvelope: {
+      success: boolean;
+      data: components["schemas"]["DeletedFile"];
+      message: string;
+    };
     DirectLoginData: {
       access_token: string;
       /** Format: date-time */
@@ -1194,6 +1303,20 @@ export interface components {
       /** @default true */
       success: boolean;
       data: components["schemas"]["DirectLoginData"];
+      message: string;
+    };
+    DownloadUrl: {
+      url: string;
+      method: string;
+      expires_at: string;
+      filename: string;
+      content_type: string;
+      byte_size: number;
+      sha256: string;
+    };
+    DownloadUrlEnvelope: {
+      success: boolean;
+      data: components["schemas"]["DownloadUrl"];
       message: string;
     };
     /**
@@ -2286,6 +2409,39 @@ export interface components {
       refresh_token: string;
       /** Format: date-time */
       refresh_expires_at: string;
+    };
+    UploadIntentData: {
+      /** Format: uuid */
+      file_id: string;
+      purpose: string;
+      owner_type: string;
+      /** Format: uuid */
+      owner_id: string;
+      upload: components["schemas"]["UploadTarget"];
+    };
+    UploadIntentEnvelope: {
+      success: boolean;
+      data: components["schemas"]["UploadIntentData"];
+      message: string;
+    };
+    UploadIntentRequest: {
+      original_name: string;
+      content_type: string;
+      byte_size: number;
+      sha256: string;
+      purpose: string;
+      owner_type: string;
+      /** Format: uuid */
+      owner_id: string;
+    };
+    UploadTarget: {
+      method: string;
+      url: string;
+      file_field: string;
+      expires_at: string;
+      fields: {
+        [key: string]: string;
+      };
     };
   };
   responses: never;
@@ -3530,6 +3686,318 @@ export interface operations {
         };
       };
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  files_delete_upload: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DeletedFileEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  files_complete_upload: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CompleteUploadRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CompleteUploadRequest"];
+        "multipart/form-data": components["schemas"]["CompleteUploadRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CompletedFileEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          /** @description Whole seconds to wait before retrying a 409 FILE_SCAN_IN_PROGRESS response, from 1 through 120. Other 409 responses omit this header. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  files_download_url: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadUrlEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  files_upload_intent: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UploadIntentRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["UploadIntentRequest"];
+        "multipart/form-data": components["schemas"]["UploadIntentRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UploadIntentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
         headers: {
           [name: string]: unknown;
         };

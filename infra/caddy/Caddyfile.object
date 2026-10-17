@@ -1,0 +1,45 @@
+{
+	auto_https off
+	admin off
+}
+
+http://{$OBJECT_PUBLIC_HOST:files.localhost} {
+	header {
+		Vary Origin
+		-Access-Control-Allow-Credentials
+	}
+	@allowed_origin header Origin {$OBJECT_CORS_ORIGIN:http://localhost:3000}
+	header @allowed_origin Access-Control-Allow-Origin {$OBJECT_CORS_ORIGIN:http://localhost:3000}
+
+	# Preflight only. The browser upload is a form POST and the photo is a GET.
+	# Content-Type is the only request header that form POST may preflight.
+	@preflight {
+		method OPTIONS
+		header Origin {$OBJECT_CORS_ORIGIN:http://localhost:3000}
+	}
+	handle @preflight {
+		header Access-Control-Allow-Methods "GET, POST"
+		header Access-Control-Allow-Headers "Content-Type"
+		respond "" 204
+	}
+
+	@object method GET POST
+	handle @object {
+		reverse_proxy minio:9000 {
+			# {http.request.host} drops a non-default port. SigV4 signed the
+			# browser authority, so the upstream Host must keep that port.
+			header_up Host {http.request.hostport}
+			# The upstream may reflect Origin. A second Allow-Origin value makes
+			# the browser reject the response, so this proxy owns that header.
+			header_down -Access-Control-Allow-Origin
+			header_down -Access-Control-Allow-Methods
+			header_down -Access-Control-Allow-Headers
+			header_down -Access-Control-Allow-Credentials
+			header_down -Access-Control-Expose-Headers
+			header_down -Access-Control-Max-Age
+		}
+	}
+	handle {
+		respond "Not found" 404
+	}
+}

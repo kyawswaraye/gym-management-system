@@ -92,6 +92,7 @@ _MEMBER_MUTABLE_FIELDS = (
     "profile_photo_asset_id",
 )
 _PROFILE_PHOTO_ERROR = "Select a clean profile photo from this gym."
+_PROFILE_PHOTO_CREATE_ERROR = "Create the member before attaching a profile photo."
 
 
 def gym_today(gym: Gym) -> date:
@@ -395,12 +396,15 @@ def _member_conflict(exc: IntegrityError) -> MemberConflict | None:
     return None
 
 
-def _require_profile_photo(gym: Gym, asset_id: UUID | None) -> UUID | None:
+def _require_profile_photo(gym: Gym, asset_id: UUID | None, *, member_id: UUID) -> UUID | None:
     if asset_id is None:
         return None
     asset = FileAsset.objects.select_for_update().filter(gym=gym, id=asset_id).first()
     if (
         asset is None
+        or asset.purpose != "PROFILE_PHOTO"
+        or asset.owner_type != "MEMBER"
+        or asset.owner_id != member_id
         or asset.scan_status != FileAsset.ScanStatus.CLEAN
         or asset.retention_status != FileAsset.RetentionStatus.ACTIVE
         or asset.deleted_at is not None
@@ -597,7 +601,9 @@ def create_member(
         assigned_number = f"{settings.member_number_prefix}-{settings.next_member_number:06d}"
         settings.next_member_number += 1
         advance_sequence = True
-    photo_id = _require_profile_photo(gym, profile_photo_asset_id)
+    if profile_photo_asset_id is not None:
+        raise ValidationError({"profile_photo_asset_id": [_PROFILE_PHOTO_CREATE_ERROR]})
+    photo_id = None
     prepared = _prepare_member_changes(
         {
             "first_name": first_name,
@@ -652,7 +658,7 @@ def update_member(
     prepared = _prepare_member_changes(changes)
     if "profile_photo_asset_id" in prepared:
         prepared["profile_photo_asset_id"] = _require_profile_photo(
-            gym, prepared["profile_photo_asset_id"]
+            gym, prepared["profile_photo_asset_id"], member_id=member.id
         )
     _validate_member_dates(
         prepared["date_of_birth"] if "date_of_birth" in prepared else member.date_of_birth,

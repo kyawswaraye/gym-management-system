@@ -9,14 +9,16 @@ class FileAsset(TenantModel):
     """Tenant-owned metadata for one private object.
 
     ``object_key`` is ``{gym_id}/{random_uuid}``. The key is organization, not
-    authorization. This model does not issue signed URLs or integrate a storage
-    provider. ``owner_type`` and ``owner_id`` are an opaque pair with no foreign
-    key; a later service must prove that pair belongs to the same gym.
+    authorization. ``owner_type`` and ``owner_id`` are an opaque pair with no
+    foreign key; the file service proves that pair belongs to the same gym.
+    ``upload_*`` keeps the original declaration. ``sha256``, ``byte_size``, and
+    ``content_type`` describe the object currently stored at ``object_key``.
     ``deleted_at`` is present only when retention is ``DELETED``.
     """
 
     class ScanStatus(models.TextChoices):
         PENDING = "PENDING"
+        SCANNING = "SCANNING"
         CLEAN = "CLEAN"
         REJECTED = "REJECTED"
         ERROR = "ERROR"
@@ -41,6 +43,12 @@ class FileAsset(TenantModel):
     owner_type = models.CharField(max_length=64, null=True, blank=True)
     owner_id = models.UUIDField(null=True, blank=True)
     uploaded_by_membership_id = models.UUIDField()
+    upload_sha256 = models.CharField(max_length=64, null=True, blank=True)
+    upload_byte_size = models.BigIntegerField(null=True, blank=True)
+    upload_content_type = models.CharField(max_length=255, null=True, blank=True)
+    rejection_code = models.CharField(max_length=64, null=True, blank=True)
+    scan_attempt_id = models.UUIDField(null=True, blank=True)
+    scan_started_at = models.DateTimeField(null=True, blank=True)
     retention_status = models.CharField(
         max_length=14,
         choices=RetentionStatus,
@@ -90,8 +98,71 @@ class FileAsset(TenantModel):
                 name="fileasset_sha256_format_ck",
             ),
             models.CheckConstraint(
-                condition=models.Q(scan_status__in=["PENDING", "CLEAN", "REJECTED", "ERROR"]),
+                condition=models.Q(
+                    scan_status__in=["PENDING", "SCANNING", "CLEAN", "REJECTED", "ERROR"]
+                ),
                 name="fileasset_scan_status_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(upload_sha256__isnull=True)
+                    | models.Q(upload_sha256__regex=r"^[0-9a-f]{64}$")
+                ),
+                name="fileasset_upload_sha256_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(rejection_code__isnull=True)
+                    | models.Q(rejection_code__regex=r"^[A-Z0-9_]{1,64}$")
+                ),
+                name="fileasset_rejection_code_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        scan_status="SCANNING",
+                        scan_attempt_id__isnull=False,
+                        scan_started_at__isnull=False,
+                        retention_status="QUARANTINED",
+                    )
+                    | (
+                        ~models.Q(scan_status="SCANNING")
+                        & models.Q(scan_attempt_id__isnull=True, scan_started_at__isnull=True)
+                    )
+                ),
+                name="fileasset_scan_claim_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(purpose="PROFILE_PHOTO")
+                    | (
+                        models.Q(owner_type="MEMBER", owner_id__isnull=False)
+                        & models.Q(
+                            upload_sha256__isnull=False,
+                            upload_byte_size__isnull=False,
+                            upload_content_type__isnull=False,
+                        )
+                        & models.Q(
+                            upload_content_type__in=["image/jpeg", "image/png", "image/webp"],
+                            content_type__in=["image/jpeg", "image/png", "image/webp"],
+                        )
+                        & models.Q(upload_byte_size__gte=1, upload_byte_size__lte=5242880)
+                        & models.Q(byte_size__gte=1, byte_size__lte=5242880)
+                        & (~models.Q(retention_status="ACTIVE") | models.Q(scan_status="CLEAN"))
+                        & (
+                            models.Q(scan_status="REJECTED", rejection_code__isnull=False)
+                            | (
+                                ~models.Q(scan_status="REJECTED")
+                                & models.Q(rejection_code__isnull=True)
+                            )
+                        )
+                        & (
+                            ~models.Q(scan_status="CLEAN")
+                            | models.Q(content_type=models.F("upload_content_type"))
+                        )
+                    )
+                ),
+                name="fileasset_profile_photo_ck",
             ),
             models.CheckConstraint(
                 condition=(

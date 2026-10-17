@@ -1,5 +1,6 @@
 import type { ComponentProps } from "react";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -149,7 +150,7 @@ function deferred<T>() {
 function renderManager(
   props: Partial<ComponentProps<typeof MembershipsManager>> = {},
 ) {
-  render(
+  return render(
     <MembershipsManager
       canCancel
       canCreate
@@ -322,6 +323,7 @@ describe("Memberships manager", () => {
         plan_id: PLAN_ID,
         start_date: "2026-10-17",
         discount_amount: "10.50",
+        note: "",
       }),
     );
   });
@@ -614,6 +616,20 @@ describe("Memberships manager", () => {
     expect(
       screen.queryByRole("button", { name: "Cancel" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Edit .+ plan/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("table", { name: "Memberships" })).getByRole(
+        "cell",
+        { name: "Desk note" },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+      }),
+    ).not.toBeInTheDocument();
     expect(listAllMembershipPlans).not.toHaveBeenCalled();
   });
 
@@ -758,6 +774,12 @@ describe("Memberships manager", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Archive Legacy (OLD) plan" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit Monthly (MONTH) plan" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit Legacy (OLD) plan" }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "New plan" }),
@@ -999,5 +1021,650 @@ describe("Memberships manager", () => {
       screen.queryByRole("button", { name: "Archive Annual (YEAR) plan" }),
     ).not.toBeInTheDocument();
     expect(listAllMembershipPlans).toHaveBeenCalledTimes(2);
+  });
+
+  it("prefills active and archived plan editors and patches only writable fields", async () => {
+    const archived = plan({
+      id: LATER_PLAN_ID,
+      code: "OLD",
+      name: "Legacy",
+      description: "Former terms",
+      duration_value: 2,
+      duration_unit: "WEEK",
+      price: "800.00",
+      currency: "THB",
+      is_active: false,
+      archived_at: "2026-09-01T00:00:00Z",
+    });
+    vi.mocked(listAllMembershipPlans).mockResolvedValue([plan(), archived]);
+    renderManager();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit Legacy (OLD) plan" }),
+    );
+    const archivedDialog = screen.getByRole("dialog", {
+      name: "Edit Legacy (OLD)",
+    });
+    expect(within(archivedDialog).getByLabelText("Code")).toHaveValue("OLD");
+    expect(within(archivedDialog).getByLabelText("Name")).toHaveValue("Legacy");
+    expect(within(archivedDialog).getByLabelText("Description")).toHaveValue(
+      "Former terms",
+    );
+    expect(within(archivedDialog).getByLabelText("Duration")).toHaveValue("2");
+    expect(within(archivedDialog).getByLabelText("Unit")).toHaveValue("WEEK");
+    expect(within(archivedDialog).getByLabelText("Price")).toHaveValue(
+      "800.00",
+    );
+    expect(within(archivedDialog).getByLabelText("Currency")).toHaveValue(
+      "THB",
+    );
+    expect(
+      within(archivedDialog).getByLabelText("Currency"),
+    ).not.toHaveAttribute("name");
+    expect(within(archivedDialog).getByText("Archived")).toBeInTheDocument();
+    fireEvent.click(
+      within(archivedDialog).getByRole("button", {
+        name: "Cancel editing Legacy (OLD) plan",
+      }),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(operationMutation).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Monthly (MONTH) plan" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Edit Monthly (MONTH)" });
+    expect(within(dialog).getByLabelText("Code")).toHaveValue("MONTH");
+    expect(within(dialog).getByLabelText("Name")).toHaveValue("Monthly");
+    expect(within(dialog).getByLabelText("Description")).toHaveValue("");
+    expect(within(dialog).getByLabelText("Duration")).toHaveValue("1");
+    expect(within(dialog).getByLabelText("Unit")).toHaveValue("MONTH");
+    expect(within(dialog).getByLabelText("Price")).toHaveValue("1500.00");
+    expect(within(dialog).getByText("Active")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive Monthly (MONTH) plan" }),
+    ).toBeDisabled();
+
+    fireEvent.change(within(dialog).getByLabelText("Code"), {
+      target: { value: "  YEAR  " },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Name"), {
+      target: { value: "  Annual pass  " },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Description"), {
+      target: { value: "  Front desk  " },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Duration"), {
+      target: { value: " 12 " },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Unit"), {
+      target: { value: "YEAR" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Price"), {
+      target: { value: " 2000.5 " },
+    });
+    vi.mocked(operationMutation).mockResolvedValue(
+      plan({
+        code: "YEAR",
+        name: "Annual pass",
+        description: "Front desk",
+        duration_value: 12,
+        duration_unit: "YEAR",
+        price: "2000.50",
+        is_active: true,
+      }),
+    );
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: "Save Monthly (MONTH) plan",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith(
+        `membership-plans/${PLAN_ID}/`,
+        {
+          code: "YEAR",
+          name: "Annual pass",
+          description: "Front desk",
+          duration_value: 12,
+          duration_unit: "YEAR",
+          price: "2000.50",
+        },
+        "PATCH",
+      ),
+    );
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const planCatalog = screen.getByRole("table", { name: "Membership plans" });
+    expect(
+      within(planCatalog).getByRole("cell", { name: "YEAR" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "Annual pass" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "2000.50 THB" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).queryByRole("cell", { name: "1500.00 THB" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Annual pass — 2000.50 THB" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "Monthly — 1500.00 THB" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /Legacy/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Restore/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the plan editor and row when update fails or is cancelled", async () => {
+    renderManager();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit Monthly (MONTH) plan" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Edit Monthly (MONTH)" });
+    fireEvent.change(within(dialog).getByLabelText("Name"), {
+      target: { value: "Renamed" },
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: "Cancel editing Monthly (MONTH) plan",
+      }),
+    );
+    expect(operationMutation).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("table", { name: "Membership plans" })).getByRole(
+        "cell",
+        { name: "Monthly" },
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Monthly (MONTH) plan" }),
+    );
+    const reopened = screen.getByRole("dialog", {
+      name: "Edit Monthly (MONTH)",
+    });
+    expect(within(reopened).getByLabelText("Name")).toHaveValue("Monthly");
+    fireEvent.change(within(reopened).getByLabelText("Name"), {
+      target: { value: "Renamed" },
+    });
+    vi.mocked(operationMutation).mockRejectedValue(
+      new Error("Plan update was rejected."),
+    );
+    fireEvent.click(
+      within(reopened).getByRole("button", {
+        name: "Save Monthly (MONTH) plan",
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Plan update was rejected.",
+    );
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(within(reopened).getByLabelText("Name")).toHaveValue("Renamed");
+    expect(
+      within(screen.getByRole("table", { name: "Membership plans" })).getByRole(
+        "cell",
+        { name: "Monthly" },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Monthly — 1500.00 THB" }),
+    ).toBeInTheDocument();
+    expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a duplicate plan save and a stale save for a different plan", async () => {
+    const pending = deferred<MembershipPlan>();
+    vi.mocked(listAllMembershipPlans).mockResolvedValue([
+      plan(),
+      plan({
+        id: LATER_PLAN_ID,
+        code: "YEAR",
+        name: "Annual",
+        price: "9000.00",
+      }),
+    ]);
+    vi.mocked(operationMutation).mockReturnValue(pending.promise);
+    const { unmount } = renderManager();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit Monthly (MONTH) plan" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Edit Monthly (MONTH)" });
+    fireEvent.change(within(dialog).getByLabelText("Name"), {
+      target: { value: "Renamed" },
+    });
+    const save = within(dialog).getByRole("button", {
+      name: "Save Monthly (MONTH) plan",
+    });
+    save.click();
+    save.click();
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Annual (YEAR) plan" }),
+    );
+    const annual = await screen.findByRole("dialog", {
+      name: "Edit Annual (YEAR)",
+    });
+    expect(within(annual).getByLabelText("Code")).toHaveValue("YEAR");
+    expect(within(annual).getByLabelText("Name")).toHaveValue("Annual");
+    await act(async () => {
+      pending.resolve(plan({ name: "Renamed" }));
+      await pending.promise;
+    });
+
+    expect(within(annual).getByLabelText("Name")).toHaveValue("Annual");
+    expect(
+      within(screen.getByRole("table", { name: "Membership plans" })).getByRole(
+        "cell",
+        { name: "Monthly" },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole("table", { name: "Membership plans" }),
+      ).queryByRole("cell", { name: "Renamed" }),
+    ).not.toBeInTheDocument();
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
+
+    unmount();
+    await act(async () => {
+      pending.resolve(plan({ name: "Late update" }));
+      await pending.promise;
+    });
+  });
+
+  it("merges a concurrently archived plan without offering restore", async () => {
+    vi.mocked(operationMutation).mockResolvedValue(
+      plan({
+        name: "Monthly",
+        is_active: false,
+        archived_at: "2026-10-17T12:00:00Z",
+        price: "1500.00",
+      }),
+    );
+    renderManager();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit Monthly (MONTH) plan" }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", { name: "Edit Monthly (MONTH)" }),
+      ).getByRole("button", { name: "Save Monthly (MONTH) plan" }),
+    );
+
+    expect(
+      await within(
+        screen.getByRole("table", { name: "Membership plans" }),
+      ).findByRole("cell", { name: "Archived" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive Monthly (MONTH) plan" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "Monthly — 1500.00 THB" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Restore/ }),
+    ).not.toBeInTheDocument();
+    expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends a trimmed membership note and shows it from the reloaded list", async () => {
+    vi.mocked(listMemberships)
+      .mockResolvedValueOnce(membershipPage([membership()]))
+      .mockResolvedValueOnce(
+        membershipPage([membership({ note: "Front desk" })]),
+      );
+    vi.mocked(operationMutation).mockResolvedValue(
+      membership({ note: "Front desk" }),
+    );
+    renderManager();
+    await screen.findByRole("option", { name: "Monthly — 1500.00 THB" });
+    expect(screen.getByLabelText("Note")).toHaveAttribute("maxLength", "4000");
+
+    fireEvent.change(screen.getByLabelText("Search members"), {
+      target: { value: "Ada" },
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "MEM-000001 — Ada Lovelace" }),
+    );
+    fireEvent.change(screen.getByLabelText("Plan"), {
+      target: { value: PLAN_ID },
+    });
+    fireEvent.change(screen.getByLabelText("Note"), {
+      target: { value: "  Front desk  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start membership" }));
+
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith("memberships/", {
+        member_id: MEMBER_ID,
+        plan_id: PLAN_ID,
+        start_date: "2026-10-17",
+        discount_amount: "0.00",
+        note: "Front desk",
+      }),
+    );
+    expect(
+      await within(
+        screen.getByRole("table", { name: "Memberships" }),
+      ).findByRole("cell", { name: "Front desk" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("cell", { name: "Desk note" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("patches a membership note in place and preserves the loaded page", async () => {
+    vi.mocked(listMemberships)
+      .mockResolvedValueOnce(membershipPage([membership()], "cursor.next"))
+      .mockResolvedValueOnce(
+        membershipPage([
+          membership({
+            id: LATER_MEMBERSHIP_ID,
+            member_id: LATER_MEMBER_ID,
+            plan_name: "Annual",
+            note: "Second page",
+            status: "EXPIRED",
+          }),
+        ]),
+      );
+    renderManager();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Load more memberships" }),
+    );
+    expect(await screen.findByText("Second page")).toBeInTheDocument();
+    const callsBeforeSave = vi.mocked(listMemberships).mock.calls.length;
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+      }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+    });
+    expect(within(dialog).getByLabelText("Membership note")).toHaveValue(
+      "Desk note",
+    );
+    expect(within(dialog).getByLabelText("Membership note")).toHaveAttribute(
+      "maxLength",
+      "4000",
+    );
+    fireEvent.change(within(dialog).getByLabelText("Membership note"), {
+      target: { value: "  Updated desk  " },
+    });
+    vi.mocked(operationMutation).mockResolvedValue(
+      membership({ note: "Updated desk" }),
+    );
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: `Save note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith(
+        `memberships/${MEMBERSHIP_ID}/`,
+        { note: "Updated desk" },
+        "PATCH",
+      ),
+    );
+    expect(
+      await within(
+        screen.getByRole("table", { name: "Memberships" }),
+      ).findByRole("cell", { name: "Updated desk" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("table", { name: "Memberships" })).getByRole(
+        "cell",
+        { name: "Second page" },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("table", { name: "Memberships" })).getByRole(
+        "cell",
+        { name: "Annual" },
+      ),
+    ).toBeInTheDocument();
+    expect(vi.mocked(listMemberships).mock.calls.length).toBe(callsBeforeSave);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("trims a blank note, and cancel or failure keeps the loaded note", async () => {
+    renderManager();
+    const editName = `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`;
+    fireEvent.click(await screen.findByRole("button", { name: editName }));
+    const dialog = screen.getByRole("dialog", { name: editName });
+    fireEvent.change(within(dialog).getByLabelText("Membership note"), {
+      target: { value: "Temporary" },
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: `Discard note edit for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+      }),
+    );
+    expect(operationMutation).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("table", { name: "Memberships" })).getByRole(
+        "cell",
+        { name: "Desk note" },
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: editName }));
+    const reopened = screen.getByRole("dialog", { name: editName });
+    expect(within(reopened).getByLabelText("Membership note")).toHaveValue(
+      "Desk note",
+    );
+    fireEvent.change(within(reopened).getByLabelText("Membership note"), {
+      target: { value: "Temporary" },
+    });
+    vi.mocked(operationMutation).mockRejectedValue(
+      new Error("Note update was rejected."),
+    );
+    fireEvent.click(
+      within(reopened).getByRole("button", {
+        name: `Save note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+      }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Note update was rejected.",
+    );
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(within(reopened).getByLabelText("Membership note")).toHaveValue(
+      "Temporary",
+    );
+    expect(
+      within(screen.getByRole("table", { name: "Memberships" })).getByRole(
+        "cell",
+        { name: "Desk note" },
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.change(within(reopened).getByLabelText("Membership note"), {
+      target: { value: "   " },
+    });
+    vi.mocked(operationMutation).mockResolvedValue(membership({ note: "" }));
+    fireEvent.click(
+      within(reopened).getByRole("button", {
+        name: `Save note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+      }),
+    );
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith(
+        `memberships/${MEMBERSHIP_ID}/`,
+        { note: "" },
+        "PATCH",
+      ),
+    );
+    expect(
+      await within(
+        screen.getByRole("table", { name: "Memberships" }),
+      ).findByRole("cell", { name: "No note" }),
+    ).toBeInTheDocument();
+  });
+
+  it("ignores a duplicate or stale note save after the list context changes", async () => {
+    const pending = deferred<Membership>();
+    vi.mocked(listMemberships).mockReset();
+    vi.mocked(listMemberships)
+      .mockResolvedValueOnce(
+        membershipPage([
+          membership(),
+          membership({
+            id: LATER_MEMBERSHIP_ID,
+            member_id: LATER_MEMBER_ID,
+            plan_name: "Annual",
+            note: "Second note",
+          }),
+        ]),
+      )
+      .mockResolvedValueOnce(
+        membershipPage([
+          membership({
+            plan_name: "Filtered",
+            note: "Kept",
+          }),
+        ]),
+      );
+    vi.mocked(operationMutation).mockImplementation((path) => {
+      if (path === `memberships/${MEMBERSHIP_ID}/`) return pending.promise;
+      return Promise.resolve({});
+    });
+    const { unmount } = renderManager();
+    const membershipsTable = async () =>
+      screen.findByRole("table", { name: "Memberships" });
+
+    expect(
+      await screen.findByRole("button", {
+        name: `Edit note for ${LATER_MEMBER_ID}, Annual, ${LATER_MEMBERSHIP_ID}`,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+      }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+    });
+    fireEvent.change(within(dialog).getByLabelText("Membership note"), {
+      target: { value: "Local draft" },
+    });
+    const save = within(dialog).getByRole("button", {
+      name: `Save note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+    });
+    save.click();
+    save.click();
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    expect(operationMutation).toHaveBeenCalledWith(
+      `memberships/${MEMBERSHIP_ID}/`,
+      { note: "Local draft" },
+      "PATCH",
+    );
+    const otherSuspend = within(await membershipsTable())
+      .getAllByRole("button", { name: "Suspend" })
+      .at(-1);
+    otherSuspend?.click();
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByLabelText("Filter by status"), {
+      target: { value: "ACTIVE" },
+    });
+    expect(
+      await within(await membershipsTable()).findByRole("cell", {
+        name: "Kept",
+      }),
+    ).toBeInTheDocument();
+    const calls = vi.mocked(listMemberships).mock.calls.length;
+    await act(async () => {
+      pending.resolve(membership({ note: "From the server" }));
+      await pending.promise;
+    });
+    expect(vi.mocked(listMemberships).mock.calls.length).toBe(calls);
+    expect(screen.queryByText("From the server")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("table", { name: "Memberships" })).getByRole(
+        "cell",
+        { name: "Kept" },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("table", { name: "Memberships" })).queryByRole(
+        "cell",
+        { name: "Desk note" },
+      ),
+    ).not.toBeInTheDocument();
+
+    unmount();
+    await act(async () => {
+      pending.resolve(membership({ note: "After unmount" }));
+      await pending.promise;
+    });
+  });
+
+  it("ignores a note save that resolves after the selected member changes", async () => {
+    const pending = deferred<Membership>();
+    vi.mocked(operationMutation).mockImplementation((path) => {
+      if (path === `memberships/${MEMBERSHIP_ID}/`) return pending.promise;
+      return Promise.resolve({});
+    });
+    renderManager();
+    const editName = `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`;
+    fireEvent.click(await screen.findByRole("button", { name: editName }));
+    const dialog = screen.getByRole("dialog", { name: editName });
+    fireEvent.change(within(dialog).getByLabelText("Membership note"), {
+      target: { value: "Local draft" },
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: `Save note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+      }),
+    );
+    fireEvent.change(screen.getByLabelText("Search members"), {
+      target: { value: "Ada" },
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "MEM-000001 — Ada Lovelace" }),
+    );
+
+    const calls = vi.mocked(listMemberships).mock.calls.length;
+    await act(async () => {
+      pending.resolve(membership({ note: "From the server" }));
+      await pending.promise;
+    });
+
+    expect(vi.mocked(listMemberships).mock.calls.length).toBe(calls);
+    expect(screen.queryByText("From the server")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("table", { name: "Memberships" })).getByRole(
+        "cell",
+        { name: "Desk note" },
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Membership note")).toHaveValue(
+      "Local draft",
+    );
   });
 });

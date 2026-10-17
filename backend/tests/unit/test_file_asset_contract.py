@@ -23,6 +23,10 @@ EXPECTED_CONSTRAINTS = {
     "fileasset_owner_pair_ck",
     "fileasset_retention_status_ck",
     "fileasset_retention_deleted_ck",
+    "fileasset_upload_sha256_ck",
+    "fileasset_rejection_code_ck",
+    "fileasset_scan_claim_ck",
+    "fileasset_profile_photo_ck",
 }
 EXPECTED_INDEXES = {
     "fileasset_gym_purpose_idx": ("gym", "purpose"),
@@ -47,6 +51,12 @@ def test_file_asset_model_matches_the_metadata_contract() -> None:
     assert FileAsset._meta.get_field("owner_type").null is True
     assert FileAsset._meta.get_field("owner_id").null is True
     assert FileAsset._meta.get_field("deleted_at").null is True
+    assert FileAsset.ScanStatus.SCANNING == "SCANNING"
+    assert FileAsset._meta.get_field("scan_status").max_length == 8
+    assert FileAsset._meta.get_field("scan_attempt_id").null is True
+    assert FileAsset._meta.get_field("scan_started_at").null is True
+    assert FileAsset._meta.get_field("upload_sha256").max_length == 64
+    assert FileAsset._meta.get_field("rejection_code").max_length == 64
     assert FileAsset._meta.get_field("scan_status").default == FileAsset.ScanStatus.PENDING
     assert FileAsset._meta.get_field("retention_status").default == FileAsset.RetentionStatus.ACTIVE
     assert {constraint.name for constraint in FileAsset._meta.constraints} == EXPECTED_CONSTRAINTS
@@ -100,27 +110,99 @@ def test_file_migrations_are_linear_and_follow_the_tenants_leaf() -> None:
     nodes = _migration_nodes()
     initial = nodes[("files", "0001_initial")]
     security = nodes[("files", "0002_rls_integrity_and_grants")]
+    profile = nodes[("files", "0003_profile_photo_contract")]
 
     assert initial == [("tenants", "0020_retire_platform_settings_manage")]
     assert security == [("files", "0001_initial")]
-    assert _leaves(nodes)["files"] == [("files", "0002_rls_integrity_and_grants")]
+    assert ("files", "0002_rls_integrity_and_grants") in profile
+    assert _leaves(nodes)["files"] == [("files", "0003_profile_photo_contract")]
     assert _leaves(nodes)["tenants"] == [("tenants", "0021_security_definer_least_privilege")]
     assert all(len(leaves) == 1 for leaves in _leaves(nodes).values())
 
 
-def test_no_file_route_or_storage_secret_is_introduced() -> None:
+def test_profile_photo_migration_preserves_runtime_grants_and_declaration() -> None:
+    migration = importlib.import_module("apps.files.migrations.0003_profile_photo_contract")
+    trigger = migration.TRIGGER_SQL
+    backfill = migration.BACKFILL_SQL
+
+    assert "GRANT DELETE" not in migration.TRIGGER_SQL
+    assert "GRANT " not in backfill
+    assert "app_guard_file_asset_immutable" in trigger
+    assert "upload_sha256" in trigger
+    assert "uploaded_by_membership_id" in trigger
+    assert "purpose = 'PROFILE_PHOTO'" in backfill
+    assert "FILE_UPLOAD_EXPIRED" not in backfill
+    assert "RAISE EXCEPTION 'profile photo rows do not meet the Phase 2 contract'" in backfill
+
+
+def test_profile_photo_reverse_normalizes_scanning_before_columns_drop() -> None:
+    from django.db.migrations.operations.base import Operation
+    from django.db.migrations.operations.fields import AddField
+    from django.db.migrations.operations.models import AddConstraint, RemoveConstraint
+
+    migration = importlib.import_module("apps.files.migrations.0003_profile_photo_contract")
+    initial = (BACKEND_ROOT / "apps" / "files" / "migrations" / "0001_initial.py").read_text()
+    operations = migration.Migration.operations
+    reverse_sql = migration.BACKFILL_REVERSE_SQL
+
+    assert "SET scan_status = 'ERROR'" in reverse_sql
+    assert "scan_attempt_id = NULL" in reverse_sql
+    assert "scan_started_at = NULL" in reverse_sql
+    assert "WHERE scan_status = 'SCANNING'" in reverse_sql
+    assert "SCANNING" not in initial
+    assert "'PENDING', 'CLEAN', 'REJECTED', 'ERROR'" in initial
+    assert AddField.database_backwards is not Operation.database_backwards
+    assert AddConstraint.database_backwards is not Operation.database_backwards
+    assert not any(
+        isinstance(operation, migration.migrations.RemoveField) for operation in operations
+    )
+
+    def at(kind: type[object], name: str = "") -> int:
+        for index, operation in enumerate(operations):
+            if not isinstance(operation, kind):
+                continue
+            if name and getattr(operation, "name", None) != name:
+                constraint = getattr(operation, "constraint", None)
+                if getattr(constraint, "name", None) != name:
+                    continue
+            return index
+        raise AssertionError(name or kind)
+
+    backfill_at = next(
+        index
+        for index, operation in enumerate(operations)
+        if isinstance(operation, migration.migrations.RunSQL)
+        and operation.reverse_sql == reverse_sql
+    )
+    claim_at = at(AddConstraint, "fileasset_scan_claim_ck")
+    status_remove_at = at(RemoveConstraint, "fileasset_scan_status_ck")
+    field_at = [
+        index for index, operation in enumerate(operations) if isinstance(operation, AddField)
+    ]
+    assert field_at
+    assert max(field_at) < backfill_at
+    assert claim_at < backfill_at
+    assert status_remove_at < backfill_at
+
+
+def test_profile_photo_routes_do_not_embed_storage_secrets() -> None:
     paths = _paths()
     files_root = BACKEND_ROOT / "apps" / "files"
-    source = "\n".join(path.read_text() for path in files_root.rglob("*.py")).lower()
-    urls = (BACKEND_ROOT / "config" / "urls.py").read_text()
+    source = "\n".join(path.read_text() for path in files_root.rglob("*.py"))
+    settings = (BACKEND_ROOT / "config" / "settings" / "base.py").read_text()
 
-    assert paths
-    assert not any("files" in path for path in paths)
-    assert "apps.files" not in urls
-    assert not (files_root / "urls.py").exists()
-    assert not (files_root / "views.py").exists()
-    for token in ("minio", "aws_secret", "aws_access", "presign", "signed_url", "boto"):
-        assert token not in source
+    assert {
+        "api/v1/files/upload-intents/",
+        "api/v1/files/<uuid:id>/complete/",
+        "api/v1/files/<uuid:id>/download-url/",
+        "api/v1/files/<uuid:id>/",
+    } <= set(paths)
+    assert "apps.files.urls" in (BACKEND_ROOT / "config" / "urls.py").read_text()
+    assert 'os.environ.get("MINIO_SECRET_KEY", "")' in settings
+    assert 'os.environ.get("MINIO_ACCESS_KEY", "")' in settings
+    assert "signed_url" not in source
+    for literal in ("wJalrXUtnFEMI", "minioadmin", "change-me"):
+        assert literal not in source
 
 
 def _migration_nodes() -> dict[tuple[str, str], list[tuple[str, str]]]:

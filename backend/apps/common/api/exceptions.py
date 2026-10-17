@@ -61,6 +61,9 @@ def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
         if isinstance(exc.detail, ErrorDetail):
             code = str(exc.detail.code).upper()
             message = str(exc.detail)
+            extra_fields = getattr(exc, "error_fields", None)
+            if isinstance(extra_fields, dict):
+                fields = extra_fields
         else:
             fields = _flatten_fields(response.data)
     return Response(
@@ -70,5 +73,18 @@ def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
             "request_id": request_id,
         },
         status=response.status_code,
-        headers=response.headers,
+        headers=_exception_headers(exc, response),
     )
+
+
+def _exception_headers(exc: Exception, response: Response) -> dict[str, str]:
+    """Copy DRF headers, then emit Retry-After only for a present integer wait."""
+
+    headers = {str(key): str(value) for key, value in response.headers.items()}
+    wait = getattr(exc, "wait", None)
+    if isinstance(wait, bool) or (isinstance(wait, int) and wait < 0):
+        return {key: value for key, value in headers.items() if key.lower() != "retry-after"}
+    if isinstance(wait, int):
+        headers = {key: value for key, value in headers.items() if key.lower() != "retry-after"}
+        headers["Retry-After"] = str(wait)
+    return headers

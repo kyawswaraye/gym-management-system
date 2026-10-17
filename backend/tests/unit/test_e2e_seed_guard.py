@@ -1,7 +1,11 @@
+import inspect
+
 import pytest
 from django.core.management.base import CommandError
 
 from apps.tenants.e2e import assert_e2e_seed_allowed
+from apps.tenants.e2e_runtime import e2e_reuses_storage_keys
+from apps.tenants.management.commands.seed_e2e import Command, _delete_gym_tree
 
 
 def test_seed_allows_only_the_dedicated_e2e_database() -> None:
@@ -28,6 +32,13 @@ def test_seed_refuses_to_run_without_the_explicit_flag() -> None:
             settings_module="config.settings.e2e",
             seed_flag="",
         )
+
+
+def test_seed_refuses_reused_object_keys_and_drops_members_first() -> None:
+    assert e2e_reuses_storage_keys() is False
+    assert "e2e_reuses_storage_keys" in inspect.getsource(Command.handle)
+    source = inspect.getsource(_delete_gym_tree)
+    assert source.index("Member.objects.filter") < source.index("FileAsset.objects.filter")
 
 
 def test_seed_refuses_local_and_production_settings() -> None:

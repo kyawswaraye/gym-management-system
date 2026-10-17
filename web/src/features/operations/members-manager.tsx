@@ -4,6 +4,12 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import { listMembers, operationMutation } from "@/features/operations/client";
+import { MemberProfileFields } from "@/features/operations/member-profile-fields";
+import {
+  emptyMemberProfile,
+  memberCreatePayload,
+  type MemberProfileInput,
+} from "@/features/operations/member-profile";
 import type { Member, MemberListPage, MemberListQuery } from "@/types/api";
 
 const PAGE_LIMIT = 25;
@@ -91,6 +97,9 @@ export function MembersManager({
   const [error, setError] = useState("");
   const [errorScope, setErrorScope] = useState<"list" | "page" | null>(null);
   const [pending, setPending] = useState(false);
+  const [draft, setDraft] = useState<MemberProfileInput>(() =>
+    emptyMemberProfile(defaultDate),
+  );
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"" | MemberStatus>("");
   const [joinedFrom, setJoinedFrom] = useState("");
@@ -98,6 +107,7 @@ export function MembersManager({
   const [ptClient, setPtClient] = useState<PtClientFilter>("");
   const requestVersion = useRef(0);
   const appliedCursors = useRef(new Set<string>());
+  const submitLock = useRef(false);
   const filters = { search, status, joinedFrom, joinedTo, ptClient };
 
   function resetPage() {
@@ -225,23 +235,24 @@ export function MembersManager({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitLock.current) return;
+    const payload = memberCreatePayload(draft);
+    if (!payload.first_name || !payload.last_name || !payload.join_date) {
+      setError("Enter a first name, last name, and join date.");
+      setErrorScope(null);
+      return;
+    }
+    submitLock.current = true;
     setPending(true);
-    const formElement = event.currentTarget;
-    const form = new FormData(formElement);
     try {
-      await operationMutation<Member>("members/", {
-        first_name: form.get("first_name"),
-        last_name: form.get("last_name"),
-        phone: form.get("phone"),
-        email: form.get("email"),
-        join_date: form.get("join_date"),
-      });
-      formElement.reset();
+      await operationMutation<Member>("members/", payload);
+      setDraft(emptyMemberProfile(defaultDate));
       await loadFirst();
     } catch (caught) {
       setError(errorText(caught, "Unable to create member."));
       setErrorScope(null);
     } finally {
+      submitLock.current = false;
       setPending(false);
     }
   }
@@ -251,32 +262,12 @@ export function MembersManager({
       {canCreate && (
         <form className="card grid gap-4 p-5" onSubmit={submit}>
           <h2 className="text-lg font-bold">Add member</h2>
-          <label className="field">
-            First name
-            <input className="input" name="first_name" required />
-          </label>
-          <label className="field">
-            Last name
-            <input className="input" name="last_name" />
-          </label>
-          <label className="field">
-            Phone
-            <input className="input" name="phone" />
-          </label>
-          <label className="field">
-            Email
-            <input className="input" name="email" type="email" />
-          </label>
-          <label className="field">
-            Join date
-            <input
-              className="input"
-              defaultValue={defaultDate}
-              name="join_date"
-              required
-              type="date"
-            />
-          </label>
+          <MemberProfileFields
+            disabled={pending}
+            includeMemberNumber
+            onChange={setDraft}
+            value={draft}
+          />
           <button className="button" disabled={pending} type="submit">
             {pending ? "Saving…" : "Save member"}
           </button>

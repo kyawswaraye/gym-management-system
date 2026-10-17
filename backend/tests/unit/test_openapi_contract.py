@@ -64,6 +64,10 @@ PUBLISHED_PATHS = {
     "/api/v1/staff/{id}/",
     "/api/v1/staff/{id}/activate/",
     "/api/v1/staff/{id}/suspend/",
+    "/api/v1/files/upload-intents/",
+    "/api/v1/files/{id}/",
+    "/api/v1/files/{id}/complete/",
+    "/api/v1/files/{id}/download-url/",
 }
 CONTRACT_PATH = Path(__file__).resolve().parents[3] / "contracts" / "openapi.v1.json"
 
@@ -877,3 +881,14 @@ def test_openapi_documents_platform_dashboard_and_subscription_update() -> None:
     status_schema = schemas[update_properties["status"]["$ref"].rsplit("/", 1)[-1]]
     assert set(update_properties) == {"name", "status", "price", "billing_interval"}
     assert set(status_schema["enum"]) == {"ACTIVE", "RETIRED"}
+
+
+def test_openapi_documents_complete_retry_after() -> None:
+    document = generated_schema()
+    complete = document["paths"]["/api/v1/files/{id}/complete/"]["post"]
+    header = complete["responses"]["409"]["headers"]["Retry-After"]
+    assert header["schema"]["type"] == "integer"
+    assert header.get("required", False) is False
+    assert "FILE_SCAN_IN_PROGRESS" in header["description"]
+    names = [parameter.get("name") for parameter in complete.get("parameters", [])]
+    assert "Retry-After" not in names

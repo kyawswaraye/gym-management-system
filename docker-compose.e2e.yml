@@ -1,0 +1,81 @@
+# Disposable file services for browser E2E. This project is gym-e2e-files.
+# It does not define PostgreSQL and must not be torn down with the application
+# database volume. Host ports are loopback-only so the host Django process can
+# reach MinIO and ClamAV. The browser uses the object proxy, not these ports.
+name: gym-e2e-files
+
+services:
+  minio:
+    # Official MinIO is not anonymously pullable. quay.io/minio/minio and
+    # quay.io/minio/mc return 401: an anonymous token is issued with an empty
+    # pull action for the pinned release and for latest. Docker Hub answers
+    # 404 for minio/minio and minio/mc. pgsty/silo is a third-party MinIO fork,
+    # not an official MinIO build. The digest is the multi-arch index.
+    image: docker.io/pgsty/silo:RELEASE.2026-10-15T00-00-00Z@sha256:aaac6bce13eb99316b3c88bd20143fc3c38ab607585256a411a095c44ee57f62
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      MINIO_SERVER_URL: ${MINIO_PUBLIC_URL:?Set MINIO_PUBLIC_URL}
+    ports:
+      - "127.0.0.1:${E2E_MINIO_PORT:?Set E2E_MINIO_PORT}:9000"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: "no"
+
+  minio-init:
+    # Same pinned fork image. It contains the mc client used to create the bucket.
+    image: docker.io/pgsty/silo:RELEASE.2026-10-15T00-00-00Z@sha256:aaac6bce13eb99316b3c88bd20143fc3c38ab607585256a411a095c44ee57f62
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-gym-private}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "local/$$MINIO_BUCKET"
+        mc anonymous set none "local/$$MINIO_BUCKET"
+    restart: "no"
+
+  clamav:
+    image: clamav/clamav:1.4
+    # The 1.4 tag publishes amd64 only. Apple Silicon runs it through emulation.
+    platform: linux/amd64
+    ports:
+      - "127.0.0.1:${E2E_CLAMAV_PORT:?Set E2E_CLAMAV_PORT}:3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+    restart: "no"
+
+  object-proxy:
+    image: caddy:2.10.2
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      OBJECT_PUBLIC_HOST: ${OBJECT_PUBLIC_HOST:?Set OBJECT_PUBLIC_HOST}
+      OBJECT_CORS_ORIGIN: ${OBJECT_CORS_ORIGIN:?Set OBJECT_CORS_ORIGIN}
+    ports:
+      - "127.0.0.1:${E2E_OBJECT_PROXY_PORT:?Set E2E_OBJECT_PROXY_PORT}:80"
+    volumes:
+      - ./infra/caddy/Caddyfile.object:/etc/caddy/Caddyfile:ro
+    restart: "no"
+
+volumes:
+  minio_data:
+  clamav_data:

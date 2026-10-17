@@ -29,3 +29,11 @@ export async function PATCH(request: NextRequest, context: Context) {
     "PATCH",
   );
 }
+
+export async function DELETE(request: NextRequest, context: Context) {
+  return authenticatedMutation(
+    request,
+    await djangoPath(request, context),
+    "DELETE",
+  );
+}

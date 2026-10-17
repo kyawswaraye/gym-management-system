@@ -14,7 +14,7 @@ The system has three deployable applications — one authoritative server and tw
 
 The primary design goal is fail-closed tenant isolation. UI filtering is never a security control.
 
-Phase 1A is foundation only. It creates authentication, tenancy, authorization, RLS, API infrastructure, and minimal web shells; it does not implement members, check-in, finance, PT, reports, or mobile features. Phase 1B platform administration, provisioning, staff, roles, settings, audit reads, and file-metadata persistence are in place and gate-closed. Phase 2 publishes the MembershipPlan and Member list, create, detail, update, and archive APIs, the Membership sale, lifecycle, and expiry API, the member summary API, and the nested member payment-history read. That history orders `received_at DESC, id DESC` through `payment_gym_member_hist_idx` and stops at the page limit. Membership-expiry scheduling and delivery commands are implemented. The member and membership browser workspaces follow those cursor pages, and the membership workspace can browse one expiry bucket at a time. Nested check-in history, notification HTTP routes, general payment and receipt endpoints, and private member files remain unpublished. Phase 2 is not complete. Production expiry delivery remains gated on an idempotency-capable transactional provider.
+Phase 1A is foundation only. It creates authentication, tenancy, authorization, RLS, API infrastructure, and minimal web shells; it does not implement members, check-in, finance, PT, reports, or mobile features. Phase 1B platform administration, provisioning, staff, roles, settings, audit reads, and file-metadata persistence are in place and gate-closed. Phase 2 publishes the MembershipPlan and Member list, create, detail, update, and archive APIs, the Membership sale, lifecycle, and expiry API, the member summary API, and the nested member payment-history read. That history orders `received_at DESC, id DESC` through `payment_gym_member_hist_idx` and stops at the page limit. Membership-expiry scheduling and delivery commands are implemented. The member and membership browser workspaces follow those cursor pages, and the membership workspace can browse one expiry bucket at a time. The private profile-photo routes are implemented. Nested check-in history, notification HTTP routes, and general payment and receipt endpoints remain unpublished. Phase 2 implementation is complete. `is_pt_client` stays false until Phase 5. Production expiry delivery remains gated on an idempotency-capable transactional provider. Production object-storage image approval also remains open: local and end-to-end Compose use digest-pinned `docker.io/pgsty/silo`, a third-party MinIO-compatible fork, not official MinIO.
 
 ## 2. Architecture principles
 
@@ -308,34 +308,49 @@ An accounting ledger can be added later without changing public payment and expe
 
 ## 11. File architecture
 
-MinIO exposes private S3-compatible buckets only on the VPS internal Docker network. The database stores tenant-scoped metadata, ownership, object key, content type, size, checksum, scan status, and lifecycle status.
+MinIO exposes one private S3-compatible bucket on the VPS internal Docker network. It publishes no host port and allows no anonymous bucket or object access. Caddy reverse-proxies a separate public object origin to that private endpoint and preserves the public `Host`. The browser uses that origin only for a presigned POST or GET. PostgreSQL stores tenant-scoped metadata, the member owner, the object key, the original upload declaration, the authoritative sanitized content type, size, and checksum, scan status, the scan-attempt token, and retention status.
 
-Upload flow:
+The Phase 2 flow is a member profile photo, purpose `PROFILE_PHOTO`, and it is implemented. The HTTP fields, statuses, and retry rules are in `API.md`. Production MinIO-compatible credentials and ClamAV deployment remain gated. The local image is the digest-pinned third-party fork `docker.io/pgsty/silo`, not official MinIO, and production image approval remains unresolved. The sequence is:
 
-1. authorize an upload intent for the active gym;
-2. issue a short-lived signed URL with size and type restrictions;
-3. verify the resulting object and detected type;
-4. quarantine/scan untrusted files;
-5. attach only verified metadata to a domain record.
+1. authorize an upload intent for the token gym and an existing same-gym member;
+2. insert `PENDING` / `QUARANTINED` metadata and return a 300-second presigned POST whose policy binds the exact key, exact content type, the exact signature algorithm, credential, and date, and maximum 5,242,880-byte size;
+3. the browser posts the original bytes directly to the public object origin;
+4. complete locks the member and asset, claims `SCANNING` with a new `scan_attempt_id`, commits, and releases those locks;
+5. with no database transaction or row lock held, complete reads the object, checks the original SHA-256 and byte size, scans it with ClamAV, decodes it within 20,000,000 pixels, re-encodes it without metadata, overwrites the same key, and scans the canonical bytes;
+6. a second short transaction stores the sanitized checksum, size, and content type and marks `CLEAN` / `ACTIVE` only when that attempt token still matches and retention is still `QUARANTINED`;
+7. a later member update attaches that asset. Complete does not attach it.
 
-Download URLs are issued only after tenant and permission checks. Object paths are not authorization controls.
+A download is a separate authorized 60-second presigned GET. Its integrity check is a `HEAD` of server-written object metadata and `Content-Length`, specified in `API.md`. The signed response disposition is `inline; filename="profile-photo.jpg"` (or `.png` / `.webp`), with the sanitized content type and `private, no-store`, because the staff UI renders that sanitized image. It is not a general document mode. Delete updates retention, clears any scan attempt, and removes the object without deleting the database row. `expire_profile_photo_uploads` also retires `CLEAN` and `ACTIVE` profile photos that are at least 24 hours old and not referenced by any same-gym member, using the claim and retry rules in `API.md`. Upload intent, complete, download-url, and delete disable the request-scoped atomic wrapper. Each of their database steps is its own committed transaction, and no step holds a database transaction or row lock across MinIO, ClamAV, or image processing. A `SCANNING` claim at least 120 seconds old may be replaced. Object paths are not authorization controls. ClamAV is a private container on the same Docker network, with no published port. Production endpoints and credentials are environment-provided, as listed in `SECURITY.md`.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant C as Client
+    participant C as Staff browser
+    participant B as Next.js BFF
     participant A as DRF API
-    participant O as Private MinIO bucket
+    participant S as Private ClamAV
+    participant O as Private MinIO via Caddy
     participant D as PostgreSQL
-    C->>A: Request upload intent + metadata
-    A->>A: Authorize selected gym and constraints
-    A-->>C: Short-lived presigned upload URL + object key
-    C->>O: Upload through constrained object endpoint
-    C->>A: Complete upload intent
-    A->>O: Verify object, checksum, size, detected type
-    A->>D: Mark scanned/verified and attach tenant metadata
-    A-->>C: File reference
-    Note over C,O: Downloads require a fresh authorized presigned URL
+    C->>B: POST upload intent
+    B->>A: Forward staff JWT and body
+    A->>D: Insert PENDING and QUARANTINED asset
+    A-->>B: Presigned POST url, form fields, 300-second expiry
+    B-->>C: Same JSON
+    C->>O: Multipart POST original bytes
+    O-->>C: 204
+    C->>B: POST complete with original sha256 and byte size
+    B->>A: Forward complete
+    A->>D: Lock member, then asset; claim SCANNING and commit
+    A->>O: Read object and verify original checksum and size
+    A->>S: Scan original bytes
+    A->>A: Decode, enforce pixel limit, re-encode without metadata
+    A->>O: Overwrite key with canonical bytes and server metadata
+    A->>S: Scan canonical bytes
+    A->>D: Finalize CLEAN and ACTIVE only if the attempt token still matches
+    A-->>B: Sanitized metadata, attachable true
+    B-->>C: Same JSON
+    C->>B: PATCH member profile_photo_asset_id
+    Note over C,O: A later download is a new 60-second presigned GET
 ```
 
 ## 12. Deployment architecture
@@ -344,8 +359,8 @@ The approved compatibility baseline is Python 3.14.7, Django 5.2.17 LTS, Django 
 
 - Cloudflare provides DNS, edge TLS, WAF, bot/rate controls, and origin protection; the free tier is the budget baseline.
 - One production VPS provides 4–8 vCPU, 8–16 GiB RAM, and 80–160 GiB NVMe storage, subject to measured load. It runs a pinned Linux release, host firewall, automatic security patches, and Docker Compose.
-- Caddy is the only public origin service and exposes ports 80/443. SSH is key-only and restricted by firewall/admin source. PostgreSQL and MinIO publish no public host ports.
-- Docker Compose runs separate non-root containers for Next.js, Django/Gunicorn, PostgreSQL, MinIO, and bounded monitoring. Containers communicate only over explicit private networks and use persistent named volumes.
+- Caddy is the only public origin service and exposes ports 80/443. SSH is key-only and restricted by firewall/admin source. PostgreSQL, MinIO, and ClamAV publish no public host ports. Caddy proxies the public object origin to private MinIO for presigned POST and GET only.
+- Local Docker Compose runs private S3-compatible storage, ClamAV, and a Caddy object-origin proxy with development placeholders only. The storage image is digest-pinned `docker.io/pgsty/silo`, a third-party MinIO-compatible fork. It is not an official MinIO image. Official MinIO images are not anonymously distributable, so production object-storage image and provider approval remains an unresolved deployment gate. Production ClamAV deployment and storage credentials are not committed. Containers communicate only over explicit private networks and use persistent named volumes.
 - Docker secrets or root-readable encrypted environment files provide database credentials, JWT signing material, storage credentials, and provider secrets. Plaintext secrets never enter Git or image layers.
 - GitHub Actions runs tests/scans and publishes immutable images to GitHub Container Registry (GHCR). A protected deployment pulls digest-pinned images, runs a one-shot migration service with the migration role, performs health checks, and switches/restarts services in a controlled order.
 - Encrypted PostgreSQL base/logical backups, WAL archives, and MinIO object backups leave the VPS for an independent S3-compatible backup provider. A backup stored only on the VPS is not a backup.
@@ -360,6 +375,8 @@ flowchart LR
         RP --> API[Django DRF API]
         API --> SQL[(PostgreSQL<br/>forced RLS)]
         API --> OBJ[(Private MinIO)]
+        API --> CLAM[Private ClamAV]
+        RP --> OBJ
         API --> OBS[Local structured logs<br/>bounded metrics]
     end
     GH[GitHub Actions] --> REG[GHCR]

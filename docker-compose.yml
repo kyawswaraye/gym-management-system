@@ -19,5 +19,72 @@ services:
       retries: 20
     restart: unless-stopped
 
+  minio:
+    # quay.io/minio/minio:RELEASE.2025-10-15T17-29-55Z is not anonymously
+    # pullable (401, empty pull action; latest fails the same way). Docker Hub
+    # no longer publishes minio/minio. This is the same digest-pinned third-party
+    # fork as the E2E file stack, not an official MinIO image.
+    image: docker.io/pgsty/silo:RELEASE.2026-10-15T00-00-00Z@sha256:aaac6bce13eb99316b3c88bd20143fc3c38ab607585256a411a095c44ee57f62
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-local-dev-only}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-dev-only-change}
+      MINIO_SERVER_URL: ${MINIO_PUBLIC_URL:-http://files.localhost:8088}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  minio-init:
+    # quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z returns the same anonymous
+    # 401. This pinned fork image provides mc.
+    image: docker.io/pgsty/silo:RELEASE.2026-10-15T00-00-00Z@sha256:aaac6bce13eb99316b3c88bd20143fc3c38ab607585256a411a095c44ee57f62
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-local-dev-only}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-dev-only-change}
+      MINIO_BUCKET: ${MINIO_BUCKET:-gym-private}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "local/$$MINIO_BUCKET"
+        mc anonymous set none "local/$$MINIO_BUCKET"
+    restart: "no"
+
+  clamav:
+    image: clamav/clamav:1.4
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    restart: unless-stopped
+
+  object-proxy:
+    image: caddy:2.10.2
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      OBJECT_PUBLIC_HOST: ${OBJECT_PUBLIC_HOST:-files.localhost}
+      OBJECT_CORS_ORIGIN: ${OBJECT_CORS_ORIGIN:-http://localhost:3000}
+    ports:
+      - "127.0.0.1:${OBJECT_PROXY_PORT:-8088}:80"
+    volumes:
+      - ./infra/caddy/Caddyfile.object:/etc/caddy/Caddyfile:ro
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  minio_data:
+  clamav_data:

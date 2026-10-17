@@ -1,4 +1,5 @@
 import { getCsrfToken, mutationHeaders } from "@/features/auth/client";
+import { isAllowedObjectUrl } from "@/lib/object-origin";
 import {
   buildTenantAuditListPath,
   redactTenantAuditValue,
@@ -12,6 +13,9 @@ import type {
   GymProfileUpdate,
   GymSettings,
   GymSettingsUpdate,
+  CompleteUploadRequest,
+  CompletedFile,
+  DownloadUrl,
   Member,
   MemberListPage,
   MemberListQuery,
@@ -36,6 +40,10 @@ import type {
   StaffUpdate,
   TenantAuditItem,
   TenantAuditMeta,
+  ProfilePhotoContentType,
+  ProfilePhotoDownload,
+  UploadIntentData,
+  UploadIntentRequest,
 } from "@/types/api";
 
 export class OperationError extends Error {
@@ -121,6 +129,310 @@ export async function operationMutation<T>(
   const responseBody: unknown = await response.json();
   if (!response.ok) throw readOperationError(responseBody);
   return (responseBody as ApiEnvelope<T>).data;
+}
+
+export const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+
+const PROFILE_PHOTO_TYPES = new Set<ProfilePhotoContentType>([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+const PHOTO_NAME_FALLBACK: Record<ProfilePhotoContentType, string> = {
+  "image/jpeg": "profile-photo.jpg",
+  "image/png": "profile-photo.png",
+  "image/webp": "profile-photo.webp",
+};
+
+export class FileTransferError extends OperationError {
+  readonly recoverableFileId: string | null;
+  readonly attachReady: boolean;
+
+  constructor(
+    message: string,
+    recoverableFileId: string | null = null,
+    attachReady = false,
+  ) {
+    super(message);
+    this.name = "FileTransferError";
+    this.recoverableFileId = recoverableFileId;
+    this.attachReady = attachReady;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isProfilePhotoContentType(
+  value: unknown,
+): value is ProfilePhotoContentType {
+  return (
+    typeof value === "string" &&
+    PROFILE_PHOTO_TYPES.has(value as ProfilePhotoContentType)
+  );
+}
+
+function profilePhotoContentType(file: File): ProfilePhotoContentType {
+  if (!isProfilePhotoContentType(file.type)) {
+    throw new OperationError("Choose a JPEG, PNG, or WebP image.");
+  }
+  return file.type;
+}
+
+function profilePhotoByteSize(file: File): number {
+  if (!Number.isInteger(file.size) || file.size < 1) {
+    throw new OperationError("Choose a photo that is not empty.");
+  }
+  if (file.size > PROFILE_PHOTO_MAX_BYTES) {
+    throw new OperationError("Choose a photo that is 5 MB or smaller.");
+  }
+  return file.size;
+}
+
+function originalPhotoName(
+  file: File,
+  contentType: ProfilePhotoContentType,
+): string {
+  const base = file.name.split(/[/\\]/).pop() ?? "";
+  const cleaned = base.replace(/[\u0000-\u001f\u007f]/g, "").trim();
+  if (!cleaned || cleaned.length > 255) return PHOTO_NAME_FALLBACK[contentType];
+  return cleaned;
+}
+
+async function sha256Hex(bytes: BufferSource): Promise<string> {
+  if (!globalThis.crypto?.subtle) {
+    throw new OperationError("Unable to upload the profile photo.");
+  }
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  let hex = "";
+  for (const byte of new Uint8Array(digest)) {
+    hex += byte.toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+type DirectUpload = {
+  fileId: string;
+  url: string;
+  fields: Array<[string, string]>;
+};
+
+function transferFailure(fileId: string | null = null): never {
+  throw new FileTransferError("Unable to upload the profile photo.", fileId);
+}
+
+function readDirectUpload(data: unknown, ownerId: string): DirectUpload {
+  if (!isRecord(data)) transferFailure();
+  const fileId =
+    typeof data.file_id === "string" ? data.file_id.toLowerCase() : "";
+  const recoverable = RESOURCE_ID.test(fileId) ? fileId : null;
+  const owner =
+    typeof data.owner_id === "string" ? data.owner_id.toLowerCase() : "";
+  if (
+    data.purpose !== "PROFILE_PHOTO" ||
+    data.owner_type !== "MEMBER" ||
+    owner !== ownerId ||
+    !recoverable
+  ) {
+    transferFailure(recoverable);
+  }
+  const upload = data.upload;
+  if (
+    !isRecord(upload) ||
+    upload.method !== "POST" ||
+    upload.file_field !== "file"
+  ) {
+    transferFailure(recoverable);
+  }
+  if (typeof upload.url !== "string" || !isAllowedObjectUrl(upload.url)) {
+    transferFailure(recoverable);
+  }
+  if (!isRecord(upload.fields)) transferFailure(recoverable);
+  const entries = Object.entries(upload.fields);
+  if (
+    entries.some(
+      ([key, fieldValue]) =>
+        key.length === 0 || key === "file" || typeof fieldValue !== "string",
+    )
+  ) {
+    transferFailure(recoverable);
+  }
+  const fields = entries as Array<[string, string]>;
+  if (fields.find(([key]) => key === "success_action_status")?.[1] !== "204") {
+    transferFailure(recoverable);
+  }
+  return { fileId: recoverable, url: upload.url, fields };
+}
+
+async function postProfileObject(
+  target: DirectUpload,
+  file: File,
+): Promise<void> {
+  const form = new FormData();
+  for (const [key, fieldValue] of target.fields) {
+    form.append(key, fieldValue);
+  }
+  form.append("file", file);
+  let response: Response;
+  try {
+    response = await fetch(target.url, {
+      method: "POST",
+      body: form,
+      credentials: "omit",
+      cache: "no-store",
+      redirect: "error",
+      mode: "cors",
+    });
+  } catch {
+    throw new FileTransferError(
+      "The file service is unavailable.",
+      target.fileId,
+    );
+  }
+  if (response.status !== 204) {
+    throw new FileTransferError(
+      "The file service did not accept the profile photo.",
+      target.fileId,
+    );
+  }
+}
+
+function readCompletedFile(
+  data: unknown,
+  ownerId: string,
+  fileId: string,
+): string {
+  if (!isRecord(data)) transferFailure(fileId);
+  const completedId =
+    typeof data.file_id === "string" ? data.file_id.toLowerCase() : "";
+  const owner =
+    typeof data.owner_id === "string" ? data.owner_id.toLowerCase() : "";
+  if (
+    completedId !== fileId ||
+    data.purpose !== "PROFILE_PHOTO" ||
+    data.owner_type !== "MEMBER" ||
+    owner !== ownerId ||
+    data.attachable !== true
+  ) {
+    transferFailure(fileId);
+  }
+  return fileId;
+}
+
+function withRecoverableFile(
+  caught: unknown,
+  fileId: string,
+  fallback: string,
+): FileTransferError {
+  if (caught instanceof FileTransferError) return caught;
+  const message =
+    caught instanceof OperationError && caught.message
+      ? caught.message
+      : fallback;
+  return new FileTransferError(message, fileId);
+}
+
+export async function uploadProfilePhoto(
+  memberId: string,
+  file: File,
+): Promise<{ fileId: string }> {
+  const ownerId = assertResourceId(memberId, "Member");
+  const contentType = profilePhotoContentType(file);
+  const byteSize = profilePhotoByteSize(file);
+  const bytes = Uint8Array.from(new Uint8Array(await file.arrayBuffer()));
+  if (bytes.byteLength !== byteSize) {
+    throw new OperationError("Choose a photo that is 5 MB or smaller.");
+  }
+  const sha256 = await sha256Hex(bytes);
+  const request: UploadIntentRequest = {
+    original_name: originalPhotoName(file, contentType),
+    content_type: contentType,
+    byte_size: byteSize,
+    sha256,
+    purpose: "PROFILE_PHOTO",
+    owner_type: "MEMBER",
+    owner_id: ownerId,
+  };
+  let intent: UploadIntentData;
+  try {
+    intent = await operationMutation<UploadIntentData>(
+      "files/upload-intents/",
+      request,
+    );
+  } catch (caught) {
+    if (caught instanceof OperationError) throw caught;
+    throw new OperationError("Unable to upload the profile photo.");
+  }
+  const target = readDirectUpload(intent, ownerId);
+  try {
+    await postProfileObject(target, file);
+  } catch (caught) {
+    throw withRecoverableFile(
+      caught,
+      target.fileId,
+      "The file service is unavailable.",
+    );
+  }
+  let completed: CompletedFile;
+  try {
+    const confirmation: CompleteUploadRequest = {
+      sha256,
+      byte_size: byteSize,
+    };
+    completed = await operationMutation<CompletedFile>(
+      `files/${target.fileId}/complete/`,
+      confirmation,
+    );
+  } catch (caught) {
+    throw withRecoverableFile(
+      caught,
+      target.fileId,
+      "Unable to upload the profile photo.",
+    );
+  }
+  return { fileId: readCompletedFile(completed, ownerId, target.fileId) };
+}
+
+function readProfilePhotoDownload(data: unknown): ProfilePhotoDownload {
+  if (
+    !isRecord(data) ||
+    data.method !== "GET" ||
+    typeof data.url !== "string" ||
+    !isProfilePhotoContentType(data.content_type) ||
+    !isAllowedObjectUrl(data.url)
+  ) {
+    throw new OperationError("Unable to load the profile photo.");
+  }
+  return { url: data.url, contentType: data.content_type };
+}
+
+export async function getFileDownloadUrl(
+  fileId: string,
+): Promise<ProfilePhotoDownload> {
+  const id = assertResourceId(fileId, "File");
+  const data = await operationGet<DownloadUrl>(`files/${id}/download-url/`);
+  return readProfilePhotoDownload(data);
+}
+
+export async function deleteFileAsset(fileId: string): Promise<void> {
+  const id = assertResourceId(fileId, "File");
+  const csrf = await getCsrfToken();
+  const response = await fetch(`/api/operations/files/${id}/`, {
+    method: "DELETE",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { "X-CSRF-Token": csrf },
+  });
+  if (response.ok) return;
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+  throw readOperationError(body);
 }
 
 export function getGymProfile(): Promise<GymProfile> {

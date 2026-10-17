@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { MemberDetail } from "@/features/operations/member-detail";
-import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
+import {
+  hasTenantCapability,
+  memberPhotoAccess,
+  tenantHomePath,
+} from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
 
 export default async function MemberDetailPage({
@@ -14,6 +18,7 @@ export default async function MemberDetailPage({
     redirect(tenantHomePath(session));
   }
   const { id } = await params;
+  const photo = memberPhotoAccess(session);
   return (
     <section aria-labelledby="member-title">
       <h1 className="mb-6 text-2xl font-bold" id="member-title">
@@ -21,12 +26,15 @@ export default async function MemberDetailPage({
       </h1>
       <MemberDetail
         canArchive={session.permissions.includes("members.archive")}
+        canDeletePhoto={photo.canDelete}
         canUpdate={session.permissions.includes("members.update")}
+        canUploadPhoto={photo.canUpload}
         canViewPayments={hasTenantCapability(
           session,
           "payments.view",
           "finance",
         )}
+        canViewPhoto={photo.canView}
         memberId={id}
       />
     </section>

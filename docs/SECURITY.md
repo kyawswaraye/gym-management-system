@@ -313,7 +313,7 @@ A gym may have multiple active Owners with equal Owner login authority. Adding a
 
 ### Object restrictions and entitlements
 
-- A TRAINER with a conditional member, membership, check-in, PT, or file permission can access only members currently assigned to that trainer and records belonging to those assignments. A trainer may update only explicitly trainer-editable fields.
+- Until Phase 5 assignments exist, trainer-only member and file mutation and read are denied. A staff membership whose only active role is TRAINER is not an assigned trainer, and the profile-photo routes return `404` for that caller. Phase 5 will limit a TRAINER with a conditional member, membership, check-in, PT, or file permission to members currently assigned to that trainer and to records belonging to those assignments. A trainer may update only explicitly trainer-editable fields.
 - `pt.commissions.view` gives a TRAINER access only to that trainer's own commission records; it never permits viewing another trainer's rates, commissions, or payroll. `pt.commissions.pay` is always denied to TRAINER.
 - A RECEPTIONIST's conditional salary scope permits only draft preparation/submission and the minimum staff identity needed to select a payee. Salary approval, posted salary history, aggregate salary reporting, and other creators' salary drafts are denied.
 - A RECEPTIONIST's cash-session condition is exactly `CashSession.opened_by_membership_id = current GymMembership.id` after normal same-gym Django scope and forced RLS. It does not widen access based on role name, register code, shift, creator, or user identity shared across memberships. Close totals are always server-derived under lock, and a closed session cannot be changed or reopened.
@@ -361,28 +361,46 @@ Authorization state is authoritative in PostgreSQL. Tokens carry an `authz_versi
 
 ## 9. File security
 
-MinIO object storage is private, uses explicit S3-compatible bucket policies, and is reachable only through the internal Docker network and authorized presigned-URL path.
+MinIO is private S3-compatible object storage. Its bucket policy denies anonymous reads, writes, and listing, and objects have no public ACL. Its container publishes no host port. Caddy is the only public ingress and reverse-proxies the configured public object origin to MinIO on the Docker network, preserving the public `Host`. That proxy forwards `OPTIONS`, presigned `POST`, and presigned `GET` for the object origin.
+
+Phase 2 file HTTP behavior is implemented as specified in `API.md`. The only Phase 2 purpose is `PROFILE_PHOTO` for an existing same-gym member. The browser upload is a presigned POST whose policy binds the exact key, the exact declared content type (`image/jpeg`, `image/png`, or `image/webp`), `content-length-range` 1 through 5,242,880 bytes, and the exact `x-amz-algorithm`, `x-amz-credential`, and `x-amz-date` values returned in the form. `file`, `policy`, and `x-amz-signature` are the POST exemptions and are not conditions. The policy expires 300 seconds after intent. A presigned GET expires 60 seconds after issue. Server-side reads, the sanitized overwrite, and object deletion use the internal endpoint and server credentials.
+
+The public object origin allows cross-origin `POST` and `GET` only from the configured staff web origins. `Access-Control-Allow-Origin` echoes one allowlisted origin, `Vary` includes `Origin`, and credentialed CORS is not enabled. The browser does not send cookies or `Authorization` to that origin.
 
 Upload controls:
 
-- create a tenant-scoped upload intent after permission checks;
-- use random object identifiers;
-- restrict signed URL expiry, method, maximum size, and expected content type;
-- verify actual size, checksum, and detected content type;
-- quarantine and malware-scan untrusted content before use;
-- strip sensitive image metadata where required;
-- disallow executable/active content unless a business case and safe delivery path exist.
+- create a tenant-scoped `PENDING` / `QUARANTINED` intent only after `files.upload`, `members.update`, object scope, and the `members` entitlement;
+- use a random object key `{gym_id}/{random_uuid}`; the gym prefix is organization, not authorization;
+- keep the asset quarantined until ClamAV accepts both the original object and the canonical re-encode, and a safe decode succeeds inside the 20,000,000-pixel ceiling;
+- claim `SCANNING` with `scan_attempt_id` and `scan_started_at` in a short transaction, commit, and release the row locks before any MinIO, ClamAV, decode, or re-encode call; a claim younger than 120 seconds returns `409 FILE_SCAN_IN_PROGRESS` with `Retry-After` of 1 through 120 seconds;
+- finalize `CLEAN`, `ERROR`, or `REJECTED` only when that same attempt token still matches and retention is still `QUARANTINED`; delete clears the attempt so a late worker cannot mark the asset clean, and a canonical object that worker already wrote is removed when the row is `DELETE_PENDING` or `DELETED` with no scan claim; a failed removal sets `DELETE_PENDING` with `deleted_at` null so retention retries, a successful removal finishes `DELETED`, and a current or newer claim is left in place without reviving scan state or detaching a newer photo;
+- reject infected, malformed, mismatched, empty, oversize, and checksum-mismatched objects; strip metadata by re-encoding before `CLEAN` / `ACTIVE`;
+- allow attachment and download only for `CLEAN` and `ACTIVE`;
+- map same-gym owner mismatch and cross-tenant ids to `404`.
 
-Download controls:
+Download and delete controls:
 
-- look up RLS-protected file metadata;
-- verify tenant, actor permission, and relationship to the domain record;
-- issue a short-lived URL with safe `Content-Disposition`;
-- audit sensitive downloads and exports.
+- resolve RLS-protected metadata and the owning member before issuing a URL or changing retention;
+- require `files.view` plus `members.view` for a download URL, and `files.delete` plus `members.update` for delete;
+- sign a GET for this sanitized profile image only, with `inline; filename="profile-photo.jpg"` (`.png` or `.webp` for those types), the sanitized content type, and `private, no-store`; the filename is fixed and this inline disposition is not a general document mode;
+- verify integrity with a server-credential `HEAD` before signing: `Content-Length` and the server-written `x-amz-meta-gms-sha256`, `x-amz-meta-gms-content-type`, and `x-amz-meta-gms-byte-size` headers must match the sanitized database values; a successful HEAD whose `Content-Length` is missing, non-integer, negative, or otherwise invalid is `409 FILE_INTEGRITY_FAILED`; a network or provider failure stays `503 FILE_STORE_FAILED`; ignore `Content-Type`, `ETag`, and every metadata header the original browser POST could have written;
+- treat delete as retention metadata plus object removal, never as a database row delete; clear `scan_attempt_id` and `scan_started_at` before the object delete so a late worker cannot resurrect the asset; deleting an older asset does not clear a different `profile_photo_asset_id`;
+- `expire_profile_photo_uploads` also claims `PROFILE_PHOTO` rows that are `CLEAN` and `ACTIVE`, at least 24 hours old, and not referenced by any same-gym `Member.profile_photo_asset_id`. It rechecks those conditions under the owning-member lock and the asset lock, sets `DELETE_PENDING` before the object delete, leaves `DELETE_PENDING` when that delete fails, and sets `DELETED` only after the object is gone. It never deletes a photo that is attached when the lock is taken.
 
-An object key containing a gym prefix is organization, not authorization.
+ClamAV runs as a private container with no published host port. The API reaches it only on the Docker network. A scanner timeout or connection failure is retryable `ERROR`. An infected result is terminal `REJECTED`. Production MinIO-compatible storage and ClamAV credentials and endpoints are environment-provided and are absent from the repository, images, and logs. Local and end-to-end Compose use digest-pinned `docker.io/pgsty/silo` for the S3-compatible API. That image is a third-party MinIO fork, not official MinIO. Official MinIO images are not anonymously distributable, so production object-storage image and provider approval remains an unresolved deployment gate. End-to-end profile-photo upload through the fork is interoperability evidence only. Local Compose may set non-production placeholders; those values are not production secrets:
 
-The Phase 1B foundation stores that metadata in forced-RLS `FileAsset` and grants the runtime role select, insert, and update only. Direct runtime delete is denied. Signed URL issuance, object-storage credentials, malware scanning, and file HTTP routes are deferred.
+- `MINIO_ENDPOINT_URL` is the internal URL the API uses for read, overwrite, and delete.
+- `MINIO_PUBLIC_URL` is the browser-facing HTTPS origin. Presigned POST and GET are signed for this host.
+- `MINIO_SERVER_URL` is MinIO's own public-origin setting and equals `MINIO_PUBLIC_URL`.
+- `MINIO_BUCKET` and `MINIO_REGION` select the private bucket and SigV4 region.
+- `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY` are the signing secrets.
+- `CLAMAV_HOST`, `CLAMAV_PORT`, and `CLAMAV_TIMEOUT_SECONDS` (15) configure the scanner.
+
+Logs, audit payloads, and error bodies may include the file id, gym id, purpose, owner id, content type, byte size, checksum, and stable rejection code. They must not include object bytes, the presigned URL, POST fields, the signature, the scan attempt id, or either MinIO key. Audit rows are written in the same short transaction as the metadata change they record: `FILE_UPLOAD_INTENT`, `FILE_UPLOAD_COMPLETED`, `FILE_UPLOAD_REJECTED`, `FILE_UPLOAD_ERROR`, `FILE_DOWNLOAD_URL_ISSUED`, and `FILE_DELETE_REQUESTED`. None of those transactions stays open across a MinIO call, a ClamAV scan, or image decode. If that audit insert fails, the metadata transaction rolls back and no URL is returned.
+
+The Phase 1B foundation stores `FileAsset` under forced RLS and grants the runtime role select, insert, and update only. Direct runtime delete remains denied. The Phase 2 profile-photo routes and ClamAV scanner are implemented. Production storage credentials, ClamAV deployment, and object-storage image approval remain gated. The local image is `docker.io/pgsty/silo`, not official MinIO.
+
+Membership rate limits are 10 upload intents per 300 seconds, 20 completes per 300 seconds, 60 download URLs per 60 seconds, and 10 deletes per 300 seconds. The HTTP status is `429 RATE_LIMITED`.
 
 ## 10. Financial security
 
@@ -439,7 +457,7 @@ Separate throttles cover:
 - login, refresh, password reset, MFA, gym-selection-ticket issue, and gym selection;
 - ordinary authenticated reads;
 - mutations;
-- file upload/download URL generation;
+- file upload intents, complete retries, download URL generation, and deletes, at the Phase 2 profile-photo limits in section 9;
 - searches and report queries;
 - exports and platform administration.
 
@@ -485,7 +503,7 @@ For every tenant resource and HTTP action:
 - Receptionist cannot access owner financial reports by default.
 - Receptionist can submit only authorized front-desk finance drafts, cannot approve any finance record, and cannot view salary records outside the restricted own-draft scope.
 - Manager approval fails for a record created or submitted by that same manager membership, including concurrent role or actor changes.
-- Trainer sees only assigned members, assignment-related files, and the trainer's own private commission.
+- Phase 5 trainer access is assignment-scoped: a trainer sees only assigned members, assignment-related files, and the trainer's own private commission. Until those assignments exist, trainer-only member and file mutation and read are denied.
 - Member self endpoints require both the authenticated gym and authenticated member; changing either path/body identifier fails.
 - Member/trainer QR scan tests cover expired/replayed challenges, static-token rejection, Gym A challenge with Gym B principal, principal substitution, concurrent scans, duplicate windows, and no PII or permanent secret in the QR payload.
 - PT/class tests cover cross-gym trainer/member/package/occurrence IDs, schedule overlap, capacity races, duplicate attendance, no-show policy, session-ledger correction, and concurrent last-session consumption.
@@ -517,8 +535,8 @@ For every tenant resource and HTTP action:
 
 ### Files and finance
 
-- Cross-gym, unassigned-trainer, and non-self-member file metadata, upload intent, download, delete, and signed URL requests are denied without object existence disclosure.
-- URL expiry/replay expectations, method binding, filename disposition, checksum, content-type mismatch, oversize, malware quarantine, and active-content delivery are tested.
+- Cross-gym and non-self-member file metadata, upload intent, download, delete, and presigned POST or GET requests are denied without object existence disclosure. Until Phase 5 assignments exist, trainer-only member and file mutation and read are denied: upload intent, complete, and download-url return `404` for a trainer-only caller, and an assigned trainer is not allowed. Same-gym owner mismatch is `404`. Missing `files.upload`, `files.view`, `files.delete`, `members.update`, or `members.view` is `403`.
+- Tests cover the 300-second POST policy and 60-second GET, exact content type and `content-length-range`, declared versus sanitized checksums, type and size mismatch, the 5,242,880-byte and 20,000,000-pixel ceilings, decompression bombs, malformed and infected objects, quarantine until both scans and the canonical re-encode succeed, a committed `SCANNING` claim before any MinIO or ClamAV call, `409 FILE_SCAN_IN_PROGRESS` with `Retry-After` while a claim is younger than 120 seconds, stale reclaim, finalize that requires the same `scan_attempt_id` and `QUARANTINED` retention, a late worker discarding its result after delete or reclaim, a canonical PUT that races a committed delete and is removed, a failed removal that the retention command retries to `DELETED`, and a current or newer claim that is not deleted, crash recovery after a canonical overwrite and before finalize for a claim the worker still owns, `HEAD` integrity using the three server-written metadata headers, delete that clears the attempt and retains the database row, an inline profile-photo content disposition, and retention that removes an unattached clean profile photo older than 24 hours while leaving an attached photo in place.
 - Exact decimal rounding, commission split, membership expiry, expected cash, and immutable-posting rules are tested.
 - Reception cash tests allow view/operation/reconcile/close for the current membership's own-opened session; deny another Reception membership's session and every cross-gym session; deny every finance approval/posting and manual adjustment; verify close totals are calculated by the server under lock; and verify closed sessions and their transactions remain immutable.
 - Duplicate and concurrent payment, expense, PT-sale, and salary submit/approve/reject commands, callbacks, voids, refunds, cashbook open/reconcile/adjust, commission pay, and receipt allocation produce one valid financial result.
@@ -538,7 +556,7 @@ Phase 0 is design and documentation only. This document defines required behavio
 
 Phase 1A is foundation only and does not implement members, check-in, finance, PT, reports, or mobile features. Its approved pins are Python 3.14.7, Django 5.2.17 LTS, Django REST Framework 3.18.0, Node.js 24.20.0 LTS, Next.js 16.4.1 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. Next.js 16.4.1 is an approved security compatibility update for the critical October 2026 Next.js advisories. `docs/DEVELOPMENT_PLAN.md` remains the immutable historical baseline and still records Next.js 16.3.3. Compatibility must be proven by the real PostgreSQL security suite, Django/DRF checks, and Next.js/TypeScript build tests.
 
-Phase 1B closed its gate on 2026-10-17 under the local CI-equivalent evidence in `DEVELOPMENT_PLAN.md`. Published OpenAPI includes the Phase 1B administration, staff, role, settings, and audit routes, plus MembershipPlan and Member list, create, detail, update, and archive, Membership sale, lifecycle, and expiry routes, the member summary, and nested member payment history. Membership-expiry scheduling and delivery commands are implemented. Nested check-in history, notification HTTP routes, and general payment and receipt endpoints remain unpublished. Phase 2 is not complete. Production expiry delivery remains gated on an idempotency-capable transactional provider. `memberships.create` authorizes a discount from zero through the plan list price.
+Phase 1B closed its gate on 2026-10-17 under the local CI-equivalent evidence in `DEVELOPMENT_PLAN.md`. Published OpenAPI includes the Phase 1B administration, staff, role, settings, and audit routes, plus MembershipPlan and Member list, create, detail, update, and archive, Membership sale, lifecycle, and expiry routes, the member summary, and nested member payment history. Membership-expiry scheduling and delivery commands are implemented. Nested check-in history, notification HTTP routes, and general payment and receipt endpoints remain unpublished. Phase 2 implementation is complete. Production expiry delivery remains gated on an idempotency-capable transactional provider. Production object-storage image and provider approval remains unresolved. The local `docker.io/pgsty/silo` image is a third-party fork, not official MinIO. `memberships.create` authorizes a discount from zero through the plan list price.
 
 Web lint does not load `@next/eslint-plugin-next`. Releases 16.4.1 and 16.4.2 of that plugin still depend on `fast-glob@3.3.1`, which resolves unfixed high-severity `braces@3.0.3`; npm publishes no later `braces` 3.x release. The independent fork `eslint-plugin-nextjs@1.1.4` depends on `fast-glob@3.3.3` and the same `braces@3.0.3` chain, so it cannot restore the Next.js rules without reintroducing the finding. Older Next-oriented plugins are unmaintained and are not equivalent replacements. ESLint still enforces core JavaScript rules, React Hooks recommended rules, Babel/TypeScript parsing, `no-debugger`, `no-var`, and `prefer-const`. Framework behavior stays gated by strict TypeScript, the Next.js production build, Vitest, and Playwright E2E. The high-severity dependency audit, including development dependencies, is not waived.
 

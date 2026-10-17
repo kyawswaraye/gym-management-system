@@ -31,6 +31,14 @@ const ALLOWED_PATHS = new Set([
 
 const MEMBER_PAYMENT_HISTORY_PATH =
   /^\/api\/v1\/members\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/payments\/$/;
+const FILE_UPLOAD_INTENT_PATH = "/api/v1/files/upload-intents/";
+const FILE_UPLOAD_INTENT_PATTERN = /^\/api\/v1\/files\/upload-intents\/$/;
+const FILE_ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const FILE_COMPLETE_PATH = new RegExp(`^/api/v1/files/${FILE_ID}/complete/$`);
+const FILE_DOWNLOAD_PATH = new RegExp(
+  `^/api/v1/files/${FILE_ID}/download-url/$`,
+);
+const FILE_DELETE_PATH = new RegExp(`^/api/v1/files/${FILE_ID}/$`);
 
 const ALLOWED_TENANT_PATHS = [
   /^\/api\/v1\/gym\/$/,
@@ -56,6 +64,10 @@ const ALLOWED_TENANT_PATHS = [
   /^\/api\/v1\/payments\/(?:[0-9a-f-]+\/(?:submit|approve|reject|cancel|void|refund)\/)?$/,
   /^\/api\/v1\/dashboard\/$/,
   /^\/api\/v1\/audit-logs\/$/,
+  FILE_UPLOAD_INTENT_PATTERN,
+  FILE_COMPLETE_PATH,
+  FILE_DOWNLOAD_PATH,
+  FILE_DELETE_PATH,
 ];
 
 const PLATFORM_DASHBOARD_PATH = /^\/api\/v1\/admin\/dashboard\/$/;
@@ -492,6 +504,18 @@ function allowsForwardedQuery(
   if (pathname === MEMBERSHIP_EXPIRY_PATH) {
     return allowsGetOnlyQuery(method, search, allowsMembershipExpiryQuery);
   }
+  if (
+    pathname === FILE_UPLOAD_INTENT_PATH ||
+    FILE_COMPLETE_PATH.test(pathname)
+  ) {
+    return method === "POST" && search.length === 0;
+  }
+  if (FILE_DOWNLOAD_PATH.test(pathname)) {
+    return method === "GET" && search.length === 0;
+  }
+  if (FILE_DELETE_PATH.test(pathname)) {
+    return method === "DELETE" && search.length === 0;
+  }
   return allowsExactPlatformQuery(pathname, search);
 }
 
@@ -886,9 +910,18 @@ export async function authenticatedGet(
 export async function authenticatedMutation(
   request: NextRequest,
   path: string,
-  method: "POST" | "PATCH" | "PUT" = "POST",
+  method: "POST" | "PATCH" | "PUT" | "DELETE" = "POST",
 ): Promise<NextResponse> {
-  const body = await parseRequestBody(request);
+  if (method === "DELETE") {
+    const text = await request.text();
+    if (text.trim().length > 0) {
+      return responseFromUpstream(400, {
+        success: false,
+        error: { code: "INVALID_REQUEST", message: "Invalid request body." },
+      });
+    }
+  }
+  const body = method === "DELETE" ? {} : await parseRequestBody(request);
   if (body === null) {
     return responseFromUpstream(400, {
       success: false,
@@ -926,10 +959,12 @@ export async function authenticatedMutation(
         method,
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
+          ...(method === "DELETE"
+            ? {}
+            : { "Content-Type": "application/json" }),
           ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
         },
-        body: JSON.stringify(body),
+        ...(method === "DELETE" ? {} : { body: JSON.stringify(body) }),
       });
     const upstream = await perform(access);
     const upstreamBody = await parseJson(upstream);

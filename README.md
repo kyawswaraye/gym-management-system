@@ -7,19 +7,28 @@ prerequisites) are complete. The Phase 1B gate closed on 2026-10-17 on the
 local CI-equivalent evidence in [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md).
 CI still enforces those check classes on push and pull request.
 
-Phase 2 prerequisites are approved as the member, membership, expiry, file,
-and dashboard policies already specified in the canonical contracts. Phase 2
-publishes the MembershipPlan and Member list, create, detail, update, and
-archive APIs, the Membership sale, lifecycle, and expiry API, and the member
-summary API. Membership-expiry scheduling and delivery commands are
-implemented. Nested member payment history is published. The member and
-membership browser workspaces follow those cursor pages, and the membership
-workspace can browse one expiry bucket at a time. Nested check-in
-history, notification HTTP routes, general payment and receipt endpoints, and
-private member files remain unpublished. Phase 2 is not
-complete. Production expiry delivery remains gated on an approved
-transactional provider that honors the idempotency header. Earlier persistence
-for those areas stays outside the closed Phase 1B gate.
+Phase 2 implementation is complete as of 2026-10-17. Staff can manage
+members, membership plans, and memberships inside one gym, including the full
+member profile, private profile photos, the member summary, nested payment
+history, expiry buckets, and membership-expiry scheduling and delivery
+commands. `docs/DEVELOPMENT_PLAN.md` remains the immutable phase specification
+and was not edited for this closure. Nested check-in history stays unpublished
+for Phase 3. Notification HTTP routes and general payment and receipt
+endpoints stay unpublished for later phases. `is_pt_client` stays false until
+Phase 5 derives it from an active trainer assignment.
+
+Production deployment is not complete. These gates remain open:
+
+- an approved transactional email provider that honors `X-Idempotency-Key`,
+  before invitation, password-recovery, or membership-expiry delivery is
+  production-ready;
+- production object-storage image and provider approval. Official MinIO images
+  are not anonymously distributable. Local and end-to-end Compose use the
+  digest-pinned third-party image `docker.io/pgsty/silo`, a MinIO-compatible
+  fork. That image is not official MinIO, and the end-to-end profile-photo
+  journey is interoperability evidence only;
+- production object-storage and ClamAV credentials and deployment. Those values
+  are not in the repository.
 
 - Django REST Framework API for the published foundation and Phase 1B contracts;
 - staff authentication, TOTP MFA, and rotating sessions;
@@ -31,12 +40,12 @@ for those areas stays outside the closed Phase 1B gate.
   and audit reads;
 - automated security and contract checks.
 
-The target product additionally includes membership management, attendance and
-unattended onsite QR check-in, trainer/PT and classes with remaining sessions,
-product inventory and retail sales, reports, announcements/reminders, and a
-member mobile application. These remain incomplete until their
-`docs/DEVELOPMENT_PLAN.md` phase exit criteria pass. Documentation describes
-the approved target contract, not proof that a feature exists at runtime.
+The target product additionally includes attendance and unattended onsite QR
+check-in, trainer/PT and classes with remaining sessions, product inventory
+and retail sales, reports, announcements/reminders, and a member mobile
+application. These remain incomplete until their `docs/DEVELOPMENT_PLAN.md`
+phase exit criteria pass. Documentation describes the approved target
+contract, not proof that a later phase exists at runtime.
 
 ## Approved runtimes
 
@@ -80,18 +89,24 @@ development. Browser JavaScript never receives authentication tokens.
 
 ## Browser smoke tests
 
-`make e2e` runs two Playwright Chromium journeys against the real Next.js pages,
-the same-origin BFF, and the Django API on PostgreSQL. It uses only the
-disposable `gym_platform_e2e` database. Unit tests do not install or launch a
-browser.
+`make e2e` runs the Playwright Chromium journeys against the real Next.js pages,
+the same-origin BFF, and the Django API on PostgreSQL. The Phase 2 journey also
+uploads a profile photo through live MinIO, ClamAV, and the Caddy object proxy.
+It uses only the disposable `gym_platform_e2e` database. Unit tests do not
+install or launch a browser.
 
-Prerequisites are the local PostgreSQL roles from `make db-up`, Python 3.14.7,
-Node.js 24.20.0, and `npm --prefix web ci`. The script installs Chromium through
-Playwright, builds the web app, migrates as `gym_migration`, seeds MFA-backed
-E2E identities, and serves Django as `gym_runtime` on `127.0.0.1:8010`. Next.js
-listens on `localhost:3010`. Login still requires the BFF secret, password, and
-a real TOTP code. Placeholder passwords and TOTP secrets live in `scripts/e2e-env.sh`
+Prerequisites are the local PostgreSQL roles from `make db-up`, Docker with
+Compose v2, Python 3.14.7, Node.js 24.20.0, and `npm --prefix web ci`. The
+script installs Chromium through Playwright, starts a separate `gym-e2e-files`
+compose project for MinIO, ClamAV, and the object proxy, builds the web app,
+migrates as `gym_migration`, seeds MFA-backed E2E identities, and serves Django
+as `gym_runtime` on `127.0.0.1:8010`. Next.js listens on `localhost:3010`.
+Login still requires the BFF secret, password, and a real TOTP code. Placeholder
+passwords, TOTP secrets, and the local MinIO password live in `scripts/e2e-env.sh`
 and can be overridden with `E2E_*` variables; they are not production secrets.
+The file-service containers are removed when the command exits. Their volumes
+stay so ClamAV does not download signatures again, and the application Postgres
+volume is not touched.
 Migrations run as `gym_migration` with ordinary `manage.py migrate`. After
 migrate, only `gym_platform_e2e` grants `gym_runtime` `SELECT` on
 `django_migrations` so Django's runserver migration check can read that table.
@@ -117,16 +132,17 @@ committed at `web/src/types/api.generated.ts`. Run `make openapi-check` with
 the approved Python and Node versions to regenerate both artifacts and fail on
 contract drift.
 
-MembershipPlan and Member list, create, detail, update, and archive are
-published. Membership list, create, detail, note update, cancel, suspend,
-resume, and expiry buckets are published. The member summary is published.
+Phase 2 routes are published: MembershipPlan and Member list, create, detail,
+update, and archive; Membership list, create, detail, note update, cancel,
+suspend, resume, and expiry buckets; the member summary; nested member payment
+history; and profile-photo upload, complete, download-url, and delete.
 Membership-expiry scheduling and delivery commands are implemented. Nested
-member payment history is published. Nested check-in history, notification HTTP
-routes, and general payment and receipt endpoints remain unpublished.
-Production expiry delivery remains gated
-on an idempotency-capable transactional provider.
-Check-in, finance, PT, reports, and
-mobile routes stay excluded until their own phases.
+check-in history, notification HTTP routes, and general payment and receipt
+endpoints remain unpublished. Production expiry delivery remains gated on an
+idempotency-capable transactional provider. Production object-storage image
+approval remains gated: Compose uses digest-pinned `docker.io/pgsty/silo`, a
+third-party MinIO-compatible fork, not official MinIO. Check-in, finance, PT,
+reports, and mobile routes stay excluded until their own phases.
 
 ## Documentation
 

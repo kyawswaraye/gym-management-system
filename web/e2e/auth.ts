@@ -43,25 +43,66 @@ const STORAGE_MARKERS = [
   "gym_selection",
 ];
 
-export function watchJsonResponses(page: Page): () => Promise<void> {
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function responsePath(url: string): string {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url;
+  }
+}
+
+function responseBody(response: {
+  text: () => Promise<string>;
+}): Promise<string> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(""), 5_000);
+    void response.text().then(
+      (body) => {
+        clearTimeout(timer);
+        resolve(body);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve("");
+      },
+    );
+  });
+}
+
+export function watchJsonResponses(
+  page: Page,
+  forbidden: readonly string[] = [],
+): () => Promise<void> {
   const pending: Promise<void>[] = [];
   const leaks: string[] = [];
+  const serverErrors: string[] = [];
+  const needles = forbidden
+    .map((secret) => secret.trim().toLowerCase())
+    .filter((secret) => secret.length >= 8);
   page.on("response", (response) => {
+    const method = response.request().method();
+    const pathname = responsePath(response.url());
+    if (response.status() >= 500 && MUTATING_METHODS.has(method)) {
+      serverErrors.push(`${method} ${pathname} ${response.status()}`);
+    }
     const contentType = response.headers()["content-type"] ?? "";
     if (!contentType.includes("json")) return;
     pending.push(
-      response.text().then(
-        (body) => {
-          if (SECRET_RESPONSE.test(body)) {
-            leaks.push(new URL(response.url()).pathname);
-          }
-        },
-        () => undefined,
-      ),
+      responseBody(response).then((body) => {
+        if (!body) return;
+        if (SECRET_RESPONSE.test(body)) leaks.push(pathname);
+        const lowered = body.toLowerCase();
+        if (needles.some((needle) => lowered.includes(needle))) {
+          leaks.push(pathname);
+        }
+      }),
     );
   });
   return async () => {
     await Promise.all(pending);
+    expect(serverErrors).toEqual([]);
     expect(leaks).toEqual([]);
   };
 }

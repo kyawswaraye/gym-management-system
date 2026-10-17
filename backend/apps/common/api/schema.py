@@ -62,6 +62,10 @@ def phase_1a_endpoints(endpoints: list[Endpoint]) -> list[Endpoint]:
             "/api/v1/roles/{id}/",
             "/api/v1/roles/{id}/archive/",
             "/api/v1/roles/{id}/permissions/",
+            "/api/v1/files/upload-intents/",
+            "/api/v1/files/{id}/complete/",
+            "/api/v1/files/{id}/download-url/",
+            "/api/v1/files/{id}/",
         }
     ]
 
@@ -69,6 +73,18 @@ def phase_1a_endpoints(endpoints: list[Endpoint]) -> list[Endpoint]:
 class StaffJWTAuthenticationScheme(OpenApiAuthenticationExtension):
     target_class = "apps.users.authentication.StaffJWTAuthentication"
     name = "staffBearerAuth"
+
+    def get_security_definition(self, auto_schema: AutoSchema) -> dict[str, str]:
+        return {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+
+
+class StaffFileAuthenticationScheme(OpenApiAuthenticationExtension):
+    target_class = "apps.files.authentication.StaffFileAuthentication"
+    name = "staffFileBearerAuth"
 
     def get_security_definition(self, auto_schema: AutoSchema) -> dict[str, str]:
         return {

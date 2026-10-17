@@ -93,6 +93,7 @@ def _settings(gym: Gym) -> GymSettings:
 
 
 def _asset(gym: Gym, membership_id: object, **overrides: object) -> FileAsset:
+    owner_id = overrides.pop("owner_id", uuid4())
     values: dict[str, object] = {
         "gym": gym,
         "object_key": f"{gym.id}/{uuid4()}",
@@ -100,12 +101,25 @@ def _asset(gym: Gym, membership_id: object, **overrides: object) -> FileAsset:
         "content_type": "image/jpeg",
         "byte_size": 128,
         "sha256": "ab" * 32,
+        "upload_content_type": "image/jpeg",
+        "upload_byte_size": 128,
+        "upload_sha256": "ab" * 32,
         "purpose": "PROFILE_PHOTO",
+        "owner_type": "MEMBER",
+        "owner_id": owner_id,
         "scan_status": FileAsset.ScanStatus.CLEAN,
         "retention_status": FileAsset.RetentionStatus.ACTIVE,
         "uploaded_by_membership_id": membership_id,
     }
     values.update(overrides)
+    if values.get("scan_status") != FileAsset.ScanStatus.CLEAN and (
+        "retention_status" not in overrides
+    ):
+        values["retention_status"] = FileAsset.RetentionStatus.QUARANTINED
+    if values.get("scan_status") == FileAsset.ScanStatus.REJECTED and (
+        "rejection_code" not in values
+    ):
+        values["rejection_code"] = "FILE_TYPE_MISMATCH"
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         return FileAsset.objects.create(**values)
@@ -387,35 +401,61 @@ def test_member_profile_photo_must_be_same_gym_and_clean() -> None:
     owner_b = GymMembership.objects.get(id=gym_b_payload["owner"]["gym_membership"]["id"])
     headers = auth_headers(staff_token(owner_a))
     api = _client()
-    clean = _asset(gym_a, owner_a.id)
-    pending = _asset(gym_a, owner_a.id, scan_status=FileAsset.ScanStatus.PENDING)
-    quarantined = _asset(gym_a, owner_a.id, retention_status=FileAsset.RetentionStatus.QUARANTINED)
+    created = api.post("/api/v1/members/", _body(), format="json", **headers)
+    assert created.status_code == 201, created.json()
+    member_id = created.json()["data"]["id"]
+    assert created.json()["data"]["profile_photo_asset_id"] is None
+    too_early = api.post(
+        "/api/v1/members/",
+        _body(profile_photo_asset_id=str(uuid4())),
+        format="json",
+        **headers,
+    )
+    assert too_early.status_code == 400, too_early.json()
+    assert too_early.json()["error"]["fields"]["profile_photo_asset_id"] == [
+        "Create the member before attaching a profile photo."
+    ]
+    clean = _asset(gym_a, owner_a.id, owner_id=member_id)
+    pending = _asset(
+        gym_a, owner_a.id, owner_id=member_id, scan_status=FileAsset.ScanStatus.PENDING
+    )
+    quarantined = _asset(
+        gym_a,
+        owner_a.id,
+        owner_id=member_id,
+        retention_status=FileAsset.RetentionStatus.QUARANTINED,
+    )
     deleted = _asset(
         gym_a,
         owner_a.id,
+        owner_id=member_id,
         retention_status=FileAsset.RetentionStatus.DELETED,
         deleted_at=timezone.now(),
     )
     pending_delete = _asset(
-        gym_a, owner_a.id, retention_status=FileAsset.RetentionStatus.DELETE_PENDING
+        gym_a,
+        owner_a.id,
+        owner_id=member_id,
+        retention_status=FileAsset.RetentionStatus.DELETE_PENDING,
     )
+    wrong_owner = _asset(gym_a, owner_a.id)
+    wrong_purpose = _asset(gym_a, owner_a.id, owner_id=member_id, purpose="DOCUMENT")
     other = _asset(gym_b, owner_b.id)
     message = "Select a clean profile photo from this gym."
 
-    created = api.post(
-        "/api/v1/members/",
-        _body(profile_photo_asset_id=str(clean.id)),
+    attached = api.patch(
+        f"/api/v1/members/{member_id}/",
+        {"profile_photo_asset_id": str(clean.id)},
         format="json",
         **headers,
     )
-    assert created.status_code == 201, created.json()
-    member_id = created.json()["data"]["id"]
-    assert created.json()["data"]["profile_photo_asset_id"] == str(clean.id)
-    rendered = created.content.decode()
+    assert attached.status_code == 200, attached.json()
+    assert attached.json()["data"]["profile_photo_asset_id"] == str(clean.id)
+    rendered = attached.content.decode()
     assert "object_key" not in rendered
     assert clean.sha256 not in rendered
 
-    for asset in (pending, quarantined, deleted, pending_delete, other):
+    for asset in (pending, quarantined, deleted, pending_delete, wrong_owner, wrong_purpose, other):
         rejected = api.patch(
             f"/api/v1/members/{member_id}/",
             {"profile_photo_asset_id": str(asset.id)},

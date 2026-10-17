@@ -431,13 +431,36 @@ describe("Members manager", () => {
 
     await waitFor(() =>
       expect(operationMutation).toHaveBeenCalledWith("members/", {
+        member_number: "",
         first_name: "Grace",
         last_name: "Hopper",
         phone: "777",
         email: "grace@example.test",
+        gender: null,
+        date_of_birth: null,
+        address: {
+          address_line1: "",
+          address_line2: "",
+          city: "",
+          region: "",
+          postal_code: "",
+          country_code: "",
+        },
         join_date: "2026-10-17",
+        emergency_contact_name: "",
+        emergency_contact_phone: "",
+        notes: "",
       }),
     );
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    const created = vi.mocked(operationMutation).mock.calls[0]?.[1] as Record<
+      string,
+      unknown
+    >;
+    expect(created).not.toHaveProperty("profile_photo_asset_id");
+    expect(created).not.toHaveProperty("status");
+    expect(created).not.toHaveProperty("gym_id");
+    expect(created).not.toHaveProperty("id");
     expect(await screen.findByText("MEM-000003")).toBeInTheDocument();
     expect(screen.queryByText("MEM-000001")).not.toBeInTheDocument();
     expect(screen.queryByText("MEM-000002")).not.toBeInTheDocument();
@@ -447,6 +470,121 @@ describe("Members manager", () => {
     });
     expect(vi.mocked(listMembers).mock.calls.at(-1)?.[0]).not.toHaveProperty(
       "after",
+    );
+  });
+
+  it("hides the create form without members.create", async () => {
+    render(<MembersManager canCreate={false} defaultDate="2026-10-17" />);
+    expect(await screen.findByText("MEM-000001")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Add member" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Save member" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("normalizes a full create form and blank nullable fields", async () => {
+    render(<MembersManager canCreate defaultDate="2026-10-17" />);
+    expect(await screen.findByText("MEM-000001")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Member number"), {
+      target: { value: "  " },
+    });
+    fireEvent.change(screen.getByLabelText("First name"), {
+      target: { value: "  Grace   Hopper " },
+    });
+    fireEvent.change(screen.getByLabelText("Last name"), {
+      target: { value: "  " },
+    });
+    fireEvent.change(screen.getByLabelText("Phone"), {
+      target: { value: "   " },
+    });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save member" }));
+
+    expect(operationMutation).not.toHaveBeenCalled();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Enter a first name, last name, and join date.",
+    );
+
+    fireEvent.change(screen.getByLabelText("Member number"), {
+      target: { value: "  M-42  " },
+    });
+    fireEvent.change(screen.getByLabelText("First name"), {
+      target: { value: "  Grace  " },
+    });
+    fireEvent.change(screen.getByLabelText("Last name"), {
+      target: { value: "  Hopper  " },
+    });
+    fireEvent.change(screen.getByLabelText("Phone"), {
+      target: { value: "  +1 555  " },
+    });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "  Grace@Example.test  " },
+    });
+    fireEvent.change(screen.getByLabelText("Gender"), {
+      target: { value: "FEMALE" },
+    });
+    fireEvent.change(screen.getByLabelText("Date of birth"), {
+      target: { value: "1990-04-02" },
+    });
+    fireEvent.change(screen.getByLabelText("Address line 1"), {
+      target: { value: "  1  Main  " },
+    });
+    fireEvent.change(screen.getByLabelText("Address line 2"), {
+      target: { value: "  Apt 2  " },
+    });
+    fireEvent.change(screen.getByLabelText("City"), {
+      target: { value: "  Austin  " },
+    });
+    fireEvent.change(screen.getByLabelText("Region"), {
+      target: { value: "  Texas  " },
+    });
+    fireEvent.change(screen.getByLabelText("Postal code"), {
+      target: { value: "  78701  " },
+    });
+    fireEvent.change(screen.getByLabelText("Country code"), {
+      target: { value: "  us  " },
+    });
+    fireEvent.change(screen.getByLabelText("Join date"), {
+      target: { value: "2026-02-01" },
+    });
+    fireEvent.change(screen.getByLabelText("Emergency contact name"), {
+      target: { value: "  Pat  Lee  " },
+    });
+    fireEvent.change(screen.getByLabelText("Emergency contact phone"), {
+      target: { value: "  999  " },
+    });
+    fireEvent.change(screen.getByLabelText("Notes"), {
+      target: { value: "  Evening visits  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save member" }));
+
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith("members/", {
+        member_number: "M-42",
+        first_name: "Grace",
+        last_name: "Hopper",
+        phone: "+1 555",
+        email: "grace@example.test",
+        gender: "FEMALE",
+        date_of_birth: "1990-04-02",
+        address: {
+          address_line1: "1 Main",
+          address_line2: "Apt 2",
+          city: "Austin",
+          region: "Texas",
+          postal_code: "78701",
+          country_code: "US",
+        },
+        join_date: "2026-02-01",
+        emergency_contact_name: "Pat Lee",
+        emergency_contact_phone: "999",
+        notes: "Evening visits",
+      }),
     );
   });
 });

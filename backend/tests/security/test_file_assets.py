@@ -39,6 +39,10 @@ EXPECTED_CONSTRAINTS = {
     "fileasset_retention_deleted_ck",
     "fileasset_object_key_gym_prefix_ck",
     "file_asset_uploader_same_gym_fk",
+    "fileasset_upload_sha256_ck",
+    "fileasset_rejection_code_ck",
+    "fileasset_scan_claim_ck",
+    "fileasset_profile_photo_ck",
 }
 
 
@@ -103,7 +107,11 @@ def test_file_asset_migration_state_constraints_indexes_rls_and_grants() -> None
         )
         privileges = cursor.fetchone()
 
-    assert applied == ["0001_initial", "0002_rls_integrity_and_grants"]
+    assert applied == [
+        "0001_initial",
+        "0002_rls_integrity_and_grants",
+        "0003_profile_photo_contract",
+    ]
     assert (enabled, forced) == (True, True)
     assert owner != "gym_runtime"
     assert EXPECTED_CONSTRAINTS <= constraints
@@ -398,7 +406,7 @@ def _create_asset(gym: Gym, membership_id: UUID, **overrides: object) -> FileAss
         "content_type": "image/jpeg",
         "byte_size": 128,
         "sha256": "ab" * 32,
-        "purpose": "PROFILE_PHOTO",
+        "purpose": "DOCUMENT",
         "uploaded_by_membership_id": membership_id,
     }
     values.update(overrides)

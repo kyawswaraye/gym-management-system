@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 
 import {
   listAllMembershipPlans,
@@ -9,13 +9,20 @@ import {
   listMemberships,
   operationMutation,
 } from "@/features/operations/client";
+import {
+  updateMembership,
+  updateMembershipPlan,
+} from "@/features/operations/membership-writes";
 import type {
   Member,
   Membership,
+  MembershipCreateRequest,
   MembershipExpiryQuery,
   MembershipListPage,
   MembershipListQuery,
   MembershipPlan,
+  MembershipPlanUpdate,
+  MembershipUpdate,
 } from "@/types/api";
 
 const PAGE_LIMIT = 25;
@@ -112,6 +119,130 @@ function planArchiveActionName(row: MembershipPlan): string {
   return `Archive ${row.name} (${row.code}) plan`;
 }
 
+function planEditActionName(row: MembershipPlan): string {
+  return `Edit ${row.name} (${row.code}) plan`;
+}
+
+function membershipNoteActionName(
+  row: Membership,
+  memberLabel: string,
+): string {
+  return `Edit note for ${memberLabel}, ${row.plan_name}, ${row.id}`;
+}
+
+const PLAN_PRICE = /^(?:0|[1-9]\d{0,15})(?:\.\d{1,2})?$/;
+const DURATION_UNITS = [
+  "DAY",
+  "WEEK",
+  "MONTH",
+  "YEAR",
+] as const satisfies readonly MembershipPlan["duration_unit"][];
+const MAX_DURATION = 2147483647;
+const PLAN_CODE_MAX = 32;
+const PLAN_NAME_MAX = 100;
+const PLAN_TEXT_MAX = 4000;
+
+type PlanDraft = {
+  code: string;
+  name: string;
+  description: string;
+  duration_value: string;
+  duration_unit: MembershipPlan["duration_unit"];
+  price: string;
+};
+
+type PlanEditorState = {
+  source: MembershipPlan;
+  draft: PlanDraft;
+};
+
+type NoteEditorState = {
+  membershipId: string;
+  memberLabel: string;
+  planName: string;
+  draft: string;
+};
+
+type Parsed<T> = { ok: true; body: T } | { ok: false; message: string };
+
+function isDurationUnit(
+  value: string,
+): value is MembershipPlan["duration_unit"] {
+  return (DURATION_UNITS as readonly string[]).includes(value);
+}
+
+function draftFromPlan(row: MembershipPlan): PlanDraft {
+  return {
+    code: row.code,
+    name: row.name,
+    description: row.description,
+    duration_value: String(row.duration_value),
+    duration_unit: row.duration_unit,
+    price: row.price,
+  };
+}
+
+function normalizePlanPrice(value: string): string | null {
+  const trimmed = value.trim();
+  if (!PLAN_PRICE.test(trimmed)) return null;
+  const [whole, fraction = ""] = trimmed.split(".");
+  return `${whole}.${fraction.padEnd(2, "0")}`;
+}
+
+function planUpdateBody(draft: PlanDraft): Parsed<MembershipPlanUpdate> {
+  const code = draft.code.trim();
+  if (!code || /\s/u.test(code) || code.length > PLAN_CODE_MAX) {
+    return { ok: false, message: "Enter a plan code without spaces." };
+  }
+  const name = draft.name.trim();
+  if (!name || name.length > PLAN_NAME_MAX) {
+    return { ok: false, message: "Enter a plan name." };
+  }
+  const description = draft.description.trim();
+  if (description.length > PLAN_TEXT_MAX) {
+    return {
+      ok: false,
+      message: "Enter a description up to 4000 characters.",
+    };
+  }
+  if (!/^\d+$/.test(draft.duration_value.trim())) {
+    return { ok: false, message: "Enter a whole duration of at least 1." };
+  }
+  const durationValue = Number(draft.duration_value.trim());
+  if (durationValue < 1 || durationValue > MAX_DURATION) {
+    return { ok: false, message: "Enter a whole duration of at least 1." };
+  }
+  if (!isDurationUnit(draft.duration_unit)) {
+    return { ok: false, message: "Choose a duration unit." };
+  }
+  const price = normalizePlanPrice(draft.price);
+  if (!price) {
+    return {
+      ok: false,
+      message: "Enter a nonnegative price with up to 2 decimal places.",
+    };
+  }
+  return {
+    ok: true,
+    body: {
+      code,
+      name,
+      description,
+      duration_value: durationValue,
+      duration_unit: draft.duration_unit,
+      price,
+    },
+  };
+}
+
+function membershipNoteBody(value: string): Parsed<MembershipUpdate> {
+  const note = value.trim();
+  if (note.length > PLAN_TEXT_MAX) {
+    return { ok: false, message: "Enter a note up to 4000 characters." };
+  }
+  return { ok: true, body: { note } };
+}
+
 function uniqueById<T extends { id: string }>(rows: T[]): T[] {
   const seen = new Set<string>();
   return rows.filter((row) => {
@@ -183,9 +314,12 @@ export function MembershipsManager({
   const [planError, setPlanError] = useState("");
   const [planGeneration, setPlanGeneration] = useState(0);
   const [plansLoading, setPlansLoading] = useState(canCreate || canUpdate);
-  const [archivingPlanIdList, setArchivingPlanIdList] = useState<
-    readonly string[]
-  >([]);
+  const [lockedPlanIds, setLockedPlanIds] = useState<readonly string[]>([]);
+  const [planEditor, setPlanEditor] = useState<PlanEditorState | null>(null);
+  const [planEditError, setPlanEditError] = useState("");
+  const [noteEditor, setNoteEditor] = useState<NoteEditorState | null>(null);
+  const [noteError, setNoteError] = useState("");
+  const [membershipBusyId, setMembershipBusyId] = useState<string | null>(null);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [nextAfter, setNextAfter] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -208,10 +342,17 @@ export function MembershipsManager({
   const requestVersion = useRef(0);
   const appliedCursors = useRef(new Set<string>());
   const planRequest = useRef(0);
-  const archivingPlanIds = useRef(new Set<string>());
+  const planLocks = useRef(new Set<string>());
+  const planVersions = useRef(new Map<string, number>());
   const memberSearchVersion = useRef(0);
+  const listEpoch = useRef(0);
+  const memberEpoch = useRef(0);
+  const membershipBusy = useRef<string | null>(null);
+  const pendingRef = useRef(false);
+  const mountedRef = useRef(true);
   const canManagePlans = canCreate || canUpdate;
   const filters = { listMode, status, paymentStatus };
+  const membershipActionsLocked = pending || membershipBusyId !== null;
 
   function publishPage(
     page: MembershipListPage,
@@ -236,6 +377,7 @@ export function MembershipsManager({
   }
 
   function resetMembershipPage() {
+    listEpoch.current += 1;
     appliedCursors.current = new Set();
     requestVersion.current += 1;
     setMemberships([]);
@@ -248,6 +390,7 @@ export function MembershipsManager({
   }
 
   async function refreshMemberships() {
+    listEpoch.current += 1;
     const version = ++requestVersion.current;
     appliedCursors.current = new Set();
     setMemberships([]);
@@ -272,6 +415,13 @@ export function MembershipsManager({
       if (version === requestVersion.current) setLoading(false);
     }
   }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!canManagePlans) return;
@@ -326,6 +476,7 @@ export function MembershipsManager({
     return () => {
       window.clearTimeout(timer);
       requestVersion.current += 1;
+      listEpoch.current += 1;
     };
   }, [listMode, paymentStatus, status]);
 
@@ -412,21 +563,79 @@ export function MembershipsManager({
     setPlanGeneration((current) => current + 1);
   }
 
+  function releasePlan(planId: string) {
+    planLocks.current.delete(planId);
+    if (mountedRef.current) setLockedPlanIds([...planLocks.current]);
+  }
+
+  function openPlanEditor(target: MembershipPlan) {
+    if (!canUpdate || planLocks.current.has(target.id)) return;
+    if (planEditor?.source.id === target.id) return;
+    if (planEditor) {
+      const next = (planVersions.current.get(planEditor.source.id) ?? 0) + 1;
+      planVersions.current.set(planEditor.source.id, next);
+    }
+    setPlanEditor({ source: target, draft: draftFromPlan(target) });
+    setPlanEditError("");
+  }
+
+  function cancelPlanEdit() {
+    if (!planEditor || planLocks.current.has(planEditor.source.id)) return;
+    const next = (planVersions.current.get(planEditor.source.id) ?? 0) + 1;
+    planVersions.current.set(planEditor.source.id, next);
+    setPlanEditor(null);
+    setPlanEditError("");
+  }
+
+  async function savePlan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!planEditor) return;
+    const target = planEditor.source;
+    if (planLocks.current.has(target.id)) return;
+    const parsed = planUpdateBody(planEditor.draft);
+    if (!parsed.ok) {
+      setPlanEditError(parsed.message);
+      return;
+    }
+    planLocks.current.add(target.id);
+    setLockedPlanIds([...planLocks.current]);
+    const version = planVersions.current.get(target.id) ?? 0;
+    setPlanEditError("");
+    try {
+      const updated = await updateMembershipPlan(target.id, parsed.body);
+      if (!mountedRef.current) return;
+      if ((planVersions.current.get(target.id) ?? 0) !== version) return;
+      setPlans((current) =>
+        current.map((row) => (row.id === updated.id ? updated : row)),
+      );
+      setPlanEditor((current) =>
+        current?.source.id === target.id ? null : current,
+      );
+    } catch (caught) {
+      if (!mountedRef.current) return;
+      if ((planVersions.current.get(target.id) ?? 0) !== version) return;
+      setPlanEditError(errorText(caught, "Unable to update plan."));
+    } finally {
+      releasePlan(target.id);
+    }
+  }
+
   async function archivePlan(target: MembershipPlan) {
     if (
       !canUpdate ||
       !target.is_active ||
-      archivingPlanIds.current.has(target.id)
+      planLocks.current.has(target.id) ||
+      planEditor?.source.id === target.id
     ) {
       return;
     }
-    archivingPlanIds.current.add(target.id);
-    setArchivingPlanIdList([...archivingPlanIds.current]);
+    planLocks.current.add(target.id);
+    setLockedPlanIds([...planLocks.current]);
     if (!window.confirm(`Archive plan ${target.name} (${target.code})?`)) {
-      archivingPlanIds.current.delete(target.id);
-      setArchivingPlanIdList([...archivingPlanIds.current]);
+      releasePlan(target.id);
       return;
     }
+    const version = planVersions.current.get(target.id) ?? 0;
     setError("");
     setErrorScope(null);
     try {
@@ -434,26 +643,45 @@ export function MembershipsManager({
         `membership-plans/${target.id}/archive/`,
         {},
       );
+      if (!mountedRef.current) return;
+      if ((planVersions.current.get(target.id) ?? 0) !== version) return;
       setPlans((current) =>
         current.map((row) => (row.id === target.id ? archived : row)),
       );
     } catch (caught) {
+      if (!mountedRef.current) return;
+      if ((planVersions.current.get(target.id) ?? 0) !== version) return;
       setError(errorText(caught, "Unable to archive plan."));
       setErrorScope(null);
     } finally {
-      archivingPlanIds.current.delete(target.id);
-      setArchivingPlanIdList([...archivingPlanIds.current]);
+      releasePlan(target.id);
     }
   }
 
   function selectMember(member: Member) {
+    if (selectedMember?.id !== member.id) memberEpoch.current += 1;
     setSelectedMember(member);
     setKnownMembers((current) => rememberMembers(current, [member]));
   }
 
+  function beginSharedPending(): boolean {
+    if (pendingRef.current || membershipBusy.current !== null) return false;
+    pendingRef.current = true;
+    setPending(true);
+    return true;
+  }
+
+  function endSharedPending() {
+    pendingRef.current = false;
+    membershipBusy.current = null;
+    if (!mountedRef.current) return;
+    setPending(false);
+    setMembershipBusyId(null);
+  }
+
   async function createPlan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPending(true);
+    if (!beginSharedPending()) return;
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     try {
@@ -468,10 +696,11 @@ export function MembershipsManager({
       setPlanGeneration((current) => current + 1);
       await refreshMemberships();
     } catch (caught) {
+      if (!mountedRef.current) return;
       setError(errorText(caught, "Unable to create plan."));
       setErrorScope(null);
     } finally {
-      setPending(false);
+      endSharedPending();
     }
   }
 
@@ -482,21 +711,86 @@ export function MembershipsManager({
       setErrorScope(null);
       return;
     }
-    setPending(true);
+    if (!beginSharedPending()) return;
     const form = new FormData(event.currentTarget);
+    const body = {
+      member_id: selectedMember.id,
+      plan_id: String(form.get("plan_id") ?? ""),
+      start_date: String(form.get("start_date") ?? ""),
+      discount_amount: String(form.get("discount_amount") || "0.00"),
+      note: String(form.get("note") ?? "").trim(),
+    } satisfies MembershipCreateRequest;
     try {
-      await operationMutation<Membership>("memberships/", {
-        member_id: selectedMember.id,
-        plan_id: form.get("plan_id"),
-        start_date: form.get("start_date"),
-        discount_amount: form.get("discount_amount") || "0.00",
-      });
+      await operationMutation<Membership>("memberships/", body);
       await refreshMemberships();
     } catch (caught) {
+      if (!mountedRef.current) return;
       setError(errorText(caught, "Unable to create membership."));
       setErrorScope(null);
     } finally {
-      setPending(false);
+      endSharedPending();
+    }
+  }
+
+  function openNoteEditor(membership: Membership) {
+    if (!canUpdate || pendingRef.current || membershipBusy.current !== null) {
+      return;
+    }
+    setNoteEditor({
+      membershipId: membership.id,
+      memberLabel: memberTableLabel(
+        knownMembers.get(membership.member_id),
+        membership.member_id,
+      ),
+      planName: membership.plan_name,
+      draft: membership.note,
+    });
+    setNoteError("");
+  }
+
+  function cancelNoteEdit() {
+    if (membershipBusy.current !== null) return;
+    setNoteEditor(null);
+    setNoteError("");
+  }
+
+  function noteResultIsCurrent(epoch: number, membersAtStart: number): boolean {
+    return (
+      mountedRef.current &&
+      epoch === listEpoch.current &&
+      membersAtStart === memberEpoch.current
+    );
+  }
+
+  async function saveNote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!noteEditor) return;
+    const editor = noteEditor;
+    const parsed = membershipNoteBody(editor.draft);
+    if (!parsed.ok) {
+      setNoteError(parsed.message);
+      return;
+    }
+    if (!beginSharedPending()) return;
+    membershipBusy.current = editor.membershipId;
+    setMembershipBusyId(editor.membershipId);
+    const epoch = listEpoch.current;
+    const membersAtStart = memberEpoch.current;
+    setNoteError("");
+    try {
+      const updated = await updateMembership(editor.membershipId, parsed.body);
+      if (!noteResultIsCurrent(epoch, membersAtStart)) return;
+      setMemberships((current) =>
+        current.map((row) => (row.id === updated.id ? updated : row)),
+      );
+      setNoteEditor((current) =>
+        current?.membershipId === editor.membershipId ? null : current,
+      );
+    } catch (caught) {
+      if (!noteResultIsCurrent(epoch, membersAtStart)) return;
+      setNoteError(errorText(caught, "Unable to update membership note."));
+    } finally {
+      endSharedPending();
     }
   }
 
@@ -504,22 +798,32 @@ export function MembershipsManager({
     membership: Membership,
     action: "suspend" | "resume" | "cancel",
   ) {
+    if (pendingRef.current || membershipBusy.current !== null) return;
     const body: { reason?: string } = {};
     if (action === "cancel") {
       const reason = window.prompt("Cancellation reason");
       if (reason === null || reason.trim() === "") return;
+      if (pendingRef.current || membershipBusy.current !== null) return;
       body.reason = reason.trim();
     }
-    setPending(true);
+    if (!beginSharedPending()) return;
+    membershipBusy.current = membership.id;
+    setMembershipBusyId(membership.id);
+    const epoch = listEpoch.current;
+    const membersAtStart = memberEpoch.current;
+    let succeeded = false;
     try {
       await operationMutation(`memberships/${membership.id}/${action}/`, body);
-      await refreshMemberships();
+      if (!noteResultIsCurrent(epoch, membersAtStart)) return;
+      succeeded = true;
     } catch (caught) {
+      if (!noteResultIsCurrent(epoch, membersAtStart)) return;
       setError(errorText(caught, "Unable to update membership."));
       setErrorScope(null);
     } finally {
-      setPending(false);
+      endSharedPending();
     }
+    if (succeeded && mountedRef.current) await refreshMemberships();
   }
 
   const activePlans = planError ? [] : plans.filter((plan) => plan.is_active);
@@ -617,17 +921,31 @@ export function MembershipsManager({
                       <td className="p-3">{planStatusLabel(plan)}</td>
                       {canUpdate ? (
                         <td className="p-3">
-                          {plan.is_active ? (
+                          <div className="flex flex-wrap gap-3">
                             <button
-                              aria-label={planArchiveActionName(plan)}
+                              aria-label={planEditActionName(plan)}
                               className="underline"
-                              disabled={archivingPlanIdList.includes(plan.id)}
-                              onClick={() => void archivePlan(plan)}
+                              disabled={lockedPlanIds.includes(plan.id)}
+                              onClick={() => openPlanEditor(plan)}
                               type="button"
                             >
-                              Archive {plan.name} plan
+                              Edit {plan.name} plan
                             </button>
-                          ) : null}
+                            {plan.is_active ? (
+                              <button
+                                aria-label={planArchiveActionName(plan)}
+                                className="underline"
+                                disabled={
+                                  lockedPlanIds.includes(plan.id) ||
+                                  planEditor?.source.id === plan.id
+                                }
+                                onClick={() => void archivePlan(plan)}
+                                type="button"
+                              >
+                                Archive {plan.name} plan
+                              </button>
+                            ) : null}
+                          </div>
                         </td>
                       ) : null}
                     </tr>
@@ -797,6 +1115,14 @@ export function MembershipsManager({
                 type="number"
               />
             </label>
+            <label className="field">
+              Note
+              <textarea
+                className="input min-h-24"
+                maxLength={4000}
+                name="note"
+              />
+            </label>
             <button className="button" disabled={pending} type="submit">
               Start membership
             </button>
@@ -884,6 +1210,9 @@ export function MembershipsManager({
                   Status
                 </th>
                 <th className="p-3" scope="col">
+                  Note
+                </th>
+                <th className="p-3" scope="col">
                   Action
                 </th>
               </tr>
@@ -908,48 +1237,73 @@ export function MembershipsManager({
                     {membership.status} / {membership.payment_status}
                   </td>
                   <td className="p-3">
-                    {canUpdate && membership.status === "ACTIVE" && (
-                      <button
-                        className="underline"
-                        onClick={() =>
-                          void membershipAction(membership, "suspend")
-                        }
-                        type="button"
-                      >
-                        Suspend
-                      </button>
-                    )}
-                    {canUpdate && membership.status === "SUSPENDED" && (
-                      <button
-                        className="underline"
-                        onClick={() =>
-                          void membershipAction(membership, "resume")
-                        }
-                        type="button"
-                      >
-                        Resume
-                      </button>
-                    )}
-                    {canCancel &&
-                      ["PENDING", "ACTIVE", "SUSPENDED"].includes(
-                        membership.status,
-                      ) && (
+                    {membership.note ? membership.note : "No note"}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex flex-wrap gap-3">
+                      {canUpdate ? (
                         <button
-                          className="ml-3 underline"
+                          aria-label={membershipNoteActionName(
+                            membership,
+                            memberTableLabel(
+                              knownMembers.get(membership.member_id),
+                              membership.member_id,
+                            ),
+                          )}
+                          className="underline"
+                          disabled={membershipActionsLocked}
+                          onClick={() => openNoteEditor(membership)}
+                          type="button"
+                        >
+                          Edit note
+                        </button>
+                      ) : null}
+                      {canUpdate && membership.status === "ACTIVE" && (
+                        <button
+                          className="underline"
+                          disabled={membershipActionsLocked}
                           onClick={() =>
-                            void membershipAction(membership, "cancel")
+                            void membershipAction(membership, "suspend")
                           }
                           type="button"
                         >
-                          Cancel
+                          Suspend
                         </button>
                       )}
+                      {canUpdate && membership.status === "SUSPENDED" && (
+                        <button
+                          className="underline"
+                          disabled={membershipActionsLocked}
+                          onClick={() =>
+                            void membershipAction(membership, "resume")
+                          }
+                          type="button"
+                        >
+                          Resume
+                        </button>
+                      )}
+                      {canCancel &&
+                        ["PENDING", "ACTIVE", "SUSPENDED"].includes(
+                          membership.status,
+                        ) && (
+                          <button
+                            className="underline"
+                            disabled={membershipActionsLocked}
+                            onClick={() =>
+                              void membershipAction(membership, "cancel")
+                            }
+                            type="button"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                    </div>
                   </td>
                 </tr>
               ))}
               {!loading && !error && memberships.length === 0 ? (
                 <tr>
-                  <td className="muted p-6 text-center" colSpan={6}>
+                  <td className="muted p-6 text-center" colSpan={7}>
                     No memberships found.
                   </td>
                 </tr>
@@ -975,6 +1329,246 @@ export function MembershipsManager({
           </div>
         ) : null}
       </section>
+      {planEditor ? (
+        <PlanEditorDialog
+          error={planEditError}
+          pending={lockedPlanIds.includes(planEditor.source.id)}
+          state={planEditor}
+          onCancel={cancelPlanEdit}
+          onDraft={(draft) =>
+            setPlanEditor((current) =>
+              current ? { ...current, draft } : current,
+            )
+          }
+          onSubmit={(event) => void savePlan(event)}
+        />
+      ) : null}
+      {noteEditor ? (
+        <NoteEditorDialog
+          error={noteError}
+          pending={membershipBusyId === noteEditor.membershipId}
+          state={noteEditor}
+          onCancel={cancelNoteEdit}
+          onDraft={(draft) =>
+            setNoteEditor((current) =>
+              current ? { ...current, draft } : current,
+            )
+          }
+          onSubmit={(event) => void saveNote(event)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function PlanEditorDialog({
+  state,
+  error,
+  pending,
+  onDraft,
+  onSubmit,
+  onCancel,
+}: {
+  state: PlanEditorState;
+  error: string;
+  pending: boolean;
+  onDraft: (draft: PlanDraft) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCancel: () => void;
+}) {
+  const titleId = useId();
+  const { source, draft } = state;
+  const title = `Edit ${source.name} (${source.code})`;
+  return (
+    <div className="fixed inset-0 z-20 grid place-items-center bg-slate-950/40 p-4">
+      <div
+        aria-busy={pending}
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="card grid max-h-[90vh] w-full max-w-lg gap-4 overflow-y-auto p-5"
+        role="dialog"
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && !pending) onCancel();
+        }}
+      >
+        <h2 className="text-lg font-bold" id={titleId}>
+          {title}
+        </h2>
+        <form className="grid gap-4" onSubmit={onSubmit}>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="field">
+              Code
+              <input
+                className="input"
+                maxLength={PLAN_CODE_MAX}
+                onChange={(event) =>
+                  onDraft({ ...draft, code: event.target.value })
+                }
+                required
+                value={draft.code}
+              />
+            </label>
+            <label className="field">
+              Name
+              <input
+                className="input"
+                maxLength={PLAN_NAME_MAX}
+                onChange={(event) =>
+                  onDraft({ ...draft, name: event.target.value })
+                }
+                required
+                value={draft.name}
+              />
+            </label>
+            <label className="field col-span-2">
+              Description
+              <textarea
+                className="input min-h-24"
+                maxLength={PLAN_TEXT_MAX}
+                onChange={(event) =>
+                  onDraft({ ...draft, description: event.target.value })
+                }
+                value={draft.description}
+              />
+            </label>
+            <label className="field">
+              Duration
+              <input
+                className="input"
+                inputMode="numeric"
+                min="1"
+                onChange={(event) =>
+                  onDraft({ ...draft, duration_value: event.target.value })
+                }
+                required
+                value={draft.duration_value}
+              />
+            </label>
+            <label className="field">
+              Unit
+              <select
+                className="input"
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (!isDurationUnit(value)) return;
+                  onDraft({ ...draft, duration_unit: value });
+                }}
+                value={draft.duration_unit}
+              >
+                {DURATION_UNITS.map((unit) => (
+                  <option key={unit} value={unit}>
+                    {DURATION_UNIT_LABELS[unit]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              Price
+              <input
+                className="input"
+                inputMode="decimal"
+                onChange={(event) =>
+                  onDraft({ ...draft, price: event.target.value })
+                }
+                required
+                value={draft.price}
+              />
+            </label>
+            <label className="field">
+              Currency
+              <input className="input" readOnly value={source.currency} />
+            </label>
+          </div>
+          <p>
+            Status <span>{planStatusLabel(source)}</span>
+          </p>
+          {error ? (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <button className="button" disabled={pending} type="submit">
+              {`Save ${source.name} (${source.code}) plan`}
+            </button>
+            <button
+              className="button bg-white text-slate-900 ring-1 ring-slate-300"
+              disabled={pending}
+              onClick={onCancel}
+              type="button"
+            >
+              {`Cancel editing ${source.name} (${source.code}) plan`}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function NoteEditorDialog({
+  state,
+  error,
+  pending,
+  onDraft,
+  onSubmit,
+  onCancel,
+}: {
+  state: NoteEditorState;
+  error: string;
+  pending: boolean;
+  onDraft: (draft: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCancel: () => void;
+}) {
+  const titleId = useId();
+  const identity = `${state.memberLabel}, ${state.planName}, ${state.membershipId}`;
+  const title = `Edit note for ${identity}`;
+  return (
+    <div className="fixed inset-0 z-20 grid place-items-center bg-slate-950/40 p-4">
+      <div
+        aria-busy={pending}
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="card grid w-full max-w-lg gap-4 p-5"
+        role="dialog"
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && !pending) onCancel();
+        }}
+      >
+        <h2 className="text-lg font-bold" id={titleId}>
+          {title}
+        </h2>
+        <form className="grid gap-4" onSubmit={onSubmit}>
+          <label className="field">
+            Membership note
+            <textarea
+              className="input min-h-28"
+              maxLength={PLAN_TEXT_MAX}
+              onChange={(event) => onDraft(event.target.value)}
+              value={state.draft}
+            />
+          </label>
+          {error ? (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <button className="button" disabled={pending} type="submit">
+              {`Save note for ${identity}`}
+            </button>
+            <button
+              className="button bg-white text-slate-900 ring-1 ring-slate-300"
+              disabled={pending}
+              onClick={onCancel}
+              type="button"
+            >
+              {`Discard note edit for ${identity}`}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

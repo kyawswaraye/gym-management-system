@@ -24,6 +24,7 @@ from apps.tenants.e2e import (
     USER_EMAIL_SUFFIX,
     assert_e2e_seed_allowed,
 )
+from apps.tenants.e2e_runtime import e2e_reuses_storage_keys
 from apps.tenants.models import (
     ExpenseCategory,
     Gym,
@@ -98,6 +99,9 @@ def _delete_gym_tree(gym: Gym) -> None:
     Membership.objects.filter(gym_id=gym.id).delete()
     MembershipPlan.objects.filter(gym_id=gym.id).delete()
     Member.objects.filter(gym_id=gym.id).delete()
+    # Members reference profile photos. Delete those rows only after the
+    # members. Object keys are random per asset, so this seed does not reuse
+    # or address a MinIO object left by a previous run.
     FileAsset.objects.filter(gym_id=gym.id).delete()
     AuditLog.objects.filter(gym_id=gym.id).delete()
     StaffInvitationRole.objects.filter(gym_id=gym.id).delete()
@@ -266,6 +270,8 @@ class Command(BaseCommand):
         )
         if str(connection.settings_dict["NAME"]) != E2E_DATABASE_NAME:
             raise CommandError("Refusing to seed a database other than gym_platform_e2e.")
+        if e2e_reuses_storage_keys():
+            raise CommandError("E2E object keys must stay unique across seeds.")
         platform_password = _env_secret("E2E_PLATFORM_PASSWORD", minimum=12)
         owner_password = _env_secret("E2E_OWNER_PASSWORD", minimum=12)
         platform_secret = _totp_secret("E2E_PLATFORM_TOTP_SECRET")

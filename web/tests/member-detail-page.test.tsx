@@ -22,11 +22,17 @@ vi.mock("@/features/operations/member-detail", () => ({
     canArchive,
     canUpdate,
     canViewPayments,
+    canUploadPhoto,
+    canViewPhoto,
+    canDeletePhoto,
     memberId,
   }: {
     canArchive: boolean;
     canUpdate: boolean;
     canViewPayments: boolean;
+    canUploadPhoto: boolean;
+    canViewPhoto: boolean;
+    canDeletePhoto: boolean;
     memberId: string;
   }) => (
     <section>
@@ -34,6 +40,9 @@ vi.mock("@/features/operations/member-detail", () => ({
       <p>archive:{String(canArchive)}</p>
       <p>update:{String(canUpdate)}</p>
       <p>payments:{String(canViewPayments)}</p>
+      <p>upload:{String(canUploadPhoto)}</p>
+      <p>view-photo:{String(canViewPhoto)}</p>
+      <p>delete-photo:{String(canDeletePhoto)}</p>
     </section>
   ),
 }));
@@ -134,6 +143,43 @@ describe("member detail page capability", () => {
 
     requireSession.mockResolvedValue(
       session(["members.view", "members.archive"], ["finance"]),
+    );
+    await expect(
+      MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
+    ).rejects.toThrow("NEXT_REDIRECT:");
+  });
+
+  it("derives photo capabilities from live permissions without a new page gate", async () => {
+    requireSession.mockResolvedValue(
+      session(
+        ["members.view", "files.view", "files.upload", "files.delete"],
+        ["members"],
+      ),
+    );
+    const { rerender } = render(
+      await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
+    );
+    expect(screen.getByText("view-photo:true")).toBeInTheDocument();
+    expect(screen.getByText("upload:false")).toBeInTheDocument();
+    expect(screen.getByText("delete-photo:false")).toBeInTheDocument();
+    expect(screen.getByText("update:false")).toBeInTheDocument();
+
+    requireSession.mockResolvedValue(
+      session(
+        ["members.view", "members.update", "files.upload", "files.delete"],
+        ["members"],
+      ),
+    );
+    rerender(
+      await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
+    );
+    expect(screen.getByText("update:true")).toBeInTheDocument();
+    expect(screen.getByText("upload:true")).toBeInTheDocument();
+    expect(screen.getByText("delete-photo:true")).toBeInTheDocument();
+    expect(screen.getByText("view-photo:false")).toBeInTheDocument();
+
+    requireSession.mockResolvedValue(
+      session(["files.view", "files.upload", "members.update"], ["members"]),
     );
     await expect(
       MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),

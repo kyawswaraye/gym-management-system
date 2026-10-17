@@ -6,6 +6,7 @@ import {
   gymSettingsAccess,
   hasFeature,
   hasTenantCapability,
+  memberPhotoAccess,
   platformHomePath,
   sessionHomePath,
   roleAccess,
@@ -128,6 +129,36 @@ describe("tenant authorization helpers", () => {
       isOwner: true,
       permissions: ["roles.view", "roles.manage", "members.view"],
     });
+  });
+
+  it("derives profile photo actions from live member and file permissions", () => {
+    expect(
+      memberPhotoAccess(
+        session(
+          ["members.view", "members.update", "files.upload", "files.view"],
+          ["members"],
+        ),
+      ),
+    ).toEqual({ canUpload: true, canView: true, canDelete: false });
+    expect(
+      memberPhotoAccess(
+        session(["files.upload", "files.delete", "files.view"], ["members"]),
+      ),
+    ).toEqual({ canUpload: false, canView: false, canDelete: false });
+    expect(
+      memberPhotoAccess(
+        session(
+          [
+            "members.view",
+            "members.update",
+            "files.upload",
+            "files.view",
+            "files.delete",
+          ],
+          [],
+        ),
+      ),
+    ).toEqual({ canUpload: true, canView: true, canDelete: true });
   });
 
   it("keeps an account with no capabilities on the safe empty dashboard", () => {

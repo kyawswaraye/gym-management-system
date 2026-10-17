@@ -13,6 +13,14 @@ import {
   operationGet,
   operationMutation,
 } from "@/features/operations/client";
+import { MemberPhoto } from "@/features/operations/member-photo";
+import { MemberProfileFields } from "@/features/operations/member-profile-fields";
+import {
+  memberProfileFromMember,
+  memberProfileSnapshot,
+  memberUpdatePayload,
+  type MemberProfileInput,
+} from "@/features/operations/member-profile";
 import type {
   Member,
   MemberPaymentHistoryItem,
@@ -181,24 +189,64 @@ export function MemberDetail({
   canArchive,
   canUpdate,
   canViewPayments,
+  canUploadPhoto = false,
+  canViewPhoto = false,
+  canDeletePhoto = false,
 }: {
   memberId: string;
   canArchive: boolean;
   canUpdate: boolean;
   canViewPayments: boolean;
+  canUploadPhoto?: boolean;
+  canViewPhoto?: boolean;
+  canDeletePhoto?: boolean;
 }) {
   const [summary, setSummary] = useState<MemberSummary | null>(null);
   const [error, setError] = useState("");
   const [archiving, setArchiving] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [activeMemberId, setActiveMemberId] = useState(memberId);
+  const [draftState, setDraftState] = useState<{
+    snapshot: string;
+    draft: MemberProfileInput;
+  } | null>(null);
   const archiveLocked = useRef(false);
+  const saveLocked = useRef(false);
+  const loadGeneration = useRef(0);
+  const viewedMemberId = useRef(memberId);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    viewedMemberId.current = memberId;
+  }, [memberId]);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  if (activeMemberId !== memberId) {
+    setActiveMemberId(memberId);
+    setSummary(null);
+    setDraftState(null);
+    setError("");
+    setSaving(false);
+    setArchiving(false);
+  }
 
   const load = useCallback(async () => {
+    const request = ++loadGeneration.current;
     try {
-      setSummary(
-        await operationGet<MemberSummary>(`members/${memberId}/summary/`),
+      const next = await operationGet<MemberSummary>(
+        `members/${memberId}/summary/`,
       );
+      if (request !== loadGeneration.current) return;
+      setSummary(next);
       setError("");
     } catch (caught) {
+      if (request !== loadGeneration.current) return;
       setError(
         caught instanceof Error ? caught.message : "Unable to load member.",
       );
@@ -210,26 +258,52 @@ export function MemberDetail({
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  const memberForDraft = summary?.member ?? null;
+  const profileSnapshot = memberForDraft
+    ? memberProfileSnapshot(memberForDraft)
+    : "";
+  const draft =
+    memberForDraft && draftState?.snapshot === profileSnapshot
+      ? draftState.draft
+      : memberForDraft
+        ? memberProfileFromMember(memberForDraft)
+        : null;
+  if (memberForDraft && draft && draftState?.snapshot !== profileSnapshot) {
+    setDraftState({ snapshot: profileSnapshot, draft });
+  }
+
+  function applyPhoto(assetId: string | null) {
+    setSummary((current) =>
+      current
+        ? {
+            ...current,
+            member: { ...current.member, profile_photo_asset_id: assetId },
+          }
+        : current,
+    );
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    if (!canUpdate || !draft || saveLocked.current) return;
+    const payload = memberUpdatePayload(draft);
+    if (!payload.first_name || !payload.last_name || !payload.join_date) {
+      setError("Enter a first name, last name, and join date.");
+      return;
+    }
+    saveLocked.current = true;
+    setSaving(true);
+    setError("");
     try {
-      await operationMutation<Member>(
-        `members/${memberId}/`,
-        {
-          first_name: form.get("first_name"),
-          last_name: form.get("last_name"),
-          phone: form.get("phone"),
-          email: form.get("email"),
-          notes: form.get("notes"),
-        },
-        "PATCH",
-      );
+      await operationMutation<Member>(`members/${memberId}/`, payload, "PATCH");
       await load();
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Unable to update member.",
       );
+    } finally {
+      saveLocked.current = false;
+      setSaving(false);
     }
   }
 
@@ -240,7 +314,7 @@ export function MemberDetail({
       </p>
     );
   }
-  if (!summary) {
+  if (!summary || !draft) {
     return (
       <p className="muted" role="status">
         Loading member summary.
@@ -289,6 +363,30 @@ export function MemberDetail({
   return (
     <div className="grid gap-6 xl:grid-cols-[22rem_1fr]">
       <div className="card grid gap-4 p-5">
+        <MemberPhoto
+          assetId={member.profile_photo_asset_id}
+          canDelete={canDeletePhoto}
+          canUpload={canUploadPhoto}
+          canView={canViewPhoto}
+          memberId={memberId}
+          memberName={`${member.first_name} ${member.last_name}`.trim()}
+          onAttach={async (fileId) => {
+            const targetMemberId = memberId;
+            await operationMutation<Member>(
+              `members/${targetMemberId}/`,
+              { profile_photo_asset_id: fileId },
+              "PATCH",
+            );
+            if (!mounted.current || viewedMemberId.current !== targetMemberId)
+              return;
+            applyPhoto(fileId);
+            await load();
+          }}
+          onRemove={async () => {
+            applyPhoto(null);
+            await load();
+          }}
+        />
         <form className="grid gap-4" onSubmit={save}>
           {error ? (
             <p className="error" role="alert">
@@ -300,58 +398,28 @@ export function MemberDetail({
             <dt className="muted">Status</dt>
             <dd>{member.status}</dd>
           </dl>
-          <label className="field">
-            First name
-            <input
-              className="input"
-              defaultValue={member.first_name}
-              disabled={!canUpdate}
-              name="first_name"
-            />
-          </label>
-          <label className="field">
-            Last name
-            <input
-              className="input"
-              defaultValue={member.last_name}
-              disabled={!canUpdate}
-              name="last_name"
-            />
-          </label>
-          <label className="field">
-            Phone
-            <input
-              className="input"
-              defaultValue={member.phone ?? ""}
-              disabled={!canUpdate}
-              name="phone"
-            />
-          </label>
-          <label className="field">
-            Email
-            <input
-              className="input"
-              defaultValue={member.email ?? ""}
-              disabled={!canUpdate}
-              name="email"
-              type="email"
-            />
-          </label>
-          <label className="field">
-            Notes
-            <textarea
-              className="input"
-              defaultValue={member.notes}
-              disabled={!canUpdate}
-              name="notes"
-            />
-          </label>
-          {canUpdate && <button className="button">Save changes</button>}
+          <MemberProfileFields
+            disabled={!canUpdate || saving || archiving}
+            includeMemberNumber={false}
+            onChange={(next) =>
+              setDraftState({ snapshot: profileSnapshot, draft: next })
+            }
+            value={draft}
+          />
+          {canUpdate && (
+            <button
+              className="button"
+              disabled={saving || archiving}
+              type="submit"
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          )}
         </form>
         {showArchive ? (
           <button
             className="button"
-            disabled={archiving}
+            disabled={archiving || saving}
             onClick={() => void archiveMember()}
             type="button"
           >

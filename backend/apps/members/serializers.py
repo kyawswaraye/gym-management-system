@@ -170,6 +170,11 @@ class MemberCreateSerializer(StrictSerializer):
     def validate_notes(self, value: str) -> str:
         return value.strip()
 
+    def validate_profile_photo_asset_id(self, value: object) -> None:
+        if value is not None:
+            raise serializers.ValidationError("Create the member before attaching a profile photo.")
+        return None
+
 
 class MemberUpdateSerializer(StrictSerializer):
     first_name = serializers.CharField(required=False, max_length=100)
