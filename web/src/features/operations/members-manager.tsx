@@ -17,11 +17,14 @@ const MEMBER_STATUSES = [
 
 type MemberStatus = (typeof MEMBER_STATUSES)[number];
 
+type PtClientFilter = "" | "true";
+
 type MemberFilters = {
   search: string;
   status: "" | MemberStatus;
   joinedFrom: string;
   joinedTo: string;
+  ptClient: PtClientFilter;
 };
 
 function isMemberStatus(value: string): value is MemberStatus {
@@ -35,6 +38,7 @@ function memberQuery(filters: MemberFilters, after?: string): MemberListQuery {
   if (filters.status) query.status = filters.status;
   if (filters.joinedFrom) query.joined_from = filters.joinedFrom;
   if (filters.joinedTo) query.joined_to = filters.joinedTo;
+  if (filters.ptClient === "true") query.is_pt_client = true;
   if (after) query.after = after;
   return query;
 }
@@ -91,9 +95,10 @@ export function MembersManager({
   const [status, setStatus] = useState<"" | MemberStatus>("");
   const [joinedFrom, setJoinedFrom] = useState("");
   const [joinedTo, setJoinedTo] = useState("");
+  const [ptClient, setPtClient] = useState<PtClientFilter>("");
   const requestVersion = useRef(0);
   const appliedCursors = useRef(new Set<string>());
-  const filters = { search, status, joinedFrom, joinedTo };
+  const filters = { search, status, joinedFrom, joinedTo, ptClient };
 
   function resetPage() {
     appliedCursors.current = new Set();
@@ -138,7 +143,7 @@ export function MembersManager({
 
   useEffect(() => {
     const version = ++requestVersion.current;
-    const currentFilters = { search, status, joinedFrom, joinedTo };
+    const currentFilters = { search, status, joinedFrom, joinedTo, ptClient };
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
@@ -170,7 +175,7 @@ export function MembersManager({
       window.clearTimeout(timer);
       requestVersion.current += 1;
     };
-  }, [joinedFrom, joinedTo, search, status]);
+  }, [joinedFrom, joinedTo, ptClient, search, status]);
 
   async function loadMore() {
     const cursor = nextAfter;
@@ -306,6 +311,18 @@ export function MembersManager({
             <option value="SUSPENDED">Suspended</option>
             <option value="CANCELLED">Cancelled</option>
             <option value="ARCHIVED">Archived</option>
+          </select>
+          <select
+            aria-label="Filter by PT client"
+            className="input max-w-56"
+            onChange={(event) => {
+              setPtClient(event.target.value === "true" ? "true" : "");
+              resetPage();
+            }}
+            value={ptClient}
+          >
+            <option value="">All members</option>
+            <option value="true">Active PT clients</option>
           </select>
           <input
             aria-label="Joined from"

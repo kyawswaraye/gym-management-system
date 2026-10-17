@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { listMembers, operationMutation } from "@/features/operations/client";
@@ -213,6 +219,114 @@ describe("Members manager", () => {
       joined_from: "2026-01-01",
       joined_to: "2026-10-17",
     });
+  });
+
+  it("filters active PT clients and omits the flag for all members", async () => {
+    const requests: Array<ReturnType<typeof deferred<MemberListPage>>> = [];
+    vi.mocked(listMembers).mockImplementation(async () => {
+      const pending = deferred<MemberListPage>();
+      requests.push(pending);
+      pending.promise.then(
+        () => undefined,
+        () => undefined,
+      );
+      return pending.promise;
+    });
+    render(<MembersManager canCreate defaultDate="2026-10-17" />);
+
+    const filter = screen.getByRole("combobox", {
+      name: "Filter by PT client",
+    });
+    expect(filter).toHaveValue("");
+    expect(
+      Array.from((filter as HTMLSelectElement).options, (option) => [
+        option.value,
+        option.text,
+      ]),
+    ).toEqual([
+      ["", "All members"],
+      ["true", "Active PT clients"],
+    ]);
+
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(listMembers).toHaveBeenCalledWith({ limit: 25 });
+    expect(vi.mocked(listMembers).mock.calls[0]?.[0]).not.toHaveProperty(
+      "is_pt_client",
+    );
+    requests[0]?.resolve(page([member()]));
+    expect(
+      await screen.findByRole("link", { name: "Ada Lovelace" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("PT")).not.toBeInTheDocument();
+
+    fireEvent.change(filter, { target: { value: "true" } });
+    expect(filter).toHaveValue("true");
+    await waitFor(() => expect(requests).toHaveLength(2));
+    expect(listMembers).toHaveBeenLastCalledWith({
+      limit: 25,
+      is_pt_client: true,
+    });
+
+    fireEvent.change(filter, { target: { value: "" } });
+    expect(filter).toHaveValue("");
+    expect(
+      screen.queryByRole("link", { name: "Ada Lovelace" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading members.");
+    await waitFor(() => expect(requests).toHaveLength(3));
+    expect(vi.mocked(listMembers).mock.calls[2]?.[0]).toEqual({ limit: 25 });
+    expect(vi.mocked(listMembers).mock.calls[2]?.[0]).not.toHaveProperty(
+      "is_pt_client",
+    );
+
+    await act(async () => {
+      requests[1]?.resolve(
+        page([
+          member({
+            id: OTHER_ID,
+            first_name: "Stale",
+            last_name: "Client",
+            is_pt_client: true,
+          }),
+        ]),
+      );
+    });
+    expect(
+      screen.queryByRole("link", { name: /Stale Client/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("PT")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading members.");
+
+    requests[2]?.resolve(page([member()]));
+    expect(
+      await screen.findByRole("link", { name: "Ada Lovelace" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /Stale Client/ }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(filter, { target: { value: "true" } });
+    await waitFor(() => expect(requests).toHaveLength(4));
+    expect(listMembers).toHaveBeenLastCalledWith({
+      limit: 25,
+      is_pt_client: true,
+    });
+    requests[3]?.resolve(
+      page([
+        member({
+          id: THIRD_ID,
+          first_name: "Grace",
+          last_name: "Hopper",
+          member_number: "MEM-000003",
+          is_pt_client: true,
+        }),
+      ]),
+    );
+    expect(
+      await screen.findByRole("link", { name: /Grace Hopper/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("PT")).toBeInTheDocument();
+    expect(screen.queryByText("MEM-000001")).not.toBeInTheDocument();
   });
 
   it("shows an empty page, a retryable load error, and a retryable paging error", async () => {
