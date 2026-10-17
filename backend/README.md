@@ -11,9 +11,11 @@ Member, membership, payment, receipt, and notification tables exist from
 earlier work. MembershipPlan list, create, detail, update, and archive are
 published. Member list, create, detail, update, and archive are published.
 Membership list, create, detail, note update, cancel, suspend, resume, and
-expiry buckets are published. Member summary and history, notification
-delivery, payment, and receipt HTTP endpoints remain unpublished. Phase 2 stays open until its development-plan
-exit criteria pass.
+expiry buckets are published. Membership-expiry scheduling and delivery
+commands are implemented. Member summary and history, notification HTTP
+routes, payment, and receipt HTTP endpoints remain unpublished. Production
+expiry delivery remains gated on an idempotency-capable transactional
+provider. Phase 2 stays open until its development-plan exit criteria pass.
 
 ## Runtime
 
@@ -82,10 +84,16 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
 
 - Password recovery endpoints return `501 PROVIDER_NOT_CONFIGURED`. Django's
   configurable `EMAIL_BACKEND` is the delivery abstraction. Tests and E2E use
-  non-delivery backends. Production must configure an approved transactional
-  provider before invitation, password-recovery, or Phase 2 expiry delivery is
-  production-ready. Vendor selection and that deployment configuration remain
-  deferred.
+  non-delivery backends. `schedule_membership_expiry_emails` and
+  `deliver_membership_expiry_emails` are implemented. The delivery command
+  locks one due row at a time with `skip_locked`, commits that outcome after
+  the provider call, and sets `X-Idempotency-Key`. Concurrent runs and ordinary
+  reruns do not deliver one row twice. A crash after provider acceptance and
+  before commit can still duplicate that send until the backend honors the
+  header. Production must configure an approved transactional provider that
+  does so before invitation, password-recovery, or expiry delivery is
+  production-ready. Vendor selection remains deferred. Notification HTTP routes
+  stay unpublished.
 - MFA is TOTP and is mandatory for platform administrators and Owners.
   MFA-enabled users do not receive a session at password login. They receive a
   short-lived challenge and must complete `POST /api/v1/auth/mfa/challenge/`
@@ -103,7 +111,9 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
 - Platform gym provisioning, lifecycle, owner invitation, platform audit reads,
   tenant audit reads, staff invitation/acceptance, staff profiles, staff
   activate/suspend, and tenant role/permission management are in place.
-  Check-in, cash, PT, notification delivery, and mobile are not complete.
+  Check-in, cash, PT, notification HTTP routes, and mobile are not complete.
+  Membership-expiry email commands are implemented and remain gated on the
+  production email provider described above.
   Tenant `FileAsset` metadata, checks, and forced RLS are in place. File HTTP
   routes, signed URLs, and object-storage integration are not.
 - `GET /api/v1/audit-logs/` requires a staff access token and active `audit.view`.

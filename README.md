@@ -10,9 +10,11 @@ CI still enforces those check classes on push and pull request.
 Phase 2 prerequisites are approved as the member, membership, expiry, file,
 and dashboard policies already specified in the canonical contracts. Phase 2
 publishes the MembershipPlan and Member list, create, detail, update, and
-archive APIs, and the Membership sale, lifecycle, and expiry API. Member
-summary and history, notification delivery, and payment endpoints remain
-unpublished. Earlier persistence
+archive APIs, and the Membership sale, lifecycle, and expiry API.
+Membership-expiry scheduling and delivery commands are implemented. Member
+summary and history, notification HTTP routes, and payment endpoints remain
+unpublished. Production expiry delivery remains gated on an approved
+transactional provider that honors the idempotency header. Earlier persistence
 for those areas stays outside the closed Phase 1B gate.
 
 - Django REST Framework API for the published foundation and Phase 1B contracts;
@@ -113,8 +115,10 @@ contract drift.
 
 MembershipPlan and Member list, create, detail, update, and archive are
 published. Membership list, create, detail, note update, cancel, suspend,
-resume, and expiry buckets are published. Member summary and history,
-notification delivery, payment, and receipt endpoints remain unpublished.
+resume, and expiry buckets are published. Membership-expiry scheduling and
+delivery commands are implemented. Member summary and history, notification
+HTTP routes, payment, and receipt endpoints remain unpublished. Production
+expiry delivery remains gated on an idempotency-capable transactional provider.
 Check-in, finance, PT, reports, and
 mobile routes stay excluded until their own phases.
 
