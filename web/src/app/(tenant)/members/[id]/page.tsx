@@ -20,6 +20,7 @@ export default async function MemberDetailPage({
         Member profile
       </h1>
       <MemberDetail
+        canArchive={session.permissions.includes("members.archive")}
         canUpdate={session.permissions.includes("members.update")}
         canViewPayments={hasTenantCapability(
           session,

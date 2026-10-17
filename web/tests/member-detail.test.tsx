@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   listMemberPayments,
@@ -149,6 +149,7 @@ describe("Member detail summary", () => {
 
     render(
       <MemberDetail
+        canArchive={false}
         canUpdate={false}
         canViewPayments={false}
         memberId={MEMBER_ID}
@@ -167,6 +168,7 @@ describe("Member detail summary", () => {
 
     render(
       <MemberDetail
+        canArchive={false}
         canUpdate={false}
         canViewPayments={false}
         memberId={MEMBER_ID}
@@ -176,6 +178,9 @@ describe("Member detail summary", () => {
     expect(
       await screen.findByRole("heading", { name: "Current membership" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Status").nextElementSibling).toHaveTextContent(
+      "ACTIVE",
+    );
     expect(
       screen.getByText("Monthly: 2026-10-01 – 2026-10-31 (PARTIAL)"),
     ).toBeInTheDocument();
@@ -231,7 +236,12 @@ describe("Member detail summary", () => {
     );
 
     render(
-      <MemberDetail canUpdate canViewPayments={false} memberId={MEMBER_ID} />,
+      <MemberDetail
+        canArchive={false}
+        canUpdate
+        canViewPayments={false}
+        memberId={MEMBER_ID}
+      />,
     );
 
     expect(
@@ -255,6 +265,7 @@ describe("Member detail summary", () => {
 
     render(
       <MemberDetail
+        canArchive={false}
         canUpdate={false}
         canViewPayments={false}
         memberId={MEMBER_ID}
@@ -276,7 +287,12 @@ describe("Member detail summary", () => {
     );
 
     render(
-      <MemberDetail canUpdate canViewPayments={false} memberId={MEMBER_ID} />,
+      <MemberDetail
+        canArchive={false}
+        canUpdate
+        canViewPayments={false}
+        memberId={MEMBER_ID}
+      />,
     );
     expect(
       await screen.findByRole("button", { name: "Save changes" }),
@@ -306,7 +322,12 @@ describe("Member detail summary", () => {
     );
 
     render(
-      <MemberDetail canUpdate={false} canViewPayments memberId={MEMBER_ID} />,
+      <MemberDetail
+        canArchive={false}
+        canUpdate={false}
+        canViewPayments
+        memberId={MEMBER_ID}
+      />,
     );
 
     expect(
@@ -351,7 +372,12 @@ describe("Member detail summary", () => {
     });
 
     render(
-      <MemberDetail canUpdate={false} canViewPayments memberId={MEMBER_ID} />,
+      <MemberDetail
+        canArchive={false}
+        canUpdate={false}
+        canViewPayments
+        memberId={MEMBER_ID}
+      />,
     );
 
     expect(await screen.findByText("No payments.")).toBeInTheDocument();
@@ -368,7 +394,12 @@ describe("Member detail summary", () => {
     );
 
     render(
-      <MemberDetail canUpdate={false} canViewPayments memberId={MEMBER_ID} />,
+      <MemberDetail
+        canArchive={false}
+        canUpdate={false}
+        canViewPayments
+        memberId={MEMBER_ID}
+      />,
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -397,7 +428,12 @@ describe("Member detail summary", () => {
       },
     );
     const view = render(
-      <MemberDetail canUpdate={false} canViewPayments memberId={MEMBER_ID} />,
+      <MemberDetail
+        canArchive={false}
+        canUpdate={false}
+        canViewPayments
+        memberId={MEMBER_ID}
+      />,
     );
     const button = await screen.findByRole("button", {
       name: "Load older payments",
@@ -405,6 +441,7 @@ describe("Member detail summary", () => {
     button.click();
     view.rerender(
       <MemberDetail
+        canArchive={false}
         canUpdate={false}
         canViewPayments
         memberId={OTHER_MEMBER_ID}
@@ -420,5 +457,196 @@ describe("Member detail summary", () => {
       expect(screen.queryByText(/Stale dues/)).not.toBeInTheDocument(),
     );
     expect(screen.getByText(/Other dues/)).toBeInTheDocument();
+  });
+});
+
+describe("Member archive", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(window, "prompt").mockImplementation(() => {
+      throw new Error("browser prompt");
+    });
+  });
+
+  afterEach(() => {
+    vi.mocked(window.prompt).mockRestore();
+    if (vi.isMockFunction(window.confirm)) {
+      vi.mocked(window.confirm).mockRestore();
+    }
+  });
+
+  function renderMember(canArchive: boolean) {
+    return render(
+      <MemberDetail
+        canArchive={canArchive}
+        canUpdate={false}
+        canViewPayments={false}
+        memberId={MEMBER_ID}
+      />,
+    );
+  }
+
+  it("hides archive without permission and when the member is already archived", async () => {
+    vi.mocked(operationGet).mockResolvedValue(summary());
+    const view = renderMember(false);
+
+    expect(await screen.findByText("ACTIVE")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive member" }),
+    ).not.toBeInTheDocument();
+    view.unmount();
+
+    vi.mocked(operationGet).mockResolvedValue(
+      summary({
+        member: member({
+          status: "ARCHIVED",
+          archived_at: "2026-10-17T00:00:00Z",
+        }),
+      }),
+    );
+    renderMember(true);
+
+    expect(await screen.findByText("ARCHIVED")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive member" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not send a request when archive is cancelled", async () => {
+    vi.mocked(operationGet).mockResolvedValue(summary());
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderMember(true);
+
+    (await screen.findByRole("button", { name: "Archive member" })).click();
+
+    expect(confirm).toHaveBeenCalledWith(
+      "Archive member Ada Lovelace (MEM-000001)?",
+    );
+    expect(operationMutation).not.toHaveBeenCalled();
+    expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive member" }),
+    ).toBeInTheDocument();
+  });
+
+  it("archives after confirmation and refreshes the summary", async () => {
+    vi.mocked(operationGet)
+      .mockResolvedValueOnce(summary())
+      .mockResolvedValueOnce(
+        summary({
+          member: member({
+            status: "ARCHIVED",
+            archived_at: "2026-10-17T00:00:00Z",
+            authz_version: 2,
+          }),
+        }),
+      );
+    vi.mocked(operationMutation).mockResolvedValue(
+      member({
+        status: "ARCHIVED",
+        archived_at: "2026-10-17T00:00:00Z",
+        authz_version: 2,
+      }),
+    );
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderMember(true);
+
+    (await screen.findByRole("button", { name: "Archive member" })).click();
+
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith(
+        `members/${MEMBER_ID}/archive/`,
+        {},
+      ),
+    );
+    expect(operationGet).toHaveBeenNthCalledWith(
+      2,
+      `members/${MEMBER_ID}/summary/`,
+    );
+    expect(await screen.findByText("ARCHIVED")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive member" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Total charged")).toBeInTheDocument();
+  });
+
+  it("ignores a second click while archive is pending", async () => {
+    const pending = deferred<Member>();
+    vi.mocked(operationGet).mockResolvedValue(summary());
+    vi.mocked(operationMutation).mockReturnValue(pending.promise);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderMember(true);
+
+    const button = await screen.findByRole("button", {
+      name: "Archive member",
+    });
+    button.click();
+    button.click();
+
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(button).toBeDisabled());
+    pending.resolve(
+      member({
+        status: "ARCHIVED",
+        archived_at: "2026-10-17T00:00:00Z",
+      }),
+    );
+    await waitFor(() => expect(operationGet).toHaveBeenCalledTimes(2));
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the summary and shows an alert when archive fails", async () => {
+    vi.mocked(operationGet).mockResolvedValue(summary());
+    vi.mocked(operationMutation).mockRejectedValue(
+      new Error("Archive was rejected."),
+    );
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderMember(true);
+
+    (await screen.findByRole("button", { name: "Archive member" })).click();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Archive was rejected.",
+    );
+    expect(screen.getByText("Total charged")).toBeInTheDocument();
+    expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive member" }),
+    ).toBeEnabled();
+    expect(operationGet).toHaveBeenCalledTimes(1);
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the archived member when summary refresh fails", async () => {
+    vi.mocked(operationGet)
+      .mockResolvedValueOnce(summary())
+      .mockRejectedValueOnce(new Error("Summary refresh failed."));
+    vi.mocked(operationMutation).mockResolvedValue(
+      member({
+        status: "ARCHIVED",
+        archived_at: "2026-10-17T00:00:00Z",
+        authz_version: 2,
+        is_pt_client: true,
+      }),
+    );
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderMember(true);
+
+    (await screen.findByRole("button", { name: "Archive member" })).click();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Summary refresh failed.",
+    );
+    expect(screen.getByText("ARCHIVED")).toBeInTheDocument();
+    expect(screen.getByText(/PT client/)).toBeInTheDocument();
+    expect(screen.getByText("Total charged")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive member" }),
+    ).not.toBeInTheDocument();
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    expect(operationGet).toHaveBeenNthCalledWith(
+      2,
+      `members/${MEMBER_ID}/summary/`,
+    );
   });
 });

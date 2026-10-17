@@ -19,16 +19,19 @@ vi.mock("@/lib/auth/session", () => ({
 
 vi.mock("@/features/operations/member-detail", () => ({
   MemberDetail: ({
+    canArchive,
     canUpdate,
     canViewPayments,
     memberId,
   }: {
+    canArchive: boolean;
     canUpdate: boolean;
     canViewPayments: boolean;
     memberId: string;
   }) => (
     <section>
       <p>member:{memberId}</p>
+      <p>archive:{String(canArchive)}</p>
       <p>update:{String(canUpdate)}</p>
       <p>payments:{String(canViewPayments)}</p>
     </section>
@@ -97,5 +100,43 @@ describe("member detail page capability", () => {
     );
     expect(screen.getByText("payments:true")).toBeInTheDocument();
     expect(screen.getByText("update:false")).toBeInTheDocument();
+    expect(screen.getByText("archive:false")).toBeInTheDocument();
+  });
+
+  it("passes archive access only from members.archive", async () => {
+    requireSession.mockResolvedValue(
+      session(
+        ["members.view", "members.update", "payments.view"],
+        ["members", "finance"],
+      ),
+    );
+    const { rerender } = render(
+      await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
+    );
+    expect(screen.getByText("archive:false")).toBeInTheDocument();
+    expect(screen.getByText("update:true")).toBeInTheDocument();
+    expect(screen.getByText("payments:true")).toBeInTheDocument();
+
+    requireSession.mockResolvedValue(
+      session(["members.view", "members.archive"], ["members"]),
+    );
+    rerender(
+      await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
+    );
+    expect(screen.getByText("archive:true")).toBeInTheDocument();
+    expect(screen.getByText("update:false")).toBeInTheDocument();
+    expect(screen.getByText("payments:false")).toBeInTheDocument();
+
+    requireSession.mockResolvedValue(session(["members.archive"], ["members"]));
+    await expect(
+      MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
+    ).rejects.toThrow("NEXT_REDIRECT:");
+
+    requireSession.mockResolvedValue(
+      session(["members.view", "members.archive"], ["finance"]),
+    );
+    await expect(
+      MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
+    ).rejects.toThrow("NEXT_REDIRECT:");
   });
 });

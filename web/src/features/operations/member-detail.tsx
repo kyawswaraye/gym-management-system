@@ -23,6 +23,11 @@ function dayLabel(days: number): string {
   return days === 1 ? "1 day remaining" : `${days} days remaining`;
 }
 
+function memberArchiveIdentity(member: Member): string {
+  const name = `${member.first_name} ${member.last_name}`.trim();
+  return name ? `${name} (${member.member_number})` : member.member_number;
+}
+
 function appendPayments(
   current: MemberPaymentHistoryItem[],
   incoming: MemberPaymentHistoryItem[],
@@ -173,15 +178,19 @@ function PaymentHistory({ memberId }: { memberId: string }) {
 
 export function MemberDetail({
   memberId,
+  canArchive,
   canUpdate,
   canViewPayments,
 }: {
   memberId: string;
+  canArchive: boolean;
   canUpdate: boolean;
   canViewPayments: boolean;
 }) {
   const [summary, setSummary] = useState<MemberSummary | null>(null);
   const [error, setError] = useState("");
+  const [archiving, setArchiving] = useState(false);
+  const archiveLocked = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -242,63 +251,114 @@ export function MemberDetail({
   const payments = summary.payment_summary;
   const noFinalizedPayments =
     payments.total_charged === "0.00" && payments.total_refunded === "0.00";
+  const showArchive = canArchive && member.status !== "ARCHIVED";
+
+  async function archiveMember() {
+    if (archiveLocked.current || !showArchive) return;
+    if (!window.confirm(`Archive member ${memberArchiveIdentity(member)}?`)) {
+      return;
+    }
+    archiveLocked.current = true;
+    setArchiving(true);
+    setError("");
+    try {
+      const archived = await operationMutation<Member>(
+        `members/${memberId}/archive/`,
+        {},
+      );
+      setSummary((current) =>
+        current
+          ? {
+              ...current,
+              member: archived,
+              is_pt_client: archived.is_pt_client,
+            }
+          : current,
+      );
+      await load();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to archive member.",
+      );
+    } finally {
+      archiveLocked.current = false;
+      setArchiving(false);
+    }
+  }
+
   return (
     <div className="grid gap-6 xl:grid-cols-[22rem_1fr]">
-      <form className="card grid gap-4 p-5" onSubmit={save}>
-        {error ? (
-          <p className="error" role="alert">
-            {error}
-          </p>
+      <div className="card grid gap-4 p-5">
+        <form className="grid gap-4" onSubmit={save}>
+          {error ? (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <p className="muted">{member.member_number}</p>
+          <dl>
+            <dt className="muted">Status</dt>
+            <dd>{member.status}</dd>
+          </dl>
+          <label className="field">
+            First name
+            <input
+              className="input"
+              defaultValue={member.first_name}
+              disabled={!canUpdate}
+              name="first_name"
+            />
+          </label>
+          <label className="field">
+            Last name
+            <input
+              className="input"
+              defaultValue={member.last_name}
+              disabled={!canUpdate}
+              name="last_name"
+            />
+          </label>
+          <label className="field">
+            Phone
+            <input
+              className="input"
+              defaultValue={member.phone ?? ""}
+              disabled={!canUpdate}
+              name="phone"
+            />
+          </label>
+          <label className="field">
+            Email
+            <input
+              className="input"
+              defaultValue={member.email ?? ""}
+              disabled={!canUpdate}
+              name="email"
+              type="email"
+            />
+          </label>
+          <label className="field">
+            Notes
+            <textarea
+              className="input"
+              defaultValue={member.notes}
+              disabled={!canUpdate}
+              name="notes"
+            />
+          </label>
+          {canUpdate && <button className="button">Save changes</button>}
+        </form>
+        {showArchive ? (
+          <button
+            className="button"
+            disabled={archiving}
+            onClick={() => void archiveMember()}
+            type="button"
+          >
+            Archive member
+          </button>
         ) : null}
-        <p className="muted">{member.member_number}</p>
-        <label className="field">
-          First name
-          <input
-            className="input"
-            defaultValue={member.first_name}
-            disabled={!canUpdate}
-            name="first_name"
-          />
-        </label>
-        <label className="field">
-          Last name
-          <input
-            className="input"
-            defaultValue={member.last_name}
-            disabled={!canUpdate}
-            name="last_name"
-          />
-        </label>
-        <label className="field">
-          Phone
-          <input
-            className="input"
-            defaultValue={member.phone ?? ""}
-            disabled={!canUpdate}
-            name="phone"
-          />
-        </label>
-        <label className="field">
-          Email
-          <input
-            className="input"
-            defaultValue={member.email ?? ""}
-            disabled={!canUpdate}
-            name="email"
-            type="email"
-          />
-        </label>
-        <label className="field">
-          Notes
-          <textarea
-            className="input"
-            defaultValue={member.notes}
-            disabled={!canUpdate}
-            name="notes"
-          />
-        </label>
-        {canUpdate && <button className="button">Save changes</button>}
-      </form>
+      </div>
       <div className="grid gap-6">
         <section
           aria-labelledby="current-membership-title"
