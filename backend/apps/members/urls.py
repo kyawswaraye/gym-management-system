@@ -10,6 +10,18 @@ from apps.members.device_views import (
     IntegrationDeviceRevokeView,
     IntegrationDeviceRotateView,
 )
+from apps.members.payment_views import (
+    DailySalesView,
+    PaymentApproveView,
+    PaymentCancelView,
+    PaymentDetailView,
+    PaymentListCreateView,
+    PaymentRejectView,
+    PaymentSubmitView,
+    ReceiptDetailView,
+    ReceiptDownloadView,
+    ReceiptListView,
+)
 from apps.members.scan_views import MemberCheckInScanView
 from apps.members.views import (
     CheckInChallengeIssueView,
@@ -29,8 +41,6 @@ from apps.members.views import (
     MembershipResumeView,
     MembershipSuspendView,
     MemberSummaryView,
-    PaymentActionView,
-    PaymentListCreateView,
     PlanArchiveView,
     PlanDetailView,
     PlanListCreateView,
@@ -138,10 +148,34 @@ urlpatterns = [
         name="membership-resume",
     ),
     path("payments/", PaymentListCreateView.as_view(), name="payment-list"),
+    path("payments/<uuid:payment_id>/", PaymentDetailView.as_view(), name="payment-detail"),
     path(
-        "payments/<uuid:payment_id>/<str:action>/",
-        PaymentActionView.as_view(),
-        name="payment-action",
+        "payments/<uuid:payment_id>/submit/",
+        PaymentSubmitView.as_view(),
+        name="payment-submit",
     ),
+    path(
+        "payments/<uuid:payment_id>/approve/",
+        PaymentApproveView.as_view(),
+        name="payment-approve",
+    ),
+    path(
+        "payments/<uuid:payment_id>/reject/",
+        PaymentRejectView.as_view(),
+        name="payment-reject",
+    ),
+    path(
+        "payments/<uuid:payment_id>/cancel/",
+        PaymentCancelView.as_view(),
+        name="payment-cancel",
+    ),
+    path("receipts/", ReceiptListView.as_view(), name="receipt-list"),
+    path("receipts/<uuid:receipt_id>/", ReceiptDetailView.as_view(), name="receipt-detail"),
+    path(
+        "receipts/<uuid:receipt_id>/download/",
+        ReceiptDownloadView.as_view(),
+        name="receipt-download",
+    ),
+    path("sales/daily/", DailySalesView.as_view(), name="sales-daily"),
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
 ]

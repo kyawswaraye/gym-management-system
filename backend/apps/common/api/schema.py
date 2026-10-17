@@ -87,6 +87,16 @@ def phase_1a_endpoints(endpoints: list[Endpoint]) -> list[Endpoint]:
             "/api/v1/cash-sessions/{id}/adjustments/",
             "/api/v1/cash-sessions/{id}/reconcile/",
             "/api/v1/cash-transactions/",
+            "/api/v1/payments/",
+            "/api/v1/payments/{payment_id}/",
+            "/api/v1/payments/{payment_id}/submit/",
+            "/api/v1/payments/{payment_id}/approve/",
+            "/api/v1/payments/{payment_id}/reject/",
+            "/api/v1/payments/{payment_id}/cancel/",
+            "/api/v1/receipts/",
+            "/api/v1/receipts/{receipt_id}/",
+            "/api/v1/receipts/{receipt_id}/download/",
+            "/api/v1/sales/daily/",
         }
     ]
 

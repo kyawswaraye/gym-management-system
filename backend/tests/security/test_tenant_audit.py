@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Callable
-from datetime import UTC, date, datetime, tzinfo
+from datetime import UTC, date, datetime, timedelta, tzinfo
 from functools import wraps
 from unittest.mock import patch
 from uuid import UUID, uuid4
@@ -695,7 +695,17 @@ def test_runtime_audit_stays_append_only_isolated_and_indexed() -> None:
     ]
     assert privileges == (True, True, False, False, True, True, False, False)
 
+    for index in range(250):
+        _insert(
+            gym_a,
+            action=f"VOLUME_{index}",
+            occurred_at=_at(0) - timedelta(minutes=index),
+            actor_membership_id=owner.id,
+            actor_user=owner.user,
+        )
     explain_sql = sql if "%s" not in sql else None
+    with connection.cursor() as cursor:
+        cursor.execute("ANALYZE audit_audit_log")
     with transaction.atomic(), connection.cursor() as cursor:
         cursor.execute("SET LOCAL enable_seqscan = off")
         if explain_sql is None:

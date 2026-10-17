@@ -1132,6 +1132,102 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/payments/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["payments_list"];
+    put?: never;
+    post: operations["payments_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/payments/{payment_id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["payments_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["payments_update"];
+    trace?: never;
+  };
+  "/api/v1/payments/{payment_id}/approve/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["payments_approve"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/payments/{payment_id}/cancel/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["payments_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/payments/{payment_id}/reject/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["payments_reject"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/payments/{payment_id}/submit/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["payments_submit"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/permissions/": {
     parameters: {
       query?: never;
@@ -1156,6 +1252,54 @@ export interface paths {
       cookie?: never;
     };
     get: operations["readiness"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/receipts/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["receipts_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/receipts/{receipt_id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["receipts_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/receipts/{receipt_id}/download/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["receipts_download"];
     put?: never;
     post?: never;
     delete?: never;
@@ -1221,6 +1365,22 @@ export interface paths {
     };
     get?: never;
     put: operations["roles_permissions_replace"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/sales/daily/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["sales_daily"];
+    put?: never;
     post?: never;
     delete?: never;
     options?: never;
@@ -1596,6 +1756,13 @@ export interface components {
       data: components["schemas"]["AdminSubscription"][];
       message: string;
     };
+    ApprovePaymentRequest: {
+      /** Format: uuid */
+      cash_session_id?: string | null;
+    };
+    CancelPaymentRequest: {
+      reason: string;
+    };
     CashCollectionMeta: {
       has_more: boolean;
       next_after: string | null;
@@ -1839,6 +2006,31 @@ export interface components {
       email: string;
       first_name: string;
       last_name: string;
+    };
+    DailySales: {
+      /** Format: date */
+      date: string;
+      currency: string;
+      gross_sales: string;
+      refunds: string;
+      reversals: string;
+      net_total: string;
+      by_payment_method: components["schemas"]["MethodTotal"][];
+      new_member_total: string;
+      renewal_total: string;
+      pt_total: string;
+      class_total: string;
+      product_total: string;
+      other_total: string;
+      product_quantity: string;
+      product_revenue: string;
+      product_cogs: string;
+      product_gross_profit: string;
+    };
+    DailySalesEnvelope: {
+      success: boolean;
+      data: components["schemas"]["DailySales"];
+      message: string;
     };
     DeletedFile: {
       /** Format: uuid */
@@ -2347,7 +2539,7 @@ export interface components {
       /** Format: decimal */
       amount: string;
       currency: string;
-      method: components["schemas"]["MemberPaymentHistoryItemMethodEnum"];
+      method: components["schemas"]["PaymentMethodEnum"];
       /** Format: date */
       business_date: string;
       /** Format: date-time */
@@ -2355,16 +2547,6 @@ export interface components {
       status: components["schemas"]["MemberPaymentHistoryItemStatusEnum"];
       readonly receipt_number: string | null;
     };
-    /**
-     * @description * `CASH` - Cash
-     *     * `BANK_TRANSFER` - Bank Transfer
-     *     * `CARD` - Card
-     *     * `MOBILE_PAYMENT` - Mobile Payment
-     *     * `OTHER` - Other
-     * @enum {string}
-     */
-    MemberPaymentHistoryItemMethodEnum:
-      "CASH" | "BANK_TRANSFER" | "CARD" | "MOBILE_PAYMENT" | "OTHER";
     /**
      * @description * `DRAFT` - Draft
      *     * `PENDING_APPROVAL` - Pending Approval
@@ -2562,6 +2744,13 @@ export interface components {
     MembershipRoleReplaceRequest: {
       role_ids: string[];
     };
+    MembershipSettlement: {
+      /** Format: uuid */
+      membership_id: string;
+      payment_status: string;
+      paid_amount: string;
+      balance_amount: string;
+    };
     /**
      * @description * `PENDING` - Pending
      *     * `ACTIVE` - Active
@@ -2572,6 +2761,10 @@ export interface components {
      */
     MembershipStatusEnum:
       "PENDING" | "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED";
+    MethodTotal: {
+      method: string;
+      total: string;
+    };
     /** @enum {unknown} */
     NullEnum: null;
     OpenCashSessionRequest: {
@@ -2736,6 +2929,23 @@ export interface components {
     PatchedMembershipUpdateRequest: {
       note?: string;
     };
+    PatchedPaymentUpdateRequest: {
+      /** Format: uuid */
+      member_id?: string | null;
+      /** Format: uuid */
+      membership_id?: string | null;
+      purpose?: components["schemas"]["PurposeEnum"];
+      description?: string;
+      /** Format: decimal */
+      amount?: string;
+      currency?: string;
+      method?: components["schemas"]["PaymentMethodEnum"];
+      /** Format: date */
+      business_date?: string;
+      /** Format: date-time */
+      received_at?: string;
+      reference_number?: string;
+    };
     PatchedRoleUpdateRequest: {
       key?: string;
       name?: string;
@@ -2752,6 +2962,108 @@ export interface components {
       /** Format: decimal */
       default_commission_percent?: string;
     };
+    Payment: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      member_id: string | null;
+      /** Format: uuid */
+      membership_id: string | null;
+      /** Format: uuid */
+      original_payment_id: string | null;
+      /** Format: uuid */
+      reversal_payment_id: string | null;
+      entry_type: string;
+      purpose: string;
+      description: string;
+      /** Format: decimal */
+      readonly amount: string;
+      currency: string;
+      method: string;
+      /** Format: date */
+      business_date: string;
+      /** Format: date-time */
+      received_at: string;
+      reference_number: string;
+      status: string;
+      rejection_reason: string;
+      cancellation_reason: string;
+      void_reason: string;
+      /** Format: date-time */
+      submitted_at: string | null;
+      /** Format: uuid */
+      submitted_by_membership_id: string | null;
+      /** Format: date-time */
+      approved_at: string | null;
+      /** Format: uuid */
+      approved_by_membership_id: string | null;
+      /** Format: date-time */
+      rejected_at: string | null;
+      /** Format: uuid */
+      rejected_by_membership_id: string | null;
+      /** Format: date-time */
+      cancelled_at: string | null;
+      /** Format: uuid */
+      cancelled_by_membership_id: string | null;
+      /** Format: date-time */
+      posted_at: string | null;
+      /** Format: uuid */
+      posted_by_membership_id: string | null;
+      /** Format: date-time */
+      voided_at: string | null;
+      /** Format: uuid */
+      voided_by_membership_id: string | null;
+      /** Format: uuid */
+      cash_session_id: string | null;
+      /** Format: uuid */
+      cash_transaction_id: string | null;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: uuid */
+      updated_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    PaymentApproval: {
+      payment: components["schemas"]["Payment"];
+      receipt: components["schemas"]["Receipt"];
+      cash_session: components["schemas"]["CashSession"] | null;
+      cash_transaction: components["schemas"]["CashTransaction"] | null;
+      membership_settlement:
+        components["schemas"]["MembershipSettlement"] | null;
+    };
+    PaymentApprovalEnvelope: {
+      success: boolean;
+      data: components["schemas"]["PaymentApproval"];
+      message: string;
+    };
+    PaymentEnvelope: {
+      success: boolean;
+      data: components["schemas"]["Payment"];
+      message: string;
+    };
+    PaymentListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["Payment"][];
+      meta: components["schemas"]["PaymentListMeta"];
+      message: string;
+    };
+    PaymentListMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    /**
+     * @description * `CASH` - Cash
+     *     * `BANK_TRANSFER` - Bank Transfer
+     *     * `CARD` - Card
+     *     * `MOBILE_PAYMENT` - Mobile Payment
+     *     * `OTHER` - Other
+     * @enum {string}
+     */
+    PaymentMethodEnum:
+      "CASH" | "BANK_TRANSFER" | "CARD" | "MOBILE_PAYMENT" | "OTHER";
     /**
      * @description * `UNPAID` - Unpaid
      *     * `PARTIAL` - Partial
@@ -2773,6 +3085,23 @@ export interface components {
       net_paid: string;
       /** Format: decimal */
       outstanding_membership_balance: string;
+    };
+    PaymentWriteRequest: {
+      /** Format: uuid */
+      member_id?: string | null;
+      /** Format: uuid */
+      membership_id?: string | null;
+      purpose: components["schemas"]["PurposeEnum"];
+      description: string;
+      /** Format: decimal */
+      amount: string;
+      currency: string;
+      method: components["schemas"]["PaymentMethodEnum"];
+      /** Format: date */
+      business_date: string;
+      /** Format: date-time */
+      received_at?: string;
+      reference_number?: string;
     };
     Permission: {
       /** Format: uuid */
@@ -2833,10 +3162,11 @@ export interface components {
      * @description * `MEMBERSHIP` - Membership
      *     * `PT` - Pt
      *     * `PRODUCT` - Product
+     *     * `CLASS` - Class
      *     * `OTHER` - Other
      * @enum {string}
      */
-    PurposeEnum: "MEMBERSHIP" | "PT" | "PRODUCT" | "OTHER";
+    PurposeEnum: "MEMBERSHIP" | "PT" | "PRODUCT" | "CLASS" | "OTHER";
     ReadinessData: {
       status: string;
       database: string;
@@ -2848,6 +3178,42 @@ export interface components {
       data: components["schemas"]["ReadinessData"];
       message: string;
     };
+    Receipt: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      payment_id: string;
+      receipt_number: string;
+      /** Format: date-time */
+      issued_at: string;
+      gym_code: string;
+      gym_name: string;
+      gym_address: string;
+      member_number: string;
+      member_name: string;
+      description: string;
+      /** Format: decimal */
+      readonly amount: string;
+      currency: string;
+      method: string;
+      /** Format: date */
+      business_date: string;
+      issuer_name: string;
+      status: string;
+      /** Format: date-time */
+      created_at: string;
+    };
+    ReceiptEnvelope: {
+      success: boolean;
+      data: components["schemas"]["Receipt"];
+      message: string;
+    };
+    ReceiptListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["Receipt"][];
+      meta: components["schemas"]["PaymentListMeta"];
+      message: string;
+    };
     ReconcileCashSessionRequest: {
       /** Format: decimal */
       actual_closing: string;
@@ -2856,6 +3222,9 @@ export interface components {
     };
     RefreshInputRequest: {
       refresh_token: string;
+    };
+    RejectPaymentRequest: {
+      rejection_reason: string;
     };
     Role: {
       /** Format: uuid */
@@ -7791,6 +8160,583 @@ export interface operations {
       };
     };
   };
+  payments_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        business_date?: string;
+        limit?: number;
+        member?: string;
+        membership?: string;
+        /**
+         * @description * `CASH` - Cash
+         *     * `BANK_TRANSFER` - Bank Transfer
+         *     * `CARD` - Card
+         *     * `MOBILE_PAYMENT` - Mobile Payment
+         *     * `OTHER` - Other
+         */
+        method?: "CASH" | "BANK_TRANSFER" | "CARD" | "MOBILE_PAYMENT" | "OTHER";
+        /**
+         * @description * `MEMBERSHIP` - Membership
+         *     * `PT` - Pt
+         *     * `PRODUCT` - Product
+         *     * `CLASS` - Class
+         *     * `OTHER` - Other
+         */
+        purpose?: "MEMBERSHIP" | "PT" | "PRODUCT" | "CLASS" | "OTHER";
+        /**
+         * @description * `DRAFT` - Draft
+         *     * `PENDING_APPROVAL` - Pending Approval
+         *     * `POSTED` - Posted
+         *     * `REJECTED` - Rejected
+         *     * `CANCELLED` - Cancelled
+         *     * `VOID` - Void
+         */
+        status?:
+          | "DRAFT"
+          | "PENDING_APPROVAL"
+          | "POSTED"
+          | "REJECTED"
+          | "CANCELLED"
+          | "VOID";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  payments_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this payment command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PaymentWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PaymentWriteRequest"];
+        "multipart/form-data": components["schemas"]["PaymentWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  payments_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        payment_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  payments_update: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this payment command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        payment_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedPaymentUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedPaymentUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedPaymentUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  payments_approve: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this payment command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        payment_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ApprovePaymentRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ApprovePaymentRequest"];
+        "multipart/form-data": components["schemas"]["ApprovePaymentRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentApprovalEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  payments_cancel: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this payment command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        payment_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CancelPaymentRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CancelPaymentRequest"];
+        "multipart/form-data": components["schemas"]["CancelPaymentRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  payments_reject: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this payment command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        payment_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RejectPaymentRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["RejectPaymentRequest"];
+        "multipart/form-data": components["schemas"]["RejectPaymentRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  payments_submit: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this payment command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        payment_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   permissions_list: {
     parameters: {
       query?: {
@@ -7855,6 +8801,151 @@ export interface operations {
         };
       };
       503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  receipts_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        business_date?: string;
+        limit?: number;
+        member?: string;
+        payment?: string;
+        /**
+         * @description * `ISSUED` - Issued
+         *     * `VOID` - Void
+         *     * `REPLACED` - Replaced
+         */
+        status?: "ISSUED" | "VOID" | "REPLACED";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReceiptListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  receipts_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        receipt_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReceiptEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  receipts_download: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        receipt_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/html": string;
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -8206,6 +9297,51 @@ export interface operations {
         };
       };
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  sales_daily: {
+    parameters: {
+      query: {
+        date: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DailySalesEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
         headers: {
           [name: string]: unknown;
         };

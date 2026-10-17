@@ -18,7 +18,7 @@ from rest_framework.test import APIClient
 
 from apps.common.db.tenant_context import set_gym_context
 from apps.members.exceptions import MembershipOverlap, MembershipStateConflict
-from apps.members.models import Member, Membership, MembershipPlan, Payment
+from apps.members.models import Member, Membership, MembershipPlan, Payment, Receipt
 from apps.members.services import (
     cancel_membership,
     create_membership,
@@ -179,6 +179,7 @@ def test_tenant_a_api_cannot_access_tenant_b_core_operations() -> None:
             revenue_source=Membership.RevenueSource.NEW_MEMBER,
             created_by_membership_id=tenant_b.owner_membership.id,
         )
+        posted_at = timezone.now()
         payment_b = Payment.objects.create(
             gym=tenant_b.gym,
             member=member_b,
@@ -189,10 +190,39 @@ def test_tenant_a_api_cannot_access_tenant_b_core_operations() -> None:
             currency=tenant_b.gym.currency,
             method=Payment.Method.CASH,
             business_date=business_date,
-            received_at=timezone.now(),
+            received_at=posted_at,
             status=Payment.Status.POSTED,
+            submitted_at=posted_at,
+            submitted_by_membership_id=tenant_b.owner_membership.id,
+            approved_at=posted_at,
+            approved_by_membership_id=tenant_b.owner_membership.id,
+            posted_at=posted_at,
+            posted_by_membership_id=tenant_b.owner_membership.id,
+            legacy_unlinked_cash=True,
             created_by_membership_id=tenant_b.owner_membership.id,
             updated_by_membership_id=tenant_b.owner_membership.id,
+        )
+        Receipt.objects.create(
+            gym=tenant_b.gym,
+            payment=payment_b,
+            receipt_number="RCPT-TENANT-B",
+            sequence_key=f"LEGACY:{business_date.year}",
+            sequence_value=1,
+            sequence_year=business_date.year,
+            issued_at=posted_at,
+            gym_code=tenant_b.gym.code,
+            gym_name=tenant_b.gym.name,
+            gym_address="",
+            member_number=member_b.member_number,
+            member_name=member_b.display_name,
+            description="Tenant B private revenue",
+            amount=payment_b.amount,
+            currency=payment_b.currency,
+            method=payment_b.method,
+            business_date=payment_b.business_date,
+            issuer_name="Owner",
+            status=Receipt.Status.ISSUED,
+            created_by_membership_id=tenant_b.owner_membership.id,
         )
 
     # Forced RLS independently hides the rows and turns direct update/delete

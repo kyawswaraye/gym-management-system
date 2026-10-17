@@ -91,6 +91,16 @@ PUBLISHED_PATHS = {
     "/api/v1/cash-sessions/{id}/adjustments/",
     "/api/v1/cash-sessions/{id}/reconcile/",
     "/api/v1/cash-transactions/",
+    "/api/v1/payments/",
+    "/api/v1/payments/{payment_id}/",
+    "/api/v1/payments/{payment_id}/submit/",
+    "/api/v1/payments/{payment_id}/approve/",
+    "/api/v1/payments/{payment_id}/reject/",
+    "/api/v1/payments/{payment_id}/cancel/",
+    "/api/v1/receipts/",
+    "/api/v1/receipts/{receipt_id}/",
+    "/api/v1/receipts/{receipt_id}/download/",
+    "/api/v1/sales/daily/",
 }
 CONTRACT_PATH = Path(__file__).resolve().parents[3] / "contracts" / "openapi.v1.json"
 
@@ -127,8 +137,9 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
         "/api/v1/check-ins/scan/",
         "/api/v1/member/me/",
         "/api/v1/notifications/",
-        "/api/v1/payments/",
-        "/api/v1/receipts/",
+        "/api/v1/payments/{payment_id}/void/",
+        "/api/v1/payments/{payment_id}/refund/",
+        "/api/v1/receipts/{receipt_id}/void/",
     )
     assert "/api/v1/members/{id}/summary/" in schema["paths"]
     assert "/api/v1/members/{id}/payments/" in schema["paths"]
@@ -136,8 +147,9 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
     assert "/api/v1/check-ins/" in schema["paths"]
     assert all(path not in schema["paths"] for path in unpublished)
     assert not any(path.startswith(unpublished) for path in schema["paths"])
-    assert "/api/v1/payments/" not in schema["paths"]
-    assert "/api/v1/receipts/" not in schema["paths"]
+    assert "/api/v1/payments/" in schema["paths"]
+    assert "/api/v1/receipts/" in schema["paths"]
+    assert "/api/v1/sales/daily/" in schema["paths"]
     assert "/api/v1/dashboard/" not in schema["paths"]
 
 
@@ -1057,3 +1069,42 @@ def test_openapi_documents_complete_retry_after() -> None:
     assert "FILE_SCAN_IN_PROGRESS" in header["description"]
     names = [parameter.get("name") for parameter in complete.get("parameters", [])]
     assert "Retry-After" not in names
+
+
+def test_openapi_documents_payment_commands_and_generated_types() -> None:
+    document = generated_schema()
+    paths = document["paths"]
+    for deferred in (
+        "/api/v1/payments/{payment_id}/void/",
+        "/api/v1/payments/{payment_id}/refund/",
+        "/api/v1/receipts/{receipt_id}/void/",
+    ):
+        assert deferred not in paths
+    writes = (
+        (paths["/api/v1/payments/"]["post"], "201"),
+        (paths["/api/v1/payments/{payment_id}/"]["patch"], "200"),
+        (paths["/api/v1/payments/{payment_id}/submit/"]["post"], "200"),
+        (paths["/api/v1/payments/{payment_id}/approve/"]["post"], "200"),
+        (paths["/api/v1/payments/{payment_id}/reject/"]["post"], "200"),
+        (paths["/api/v1/payments/{payment_id}/cancel/"]["post"], "200"),
+    )
+    for operation, success in writes:
+        header = next(
+            parameter
+            for parameter in operation["parameters"]
+            if parameter["name"] == "Idempotency-Key"
+        )
+        assert header["required"] is True
+        assert success in operation["responses"]
+        assert "400" in operation["responses"]
+        assert "409" in operation["responses"]
+    assert "Idempotency-Key" not in {
+        parameter["name"] for parameter in paths["/api/v1/payments/"]["get"].get("parameters", [])
+    }
+    assert "200" in paths["/api/v1/receipts/{receipt_id}/download/"]["get"]["responses"]
+    sales = paths["/api/v1/sales/daily/"]["get"]
+    assert any(parameter["name"] == "date" for parameter in sales["parameters"])
+    assert "200" in sales["responses"]
+    generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
+    assert '"/api/v1/payments/{payment_id}/approve/"' in generated
+    assert '"/api/v1/sales/daily/"' in generated

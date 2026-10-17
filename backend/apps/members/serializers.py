@@ -9,7 +9,7 @@ from rest_framework import serializers
 from rest_framework.utils import html
 
 from apps.members.checkin_services import aware_instant_text
-from apps.members.models import CheckIn, Member, Membership, MembershipPlan, Payment, Receipt
+from apps.members.models import CheckIn, Member, Membership, MembershipPlan, Payment
 from apps.members.normalization import (
     ADDRESS_KEYS,
     address_for_response,
@@ -578,6 +578,9 @@ class SameGymReceiptNumberField(serializers.CharField):
         super().__init__(**kwargs)
 
     def to_representation(self, value: Payment) -> str | None:  # type: ignore[override]
+        if "history_receipt_number" in value.__dict__:
+            number = value.__dict__["history_receipt_number"]
+            return number if isinstance(number, str) and number else None
         receipt = getattr(value, "receipt", None)
         if receipt is None or getattr(receipt, "gym_id", None) != value.gym_id:
             return None
@@ -613,44 +616,6 @@ class MemberPaymentHistoryEnvelopeSerializer(serializers.Serializer):
     data = MemberPaymentHistoryItemSerializer(many=True)
     meta = MemberPaymentHistoryMetaSerializer()
     message = serializers.CharField()
-
-
-class ReasonSerializer(StrictSerializer):
-    reason = serializers.CharField(max_length=500)
-
-
-class RefundSerializer(ReasonSerializer):
-    amount = serializers.DecimalField(max_digits=18, decimal_places=2, min_value=Decimal("0.01"))
-
-
-class PaymentSerializer(serializers.ModelSerializer):
-    member_name = serializers.CharField(source="member.display_name", read_only=True)
-    receipt_number = serializers.CharField(source="receipt.receipt_number", read_only=True)
-
-    class Meta:
-        model = Payment
-        exclude = ("gym",)
-        read_only_fields = "__all__"
-
-
-class PaymentCreateSerializer(StrictSerializer):
-    member_id = serializers.UUIDField()
-    membership_id = serializers.UUIDField(required=False, allow_null=True)
-    purpose = serializers.ChoiceField(choices=Payment.Purpose.choices)
-    description = serializers.CharField(max_length=255)
-    amount = serializers.DecimalField(max_digits=18, decimal_places=2, min_value=Decimal("0.01"))
-    currency = serializers.CharField(min_length=3, max_length=3)
-    method = serializers.ChoiceField(choices=Payment.Method.choices)
-    business_date = serializers.DateField()
-    received_at = serializers.DateTimeField()
-    reference_number = serializers.CharField(required=False, allow_blank=True, max_length=100)
-
-
-class ReceiptSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Receipt
-        exclude = ("gym", "created_by_membership_id")
-        read_only_fields = "__all__"
 
 
 class AwareDateTimeField(serializers.DateTimeField):

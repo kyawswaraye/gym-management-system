@@ -1,10 +1,10 @@
 from datetime import date
 
 from apps.members.models import MembershipPlan
+from apps.members.payment_serializers import PaymentCreateSerializer
 from apps.members.serializers import (
     MemberCreateSerializer,
     MemberListQuerySerializer,
-    PaymentCreateSerializer,
 )
 from apps.members.services import _add_duration
 

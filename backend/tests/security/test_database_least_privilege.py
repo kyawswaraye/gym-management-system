@@ -342,6 +342,24 @@ def test_finance_foundation_runtime_grants_exclude_delete() -> None:
         assert cursor.fetchone() == (True, True, True, False, False, False, True, False)
 
 
+def test_payment_runtime_grants_exclude_delete() -> None:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT
+              has_table_privilege('gym_runtime', 'members_payment', 'SELECT'),
+              has_table_privilege('gym_runtime', 'members_payment', 'INSERT'),
+              has_table_privilege('gym_runtime', 'members_payment', 'UPDATE'),
+              has_table_privilege('gym_runtime', 'members_payment', 'DELETE'),
+              has_table_privilege('gym_runtime', 'members_receipt', 'SELECT'),
+              has_table_privilege('gym_runtime', 'members_receipt', 'INSERT'),
+              has_table_privilege('gym_runtime', 'members_receipt', 'UPDATE'),
+              has_table_privilege('gym_runtime', 'members_receipt', 'DELETE')
+            """
+        )
+        assert cursor.fetchone() == (True, True, True, False, True, True, True, False)
+
+
 def test_cashbook_runtime_grants_are_append_only_for_movements() -> None:
     with connection.cursor() as cursor:
         cursor.execute(

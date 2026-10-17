@@ -102,12 +102,16 @@ def ensure_protected_expense_categories(
 
 
 def ensure_receipt_sequence(
-    *, gym: Gym, prefix: str, actor_membership_id: uuid.UUID | None
+    *,
+    gym: Gym,
+    prefix: str,
+    actor_membership_id: uuid.UUID | None,
+    year: int | None = None,
 ) -> TenantSequence:
-    year = datetime.now(ZoneInfo(gym.timezone)).year
+    resolved_year = year if year is not None else datetime.now(ZoneInfo(gym.timezone)).year
     sequence, _created = TenantSequence.objects.get_or_create(
         gym=gym,
-        sequence_key=f"RECEIPT:{year}",
+        sequence_key=f"RECEIPT:{resolved_year}",
         defaults={
             "prefix": prefix,
             "next_value": 1,

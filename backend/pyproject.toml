@@ -9,6 +9,7 @@ select = ["E", "F", "I", "B", "UP", "DJ", "RUF"]
 [tool.ruff.lint.per-file-ignores]
 "apps/*/models.py" = ["DJ001", "RUF012"]
 "apps/*/views.py" = ["RUF012"]
+"apps/*/payment_views.py" = ["RUF012"]
 "apps/*/scan_views.py" = ["RUF012"]
 "apps/*/device_views.py" = ["RUF012"]
 "apps/*/member_views.py" = ["RUF012"]
@@ -61,6 +62,7 @@ disable_error_code = ["assignment", "no-untyped-call", "type-arg"]
 module = [
   "apps.members.serializers",
   "apps.members.device_serializers",
+  "apps.members.payment_serializers",
   "apps.cashbook.serializers",
 ]
 disable_error_code = ["assignment", "type-arg"]
@@ -78,6 +80,7 @@ module = [
   "apps.users.views",
   "apps.files.views",
   "apps.cashbook.views",
+  "apps.members.payment_views",
   "apps.files.authentication",
 ]
 disable_error_code = [

@@ -5,9 +5,7 @@ from datetime import timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from django.db import transaction
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -67,13 +65,8 @@ from apps.members.serializers import (
     MemberSummaryQuerySerializer,
     MemberSummarySerializer,
     MemberUpdateSerializer,
-    PaymentCreateSerializer,
-    PaymentSerializer,
-    ReasonSerializer,
-    RefundSerializer,
 )
 from apps.members.services import (
-    approve_payment,
     archive_member,
     archive_plan,
     cancel_membership,
@@ -87,14 +80,11 @@ from apps.members.services import (
     page_membership_expiry,
     page_membership_plans,
     page_memberships,
-    refund_payment,
     resume_membership,
-    submit_payment,
     suspend_membership,
     update_member,
     update_membership_note,
     update_plan,
-    void_payment,
 )
 from apps.users.permissions import (
     RequiresEntitlement,
@@ -672,140 +662,6 @@ class MembershipExpiryView(MembershipFeatureAPIView):
             after=str(filters.get("after", "")),
         )
         return success_response(MembershipSerializer(memberships, many=True).data, meta=meta)
-
-
-class PaymentListCreateView(FinanceFeatureAPIView):
-    required_permission = "payments.view"
-
-    def get_permissions(self):
-        self.required_permission = (
-            "payments.create" if self.request.method == "POST" else "payments.view"
-        )
-        return super().get_permissions()
-
-    def get(self, request):
-        payments = Payment.objects.filter(gym=request.gym).select_related(
-            "member",
-            "membership",
-            "receipt",
-        )
-        if value := request.query_params.get("status"):
-            payments = payments.filter(status=value)
-        return success_response(
-            PaymentSerializer(payments.order_by("-received_at")[:200], many=True).data
-        )
-
-    def post(self, request):
-        serializer = PaymentCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        member = get_object_or_404(
-            Member, gym=request.gym, id=serializer.validated_data.pop("member_id")
-        )
-        membership_id = serializer.validated_data.pop("membership_id", None)
-        membership = None
-        if membership_id:
-            membership = get_object_or_404(
-                Membership, gym=request.gym, member=member, id=membership_id
-            )
-        if serializer.validated_data["currency"] != request.gym.currency:
-            from rest_framework.exceptions import ValidationError
-
-            raise ValidationError({"currency": ["Currency must match the selected gym."]})
-        payment = Payment.objects.create(
-            gym=request.gym,
-            member=member,
-            membership=membership,
-            created_by_membership_id=request.gym_membership.id,
-            updated_by_membership_id=request.gym_membership.id,
-            **serializer.validated_data,
-        )
-        return success_response(
-            PaymentSerializer(payment).data,
-            message="Payment draft created",
-            status=status.HTTP_201_CREATED,
-        )
-
-
-class PaymentActionView(FinanceFeatureAPIView):
-    action_permissions = {
-        "submit": "payments.submit",
-        "approve": "payments.approve",
-        "reject": "payments.approve",
-        "cancel": "payments.update",
-        "void": "payments.void",
-        "refund": "payments.refund",
-    }
-
-    @property
-    def required_permission(self):
-        return self.action_permissions.get(self.kwargs.get("action"), "payments.view")
-
-    @transaction.atomic
-    def post(self, request, payment_id, action):
-        payment = get_object_or_404(Payment, gym=request.gym, id=payment_id)
-        if action == "submit":
-            payment = submit_payment(payment=payment, actor=request.gym_membership)
-        elif action == "approve":
-            payment, receipt = approve_payment(payment=payment, actor=request.gym_membership)
-            return success_response(
-                {
-                    "payment": PaymentSerializer(payment).data,
-                    "receipt_number": receipt.receipt_number,
-                },
-                message="Payment approved",
-            )
-        elif action == "refund":
-            serializer = RefundSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            refund, receipt = refund_payment(
-                payment=payment,
-                actor=request.gym_membership,
-                amount=serializer.validated_data["amount"],
-                reason=serializer.validated_data["reason"],
-            )
-            return success_response(
-                {
-                    "payment": PaymentSerializer(refund).data,
-                    "receipt_number": receipt.receipt_number,
-                },
-                message="Payment refunded",
-            )
-        elif action == "void":
-            serializer = ReasonSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            payment, reversal = void_payment(
-                payment=payment,
-                actor=request.gym_membership,
-                reason=serializer.validated_data["reason"],
-            )
-            return success_response(
-                {
-                    "payment": PaymentSerializer(payment).data,
-                    "reversal": PaymentSerializer(reversal).data,
-                },
-                message="Payment voided",
-            )
-        else:
-            serializer = ReasonSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            reason = serializer.validated_data["reason"]
-            now = timezone.now()
-            if action == "reject" and payment.status == Payment.Status.PENDING_APPROVAL:
-                payment.status = Payment.Status.REJECTED
-                payment.rejected_at = now
-                payment.rejected_by_membership_id = request.gym_membership.id
-                payment.rejection_reason = reason
-            elif action == "cancel" and payment.status == Payment.Status.DRAFT:
-                payment.status = Payment.Status.CANCELLED
-                payment.cancelled_at = now
-                payment.cancellation_reason = reason
-            else:
-                from rest_framework.exceptions import ValidationError
-
-                raise ValidationError({"status": ["Payment cannot perform this action."]})
-            payment.updated_by_membership_id = request.gym_membership.id
-            payment.save()
-        return success_response(PaymentSerializer(payment).data, message="Payment updated")
 
 
 class DashboardView(ReportsFeatureAPIView):

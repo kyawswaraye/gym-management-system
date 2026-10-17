@@ -286,9 +286,12 @@ def test_schema_allowlist_publishes_nested_member_history() -> None:
     assert published == {
         "/api/v1/members/{id}/payments/",
         "/api/v1/members/{id}/check-ins/",
+        "/api/v1/payments/",
+        "/api/v1/receipts/",
         "/api/v1/check-in-challenges/",
         "/api/v1/member/check-ins/scan/",
     }
+    assert "/api/v1/payments/{id}/refund/" not in published
     payments = resolve(f"/api/v1/members/{MEMBER_ID}/payments/")
     check_ins = resolve(f"/api/v1/members/{MEMBER_ID}/check-ins/")
     assert payments.url_name == "member-payment-history"

@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from django.apps import apps as django_apps
-from django.db import IntegrityError, connection, transaction
+from django.db import DatabaseError, connection, transaction
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
@@ -163,28 +163,53 @@ def _payment(
     membership_id: UUID | None = None,
     reference: str = "REF-SECRET",
     reason: str = "REASON-SECRET",
+    receipt_number: str | None = None,
+    receipt_description: str = "receipt-secret-description",
 ) -> Payment:
+    moment = received_at or TIED
     values: dict[str, object] = {
         "gym": gym,
         "member": member,
         "entry_type": entry_type,
-        "purpose": Payment.Purpose.MEMBERSHIP,
+        "purpose": (
+            Payment.Purpose.MEMBERSHIP if membership_id is not None else Payment.Purpose.OTHER
+        ),
         "description": f"{status} dues",
         "amount": Decimal(amount),
         "currency": gym.currency,
         "method": Payment.Method.CASH,
         "business_date": date(2024, 6, 2),
-        "received_at": received_at or TIED,
+        "received_at": moment,
         "reference_number": reference,
         "status": status,
-        "rejection_reason": reason,
-        "void_reason": reason,
-        "cancellation_reason": reason,
         "created_by_membership_id": actor_id,
         "updated_by_membership_id": actor_id,
-        "submitted_by_membership_id": actor_id,
-        "approved_by_membership_id": actor_id,
     }
+    if status == Payment.Status.PENDING_APPROVAL:
+        values["submitted_at"] = moment
+        values["submitted_by_membership_id"] = actor_id
+    elif status == Payment.Status.POSTED:
+        values["submitted_at"] = moment
+        values["submitted_by_membership_id"] = actor_id
+        values["approved_at"] = moment
+        values["approved_by_membership_id"] = actor_id
+        values["posted_at"] = moment
+        values["posted_by_membership_id"] = actor_id
+        values["legacy_unlinked_cash"] = True
+    elif status == Payment.Status.REJECTED:
+        values["submitted_at"] = moment
+        values["submitted_by_membership_id"] = actor_id
+        values["rejected_at"] = moment
+        values["rejected_by_membership_id"] = actor_id
+        values["rejection_reason"] = reason
+    elif status == Payment.Status.CANCELLED:
+        values["cancelled_at"] = moment
+        values["cancelled_by_membership_id"] = actor_id
+        values["cancellation_reason"] = reason
+    elif status == Payment.Status.VOID:
+        values["voided_at"] = moment
+        values["voided_by_membership_id"] = actor_id
+        values["void_reason"] = reason
     if payment_id is not None:
         values["id"] = payment_id
     if original is not None:
@@ -193,7 +218,32 @@ def _payment(
         values["membership_id"] = membership_id
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
-        return Payment.objects.create(**values)
+        payment = Payment.objects.create(**values)
+        if status == Payment.Status.POSTED:
+            number = receipt_number or f"RCPT-{_next_receipt_sequence():06d}"
+            Receipt.objects.create(
+                gym=gym,
+                payment=payment,
+                receipt_number=number,
+                sequence_key=f"LEGACY:{payment.business_date.year}",
+                sequence_value=_next_receipt_sequence(),
+                sequence_year=payment.business_date.year,
+                issued_at=moment,
+                gym_code=gym.code,
+                gym_name=gym.name,
+                gym_address="",
+                member_number=member.member_number,
+                member_name="Ledger Secret",
+                description=receipt_description,
+                amount=payment.amount,
+                currency=payment.currency,
+                method=payment.method,
+                business_date=payment.business_date,
+                issuer_name="ISSUER-SECRET",
+                status=Receipt.Status.ISSUED,
+                created_by_membership_id=actor_id,
+            )
+        return payment
 
 
 def _queries_include(captured: list[dict[str, object]], table: str) -> bool:
@@ -369,6 +419,7 @@ def test_member_payment_history_pages_statuses_receipts_and_query_budget() -> No
         amount="40.10",
         received_at=NEWER,
         payment_id=OLDER_ID,
+        receipt_number="RCPT-100",
     )
     high = _payment(
         gym,
@@ -386,7 +437,7 @@ def test_member_payment_history_pages_statuses_receipts_and_query_budget() -> No
         received_at=TIED,
         payment_id=MID_ID,
         entry_type=Payment.EntryType.REFUND,
-        original=high,
+        original=newest,
         amount="1.00",
     )
     low = _payment(
@@ -405,24 +456,7 @@ def test_member_payment_history_pages_statuses_receipts_and_query_budget() -> No
         amount="999.00",
         reference="OTHER-SECRET",
     )
-    with transaction.atomic():
-        set_gym_context(gym_id=gym.id)
-        Receipt.objects.create(
-            gym=gym,
-            payment=newest,
-            receipt_number="RCPT-100",
-            issued_at=timezone.now(),
-            member_number=member.member_number,
-            member_name="Ledger Secret",
-            description="receipt-secret-description",
-            amount=newest.amount,
-            currency=gym.currency,
-            method=newest.method,
-            business_date=newest.business_date,
-            issuer_name="ISSUER-SECRET",
-            created_by_membership_id=owner.id,
-        )
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(DatabaseError), transaction.atomic():
         set_gym_context(gym_id=other_gym.id)
         Receipt.objects.create(
             gym=other_gym,
@@ -471,7 +505,7 @@ def test_member_payment_history_pages_statuses_receipts_and_query_budget() -> No
     second = _history(api, member.id, headers, _cursor_query(2, cursor))
     assert second.status_code == 200, second.json()
     assert [row["id"] for row in second.json()["data"]] == [str(mid.id), str(low.id)]
-    assert second.json()["data"][0]["original_payment_id"] == str(high.id)
+    assert second.json()["data"][0]["original_payment_id"] == str(newest.id)
     assert second.json()["data"][0]["entry_type"] == "REFUND"
     assert second.json()["meta"]["has_more"] is False
     assert second.json()["meta"]["next_after"] is None
@@ -578,6 +612,15 @@ def test_member_payment_history_pages_statuses_receipts_and_query_budget() -> No
     assert "limit 3" in sql or ("limit" in sql and 3 in flat)
 
 
+_RECEIPT_SEQUENCE = 0
+
+
+def _next_receipt_sequence() -> int:
+    global _RECEIPT_SEQUENCE
+    _RECEIPT_SEQUENCE += 1
+    return _RECEIPT_SEQUENCE
+
+
 HISTORY_INDEX = "payment_gym_member_hist_idx"
 
 
@@ -602,14 +645,14 @@ def test_member_payment_history_index_orders_the_limited_page() -> None:
             gym=gym,
             member=member,
             entry_type=Payment.EntryType.CHARGE,
-            purpose=Payment.Purpose.MEMBERSHIP,
+            purpose=Payment.Purpose.OTHER,
             description="Indexed dues",
             amount=Decimal("1.00"),
             currency=gym.currency,
             method=Payment.Method.CASH,
             business_date=date(2024, 6, 2),
             received_at=datetime(2020, 1, 1, tzinfo=UTC) + timedelta(minutes=index),
-            status=Payment.Status.POSTED,
+            status=Payment.Status.DRAFT,
             created_by_membership_id=owner.id,
             updated_by_membership_id=owner.id,
             created_at=created_at,

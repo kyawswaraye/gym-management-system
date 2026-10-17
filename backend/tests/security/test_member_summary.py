@@ -191,6 +191,9 @@ def _membership(
             updated.auto_now = previous[1]
 
 
+_SUMMARY_SEQUENCE = 0
+
+
 def _payment(
     gym: Gym,
     actor_id: object,
@@ -200,26 +203,115 @@ def _payment(
     entry_type: str,
     status: str,
     amount: str,
+    original: Payment | None = None,
+    receipt_number: str | None = None,
 ) -> Payment:
+    global _SUMMARY_SEQUENCE
+    moment = timezone.now()
+    values: dict[str, object] = {
+        "gym": gym,
+        "member": member,
+        "membership": membership,
+        "entry_type": entry_type,
+        "purpose": (
+            Payment.Purpose.MEMBERSHIP if membership is not None else Payment.Purpose.OTHER
+        ),
+        "description": "do-not-leak-description",
+        "amount": Decimal(amount),
+        "currency": gym.currency,
+        "method": Payment.Method.CASH,
+        "business_date": date(2026, 1, 15),
+        "received_at": moment,
+        "reference_number": "REF-SECRET",
+        "status": status,
+        "created_by_membership_id": actor_id,
+        "updated_by_membership_id": actor_id,
+    }
+    if original is not None:
+        values["original_payment"] = original
+    if status == Payment.Status.PENDING_APPROVAL:
+        values["submitted_at"] = moment
+        values["submitted_by_membership_id"] = actor_id
+    elif status == Payment.Status.POSTED:
+        values["submitted_at"] = moment
+        values["submitted_by_membership_id"] = actor_id
+        values["approved_at"] = moment
+        values["approved_by_membership_id"] = actor_id
+        values["posted_at"] = moment
+        values["posted_by_membership_id"] = actor_id
+        values["legacy_unlinked_cash"] = True
+    elif status == Payment.Status.REJECTED:
+        values["submitted_at"] = moment
+        values["submitted_by_membership_id"] = actor_id
+        values["rejected_at"] = moment
+        values["rejected_by_membership_id"] = actor_id
+        values["rejection_reason"] = "rejected"
+    elif status == Payment.Status.CANCELLED:
+        values["cancelled_at"] = moment
+        values["cancelled_by_membership_id"] = actor_id
+        values["cancellation_reason"] = "cancelled"
+    elif status == Payment.Status.VOID:
+        values["voided_at"] = moment
+        values["voided_by_membership_id"] = actor_id
+        values["void_reason"] = "voided"
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
-        return Payment.objects.create(
-            gym=gym,
-            member=member,
-            membership=membership,
-            entry_type=entry_type,
-            purpose=Payment.Purpose.MEMBERSHIP,
-            description="do-not-leak-description",
-            amount=Decimal(amount),
-            currency=gym.currency,
-            method=Payment.Method.CASH,
-            business_date=date(2026, 1, 15),
-            received_at=timezone.now(),
-            reference_number="REF-SECRET",
-            status=status,
-            created_by_membership_id=actor_id,
-            updated_by_membership_id=actor_id,
-        )
+        payment = Payment.objects.create(**values)
+        if status == Payment.Status.POSTED:
+            _SUMMARY_SEQUENCE += 1
+            Receipt.objects.create(
+                gym=gym,
+                payment=payment,
+                receipt_number=receipt_number or f"SUM-{_SUMMARY_SEQUENCE:06d}",
+                sequence_key="LEGACY:2026",
+                sequence_value=_SUMMARY_SEQUENCE,
+                sequence_year=2026,
+                issued_at=moment,
+                gym_code=gym.code,
+                gym_name=gym.name,
+                gym_address="",
+                member_number=member.member_number,
+                member_name=member.display_name,
+                description="do-not-leak-description",
+                amount=payment.amount,
+                currency=payment.currency,
+                method=payment.method,
+                business_date=payment.business_date,
+                issuer_name="Actor Secret" if receipt_number else "Issuer",
+                status=Receipt.Status.ISSUED,
+                created_by_membership_id=actor_id,
+            )
+        if (
+            entry_type == Payment.EntryType.REVERSAL
+            and status == Payment.Status.POSTED
+            and original is not None
+        ):
+            Receipt.objects.filter(
+                gym_id=gym.id,
+                payment_id=original.id,
+                status=Receipt.Status.ISSUED,
+            ).update(
+                status=Receipt.Status.VOID,
+                voided_at=moment,
+                voided_by_membership_id=actor_id,
+                void_reason="reversal",
+            )
+            original.status = Payment.Status.VOID
+            original.voided_at = moment
+            original.voided_by_membership_id = actor_id
+            original.void_reason = "reversal"
+            original.reversal_payment = payment
+            original.save(
+                update_fields=[
+                    "status",
+                    "voided_at",
+                    "voided_by_membership_id",
+                    "void_reason",
+                    "reversal_payment",
+                    "updated_at",
+                ]
+            )
+        return payment
 
 
 def _zone_ahead_of_utc() -> str:
@@ -507,7 +599,7 @@ def test_member_summary_dates_history_balances_and_query_budget() -> None:
     ledger = (
         (active, Payment.EntryType.CHARGE, Payment.Status.POSTED, "40.00"),
         (active, Payment.EntryType.REFUND, Payment.Status.POSTED, "10.00"),
-        (active, Payment.EntryType.CHARGE, Payment.Status.VOID, "5.00"),
+        (active, Payment.EntryType.CHARGE, Payment.Status.POSTED, "5.00"),
         (active, Payment.EntryType.REVERSAL, Payment.Status.POSTED, "5.00"),
         (active, Payment.EntryType.CHARGE, Payment.Status.DRAFT, "999.00"),
         (active, Payment.EntryType.CHARGE, Payment.Status.PENDING_APPROVAL, "888.00"),
@@ -525,7 +617,16 @@ def test_member_summary_dates_history_balances_and_query_budget() -> None:
         (None, Payment.EntryType.REFUND, Payment.Status.POSTED, "400.00"),
     )
     posted_charge = None
+    originals: dict[object, Payment] = {}
     for membership, entry_type, status, amount in ledger:
+        original = None
+        if entry_type in {Payment.EntryType.REFUND, Payment.EntryType.REVERSAL}:
+            original = originals.get(None if membership is None else membership.id)
+        first_posted = (
+            posted_charge is None
+            and status == Payment.Status.POSTED
+            and entry_type == Payment.EntryType.CHARGE
+        )
         payment = _payment(
             gym,
             owner.id,
@@ -534,31 +635,14 @@ def test_member_summary_dates_history_balances_and_query_budget() -> None:
             entry_type=entry_type,
             status=status,
             amount=amount,
+            original=original,
+            receipt_number="RCPT-SECRET" if first_posted else None,
         )
-        if (
-            posted_charge is None
-            and status == Payment.Status.POSTED
-            and entry_type == Payment.EntryType.CHARGE
-        ):
-            posted_charge = payment
+        if status == Payment.Status.POSTED and entry_type == Payment.EntryType.CHARGE:
+            originals[None if membership is None else membership.id] = payment
+            if posted_charge is None:
+                posted_charge = payment
     assert posted_charge is not None
-    with transaction.atomic():
-        set_gym_context(gym_id=gym.id)
-        Receipt.objects.create(
-            gym=gym,
-            payment=posted_charge,
-            receipt_number="RCPT-SECRET",
-            issued_at=timezone.now(),
-            member_number=finance.member_number,
-            member_name="Finance Secret",
-            description="do-not-leak-description",
-            amount=posted_charge.amount,
-            currency=gym.currency,
-            method=posted_charge.method,
-            business_date=posted_charge.business_date,
-            issuer_name="Actor Secret",
-            created_by_membership_id=owner.id,
-        )
     bystander = _member(gym, owner.id, number="SUM-OTHER", first_name="Bystander")
     bystander_membership = _membership(
         gym,

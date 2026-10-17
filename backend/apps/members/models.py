@@ -376,6 +376,7 @@ class Payment(TenantModel):
         MEMBERSHIP = "MEMBERSHIP"
         PT = "PT"
         PRODUCT = "PRODUCT"
+        CLASS = "CLASS"
         OTHER = "OTHER"
 
     class Method(models.TextChoices):
@@ -393,12 +394,17 @@ class Payment(TenantModel):
         CANCELLED = "CANCELLED"
         VOID = "VOID"
 
-    member = models.ForeignKey(Member, on_delete=models.RESTRICT, related_name="payments")
+    member = models.ForeignKey(
+        Member, on_delete=models.RESTRICT, null=True, blank=True, related_name="payments"
+    )
     membership = models.ForeignKey(
         Membership, on_delete=models.RESTRICT, null=True, blank=True, related_name="payments"
     )
     original_payment = models.ForeignKey(
         "self", on_delete=models.RESTRICT, null=True, blank=True, related_name="corrections"
+    )
+    reversal_payment = models.ForeignKey(
+        "self", on_delete=models.RESTRICT, null=True, blank=True, related_name="reversed_by"
     )
     entry_type = models.CharField(max_length=10, choices=EntryType, default=EntryType.CHARGE)
     purpose = models.CharField(max_length=12, choices=Purpose)
@@ -418,9 +424,30 @@ class Payment(TenantModel):
     rejected_by_membership_id = models.UUIDField(null=True, blank=True)
     rejection_reason = models.TextField(blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by_membership_id = models.UUIDField(null=True, blank=True)
     cancellation_reason = models.TextField(blank=True)
+    posted_at = models.DateTimeField(null=True, blank=True)
+    posted_by_membership_id = models.UUIDField(null=True, blank=True)
     voided_at = models.DateTimeField(null=True, blank=True)
+    voided_by_membership_id = models.UUIDField(null=True, blank=True)
     void_reason = models.TextField(blank=True)
+    cash_session = models.ForeignKey(
+        "cashbook.CashSession",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="payments",
+    )
+    cash_transaction = models.OneToOneField(
+        "cashbook.CashTransaction",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="source_payment",
+    )
+    legacy_unlinked_cash = models.BooleanField(default=False)
+    created_with_reception_scope = models.BooleanField(default=False)
+    submitted_with_reception_scope = models.BooleanField(default=False)
     created_by_membership_id = models.UUIDField()
     updated_by_membership_id = models.UUIDField()
 
@@ -440,13 +467,32 @@ class Payment(TenantModel):
                 fields=["gym", "member", "-received_at", "-id"],
                 name="payment_gym_member_hist_idx",
             ),
+            models.Index(fields=["gym", "membership", "status"], name="payment_gym_membership_idx"),
+            models.Index(
+                fields=["gym", "purpose", "business_date"], name="payment_gym_purpose_date_idx"
+            ),
+            models.Index(
+                fields=["gym", "method", "business_date"], name="payment_gym_method_date_idx"
+            ),
+            models.Index(fields=["gym", "original_payment"], name="payment_gym_original_idx"),
         ]
 
 
 class Receipt(TenantModel):
-    payment = models.OneToOneField(Payment, on_delete=models.RESTRICT, related_name="receipt")
+    class Status(models.TextChoices):
+        ISSUED = "ISSUED"
+        VOID = "VOID"
+        REPLACED = "REPLACED"
+
+    payment = models.ForeignKey(Payment, on_delete=models.RESTRICT, related_name="receipts")
     receipt_number = models.CharField(max_length=64)
+    sequence_key = models.CharField(max_length=48)
+    sequence_value = models.PositiveBigIntegerField()
+    sequence_year = models.PositiveIntegerField()
     issued_at = models.DateTimeField()
+    gym_code = models.CharField(max_length=32)
+    gym_name = models.CharField(max_length=150)
+    gym_address = models.CharField(max_length=800, blank=True, default="")
     member_number = models.CharField(max_length=32)
     member_name = models.CharField(max_length=201)
     description = models.CharField(max_length=255)
@@ -455,6 +501,24 @@ class Receipt(TenantModel):
     method = models.CharField(max_length=20)
     business_date = models.DateField()
     issuer_name = models.CharField(max_length=201)
+    status = models.CharField(max_length=12, choices=Status, default=Status.ISSUED)
+    voided_at = models.DateTimeField(null=True, blank=True)
+    voided_by_membership_id = models.UUIDField(null=True, blank=True)
+    void_reason = models.TextField(blank=True)
+    replacement_receipt = models.ForeignKey(
+        "self",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="replaced_receipts",
+    )
+    rendered_file_asset = models.ForeignKey(
+        "files.FileAsset",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="receipts",
+    )
     created_by_membership_id = models.UUIDField()
 
     class Meta:
@@ -463,6 +527,15 @@ class Receipt(TenantModel):
             models.UniqueConstraint(fields=["gym", "id"], name="receipt_gym_id_uniq"),
             models.UniqueConstraint(
                 fields=["gym", "receipt_number"], name="receipt_gym_number_uniq"
+            ),
+            models.UniqueConstraint(
+                fields=["gym", "sequence_key", "sequence_value"],
+                name="receipt_gym_sequence_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["gym", "payment"],
+                condition=models.Q(status="ISSUED"),
+                name="receipt_one_issued_per_payment",
             ),
         ]
 

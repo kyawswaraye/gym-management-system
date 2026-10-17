@@ -95,6 +95,7 @@ REST_FRAMEWORK = {
         "file_download_url": "60/60",
         "file_delete": "10/300",
         "cashbook_command": "120/60",
+        "payments_command": "120/60",
     },
 }
 
@@ -109,6 +110,7 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,
     "ENUM_NAME_OVERRIDES": {
         "SubscriptionPlanStatusEnum": "apps.tenants.models.SubscriptionPlan.Status",
+        "PaymentMethodEnum": "apps.members.models.Payment.Method",
     },
     "PREPROCESSING_HOOKS": ["apps.common.api.schema.phase_1a_endpoints"],
 }

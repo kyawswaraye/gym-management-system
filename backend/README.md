@@ -22,7 +22,7 @@ Member-self QR redemption is published at `POST /api/v1/member/check-ins/scan/`.
 Display-device list, enroll, rotate, and revoke are published, as is
 `POST /api/v1/device/check-in-challenges/`. NFC and biometric ingestion is published at `POST /api/v1/device/check-ins/`.
 The generic staff scan path, trainer scan, notification HTTP routes, and
-general payment and receipt HTTP endpoints remain unpublished. Cash-session
+Payment draft, submit, approve, reject, cancel, receipt list, detail, download, and daily sales are published. Void, refund, and receipt void remain unpublished. Cash-session
 list, detail, open, adjustment, and reconcile, plus the cash-transaction
 list, are published. The cash-book staff UI is deferred to increment 9. Trainer scan
 waits for Phase 5 assignments. Profile-photo
@@ -147,15 +147,15 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   broader Phase 7 mobile APIs remain deferred and are not prerequisites for
   the already-linked member QR path. Phase 3 implementation is complete as of
   2026-10-18 under ADRs 0004–0008. The closure evidence is in the repository
-  README. The generic staff scan path, notification, and general payment and
-  receipt routes stay out of the published OpenAPI contract.
+  README. The generic staff scan path and notification routes stay unpublished.
+  Payment and receipt routes are published in Increment 3.
   Phase 4 increment 1 is the finance foundation under ADR 0009: exact money,
   encrypted idempotency, receipt sequences, and `expense_categories.manage`.
-  Those finance HTTP routes remain unpublished.
+  Increment 3 publishes payment, receipt, and daily-sales routes on that foundation. Void, refund, receipt void, expense, and retail routes remain unpublished.
 - Platform gym provisioning, lifecycle, owner invitation, platform audit reads,
   tenant audit reads, staff invitation/acceptance, staff profiles, staff
   activate/suspend, and tenant role/permission management are in place.
-  Cash, PT, notification HTTP routes, and the member mobile app are not complete.
+  PT, notification HTTP routes, and the member mobile app are not complete.
   Membership-expiry email commands are implemented and remain gated on the
   production email provider described above.
   Tenant `FileAsset` metadata, checks, and forced RLS are in place. Profile-photo
@@ -192,9 +192,9 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   member summary, nested member payment history, manual check-in routes,
   staff check-in challenge issuance, member login, refresh, and logout, and
   member QR redemption, and display-device enrollment, rotation, revocation,
-  and device challenge issuance. It leaves the generic staff scan path,
-  trainer scan, notification, member profile, and general payment and receipt
-  routes unpublished.
+  and device challenge issuance, and Increment 3 payment, receipt, and daily-sales
+  routes. It leaves the generic staff scan path, trainer scan, notification,
+  member profile, payment void, refund, and receipt void routes unpublished.
   `profile_photo_asset_id` remains a nullable identifier with no foreign key to
   `FileAsset`. The staff API does not accept or return it. Attaching it later
   requires a same-gym asset whose scan status is CLEAN.
