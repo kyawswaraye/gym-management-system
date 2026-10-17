@@ -310,6 +310,8 @@ System က အောက်ပါအတိုင်းတွက်မယ် —
 
 ရှိသင့်တဲ့ငွေ၊ စုစုပေါင်းဝင်/ထွက်နဲ့ ကွာဟချက်ကို Browser က ပို့တဲ့ပမာဏအဖြစ် မယုံပါ။ Server က အတည်ပြုပြီးသား မပြောင်းလဲနိုင်သော Cash Transaction တွေကနေ ပြန်တွက်ပြီး Session ကို တစ်ကြိမ်တည်းပိတ်ပါတယ်။ Reception က Adjustment အသစ်ရေးပြီး ငွေညှိခွင့်မရှိပါ။
 
+Phase 4 Increment 2 မှာ ဒီဖွင့်ခြင်း၊ လက်ဖြင့်ပြင်ဆင်ခြင်း၊ ပြန်တွက်ပိတ်ခြင်းကို server API က လုပ်ပါတယ်။ Browser စာမျက်နှာကို Increment 9 မှ ထည့်ပါမယ်။ Cash Transaction ကို ပြင်ခြင်း၊ ဖျက်ခြင်း မရှိပါ။ Register code သည် စာလုံးအကြီး `[A-Z0-9_-]` သာဖြစ်ပြီး သီးခြား register စာရင်းမရှိပါ။ Reception role ကိုင်ထားသူသည် နောက်ထပ် role တစ်ခုခု ထပ်ရှိလည်း မိမိဖွင့်ထားသော session ကိုသာ ကြည့်၊ သုံး၊ ပိတ်နိုင်သည်။ လက်ဖြင့်ပြင်ဆင်ခွင့် မရှိပါ။ တစ်ခြား Reception ၏ session ကို မရှိသကဲ့သို့ `404` ပြသည်။ Owner က သတ်မှတ်နိုင်သော စည်းမျဉ်း မရှိသေးခင် လက်ဖြင့်ပြင်ဆင်ခြင်းကို protected Owner role ကသာ လုပ်နိုင်သည်။ Manager၊ Accountant နှင့် custom role ကို `403 PERMISSION_DENIED` ပြသည်။ `mutate()` သည် business transaction ထဲမှာ membership၊ gym၊ finance entitlement နှင့် permission ကို ပြန်စစ်ပြီး session ကို lock ပြီးမှ ထိုအခွင့်အာဏာကို ထပ်စစ်သည်။ ငြင်းပယ်လျှင် ရလဒ်မကျန်ဘဲ idempotency claim ကို မသိမ်းပါ။ Session ကို အရင် lock ပြီးမှ movement ကို ရေးသဖြင့် ပိတ်ပြီးမှ ရွေ့လျားမှု အသစ်မကျန်ပါ။
+
 ---
 
 ## Owner Dashboard မှာ ဘာမြင်ရမလဲ

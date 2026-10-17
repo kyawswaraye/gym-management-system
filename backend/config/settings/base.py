@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "apps.members",
     "apps.notifications",
     "apps.files",
+    "apps.cashbook",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -93,6 +94,7 @@ REST_FRAMEWORK = {
         "file_complete": "20/300",
         "file_download_url": "60/60",
         "file_delete": "10/300",
+        "cashbook_command": "120/60",
     },
 }
 

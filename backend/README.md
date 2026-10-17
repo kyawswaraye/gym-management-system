@@ -22,7 +22,9 @@ Member-self QR redemption is published at `POST /api/v1/member/check-ins/scan/`.
 Display-device list, enroll, rotate, and revoke are published, as is
 `POST /api/v1/device/check-in-challenges/`. NFC and biometric ingestion is published at `POST /api/v1/device/check-ins/`.
 The generic staff scan path, trainer scan, notification HTTP routes, and
-general payment and receipt HTTP endpoints remain unpublished. Trainer scan
+general payment and receipt HTTP endpoints remain unpublished. Cash-session
+list, detail, open, adjustment, and reconcile, plus the cash-transaction
+list, are published. The cash-book staff UI is deferred to increment 9. Trainer scan
 waits for Phase 5 assignments. Profile-photo
 upload, complete, download-url, and delete are published. Phase 2
 implementation is complete. `docs/DEVELOPMENT_PLAN.md` was not edited for that

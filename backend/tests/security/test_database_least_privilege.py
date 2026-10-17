@@ -342,6 +342,24 @@ def test_finance_foundation_runtime_grants_exclude_delete() -> None:
         assert cursor.fetchone() == (True, True, True, False, False, False, True, False)
 
 
+def test_cashbook_runtime_grants_are_append_only_for_movements() -> None:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT
+              has_table_privilege('gym_runtime', 'cashbook_cash_session', 'SELECT'),
+              has_table_privilege('gym_runtime', 'cashbook_cash_session', 'INSERT'),
+              has_table_privilege('gym_runtime', 'cashbook_cash_session', 'UPDATE'),
+              has_table_privilege('gym_runtime', 'cashbook_cash_session', 'DELETE'),
+              has_table_privilege('gym_runtime', 'cashbook_cash_transaction', 'SELECT'),
+              has_table_privilege('gym_runtime', 'cashbook_cash_transaction', 'INSERT'),
+              has_table_privilege('gym_runtime', 'cashbook_cash_transaction', 'UPDATE'),
+              has_table_privilege('gym_runtime', 'cashbook_cash_transaction', 'DELETE')
+            """
+        )
+        assert cursor.fetchone() == (True, True, True, False, True, True, False, False)
+
+
 def test_security_definer_catalog_matches_least_privilege() -> None:
     with connection.cursor() as cursor:
         _assert_least_privilege(cursor)

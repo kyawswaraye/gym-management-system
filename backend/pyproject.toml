@@ -39,6 +39,7 @@ module = [
   "apps.common.finance.exceptions",
   "apps.files.exceptions",
   "apps.members.exceptions",
+  "apps.cashbook.exceptions",
   "apps.tenants.exceptions",
 ]
 disable_error_code = ["assignment"]
@@ -57,7 +58,11 @@ module = [
 disable_error_code = ["assignment", "no-untyped-call", "type-arg"]
 
 [[tool.mypy.overrides]]
-module = ["apps.members.serializers", "apps.members.device_serializers"]
+module = [
+  "apps.members.serializers",
+  "apps.members.device_serializers",
+  "apps.cashbook.serializers",
+]
 disable_error_code = ["assignment", "type-arg"]
 
 [[tool.mypy.overrides]]
@@ -72,6 +77,7 @@ module = [
   "apps.users.authentication",
   "apps.users.views",
   "apps.files.views",
+  "apps.cashbook.views",
   "apps.files.authentication",
 ]
 disable_error_code = [

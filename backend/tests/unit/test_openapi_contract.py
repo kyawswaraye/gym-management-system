@@ -85,6 +85,12 @@ PUBLISHED_PATHS = {
     "/api/v1/files/{id}/",
     "/api/v1/files/{id}/complete/",
     "/api/v1/files/{id}/download-url/",
+    "/api/v1/cash-sessions/",
+    "/api/v1/cash-sessions/open/",
+    "/api/v1/cash-sessions/{id}/",
+    "/api/v1/cash-sessions/{id}/adjustments/",
+    "/api/v1/cash-sessions/{id}/reconcile/",
+    "/api/v1/cash-transactions/",
 }
 CONTRACT_PATH = Path(__file__).resolve().parents[3] / "contracts" / "openapi.v1.json"
 

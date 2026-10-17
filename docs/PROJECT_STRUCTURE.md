@@ -107,7 +107,7 @@ backend/
 
 ### Domain app convention
 
-The backend remains domain-based. `tenants`, `users`, `members`, `memberships`, `checkins`, `payments`, `expenses`, `salaries`, `trainers`, `classes`, `inventory`, `sales`, `commissions`, `cashbook`, `receipts`, `reports`, `announcements`, `notifications`, `files`, and `audit` are the approved domain apps. `common` is shared infrastructure for cross-cutting API, database-context, money, time, and validation primitives; it is not a catch-all business domain. Phase 4 increment 1 puts exact money parsing and finance idempotency under `apps/common/finance/`. Receipt numbers and protected expense-category seeding live in `apps/tenants/sequence_services.py`. The separate finance domain apps in the target tree are still later increments, and no finance HTTP route is published.
+The backend remains domain-based. `tenants`, `users`, `members`, `memberships`, `checkins`, `payments`, `expenses`, `salaries`, `trainers`, `classes`, `inventory`, `sales`, `commissions`, `cashbook`, `receipts`, `reports`, `announcements`, `notifications`, `files`, and `audit` are the approved domain apps. `common` is shared infrastructure for cross-cutting API, database-context, money, time, and validation primitives; it is not a catch-all business domain. Phase 4 increment 1 puts exact money parsing and finance idempotency under `apps/common/finance/`. Receipt numbers and protected expense-category seeding live in `apps/tenants/sequence_services.py`. Increment 2 adds `apps/cashbook/` and publishes the six cash-session and cash-transaction routes. The cash-book staff UI is deferred to increment 9. Payment, receipt, expense, inventory, and retail HTTP routes remain later increments.
 
 Each substantial app follows a predictable shape:
 

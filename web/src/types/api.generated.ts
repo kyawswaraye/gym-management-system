@@ -357,6 +357,105 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/cash-sessions/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["cash_sessions_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/cash-sessions/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["cash_sessions_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/cash-sessions/{id}/adjustments/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** @description Authenticate in a short transaction, then let the idempotency runner commit. */
+    post: operations["cash_sessions_adjust"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/cash-sessions/{id}/reconcile/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** @description Authenticate in a short transaction, then let the idempotency runner commit. */
+    post: operations["cash_sessions_reconcile"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/cash-sessions/open/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** @description Authenticate in a short transaction, then let the idempotency runner commit. */
+    post: operations["cash_sessions_open"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/cash-transactions/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["cash_transactions_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/check-in-challenges/": {
     parameters: {
       query?: never;
@@ -1245,6 +1344,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AdjustCashSessionRequest: {
+      direction: components["schemas"]["DirectionEnum"];
+      /** Format: decimal */
+      amount: string;
+      currency: string;
+      /** Format: date */
+      business_date: string;
+      description: string;
+      reason: string;
+    };
     AdminDashboard: {
       gym_statuses: components["schemas"]["GymStatusCounts"];
       gym_subscription_statuses: components["schemas"]["GymSubscriptionStatusCounts"];
@@ -1487,6 +1596,93 @@ export interface components {
       data: components["schemas"]["AdminSubscription"][];
       message: string;
     };
+    CashCollectionMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    CashCommandData: {
+      session: components["schemas"]["CashSession"];
+      transactions: components["schemas"]["CashTransaction"][];
+    };
+    CashCommandEnvelope: {
+      success: boolean;
+      data: components["schemas"]["CashCommandData"];
+      message: string;
+    };
+    CashSession: {
+      /** Format: uuid */
+      id: string;
+      /** Format: date */
+      business_date: string;
+      register_code: string;
+      currency: string;
+      /** Format: decimal */
+      readonly opening_cash: string;
+      /** Format: decimal */
+      readonly cash_sales: string;
+      /** Format: decimal */
+      readonly cash_expenses: string;
+      /** Format: decimal */
+      readonly manual_net: string;
+      /** Format: decimal */
+      readonly expected_closing: string;
+      /** Format: decimal */
+      readonly actual_closing: string | null;
+      /** Format: decimal */
+      readonly difference: string | null;
+      difference_reason: string;
+      status: string;
+      /** Format: uuid */
+      opened_by_membership_id: string;
+      /** Format: uuid */
+      closed_by_membership_id: string | null;
+      /** Format: date-time */
+      closed_at: string | null;
+      /** Format: date-time */
+      created_at: string;
+    };
+    CashSessionEnvelope: {
+      success: boolean;
+      data: components["schemas"]["CashSession"];
+      message: string;
+    };
+    CashSessionListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["CashSession"][];
+      meta: components["schemas"]["CashCollectionMeta"];
+      message: string;
+    };
+    CashTransaction: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      cash_session_id: string;
+      direction: string;
+      source_type: string;
+      /** Format: uuid */
+      source_id: string | null;
+      /** Format: decimal */
+      readonly amount: string;
+      currency: string;
+      /** Format: date */
+      business_date: string;
+      /** Format: date-time */
+      occurred_at: string;
+      description: string;
+      reason: string;
+      /** Format: uuid */
+      reversal_of_id: string | null;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+    };
+    CashTransactionListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["CashTransaction"][];
+      meta: components["schemas"]["CashCollectionMeta"];
+      message: string;
+    };
     CheckIn: {
       /** Format: uuid */
       id: string;
@@ -1699,6 +1895,12 @@ export interface components {
       data: components["schemas"]["DirectLoginData"];
       message: string;
     };
+    /**
+     * @description * `IN` - In
+     *     * `OUT` - Out
+     * @enum {string}
+     */
+    DirectionEnum: "IN" | "OUT";
     DisplayDevice: {
       /** Format: uuid */
       id: string;
@@ -2372,6 +2574,13 @@ export interface components {
       "PENDING" | "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED";
     /** @enum {unknown} */
     NullEnum: null;
+    OpenCashSessionRequest: {
+      register_code: string;
+      /** Format: date */
+      business_date: string;
+      /** Format: decimal */
+      opening_cash: string;
+    };
     OwnerAcceptInputRequest: {
       invitation_token: string;
       password: string;
@@ -2638,6 +2847,12 @@ export interface components {
       success: boolean;
       data: components["schemas"]["ReadinessData"];
       message: string;
+    };
+    ReconcileCashSessionRequest: {
+      /** Format: decimal */
+      actual_closing: string;
+      /** @default  */
+      difference_reason: string;
     };
     RefreshInputRequest: {
       refresh_token: string;
@@ -4187,6 +4402,399 @@ export interface operations {
         };
       };
       429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  cash_sessions_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        business_date?: string;
+        limit?: number;
+        register_code?: string;
+        /**
+         * @description * `OPEN` - Open
+         *     * `CLOSED` - Closed
+         *     * `VOID` - Void
+         */
+        status?: "OPEN" | "CLOSED" | "VOID";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CashSessionListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  cash_sessions_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CashSessionEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  cash_sessions_adjust: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this cash command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AdjustCashSessionRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["AdjustCashSessionRequest"];
+        "multipart/form-data": components["schemas"]["AdjustCashSessionRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CashCommandEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  cash_sessions_reconcile: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this cash command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ReconcileCashSessionRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ReconcileCashSessionRequest"];
+        "multipart/form-data": components["schemas"]["ReconcileCashSessionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CashCommandEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  cash_sessions_open: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this cash command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["OpenCashSessionRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["OpenCashSessionRequest"];
+        "multipart/form-data": components["schemas"]["OpenCashSessionRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CashCommandEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  cash_transactions_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        business_date?: string;
+        cash_session_id?: string;
+        /**
+         * @description * `IN` - In
+         *     * `OUT` - Out
+         */
+        direction?: "IN" | "OUT";
+        limit?: number;
+        /**
+         * @description * `PAYMENT` - Payment
+         *     * `EXPENSE` - Expense
+         *     * `COMMISSION` - Commission
+         *     * `MANUAL` - Manual
+         *     * `REVERSAL` - Reversal
+         */
+        source_type?:
+          "PAYMENT" | "EXPENSE" | "COMMISSION" | "MANUAL" | "REVERSAL";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CashTransactionListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
         headers: {
           [name: string]: unknown;
         };

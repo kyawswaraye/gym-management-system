@@ -71,6 +71,8 @@ TENANT_TABLES = {
     "tenants_staff_invitation",
     "tenants_staff_invitation_role",
     "tenants_staff_profile",
+    "cashbook_cash_session",
+    "cashbook_cash_transaction",
 }
 POLICY_COMMANDS = {"r", "a", "w", "d"}
 

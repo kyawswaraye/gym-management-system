@@ -49,8 +49,20 @@ migrations are in sync; 252 non-PostgreSQL backend tests passed; the
 PostgreSQL suite passed 189 tests; web format, lint, typecheck, and build
 passed, with 263 web tests. OpenAPI regeneration did not change the published
 contract.
-Notification HTTP routes and general payment and receipt endpoints stay
-unpublished for later phases.
+Phase 4 increment 2 publishes the cash-book API: open, manual adjustment,
+reconcile/close, and the session and transaction lists. A membership that
+holds Reception can view, use, and close only a session it opened, even when
+it also holds another role, and it cannot adjust. Until an Owner-configurable
+policy exists, only the protected Owner role may adjust. Movements are
+append-only. The cash-book staff UI is deferred to increment 9. Notification HTTP routes and
+general payment and receipt endpoints stay unpublished for later phases.
+Increment 2 gate evidence: backend ruff, format, and mypy passed and
+migrations stayed in sync; 255 non-PostgreSQL backend tests passed; the
+PostgreSQL suite passed 194 tests; web format, lint, typecheck, and build
+passed, with 263 web tests. OpenAPI and the generated web types include the
+six cash routes and the command `429` responses. A second schema export
+matched that file. The local `make check` contract step still reports those
+files because this increment is not committed.
 `is_pt_client` stays false until Phase 5 derives it from an active trainer
 assignment.
 
