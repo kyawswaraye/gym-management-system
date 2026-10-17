@@ -337,7 +337,8 @@ def test_member_payment_history_authorization_entitlements_and_filters() -> None
     assert set(restored.json()["meta"]) == {"has_more", "next_after"}
 
     check_ins = api.get(f"/api/v1/members/{member.id}/check-ins/", **owner_headers)
-    assert check_ins.status_code == 404
+    assert check_ins.status_code == 200, check_ins.json()
+    assert check_ins.json()["data"] == []
     assert other_gym.id != gym.id
 
 

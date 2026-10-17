@@ -357,6 +357,198 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/check-in-challenges/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["check_in_challenges_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/check-in-display-devices/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["check_in_display_devices_list"];
+    put?: never;
+    post: operations["check_in_display_devices_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/check-in-display-devices/{id}/revoke/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["check_in_display_devices_revoke"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/check-in-display-devices/{id}/rotate-credential/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["check_in_display_devices_rotate_credential"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/check-in-integration-devices/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["check_in_integration_devices_list"];
+    put?: never;
+    post: operations["check_in_integration_devices_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/check-in-integration-devices/{id}/revoke/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["check_in_integration_devices_revoke"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/check-in-integration-devices/{id}/rotate-credential/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["check_in_integration_devices_rotate_credential"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/check-ins/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["check_ins_list"];
+    put?: never;
+    post: operations["check_ins_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/check-ins/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["check_ins_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/check-ins/{id}/check-out/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["check_ins_check_out"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/device/check-in-challenges/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["device_check_in_challenges_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/device/check-ins/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["device_check_ins_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/files/{id}/": {
     parameters: {
       query?: never;
@@ -473,6 +665,70 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/member-auth/login/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["member_auth_login"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member-auth/logout/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["member_auth_logout"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member-auth/refresh/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["member_auth_refresh"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/check-ins/scan/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["member_check_in_scan"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/members/": {
     parameters: {
       query?: never;
@@ -515,6 +771,22 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["members_archive"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/members/{id}/check-ins/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["members_check_in_history"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1215,8 +1487,109 @@ export interface components {
       data: components["schemas"]["AdminSubscription"][];
       message: string;
     };
+    CheckIn: {
+      /** Format: uuid */
+      id: string;
+      member: components["schemas"]["CheckInMember"];
+      /** Format: uuid */
+      membership_id: string | null;
+      /** Format: date-time */
+      check_in_at: string;
+      /** Format: date-time */
+      check_out_at: string | null;
+      method: components["schemas"]["CheckInMethodEnum"];
+      readonly status: string;
+      note: string;
+      eligibility: components["schemas"]["CheckInEligibility"];
+    };
+    CheckInChallengeCreateRequest: {
+      display_location: string;
+    };
+    CheckInChallengeEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["CheckInChallengeIssued"];
+      message: string;
+    };
+    CheckInChallengeIssued: {
+      /** Format: uuid */
+      id: string;
+      payload: string;
+      display_location: string;
+      /** Format: date-time */
+      issued_at: string;
+      /** Format: date-time */
+      expires_at: string;
+      max_uses: number;
+      status: string;
+    };
+    CheckInCheckoutRequest: {
+      /** Format: date-time */
+      occurred_at?: string;
+    };
+    CheckInCollectionMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    CheckInCreateRequest: {
+      /** Format: uuid */
+      member_id: string;
+      /** Format: date-time */
+      occurred_at?: string;
+      note?: string;
+    };
+    CheckInEligibility: {
+      eligible: boolean;
+      backdated: boolean;
+      /** Format: uuid */
+      membership_id: string;
+      membership_status: string;
+      plan_code: string;
+      plan_name: string;
+      /** Format: date */
+      start_date: string;
+      /** Format: date */
+      expiry_date: string;
+      /** Format: date */
+      evaluated_on: string;
+    };
+    CheckInEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["CheckIn"];
+      message: string;
+    };
+    CheckInListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["CheckIn"][];
+      meta: components["schemas"]["CheckInCollectionMeta"];
+      message: string;
+    };
+    CheckInMember: {
+      /** Format: uuid */
+      id: string;
+      member_number: string;
+      first_name: string;
+      last_name: string;
+    };
+    /**
+     * @description * `MANUAL` - Manual
+     *     * `QR` - Qr
+     *     * `NFC` - Nfc
+     *     * `BIOMETRIC` - Biometric
+     * @enum {string}
+     */
+    CheckInMethodEnum: "MANUAL" | "QR" | "NFC" | "BIOMETRIC";
     CheckInSummary: {
       available: boolean;
+      currently_checked_in: boolean;
+      /** Format: uuid */
+      open_check_in_id: string | null;
+      /** Format: date-time */
+      last_check_in_at: string | null;
+      /** Format: date-time */
+      last_check_out_at: string | null;
     };
     CollectionMeta: {
       has_more: boolean;
@@ -1288,6 +1661,27 @@ export interface components {
       data: components["schemas"]["DeletedFile"];
       message: string;
     };
+    DeviceIngestEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["DeviceIngestResult"];
+      message: string;
+    };
+    DeviceIngestRequest: {
+      /** Format: uuid */
+      member_id: string;
+      event_id: string;
+    };
+    DeviceIngestResult: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      member_id: string;
+      method: string;
+      /** Format: date-time */
+      check_in_at: string;
+      status: string;
+    };
     DirectLoginData: {
       access_token: string;
       /** Format: date-time */
@@ -1303,6 +1697,66 @@ export interface components {
       /** @default true */
       success: boolean;
       data: components["schemas"]["DirectLoginData"];
+      message: string;
+    };
+    DisplayDevice: {
+      /** Format: uuid */
+      id: string;
+      label: string;
+      location: string;
+      kind: string;
+      status: string;
+      credential_selector: string;
+      credential_version: number;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      rotated_at: string | null;
+      /** Format: date-time */
+      revoked_at: string | null;
+    };
+    DisplayDeviceCollectionMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    DisplayDeviceCredential: {
+      /** Format: uuid */
+      id: string;
+      label: string;
+      location: string;
+      kind: string;
+      status: string;
+      credential_selector: string;
+      credential_version: number;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      rotated_at: string | null;
+      /** Format: date-time */
+      revoked_at: string | null;
+      credential: string;
+    };
+    DisplayDeviceCredentialEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["DisplayDeviceCredential"];
+      message: string;
+    };
+    DisplayDeviceEnrollRequest: {
+      label: string;
+      location: string;
+    };
+    DisplayDeviceEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["DisplayDevice"];
+      message: string;
+    };
+    DisplayDeviceListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["DisplayDevice"][];
+      meta: components["schemas"]["DisplayDeviceCollectionMeta"];
       message: string;
     };
     DownloadUrl: {
@@ -1477,6 +1931,17 @@ export interface components {
       data: components["schemas"]["HealthData"];
       message: string;
     };
+    IntegrationDeviceEnrollRequest: {
+      label: string;
+      location: string;
+      kind: components["schemas"]["KindEnum"];
+    };
+    /**
+     * @description * `NFC` - NFC
+     *     * `BIOMETRIC` - BIOMETRIC
+     * @enum {string}
+     */
+    KindEnum: "NFC" | "BIOMETRIC";
     LoginEnvelope:
       | components["schemas"]["DirectLoginEnvelope"]
       | components["schemas"]["SelectionLoginEnvelope"]
@@ -1607,6 +2072,9 @@ export interface components {
       /** @default  */
       country_code: string;
     };
+    MemberCheckInScanRequest: {
+      payload: string;
+    };
     MemberCollectionMeta: {
       has_more: boolean;
       next_after: string | null;
@@ -1651,6 +2119,12 @@ export interface components {
       meta: components["schemas"]["MemberCollectionMeta"];
       message: string;
     };
+    MemberLoginInputRequest: {
+      /** Format: email */
+      email: string;
+      password: string;
+      device_name?: string;
+    };
     MemberPaymentHistoryEnvelope: {
       /** @default true */
       success: boolean;
@@ -1671,7 +2145,7 @@ export interface components {
       /** Format: decimal */
       amount: string;
       currency: string;
-      method: components["schemas"]["MethodEnum"];
+      method: components["schemas"]["MemberPaymentHistoryItemMethodEnum"];
       /** Format: date */
       business_date: string;
       /** Format: date-time */
@@ -1679,6 +2153,16 @@ export interface components {
       status: components["schemas"]["MemberPaymentHistoryItemStatusEnum"];
       readonly receipt_number: string | null;
     };
+    /**
+     * @description * `CASH` - Cash
+     *     * `BANK_TRANSFER` - Bank Transfer
+     *     * `CARD` - Card
+     *     * `MOBILE_PAYMENT` - Mobile Payment
+     *     * `OTHER` - Other
+     * @enum {string}
+     */
+    MemberPaymentHistoryItemMethodEnum:
+      "CASH" | "BANK_TRANSFER" | "CARD" | "MOBILE_PAYMENT" | "OTHER";
     /**
      * @description * `DRAFT` - Draft
      *     * `PENDING_APPROVAL` - Pending Approval
@@ -1723,6 +2207,24 @@ export interface components {
       /** @default true */
       success: boolean;
       data: components["schemas"]["MemberSummary"];
+      message: string;
+    };
+    MemberTokenData: {
+      access_token: string;
+      /** Format: date-time */
+      access_expires_at: string;
+      refresh_token: string;
+      /** Format: date-time */
+      refresh_expires_at: string;
+      /** Format: uuid */
+      member_id: string;
+      /** Format: uuid */
+      gym_id: string;
+    };
+    MemberTokenEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MemberTokenData"];
       message: string;
     };
     Membership: {
@@ -1868,15 +2370,6 @@ export interface components {
      */
     MembershipStatusEnum:
       "PENDING" | "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED";
-    /**
-     * @description * `CASH` - Cash
-     *     * `BANK_TRANSFER` - Bank Transfer
-     *     * `CARD` - Card
-     *     * `MOBILE_PAYMENT` - Mobile Payment
-     *     * `OTHER` - Other
-     * @enum {string}
-     */
-    MethodEnum: "CASH" | "BANK_TRANSFER" | "CARD" | "MOBILE_PAYMENT" | "OTHER";
     /** @enum {unknown} */
     NullEnum: null;
     OwnerAcceptInputRequest: {
@@ -3703,6 +4196,851 @@ export interface operations {
       };
     };
   };
+  check_in_challenges_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CheckInChallengeCreateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CheckInChallengeCreateRequest"];
+        "multipart/form-data": components["schemas"]["CheckInChallengeCreateRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckInChallengeEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  check_in_display_devices_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DisplayDeviceListEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  check_in_display_devices_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DisplayDeviceEnrollRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["DisplayDeviceEnrollRequest"];
+        "multipart/form-data": components["schemas"]["DisplayDeviceEnrollRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DisplayDeviceCredentialEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  check_in_display_devices_revoke: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DisplayDeviceEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  check_in_display_devices_rotate_credential: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DisplayDeviceCredentialEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  check_in_integration_devices_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DisplayDeviceListEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  check_in_integration_devices_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["IntegrationDeviceEnrollRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["IntegrationDeviceEnrollRequest"];
+        "multipart/form-data": components["schemas"]["IntegrationDeviceEnrollRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DisplayDeviceCredentialEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  check_in_integration_devices_revoke: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DisplayDeviceEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  check_in_integration_devices_rotate_credential: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DisplayDeviceCredentialEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  check_ins_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+        member_id?: string;
+        /**
+         * @description * `true` - true
+         *     * `false` - false
+         */
+        open?: "true" | "false";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckInListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  check_ins_create: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional replay key for manual check-in. Checkout does not use it. */
+        "Idempotency-Key"?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CheckInCreateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CheckInCreateRequest"];
+        "multipart/form-data": components["schemas"]["CheckInCreateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckInEnvelope"];
+        };
+      };
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckInEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  check_ins_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckInEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  check_ins_check_out: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["CheckInCheckoutRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CheckInCheckoutRequest"];
+        "multipart/form-data": components["schemas"]["CheckInCheckoutRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckInEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  device_check_in_challenges_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Device credential. The value is a public selector plus a secret. This contract does not publish a sample secret. */
+        Authorization: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckInChallengeEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  device_check_ins_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description NFC or biometric device credential. A display credential cannot ingest. This contract does not publish a sample secret. */
+        Authorization: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DeviceIngestRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["DeviceIngestRequest"];
+        "multipart/form-data": components["schemas"]["DeviceIngestRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DeviceIngestEnvelope"];
+        };
+      };
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DeviceIngestEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   files_delete_upload: {
     parameters: {
       query?: never;
@@ -4238,6 +5576,201 @@ export interface operations {
       };
     };
   };
+  member_auth_login: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MemberLoginInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MemberLoginInputRequest"];
+        "multipart/form-data": components["schemas"]["MemberLoginInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberTokenEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_auth_logout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LogoutInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["LogoutInputRequest"];
+        "multipart/form-data": components["schemas"]["LogoutInputRequest"];
+      };
+    };
+    responses: {
+      /** @description Member session revoked. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_auth_refresh: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RefreshInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["RefreshInputRequest"];
+        "multipart/form-data": components["schemas"]["RefreshInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberTokenEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_check_in_scan: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MemberCheckInScanRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MemberCheckInScanRequest"];
+        "multipart/form-data": components["schemas"]["MemberCheckInScanRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckInEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   members_list: {
     parameters: {
       query?: {
@@ -4482,6 +6015,62 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["MemberEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  members_check_in_history: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckInListEnvelope"];
         };
       };
       400: {

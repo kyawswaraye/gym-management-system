@@ -8,6 +8,22 @@ export function hasFeature(session: CurrentUser, code: string): boolean {
   return session.features.some((feature) => feature.feature__code === code);
 }
 
+export function canIssueCheckInChallenge(session: CurrentUser): boolean {
+  return (
+    hasPermission(session, "checkins.challenge.issue") &&
+    hasFeature(session, "members") &&
+    hasFeature(session, "memberships")
+  );
+}
+
+export function canOpenCheckIns(session: CurrentUser): boolean {
+  return (
+    hasPermission(session, "checkins.view") &&
+    hasFeature(session, "members") &&
+    hasFeature(session, "memberships")
+  );
+}
+
 export function hasTenantCapability(
   session: CurrentUser,
   permission: string,

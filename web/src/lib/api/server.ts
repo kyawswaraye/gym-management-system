@@ -31,6 +31,16 @@ const ALLOWED_PATHS = new Set([
 
 const MEMBER_PAYMENT_HISTORY_PATH =
   /^\/api\/v1\/members\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/payments\/$/;
+const MEMBER_CHECK_IN_HISTORY_PATH =
+  /^\/api\/v1\/members\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/check-ins\/$/;
+const CHECK_IN_LIST_PATH = "/api/v1/check-ins/";
+const CHECK_IN_LIST_PATTERN = /^\/api\/v1\/check-ins\/$/;
+const CHECK_IN_DETAIL_PATH =
+  /^\/api\/v1\/check-ins\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/$/;
+const CHECK_IN_CHECKOUT_PATH =
+  /^\/api\/v1\/check-ins\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/check-out\/$/;
+const CHECK_IN_CHALLENGE_PATH = "/api/v1/check-in-challenges/";
+const CHECK_IN_CHALLENGE_PATTERN = /^\/api\/v1\/check-in-challenges\/$/;
 const FILE_UPLOAD_INTENT_PATH = "/api/v1/files/upload-intents/";
 const FILE_UPLOAD_INTENT_PATTERN = /^\/api\/v1\/files\/upload-intents\/$/;
 const FILE_ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -59,6 +69,11 @@ const ALLOWED_TENANT_PATHS = [
   /^\/api\/v1\/gym-memberships\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/roles\/$/,
   /^\/api\/v1\/members\/(?:[0-9a-f-]+\/(?:summary\/|archive\/)?)?$/,
   MEMBER_PAYMENT_HISTORY_PATH,
+  MEMBER_CHECK_IN_HISTORY_PATH,
+  CHECK_IN_LIST_PATTERN,
+  CHECK_IN_DETAIL_PATH,
+  CHECK_IN_CHECKOUT_PATH,
+  CHECK_IN_CHALLENGE_PATTERN,
   /^\/api\/v1\/membership-plans\/(?:[0-9a-f-]+\/(?:archive\/)?)?$/,
   /^\/api\/v1\/memberships\/(?:expiry\/|[0-9a-f-]+\/(?:cancel\/|suspend\/|resume\/)?)?$/,
   /^\/api\/v1\/payments\/(?:[0-9a-f-]+\/(?:submit|approve|reject|cancel|void|refund)\/)?$/,
@@ -99,6 +114,7 @@ const TENANT_AUDIT_FILTERS = new Set([
   "after",
 ]);
 const MEMBER_PAYMENT_HISTORY_FILTERS = new Set(["limit", "after"]);
+const CHECK_IN_LIST_FILTERS = new Set(["member_id", "open", "limit", "after"]);
 const MEMBER_LIST_PATH = "/api/v1/members/";
 const MEMBERSHIP_PLAN_LIST_PATH = "/api/v1/membership-plans/";
 const MEMBERSHIP_LIST_PATH = "/api/v1/memberships/";
@@ -336,6 +352,19 @@ function allowsBoundedText(
   );
 }
 
+function allowsCheckInListQuery(search: string): boolean {
+  const values = strictQueryValues(search, CHECK_IN_LIST_FILTERS);
+  if (!values || !allowsCleanValues(values)) return false;
+  const memberId = values.get("member_id");
+  if (memberId !== undefined && !CANONICAL_UUID.test(memberId)) return false;
+  const open = values.get("open");
+  if (open !== undefined && open !== "true" && open !== "false") return false;
+  return (
+    allowsLimitValue(values.get("limit")) &&
+    allowsCursorValue(values.get("after"))
+  );
+}
+
 function allowsMemberPaymentHistoryQuery(search: string): boolean {
   const values = strictQueryValues(search, MEMBER_PAYMENT_HISTORY_FILTERS);
   if (!values) return false;
@@ -491,6 +520,22 @@ function allowsForwardedQuery(
   }
   if (MEMBER_PAYMENT_HISTORY_PATH.test(pathname)) {
     return method === "GET" && allowsMemberPaymentHistoryQuery(search);
+  }
+  if (MEMBER_CHECK_IN_HISTORY_PATH.test(pathname)) {
+    return method === "GET" && allowsMemberPaymentHistoryQuery(search);
+  }
+  if (pathname === CHECK_IN_LIST_PATH) {
+    if (method === "GET") return allowsCheckInListQuery(search);
+    return method === "POST" && search.length === 0;
+  }
+  if (CHECK_IN_DETAIL_PATH.test(pathname)) {
+    return method === "GET" && search.length === 0;
+  }
+  if (CHECK_IN_CHECKOUT_PATH.test(pathname)) {
+    return method === "POST" && search.length === 0;
+  }
+  if (pathname === CHECK_IN_CHALLENGE_PATH) {
+    return method === "POST" && search.length === 0;
   }
   if (pathname === MEMBER_LIST_PATH) {
     return allowsGetOnlyQuery(method, search, allowsMemberListQuery);

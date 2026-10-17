@@ -38,6 +38,18 @@ def test_seed_refuses_reused_object_keys_and_drops_members_first() -> None:
     assert e2e_reuses_storage_keys() is False
     assert "e2e_reuses_storage_keys" in inspect.getsource(Command.handle)
     source = inspect.getsource(_delete_gym_tree)
+    assert source.index("CheckIn.objects.filter") < source.index("Member.objects.filter")
+    assert source.index("CheckIn.objects.filter") < source.index("Membership.objects.filter")
+    assert source.index("CheckIn.objects.filter") < source.index("CheckInDevice.objects.filter")
+    assert source.index("CheckInChallenge.objects.filter") < source.index(
+        "CheckInDevice.objects.filter"
+    )
+    assert source.index("CheckInDevice.objects.filter") < source.index(
+        "GymMembership.objects.filter"
+    )
+    handle = inspect.getsource(Command.handle)
+    assert "E2E_MEMBER_PASSWORD" in handle
+    assert "e2e-member@example.test" not in handle
     assert source.index("Member.objects.filter") < source.index("FileAsset.objects.filter")
 
 

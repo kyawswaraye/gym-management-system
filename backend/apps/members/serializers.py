@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, cast
 
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.utils import html
 
-from apps.members.models import Member, Membership, MembershipPlan, Payment, Receipt
+from apps.members.checkin_services import aware_instant_text
+from apps.members.models import CheckIn, Member, Membership, MembershipPlan, Payment, Receipt
 from apps.members.normalization import (
     ADDRESS_KEYS,
     address_for_response,
@@ -519,6 +521,10 @@ class PaymentSummarySerializer(serializers.Serializer):
 
 class CheckInSummarySerializer(serializers.Serializer):
     available = serializers.BooleanField()
+    currently_checked_in = serializers.BooleanField()
+    open_check_in_id = serializers.UUIDField(allow_null=True)
+    last_check_in_at = serializers.DateTimeField(allow_null=True)
+    last_check_out_at = serializers.DateTimeField(allow_null=True)
 
 
 class MemberSummarySerializer(serializers.Serializer):
@@ -645,3 +651,106 @@ class ReceiptSerializer(serializers.ModelSerializer):
         model = Receipt
         exclude = ("gym", "created_by_membership_id")
         read_only_fields = "__all__"
+
+
+class AwareDateTimeField(serializers.DateTimeField):
+    def to_internal_value(self, value: Any) -> datetime:
+        if isinstance(value, str) and not aware_instant_text(value):
+            raise serializers.ValidationError("Enter a timezone-aware time.")
+        parsed = super().to_internal_value(value)
+        if timezone.is_naive(parsed):
+            raise serializers.ValidationError("Enter a timezone-aware time.")
+        return parsed
+
+
+class CheckInCreateSerializer(StrictSerializer):
+    member_id = serializers.UUIDField()
+    occurred_at = AwareDateTimeField(required=False)
+    note = serializers.CharField(required=False, allow_blank=True, max_length=500)
+
+
+class CheckInCheckoutSerializer(StrictSerializer):
+    occurred_at = AwareDateTimeField(required=False)
+
+
+class CheckInListQuerySerializer(StrictSerializer):
+    member_id = serializers.UUIDField(required=False)
+    open = serializers.ChoiceField(choices=("true", "false"), required=False)
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=100, default=25)
+    after = OpaqueCursorField(required=False, allow_blank=False, max_length=2048)
+
+
+class CheckInMemberSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    member_number = serializers.CharField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+
+
+class CheckInEligibilitySerializer(serializers.Serializer):
+    eligible = serializers.BooleanField()
+    backdated = serializers.BooleanField()
+    membership_id = serializers.UUIDField()
+    membership_status = serializers.CharField()
+    plan_code = serializers.CharField()
+    plan_name = serializers.CharField()
+    start_date = serializers.DateField()
+    expiry_date = serializers.DateField()
+    evaluated_on = serializers.DateField()
+
+
+class CheckInSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    member = CheckInMemberSerializer()
+    membership_id = serializers.UUIDField(allow_null=True)
+    check_in_at = serializers.DateTimeField()
+    check_out_at = serializers.DateTimeField(allow_null=True)
+    method = serializers.ChoiceField(choices=CheckIn.Method.choices)
+    status = serializers.SerializerMethodField()
+    note = serializers.CharField()
+    eligibility = CheckInEligibilitySerializer(source="eligibility_snapshot")
+
+    def get_status(self, obj: CheckIn) -> str:
+        return "CHECKED_OUT" if obj.check_out_at is not None else "OPEN"
+
+
+class CheckInEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    data = CheckInSerializer()
+    message = serializers.CharField()
+
+
+class CheckInCollectionMetaSerializer(serializers.Serializer):
+    has_more = serializers.BooleanField()
+    next_after = serializers.CharField(allow_null=True)
+
+
+class CheckInListEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    data = CheckInSerializer(many=True)
+    meta = CheckInCollectionMetaSerializer()
+    message = serializers.CharField()
+
+
+class MemberCheckInScanSerializer(StrictSerializer):
+    payload = serializers.CharField(trim_whitespace=False, max_length=128)
+
+
+class CheckInChallengeCreateSerializer(StrictSerializer):
+    display_location = serializers.CharField(max_length=80)
+
+
+class CheckInChallengeIssuedSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    payload = serializers.CharField()
+    display_location = serializers.CharField()
+    issued_at = serializers.DateTimeField()
+    expires_at = serializers.DateTimeField()
+    max_uses = serializers.IntegerField()
+    status = serializers.CharField()
+
+
+class CheckInChallengeEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    data = CheckInChallengeIssuedSerializer()
+    message = serializers.CharField()

@@ -178,7 +178,13 @@ def test_member_summary_serializer_uses_the_explicit_contract() -> None:
                 "net_paid": Decimal("10.00"),
                 "outstanding_membership_balance": Decimal("0.00"),
             },
-            "check_in_summary": {"available": False},
+            "check_in_summary": {
+                "available": True,
+                "currently_checked_in": False,
+                "open_check_in_id": None,
+                "last_check_in_at": None,
+                "last_check_out_at": None,
+            },
         }
     ).data
 
@@ -193,6 +199,12 @@ def test_member_summary_serializer_uses_the_explicit_contract() -> None:
     assert len(rendered["membership_history"]) == 1
     assert set(rendered["payment_summary"]) == PAYMENT_SUMMARY_FIELDS
     assert rendered["payment_summary"]["total_charged"] == "10.00"
-    assert rendered["check_in_summary"] == {"available": False}
+    assert rendered["check_in_summary"] == {
+        "available": True,
+        "currently_checked_in": False,
+        "open_check_in_id": None,
+        "last_check_in_at": None,
+        "last_check_out_at": None,
+    }
     assert "payment_history" not in rendered
     assert "receipt_number" not in rendered["payment_summary"]

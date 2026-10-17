@@ -12,10 +12,37 @@ members, membership plans, and memberships inside one gym, including the full
 member profile, private profile photos, the member summary, nested payment
 history, expiry buckets, and membership-expiry scheduling and delivery
 commands. `docs/DEVELOPMENT_PLAN.md` remains the immutable phase specification
-and was not edited for this closure. Nested check-in history stays unpublished
-for Phase 3. Notification HTTP routes and general payment and receipt
-endpoints stay unpublished for later phases. `is_pt_client` stays false until
-Phase 5 derives it from an active trainer assignment.
+and was not edited for this closure. Manual check-in and check-out, including
+nested member check-in history and the member summary attendance facts, are
+implemented. Staff can issue a rotating onsite QR challenge, and an
+authenticated member can redeem it at `POST /api/v1/member/check-ins/scan/`.
+The generic staff scan path is not published. An owner can enroll, rotate,
+and revoke a display device, and that device can issue its own rotating
+challenge. An owner can enroll an NFC or biometric reader, and that reader
+can record attendance only through the device ingestion route. No
+vendor-specific adapter is implemented, and no biometric template, raw
+capture, or vendor secret is stored. Vendor-specific integration remains
+optional. Trainer scan remains a Phase 5 assignment-scoped extension and is
+not implemented. Public member identity linking, multi-member selection, the
+React Native app, and the broader Phase 7 mobile APIs remain deferred and are
+not prerequisites for the already-linked member QR path.
+
+Phase 3 implementation is complete as of 2026-10-18 under ADRs 0004–0008.
+`docs/DEVELOPMENT_PLAN.md` was not edited for this closure. Closure evidence:
+backend checks passed; 225 non-PostgreSQL unit tests passed; the full
+PostgreSQL security and integration suite passed 171 tests before the new
+check-in plan test, and that focused plan test passed separately; web format,
+lint, typecheck, build, and 263 component and unit tests passed earlier, and
+focused static checks passed after the end-to-end spec change; a clean
+end-to-end reset passed 4 Playwright specs, including member authentication,
+a rotating onsite challenge, member QR scan, staff front desk, history, and
+summary, then member logout and refresh replay denial. The peak query-plan
+baseline passed and is documented in `docs/DATABASE.md`. It is not a
+production load test.
+Notification HTTP routes and general payment and receipt endpoints stay
+unpublished for later phases.
+`is_pt_client` stays false until Phase 5 derives it from an active trainer
+assignment.
 
 Production deployment is not complete. These gates remain open:
 
@@ -40,12 +67,12 @@ Production deployment is not complete. These gates remain open:
   and audit reads;
 - automated security and contract checks.
 
-The target product additionally includes attendance and unattended onsite QR
-check-in, trainer/PT and classes with remaining sessions, product inventory
-and retail sales, reports, announcements/reminders, and a member mobile
-application. These remain incomplete until their `docs/DEVELOPMENT_PLAN.md`
-phase exit criteria pass. Documentation describes the approved target
-contract, not proof that a later phase exists at runtime.
+Phase 3 attendance and authenticated member-self QR check-in are implemented.
+Trainer and PT work, classes with remaining sessions, product inventory and
+retail sales, reports, announcements and reminders, and the member mobile
+application remain incomplete until their `docs/DEVELOPMENT_PLAN.md` phase
+exit criteria pass. Documentation describes the approved target contract, not
+proof that a later phase exists at runtime.
 
 ## Approved runtimes
 
@@ -90,8 +117,10 @@ development. Browser JavaScript never receives authentication tokens.
 ## Browser smoke tests
 
 `make e2e` runs the Playwright Chromium journeys against the real Next.js pages,
-the same-origin BFF, and the Django API on PostgreSQL. The Phase 2 journey also
-uploads a profile photo through live MinIO, ClamAV, and the Caddy object proxy.
+the same-origin BFF, and the Django API on PostgreSQL. The member journey also
+uploads a profile photo through live MinIO, ClamAV, and the Caddy object proxy,
+then checks that member in and out and shows the rotating desk QR. It does not
+redeem a scan.
 It uses only the disposable `gym_platform_e2e` database. Unit tests do not
 install or launch a browser.
 
@@ -136,13 +165,17 @@ Phase 2 routes are published: MembershipPlan and Member list, create, detail,
 update, and archive; Membership list, create, detail, note update, cancel,
 suspend, resume, and expiry buckets; the member summary; nested member payment
 history; and profile-photo upload, complete, download-url, and delete.
-Membership-expiry scheduling and delivery commands are implemented. Nested
-check-in history, notification HTTP routes, and general payment and receipt
-endpoints remain unpublished. Production expiry delivery remains gated on an
+Membership-expiry scheduling and delivery commands are implemented. Manual
+check-in list, detail, create, and check-out, nested member check-in
+history, and staff check-in challenge issuance are published. Member login, refresh,
+and logout are published for one already linked member. The scan route
+stays unpublished.
+Notification HTTP routes and general payment and receipt endpoints remain
+unpublished. Production expiry delivery remains gated on an
 idempotency-capable transactional provider. Production object-storage image
 approval remains gated: Compose uses digest-pinned `docker.io/pgsty/silo`, a
-third-party MinIO-compatible fork, not official MinIO. Check-in, finance, PT,
-reports, and mobile routes stay excluded until their own phases.
+third-party MinIO-compatible fork, not official MinIO. Finance, PT, reports,
+and mobile routes stay excluded until their own phases.
 
 ## Documentation
 

@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 
 import { LogoutButton } from "@/features/auth/logout-button";
 import {
+  canIssueCheckInChallenge,
+  canOpenCheckIns,
   canOpenGymSettings,
   hasPermission,
   hasTenantCapability,
@@ -56,6 +58,8 @@ export function AppShell({
     "payments.view",
     "finance",
   );
+  const canViewCheckIns = canOpenCheckIns(session);
+  const canIssueChallenge = canIssueCheckInChallenge(session);
   const canViewStaff = hasPermission(session, "staff.view");
   const canViewRoles = hasPermission(session, "roles.view");
   const canViewTenantAudit = hasPermission(session, "audit.view");
@@ -124,6 +128,22 @@ export function AppShell({
               href="/memberships"
             >
               Memberships
+            </Link>
+          )}
+          {!platform && canViewCheckIns && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/check-ins"
+            >
+              Check-ins
+            </Link>
+          )}
+          {!platform && canIssueChallenge && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/check-ins/display"
+            >
+              Check-in QR
             </Link>
           )}
           {!platform && canViewPayments && (

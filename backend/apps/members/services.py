@@ -29,6 +29,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.common.db.tenant_context import set_gym_context
 from apps.files.models import FileAsset
+from apps.members.checkin_services import member_check_in_summary
 from apps.members.exceptions import (
     MemberConflict,
     MembershipOverlap,
@@ -253,10 +254,10 @@ def member_payment_summary(*, gym: Gym, member: Member) -> MemberPaymentSummary:
 def member_summary(*, gym: Gym, member: Member) -> dict[str, object]:
     """Assemble the published summary with a fixed query budget.
 
-    After the caller loads the same-gym member, this performs four queries:
+    After the caller loads the same-gym member, this performs six queries:
     the current-membership lookup (LIMIT 1), the 21-row history fetch, the
-    finalized payment aggregate, and the outstanding-balance aggregate.
-    Check-in data is not queried; that summary stays unavailable until Phase 3.
+    finalized payment aggregate, the outstanding-balance aggregate, the latest
+    check-in, and the open check-in. Both check-in reads stay at one row.
     ``is_pt_client`` is not stored here. The summary serializer derives it with
     the same helper as the member serializer.
     """
@@ -274,7 +275,7 @@ def member_summary(*, gym: Gym, member: Member) -> dict[str, object]:
         "membership_history": history,
         "membership_history_has_more": has_more,
         "payment_summary": member_payment_summary(gym=gym, member=member),
-        "check_in_summary": {"available": False},
+        "check_in_summary": member_check_in_summary(gym=gym, member=member),
     }
 
 
@@ -701,6 +702,41 @@ def archive_member(*, gym: Gym, actor: GymMembership, member_id: UUID) -> Member
             "updated_at",
         ]
     )
+    from apps.users.member_sessions import revoke_member_sessions
+
+    revoke_member_sessions(gym_id=gym.id, member_id=member.id, reason="MEMBER_ARCHIVED")
+    return member
+
+
+@transaction.atomic
+def link_member_identity(*, gym: Gym, member_id: UUID, user: Any) -> Member:
+    """Link an existing user to one active member. This is not an HTTP route.
+
+    Owner and member onboarding stays unpublished. Tests and future approved
+    workflows call this so a link increments ``authz_version`` and revokes
+    that member's sessions. A second member for the same user in another gym
+    is allowed by the database and is not a login selector.
+    """
+
+    from apps.users.member_sessions import revoke_member_sessions
+
+    set_gym_context(gym_id=gym.id)
+    member = _locked_member(gym=gym, member_id=member_id)
+    if member.status != Member.Status.ACTIVE:
+        raise ValidationError({"status": ["Only an active member can be linked."]})
+    if not getattr(user, "is_active", False):
+        raise ValidationError({"linked_user_id": ["The user is inactive."]})
+    if member.linked_user_id == user.id:
+        return member
+    member.linked_user_id = user.id
+    member.authz_version += 1
+    try:
+        member.save(update_fields=["linked_user", "authz_version", "updated_at"])
+    except IntegrityError as exc:
+        raise ValidationError(
+            {"linked_user_id": ["This user is already linked to a member in this gym."]}
+        ) from exc
+    revoke_member_sessions(gym_id=gym.id, member_id=member.id, reason="MEMBER_LINK_CHANGED")
     return member
 
 

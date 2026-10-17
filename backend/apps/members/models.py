@@ -13,13 +13,15 @@ from apps.members.normalization import apply_member_normalization
 class Member(TenantModel):
     """Tenant member profile.
 
-    ``linked_user`` and ``authz_version`` are read-only foundations for a later
-    member session. This model does not authenticate members. Migration 0007
-    adds the same-gym profile-photo foreign key, the address shape check, and
-    ``member_linked_user_fk`` with ``ON DELETE RESTRICT``. Django cannot
-    express the composite photo reference, so that foreign key is declared in
-    SQL. ``linked_user`` uses ``db_constraint=False`` so Django does not add a
-    second foreign key beside that SQL ``ON DELETE RESTRICT`` constraint.
+    ``linked_user`` and ``authz_version`` identify a member session. Linking is
+    not exposed on the staff or member HTTP APIs. ``authz_version`` increases
+    when the member is archived or the link changes, and those changes revoke
+    MEMBER refresh sessions. Migration 0007 adds the same-gym profile-photo
+    foreign key, the address shape check, and ``member_linked_user_fk`` with
+    ``ON DELETE RESTRICT``. Django cannot express the composite photo
+    reference, so that foreign key is declared in SQL. ``linked_user`` uses
+    ``db_constraint=False`` so Django does not add a second foreign key beside
+    that SQL ``ON DELETE RESTRICT`` constraint.
     """
 
     class Status(models.TextChoices):
@@ -462,4 +464,297 @@ class Receipt(TenantModel):
             models.UniqueConstraint(
                 fields=["gym", "receipt_number"], name="receipt_gym_number_uniq"
             ),
+        ]
+
+
+class CheckIn(TenantModel):
+    """Attendance record.
+
+    Manual rows name the staff membership and leave ``device_id`` null. A
+    member-self QR row has no membership actor and no device: the challenge
+    hash is not copied onto the visit, and the challenge row already records
+    which display issued it. NFC and biometric ingestion rows have no
+    membership actor and a same-gym device of that capability. Source
+    metadata stays null. Migration 0014 adds the device foreign key and the
+    capability guard. Duplicate windows are service locks, not a
+    timestamp-rounding constraint.
+    """
+
+    class Method(models.TextChoices):
+        MANUAL = "MANUAL"
+        QR = "QR"
+        NFC = "NFC"
+        BIOMETRIC = "BIOMETRIC"
+
+    member = models.ForeignKey(Member, on_delete=models.RESTRICT, related_name="check_ins")
+    membership = models.ForeignKey(
+        Membership,
+        null=True,
+        blank=True,
+        on_delete=models.RESTRICT,
+        related_name="check_ins",
+    )
+    check_in_at = models.DateTimeField()
+    check_out_at = models.DateTimeField(null=True, blank=True)
+    method = models.CharField(max_length=12, choices=Method.choices)
+    recorded_by_membership_id = models.UUIDField(null=True, blank=True)
+    device_id = models.UUIDField(null=True, blank=True)
+    source_metadata = models.JSONField(null=True, blank=True)
+    idempotency_key = models.CharField(max_length=128, null=True, blank=True)
+    note = models.CharField(max_length=500, blank=True, default="")
+    eligibility_snapshot = models.JSONField()
+    created_by_membership_id = models.UUIDField(null=True, blank=True)
+
+    class Meta:
+        db_table = "members_check_in"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="checkin_gym_id_uniq"),
+            models.UniqueConstraint(
+                fields=["gym", "idempotency_key"],
+                condition=models.Q(idempotency_key__isnull=False),
+                name="checkin_gym_idempotency_uniq",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(method__in=["MANUAL", "QR", "NFC", "BIOMETRIC"]),
+                name="checkin_method_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(check_out_at__isnull=True)
+                | models.Q(check_out_at__gt=models.F("check_in_at")),
+                name="checkin_checkout_after_ck",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(method="MANUAL")
+                | (models.Q(device_id__isnull=True) & models.Q(source_metadata__isnull=True)),
+                name="checkin_manual_source_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    method="MANUAL",
+                    created_by_membership_id__isnull=False,
+                    recorded_by_membership_id__isnull=False,
+                )
+                | models.Q(
+                    method="QR",
+                    created_by_membership_id__isnull=True,
+                    recorded_by_membership_id__isnull=True,
+                    device_id__isnull=True,
+                    source_metadata__isnull=True,
+                )
+                | models.Q(
+                    method__in=["NFC", "BIOMETRIC"],
+                    created_by_membership_id__isnull=True,
+                    recorded_by_membership_id__isnull=True,
+                    device_id__isnull=False,
+                    source_metadata__isnull=True,
+                ),
+                name="checkin_actor_method_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(idempotency_key__isnull=True)
+                | models.Q(idempotency_key__regex=r"^[A-Za-z0-9._:-]{16,128}$"),
+                name="checkin_idempotency_key_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["gym", "member", "-check_in_at", "-id"],
+                name="checkin_gym_member_hist_idx",
+            ),
+            models.Index(
+                fields=["gym", "-check_in_at", "-id"],
+                name="checkin_gym_time_idx",
+            ),
+            models.Index(
+                fields=["gym", "member"],
+                condition=models.Q(check_out_at__isnull=True),
+                name="checkin_open_member_idx",
+            ),
+        ]
+
+
+class CheckInChallenge(TenantModel):
+    """Short-lived onsite QR challenge.
+
+    The plaintext secret is never a column. Staff issuance sets the membership
+    actor and leaves ``display_device_id`` null. A display device sets
+    ``display_device_id`` and leaves the membership actors null. The composite
+    device parent is added in migration 0013.
+    """
+
+    class Status(models.TextChoices):
+        ACTIVE = "ACTIVE"
+        CONSUMED = "CONSUMED"
+        EXPIRED = "EXPIRED"
+        REVOKED = "REVOKED"
+
+    challenge_hash = models.CharField(max_length=64)
+    display_location = models.CharField(max_length=80)
+    issued_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    use_count = models.PositiveIntegerField(default=0)
+    max_uses = models.PositiveIntegerField()
+    issued_by_membership_id = models.UUIDField(null=True, blank=True)
+    display_device_id = models.UUIDField(null=True, blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices)
+    created_by_membership_id = models.UUIDField(null=True, blank=True)
+
+    class Meta:
+        db_table = "members_check_in_challenge"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="checkin_chal_gym_id_uniq"),
+            models.UniqueConstraint(fields=["challenge_hash"], name="checkin_chal_hash_uniq"),
+            models.CheckConstraint(
+                condition=models.Q(status__in=["ACTIVE", "CONSUMED", "EXPIRED", "REVOKED"]),
+                name="checkin_chal_status_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(challenge_hash__regex=r"^[0-9a-f]{64}$"),
+                name="checkin_chal_hash_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(display_location__regex=r"^[^[:cntrl:]]{1,80}$"),
+                name="checkin_chal_location_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(max_uses__gte=1) & models.Q(max_uses__lte=100),
+                name="checkin_chal_max_uses_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(use_count__lte=models.F("max_uses")),
+                name="checkin_chal_use_count_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(expires_at__gt=models.F("issued_at")),
+                name="checkin_chal_expiry_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    issued_by_membership_id__isnull=False,
+                    created_by_membership_id__isnull=False,
+                    display_device_id__isnull=True,
+                )
+                | models.Q(
+                    issued_by_membership_id__isnull=True,
+                    created_by_membership_id__isnull=True,
+                    display_device_id__isnull=False,
+                ),
+                name="checkin_chal_actor_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["gym", "status", "expires_at"],
+                name="checkin_chal_status_idx",
+            ),
+            models.Index(
+                fields=["gym"],
+                condition=models.Q(status="ACTIVE"),
+                name="checkin_chal_active_idx",
+            ),
+        ]
+
+
+class CheckInDevice(TenantModel):
+    """Gym-owned credential for one check-in capability.
+
+    ``DISPLAY`` may issue challenges. ``NFC`` may ingest NFC events.
+    ``BIOMETRIC`` may ingest biometric-result events. The selector is public.
+    The secret is stored only as a Django password hash. Plaintext, biometric
+    templates, card secrets, and vendor secrets are not columns. ``kind`` is
+    immutable.
+    """
+
+    class Kind(models.TextChoices):
+        DISPLAY = "DISPLAY"
+        NFC = "NFC"
+        BIOMETRIC = "BIOMETRIC"
+
+    class Status(models.TextChoices):
+        ACTIVE = "ACTIVE"
+        REVOKED = "REVOKED"
+
+    label = models.CharField(max_length=80)
+    location = models.CharField(max_length=80)
+    kind = models.CharField(max_length=12, choices=Kind.choices)
+    status = models.CharField(max_length=12, choices=Status.choices)
+    credential_selector = models.CharField(max_length=64)
+    credential_hash = models.CharField(max_length=128)
+    credential_version = models.PositiveIntegerField()
+    rotated_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    created_by_membership_id = models.UUIDField()
+    rotated_by_membership_id = models.UUIDField(null=True, blank=True)
+    revoked_by_membership_id = models.UUIDField(null=True, blank=True)
+
+    class Meta:
+        db_table = "members_check_in_device"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="checkin_dev_gym_id_uniq"),
+            models.UniqueConstraint(
+                fields=["credential_selector"], name="checkin_dev_selector_uniq"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(kind__in=["DISPLAY", "NFC", "BIOMETRIC"]),
+                name="checkin_dev_kind_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status__in=["ACTIVE", "REVOKED"]),
+                name="checkin_dev_status_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(label__regex=r"^[^[:cntrl:]]{1,80}$"),
+                name="checkin_dev_label_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(location__regex=r"^[^[:cntrl:]]{1,80}$"),
+                name="checkin_dev_location_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(credential_selector__regex=r"^[A-Za-z0-9_-]{16,64}$"),
+                name="checkin_dev_selector_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    credential_hash__regex=(
+                        r"^pbkdf2_sha256\$[1-9][0-9]{6,}\$"
+                        r"[A-Za-z0-9]{22}\$[A-Za-z0-9+/]{43}=$"
+                    )
+                ),
+                name="checkin_dev_hash_ck",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(credential_hash=models.F("credential_selector")),
+                name="checkin_dev_hash_ne_sel_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    credential_version=1,
+                    rotated_at__isnull=True,
+                    rotated_by_membership_id__isnull=True,
+                )
+                | models.Q(
+                    credential_version__gte=2,
+                    rotated_at__isnull=False,
+                    rotated_by_membership_id__isnull=False,
+                ),
+                name="checkin_dev_rotation_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    status="ACTIVE",
+                    revoked_at__isnull=True,
+                    revoked_by_membership_id__isnull=True,
+                )
+                | models.Q(
+                    status="REVOKED",
+                    revoked_at__isnull=False,
+                    revoked_by_membership_id__isnull=False,
+                ),
+                name="checkin_dev_revoke_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["gym", "status"], name="checkin_dev_status_idx"),
         ]

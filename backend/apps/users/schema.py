@@ -93,6 +93,17 @@ class TokenEnvelopeSerializer(serializers.Serializer):
     message = serializers.CharField()
 
 
+class MemberTokenDataSerializer(TokenPairSerializer):
+    member_id = serializers.UUIDField()
+    gym_id = serializers.UUIDField()
+
+
+class MemberTokenEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    data = MemberTokenDataSerializer()
+    message = serializers.CharField()
+
+
 class GymMembershipListEnvelopeSerializer(serializers.Serializer):
     success = serializers.BooleanField(default=True)
     data = GymMembershipRowSerializer(many=True)

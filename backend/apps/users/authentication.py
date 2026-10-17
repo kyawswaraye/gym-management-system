@@ -11,8 +11,9 @@ from apps.common.api.exceptions import AccessTokenExpired, AuthenticationFailed
 from apps.common.db.tenant_context import set_gym_context, set_identity_context
 from apps.tenants.models import Gym, GymMembership, Permission, RolePermission
 
+from .member_sessions import establish_member_principal
 from .models import RefreshSession
-from .tokens import decode_access_token, decode_platform_access_token
+from .tokens import decode_access_token, decode_member_access_token, decode_platform_access_token
 
 
 def _bearer_token(request: Request) -> str | None:
@@ -118,6 +119,49 @@ class PlatformJWTAuthentication(BaseAuthentication):
         )
         request.refresh_session = session
         request.principal_type = RefreshSession.PrincipalType.PLATFORM
+        return session.user, claims
+
+
+class MemberJWTAuthentication(BaseAuthentication):
+    """Validate a member access token without accepting a staff or platform token."""
+
+    def authenticate(self, request: Request) -> tuple[Any, dict[str, Any]] | None:
+        token = _bearer_token(request)
+        if token is None:
+            return None
+        claims = decode_member_access_token(token)
+        user_id = uuid.UUID(claims["sub"])
+        gym_id = uuid.UUID(claims["gym_id"])
+        member_id = uuid.UUID(claims["member_id"])
+        session_id = uuid.UUID(claims["session_id"])
+        set_identity_context(user_id=user_id, request_id=request.request_id)
+        try:
+            session = RefreshSession.objects.select_related("user").get(
+                id=session_id,
+                user_id=user_id,
+                principal_type=RefreshSession.PrincipalType.MEMBER,
+                selected_gym_id=gym_id,
+                member_id=member_id,
+                gym_membership__isnull=True,
+                revoked_at__isnull=True,
+                expires_at__gt=timezone.now(),
+                user__is_active=True,
+            )
+        except RefreshSession.DoesNotExist as exc:
+            raise AuthenticationFailed() from exc
+        member, gym = establish_member_principal(
+            user_id=user_id,
+            member_id=member_id,
+            gym_id=gym_id,
+            request_id=request.request_id,
+            expected_authz_version=claims["authz_version"],
+        )
+        request.gym = gym
+        request.member = member
+        request.gym_membership = None
+        request.permission_codes = frozenset()
+        request.refresh_session = session
+        request.principal_type = RefreshSession.PrincipalType.MEMBER
         return session.user, claims
 
 

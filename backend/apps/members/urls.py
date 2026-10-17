@@ -1,8 +1,24 @@
 from django.urls import path
 
+from apps.members.device_views import (
+    DeviceCheckInChallengeView,
+    DeviceCheckInIngestView,
+    DisplayDeviceListCreateView,
+    DisplayDeviceRevokeView,
+    DisplayDeviceRotateView,
+    IntegrationDeviceListCreateView,
+    IntegrationDeviceRevokeView,
+    IntegrationDeviceRotateView,
+)
+from apps.members.scan_views import MemberCheckInScanView
 from apps.members.views import (
+    CheckInChallengeIssueView,
+    CheckInCheckoutView,
+    CheckInDetailView,
+    CheckInListCreateView,
     DashboardView,
     MemberArchiveView,
+    MemberCheckInHistoryView,
     MemberDetailView,
     MemberListCreateView,
     MemberPaymentHistoryView,
@@ -29,6 +45,68 @@ urlpatterns = [
         "members/<uuid:id>/payments/",
         MemberPaymentHistoryView.as_view(),
         name="member-payment-history",
+    ),
+    path(
+        "members/<uuid:id>/check-ins/",
+        MemberCheckInHistoryView.as_view(),
+        name="member-check-in-history",
+    ),
+    path("check-ins/", CheckInListCreateView.as_view(), name="check-in-list"),
+    path("check-ins/<uuid:id>/", CheckInDetailView.as_view(), name="check-in-detail"),
+    path(
+        "check-ins/<uuid:id>/check-out/",
+        CheckInCheckoutView.as_view(),
+        name="check-in-check-out",
+    ),
+    path(
+        "check-in-challenges/",
+        CheckInChallengeIssueView.as_view(),
+        name="check-in-challenge-issue",
+    ),
+    path(
+        "member/check-ins/scan/",
+        MemberCheckInScanView.as_view(),
+        name="member-check-in-scan",
+    ),
+    path(
+        "check-in-display-devices/",
+        DisplayDeviceListCreateView.as_view(),
+        name="check-in-display-device-list",
+    ),
+    path(
+        "check-in-display-devices/<uuid:id>/rotate-credential/",
+        DisplayDeviceRotateView.as_view(),
+        name="check-in-display-device-rotate",
+    ),
+    path(
+        "check-in-display-devices/<uuid:id>/revoke/",
+        DisplayDeviceRevokeView.as_view(),
+        name="check-in-display-device-revoke",
+    ),
+    path(
+        "device/check-in-challenges/",
+        DeviceCheckInChallengeView.as_view(),
+        name="device-check-in-challenge-issue",
+    ),
+    path(
+        "check-in-integration-devices/",
+        IntegrationDeviceListCreateView.as_view(),
+        name="check-in-integration-device-list",
+    ),
+    path(
+        "check-in-integration-devices/<uuid:id>/rotate-credential/",
+        IntegrationDeviceRotateView.as_view(),
+        name="check-in-integration-device-rotate",
+    ),
+    path(
+        "check-in-integration-devices/<uuid:id>/revoke/",
+        IntegrationDeviceRevokeView.as_view(),
+        name="check-in-integration-device-revoke",
+    ),
+    path(
+        "device/check-ins/",
+        DeviceCheckInIngestView.as_view(),
+        name="device-check-in-ingest",
     ),
     path("membership-plans/", PlanListCreateView.as_view(), name="membership-plan-list"),
     path(

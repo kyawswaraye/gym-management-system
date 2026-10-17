@@ -16,6 +16,12 @@ class StrictSerializer(serializers.Serializer):
         return cast(dict[str, object], super().to_internal_value(data))
 
 
+class MemberLoginInputSerializer(StrictSerializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(trim_whitespace=False, write_only=True)
+    device_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
+
+
 class LoginInputSerializer(StrictSerializer):
     email = serializers.EmailField()
     password = serializers.CharField(trim_whitespace=False, write_only=True)

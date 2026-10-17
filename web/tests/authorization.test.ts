@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   PLATFORM_ACCESS_PATH,
+  canIssueCheckInChallenge,
+  canOpenCheckIns,
   canOpenGymSettings,
   gymSettingsAccess,
   hasFeature,
@@ -38,6 +40,25 @@ describe("tenant authorization helpers", () => {
     expect(hasTenantCapability(current, "payments.view", "members")).toBe(
       false,
     );
+    expect(
+      canOpenCheckIns(session(["checkins.view"], ["members", "memberships"])),
+    ).toBe(true);
+    expect(canOpenCheckIns(session(["checkins.view"], ["members"]))).toBe(
+      false,
+    );
+    expect(
+      canOpenCheckIns(session(["members.view"], ["members", "memberships"])),
+    ).toBe(false);
+    expect(
+      canIssueCheckInChallenge(
+        session(["checkins.challenge.issue"], ["members", "memberships"]),
+      ),
+    ).toBe(true);
+    expect(
+      canIssueCheckInChallenge(
+        session(["checkins.view"], ["members", "memberships"]),
+      ),
+    ).toBe(false);
   });
 
   it("selects the first usable tenant route", () => {

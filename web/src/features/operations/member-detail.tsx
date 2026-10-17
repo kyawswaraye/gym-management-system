@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   type FormEvent,
   useCallback,
@@ -21,6 +22,7 @@ import {
   memberUpdatePayload,
   type MemberProfileInput,
 } from "@/features/operations/member-profile";
+import { formatInstant } from "@/lib/date";
 import type {
   Member,
   MemberPaymentHistoryItem,
@@ -189,6 +191,8 @@ export function MemberDetail({
   canArchive,
   canUpdate,
   canViewPayments,
+  canViewCheckIns = false,
+  timeZone = "Asia/Yangon",
   canUploadPhoto = false,
   canViewPhoto = false,
   canDeletePhoto = false,
@@ -197,6 +201,8 @@ export function MemberDetail({
   canArchive: boolean;
   canUpdate: boolean;
   canViewPayments: boolean;
+  canViewCheckIns?: boolean;
+  timeZone?: string;
   canUploadPhoto?: boolean;
   canViewPhoto?: boolean;
   canDeletePhoto?: boolean;
@@ -520,11 +526,43 @@ export function MemberDetail({
           <h2 className="font-bold" id="check-in-summary-title">
             Check-ins
           </h2>
-          <p className="muted mt-3">
-            {summary.check_in_summary.available
-              ? "Check-in summary is available."
-              : "Check-in summary is not available yet."}
-          </p>
+          {summary.check_in_summary.available ? (
+            <dl className="mt-3 grid gap-2">
+              <div>
+                <dt className="muted">Current visit</dt>
+                <dd>
+                  {summary.check_in_summary.currently_checked_in
+                    ? "Checked in"
+                    : "Not checked in"}
+                </dd>
+              </div>
+              <div>
+                <dt className="muted">Last check-in</dt>
+                <dd>
+                  {formatInstant(
+                    summary.check_in_summary.last_check_in_at,
+                    timeZone,
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="muted">Last check-out</dt>
+                <dd>
+                  {formatInstant(
+                    summary.check_in_summary.last_check_out_at,
+                    timeZone,
+                  )}
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="muted mt-3">Check-in summary is not available yet.</p>
+          )}
+          {canViewCheckIns ? (
+            <p className="mt-3">
+              <Link href="/check-ins">Open front desk</Link>
+            </p>
+          ) : null}
         </section>
       </div>
     </div>

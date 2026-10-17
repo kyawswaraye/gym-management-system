@@ -1,6 +1,6 @@
 # Documentation index
 
-This directory holds the authoritative Phase 0 contracts for the gym management platform. Documentation describes the approved target contract; it is never evidence that a feature exists at runtime. Phase scope and exit criteria stay in [`DEVELOPMENT_PLAN.md`](./DEVELOPMENT_PLAN.md). That file is the immutable roadmap and was not edited when the Phase 2 implementation gate closed. The closure record and the remaining production-only gates are in the repository [`README.md`](../README.md) and in [`API.md`](./API.md).
+This directory holds the authoritative Phase 0 contracts for the gym management platform. Documentation describes the approved target contract; it is never evidence that a feature exists at runtime. Phase scope and exit criteria stay in [`DEVELOPMENT_PLAN.md`](./DEVELOPMENT_PLAN.md). That file is the immutable roadmap and was not edited when the Phase 2 or Phase 3 implementation gates closed. Phase 2 implementation is complete as of 2026-10-17. Phase 3 implementation is complete as of 2026-10-18 under ADRs 0004–0008. The approved QR path is authenticated member-self scan. Trainer scan remains a Phase 5 assignment-scoped extension and is not implemented. Scoped DISPLAY, NFC, and BIOMETRIC credentials and dedicated ingestion abstractions are implemented. No vendor-specific adapter is implemented, and no biometric template, raw capture, or vendor secret is stored. Vendor-specific integration remains optional. Public member identity linking, multi-member selection, the React Native app, and broader Phase 7 mobile APIs remain deferred and are not prerequisites for the already-linked member QR path. The closure evidence and the remaining production-only provider and storage gates are in the repository [`README.md`](../README.md) and in [`API.md`](./API.md).
 
 ## The seven authoritative documents
 
@@ -21,6 +21,11 @@ These seven documents plus every accepted ADR must stay internally consistent. A
 - [ADR 0001 — Single-VPS budget production topology](./adr/0001-single-vps-production-topology.md)
 - [ADR 0002 — Next.js BFF browser authentication](./adr/0002-nextjs-bff-browser-authentication.md)
 - [ADR 0003 — Reception cash-session authority](./adr/0003-reception-cash-session-authority.md)
+- [ADR 0004 — Do not publish a staff check-in scan route](./adr/0004-defer-check-in-scan.md)
+- [ADR 0005 — Member session foundation](./adr/0005-member-session-foundation.md)
+- [ADR 0006 — Member check-in scan](./adr/0006-member-check-in-scan.md)
+- [ADR 0007 — Display-device credentials](./adr/0007-display-device-credentials.md)
+- [ADR 0008 — NFC and biometric ingestion](./adr/0008-device-ingestion.md)
 
 ## Where a rule lives
 

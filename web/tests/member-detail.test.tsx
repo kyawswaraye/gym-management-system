@@ -119,7 +119,13 @@ function summary(overrides: Partial<MemberSummary> = {}): MemberSummary {
       net_paid: "30.00",
       outstanding_membership_balance: "70.00",
     },
-    check_in_summary: { available: false },
+    check_in_summary: {
+      available: true,
+      currently_checked_in: false,
+      open_check_in_id: null,
+      last_check_in_at: null,
+      last_check_out_at: null,
+    },
     ...overrides,
   };
 }
@@ -199,7 +205,7 @@ describe("Member detail summary", () => {
     );
   });
 
-  it("shows the membership, payment summary, and unavailable check-ins", async () => {
+  it("shows the membership, payment summary, and check-in summary", async () => {
     vi.mocked(operationGet).mockResolvedValue(
       summary({ is_pt_client: true, membership_history_has_more: true }),
     );
@@ -245,9 +251,8 @@ describe("Member detail summary", () => {
     expect(
       screen.getByText(/Older memberships are not shown/),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText("Check-in summary is not available yet."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Not checked in")).toBeInTheDocument();
+    expect(screen.getAllByText("Not recorded").length).toBeGreaterThan(0);
     expect(operationGet).toHaveBeenCalledWith(`members/${MEMBER_ID}/summary/`);
     expect(listMemberPayments).not.toHaveBeenCalled();
     expect(

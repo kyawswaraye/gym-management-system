@@ -13,6 +13,8 @@ import type {
   GymProfileUpdate,
   GymSettings,
   GymSettingsUpdate,
+  CheckInChallengeIssued,
+  CheckInRecord,
   CompleteUploadRequest,
   CompletedFile,
   DownloadUrl,
@@ -752,6 +754,142 @@ export async function listMembers(
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   if (query.after !== undefined) params.set("after", query.after);
   return collectionGet<Member>("members", params);
+}
+
+const CHECK_IN_IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{16,128}$/;
+const CHECK_IN_NOTE_LIMIT = 500;
+const AWARE_INSTANT =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+export type CheckInListQuery = {
+  memberId?: string;
+  open?: "true" | "false";
+  limit?: number;
+  after?: string;
+};
+
+export async function listCheckIns(
+  query: CheckInListQuery = {},
+): Promise<CollectionPage<CheckInRecord>> {
+  let memberId: string | undefined;
+  if (query.memberId !== undefined) {
+    memberId = query.memberId.toLowerCase();
+    if (!RESOURCE_ID.test(memberId)) {
+      throw new OperationError("Enter a valid member id.", {
+        member_id: "Enter a valid member id.",
+      });
+    }
+  }
+  if (
+    query.open !== undefined &&
+    query.open !== "true" &&
+    query.open !== "false"
+  ) {
+    throw new OperationError("Open filter is invalid.", {
+      open: "Open filter is invalid.",
+    });
+  }
+  assertLimit(query.limit);
+  assertCursor(query.after);
+  const params = new URLSearchParams();
+  if (memberId) params.set("member_id", memberId);
+  if (query.open) params.set("open", query.open);
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  if (query.after !== undefined) params.set("after", query.after);
+  return collectionGet<CheckInRecord>("check-ins", params);
+}
+
+export async function listMemberCheckIns(
+  memberId: string,
+): Promise<CollectionPage<CheckInRecord>> {
+  const id = assertResourceId(memberId, "Member");
+  const response = await fetch(
+    `/api/operations/members/${id}/check-ins/?limit=10`,
+    { credentials: "same-origin", cache: "no-store" },
+  );
+  const body: unknown = await response.json();
+  if (!response.ok) throw readOperationError(body);
+  return readCollection<CheckInRecord>(body);
+}
+
+function assertCheckInInstant(value: string | undefined): string | undefined {
+  if (value === undefined || value === "") return undefined;
+  if (!AWARE_INSTANT.test(value)) {
+    throw new OperationError("Enter a timezone-aware time.", {
+      occurred_at: "Enter a timezone-aware time.",
+    });
+  }
+  return value;
+}
+
+export async function createCheckIn(input: {
+  memberId: string;
+  note?: string;
+  occurredAt?: string;
+  idempotencyKey: string;
+}): Promise<CheckInRecord> {
+  const memberId = assertResourceId(input.memberId, "Member");
+  const note = input.note?.trim() ?? "";
+  if (note.length > CHECK_IN_NOTE_LIMIT) {
+    throw new OperationError("Note is too long.", {
+      note: "Use 500 characters or fewer.",
+    });
+  }
+  if (!CHECK_IN_IDEMPOTENCY_KEY.test(input.idempotencyKey)) {
+    throw new OperationError("The check-in could not be sent.");
+  }
+  const occurredAt = assertCheckInInstant(input.occurredAt);
+  const payload: { member_id: string; note?: string; occurred_at?: string } = {
+    member_id: memberId,
+  };
+  if (note) payload.note = note;
+  if (occurredAt) payload.occurred_at = occurredAt;
+  const csrf = await getCsrfToken();
+  const response = await fetch("/api/operations/check-ins/", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      ...mutationHeaders(csrf),
+      "Idempotency-Key": input.idempotencyKey,
+    },
+    body: JSON.stringify(payload),
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) throw readOperationError(body);
+  return (body as ApiEnvelope<CheckInRecord>).data;
+}
+
+export async function checkOutCheckIn(
+  checkInId: string,
+  occurredAt?: string,
+): Promise<CheckInRecord> {
+  const id = assertResourceId(checkInId, "Check-in");
+  const instant = assertCheckInInstant(occurredAt);
+  return operationMutation<CheckInRecord>(
+    `check-ins/${id}/check-out`,
+    instant ? { occurred_at: instant } : {},
+  );
+}
+
+export async function issueCheckInChallenge(
+  displayLocation: string,
+): Promise<CheckInChallengeIssued> {
+  const location = displayLocation.trim().replace(/\s+/g, " ");
+  if (
+    location.length < 1 ||
+    location.length > 80 ||
+    /[\u0000-\u001f\u007f]/.test(location)
+  ) {
+    throw new OperationError(
+      "Enter a display location of 1 to 80 characters.",
+      {
+        display_location: "Enter a display location of 1 to 80 characters.",
+      },
+    );
+  }
+  return operationMutation<CheckInChallengeIssued>("check-in-challenges", {
+    display_location: location,
+  });
 }
 
 export async function listMembershipPlans(

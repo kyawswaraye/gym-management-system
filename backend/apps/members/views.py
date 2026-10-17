@@ -8,8 +8,9 @@ from uuid import UUID
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -17,8 +18,26 @@ from rest_framework.views import APIView
 
 from apps.common.api.responses import success_response
 from apps.common.api.schema import ErrorEnvelopeSerializer
+from apps.members.challenge_services import issue_staff_check_in_challenge
+from apps.members.checkin_services import (
+    check_out_check_in,
+    create_manual_check_in,
+    get_check_in,
+    page_check_ins,
+    page_member_check_ins,
+    parse_idempotency_key,
+)
 from apps.members.models import Member, Membership, MembershipPlan, Payment
 from apps.members.serializers import (
+    CheckInChallengeCreateSerializer,
+    CheckInChallengeEnvelopeSerializer,
+    CheckInChallengeIssuedSerializer,
+    CheckInCheckoutSerializer,
+    CheckInCreateSerializer,
+    CheckInEnvelopeSerializer,
+    CheckInListEnvelopeSerializer,
+    CheckInListQuerySerializer,
+    CheckInSerializer,
     MemberArchiveSerializer,
     MemberCreateSerializer,
     MemberEnvelopeSerializer,
@@ -861,4 +880,226 @@ class DashboardView(ReportsFeatureAPIView):
                 "attendance": {"available": False, "today": None},
                 "currency": request.gym.currency,
             }
+        )
+
+
+_CHECK_IN_IDEMPOTENCY = OpenApiParameter(
+    name="Idempotency-Key",
+    type=str,
+    location=OpenApiParameter.HEADER,
+    required=False,
+    description="Optional replay key for manual check-in. Checkout does not use it.",
+)
+
+
+def _request_id(request: Request) -> str:
+    return str(getattr(request, "request_id", "") or "req_unknown")
+
+
+def _client_address(request: Request) -> str | None:
+    address = request.META.get("REMOTE_ADDR")
+    return str(address) if address else None
+
+
+def _user_agent(request: Request) -> str:
+    return str(request.META.get("HTTP_USER_AGENT", ""))
+
+
+class CheckInAPIView(APIView):
+    permission_classes = [IsAuthenticated, RequiresPermission, RequiresEntitlements]
+    required_permission = "checkins.view"
+    required_features = ("members", "memberships")
+
+
+class CheckInListCreateView(CheckInAPIView):
+    def get_permissions(self):
+        self.required_permission = (
+            "checkins.create" if self.request.method == "POST" else "checkins.view"
+        )
+        return super().get_permissions()
+
+    @extend_schema(
+        operation_id="check_ins_list",
+        parameters=[CheckInListQuerySerializer],
+        responses={
+            200: CheckInListEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request) -> Response:
+        query = CheckInListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        filters = query.validated_data
+        rows, meta = page_check_ins(
+            gym=request.gym,
+            actor=request.gym_membership,
+            member_id=filters.get("member_id"),
+            open_state=str(filters.get("open", "")),
+            limit=int(filters["limit"]),
+            after=str(filters.get("after", "")),
+        )
+        return success_response(CheckInSerializer(rows, many=True).data, meta=meta)
+
+    @extend_schema(
+        operation_id="check_ins_create",
+        parameters=[_CHECK_IN_IDEMPOTENCY],
+        request=CheckInCreateSerializer,
+        responses={
+            200: CheckInEnvelopeSerializer,
+            201: CheckInEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request) -> Response:
+        serializer = CheckInCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+        if "occurred_at" in payload and "checkins.update" not in request.permission_codes:
+            raise PermissionDenied("Backdated check-in requires check-in correction permission.")
+        result = create_manual_check_in(
+            gym=request.gym,
+            actor=request.gym_membership,
+            member_id=payload["member_id"],
+            occurred_at=payload.get("occurred_at"),
+            note=str(payload.get("note", "")),
+            idempotency_key=parse_idempotency_key(request.headers.get("Idempotency-Key")),
+            request_id=_request_id(request),
+            ip_address=_client_address(request),
+            user_agent=_user_agent(request),
+        )
+        return success_response(
+            CheckInSerializer(result.check_in).data,
+            message="Check-in recorded" if result.created else "Check-in already recorded",
+            status=status.HTTP_201_CREATED if result.created else status.HTTP_200_OK,
+        )
+
+
+class CheckInDetailView(CheckInAPIView):
+    @extend_schema(
+        operation_id="check_ins_retrieve",
+        responses={
+            200: CheckInEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request, id: UUID) -> Response:
+        check_in = get_check_in(gym=request.gym, actor=request.gym_membership, check_in_id=id)
+        return success_response(CheckInSerializer(check_in).data)
+
+
+class CheckInCheckoutView(CheckInAPIView):
+    required_permission = "checkins.update"
+
+    @extend_schema(
+        operation_id="check_ins_check_out",
+        request=CheckInCheckoutSerializer,
+        responses={
+            200: CheckInEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, id: UUID) -> Response:
+        serializer = CheckInCheckoutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        check_in = check_out_check_in(
+            gym=request.gym,
+            actor=request.gym_membership,
+            check_in_id=id,
+            occurred_at=serializer.validated_data.get("occurred_at"),
+            request_id=_request_id(request),
+            ip_address=_client_address(request),
+            user_agent=_user_agent(request),
+        )
+        return success_response(CheckInSerializer(check_in).data, message="Checked out")
+
+
+class MemberCheckInHistoryView(APIView):
+    permission_classes = [IsAuthenticated, RequiresPermissions, RequiresEntitlements]
+    required_permissions = ("members.view", "checkins.view")
+    required_features = ("members", "memberships")
+
+    @extend_schema(
+        operation_id="members_check_in_history",
+        parameters=[MemberPaymentHistoryQuerySerializer],
+        responses={
+            200: CheckInListEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request, id: UUID) -> Response:
+        query = MemberPaymentHistoryQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        filters = query.validated_data
+        rows, meta = page_member_check_ins(
+            gym=request.gym,
+            actor=request.gym_membership,
+            member_id=id,
+            limit=int(filters["limit"]),
+            after=str(filters.get("after", "")),
+        )
+        return success_response(CheckInSerializer(rows, many=True).data, meta=meta)
+
+
+class CheckInChallengeIssueView(APIView):
+    permission_classes = [IsAuthenticated, RequiresPermission, RequiresEntitlements]
+    required_permission = "checkins.challenge.issue"
+    required_features = ("members", "memberships")
+
+    @extend_schema(
+        operation_id="check_in_challenges_create",
+        request=CheckInChallengeCreateSerializer,
+        responses={
+            201: CheckInChallengeEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request) -> Response:
+        if request.headers.get("Idempotency-Key"):
+            raise ValidationError(
+                {"Idempotency-Key": ["Idempotency-Key is not accepted for a check-in challenge."]}
+            )
+        serializer = CheckInChallengeCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        issued = issue_staff_check_in_challenge(
+            gym=request.gym,
+            actor=request.gym_membership,
+            display_location=str(serializer.validated_data["display_location"]),
+            request_id=_request_id(request),
+            ip_address=_client_address(request),
+            user_agent=_user_agent(request),
+        )
+        challenge = issued.challenge
+        return success_response(
+            CheckInChallengeIssuedSerializer(
+                {
+                    "id": challenge.id,
+                    "payload": issued.payload,
+                    "display_location": challenge.display_location,
+                    "issued_at": challenge.issued_at,
+                    "expires_at": challenge.expires_at,
+                    "max_uses": challenge.max_uses,
+                    "status": challenge.status,
+                }
+            ).data,
+            message="Challenge issued",
+            status=status.HTTP_201_CREATED,
         )

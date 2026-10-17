@@ -75,7 +75,10 @@ def ensure_authorization_catalog() -> SubscriptionPlan:
     Transaction tests flush rows inserted by migrations. The 0003 constants stay
     the historical catalog. ``retail.approve`` is applied only by the 0016
     backfill. ``platform.settings.manage`` is then marked inactive by the 0020
-    retirement, which is what a clean install runs after that seed.
+    retirement. ``checkins.challenge.issue`` is applied only by the 0022
+    backfill, for OWNER and MANAGER templates and copied roles. A clean install
+    runs those operations after the historical seed, and provisioning copies the
+    restored template permissions.
     """
 
     seed = importlib.import_module("apps.tenants.migrations.0003_seed_authorization")
@@ -112,6 +115,10 @@ def ensure_authorization_catalog() -> SubscriptionPlan:
         "apps.tenants.migrations.0020_retire_platform_settings_manage"
     )
     retirement.retire_platform_settings_manage(django_apps, None)
+    challenge = importlib.import_module(
+        "apps.tenants.migrations.0022_check_in_challenge_permission"
+    )
+    challenge.grant_check_in_challenge_issue(django_apps, None)
     feature, _ = Feature.objects.get_or_create(
         code="members",
         defaults={"name": "Members", "description": "Members module"},

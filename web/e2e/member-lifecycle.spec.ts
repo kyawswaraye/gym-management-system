@@ -70,6 +70,46 @@ function nextIsoDate(iso: string): string {
   return date.toISOString().slice(0, 10);
 }
 
+function challengePayload(body: string): string {
+  const payload = responseBodyData(body).payload;
+  if (typeof payload !== "string" || !payload.startsWith("gms-checkin:v1:")) {
+    throw new Error(
+      "The check-in challenge response omitted its one-time code.",
+    );
+  }
+  return payload;
+}
+
+async function expectChallengeStaysOnScreen(
+  page: Page,
+  payload: string,
+): Promise<void> {
+  const image = page.getByRole("img", {
+    name: "Current onsite check-in code",
+    exact: true,
+  });
+  await expect(image).toBeVisible();
+  await expect
+    .poll(() =>
+      image.evaluate((element: HTMLImageElement) => element.naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  const src = (await image.getAttribute("src")) ?? "";
+  expect(src.startsWith("data:image/")).toBe(true);
+  const text = await page.locator("body").innerText();
+  const storage = await page.evaluate(() =>
+    JSON.stringify({
+      localStorage: Object.entries(localStorage),
+      sessionStorage: Object.entries(sessionStorage),
+    }),
+  );
+  expect(text.includes(payload)).toBe(false);
+  expect(text.includes("gms-checkin:v1:")).toBe(false);
+  expect(src.includes(payload)).toBe(false);
+  expect(storage.includes(payload)).toBe(false);
+  expect(storage.includes("gms-checkin:v1:")).toBe(false);
+}
+
 function responseBodyData(body: string): Record<string, unknown> {
   const payload: unknown = JSON.parse(body);
   if (typeof payload !== "object" || payload === null || !("data" in payload)) {
@@ -98,7 +138,7 @@ async function responseData(
 
 async function openSection(
   page: Page,
-  name: "Members" | "Memberships",
+  name: "Members" | "Memberships" | "Check-ins" | "Check-in QR",
 ): Promise<void> {
   await page
     .getByRole("navigation", { name: "Primary" })
@@ -185,7 +225,9 @@ async function expectNoAlert(page: Page): Promise<void> {
   await expect(page.locator("p.error[role='alert']")).toHaveCount(0);
 }
 
-test("owner runs the phase 2 member lifecycle", async ({ page }) => {
+test("owner runs the member lifecycle, front-desk check-in, and rotating QR", async ({
+  page,
+}) => {
   test.setTimeout(300_000);
   assertProfilePhotoFixtures();
   const secrets = storageSecrets();
@@ -748,6 +790,71 @@ test("owner runs the phase 2 member lifecycle", async ({ page }) => {
     await expect(sold).toContainText(REVISED_NOTE);
   });
 
+  await test.step("check the eligible member in and out", async () => {
+    await openSection(page, "Check-ins");
+    await expect(
+      page.getByText("Loading current visits.", { exact: true }),
+    ).toHaveCount(0);
+    await page
+      .getByLabel("Search active members", { exact: true })
+      .fill(memberNumber);
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+    await page
+      .getByRole("button", {
+        name: `Select ${UPDATED_NAME} (${memberNumber})`,
+        exact: true,
+      })
+      .click();
+    await expect(
+      page.getByText("No check-ins yet.", { exact: true }),
+    ).toBeVisible();
+    await page.getByLabel("Note", { exact: true }).fill("E2E desk visit");
+    const checkedIn = page.waitForResponse(
+      (response) =>
+        settledResponse(response) &&
+        response.request().method() === "POST" &&
+        /\/api\/operations\/check-ins\/?$/.test(
+          new URL(response.url()).pathname,
+        ),
+    );
+    await page.getByRole("button", { name: "Check in", exact: true }).click();
+    expect((await checkedIn).ok()).toBeTruthy();
+    await expect(page.getByText("Checked in.", { exact: true })).toBeVisible();
+    const openVisits = page.getByRole("region", {
+      name: "Currently checked in",
+    });
+    await expect(openVisits).toContainText(
+      `${UPDATED_NAME} (${memberNumber}) · Open`,
+    );
+    await expect(openVisits).toContainText("E2E desk visit");
+
+    const checkedOut = page.waitForResponse(
+      (response) =>
+        settledResponse(response) &&
+        response.request().method() === "POST" &&
+        /\/api\/operations\/check-ins\/[0-9a-f-]+\/check-out\/?$/.test(
+          new URL(response.url()).pathname,
+        ),
+    );
+    await page
+      .getByRole("button", {
+        name: `Check out ${UPDATED_NAME} (${memberNumber})`,
+        exact: true,
+      })
+      .click();
+    expect((await checkedOut).ok()).toBeTruthy();
+    await expect(page.getByText("Checked out.", { exact: true })).toBeVisible();
+    await expect(openVisits).toContainText("Nobody is checked in.");
+    const recent = page.getByRole("region", {
+      name: `${UPDATED_NAME} (${memberNumber})`,
+    });
+    await expect(recent).toContainText(
+      `${UPDATED_NAME} (${memberNumber}) · Checked out`,
+    );
+    await expect(recent).toContainText("E2E desk visit");
+    await expectNoAlert(page);
+  });
+
   await test.step("show the active summary, then suspend, resume, and cancel", async () => {
     await openSection(page, "Members");
     await memberRow(page, UPDATED_NAME)
@@ -758,6 +865,12 @@ test("owner runs the phase 2 member lifecycle", async ({ page }) => {
       `${REVISED_PLAN}: ${startDate} – ${startDate} (UNPAID)`,
     );
     await expect(current).toContainText("1 day remaining");
+    const attendance = page.getByRole("region", { name: "Check-ins" });
+    await expect(attendance).toContainText("Not checked in");
+    await expect(attendance).not.toContainText("Not recorded");
+    await expect(
+      attendance.getByRole("link", { name: "Open front desk", exact: true }),
+    ).toBeVisible();
 
     await openSection(page, "Memberships");
     const sold = memberships.getByRole("row").filter({ hasText: REVISED_PLAN });
@@ -928,6 +1041,53 @@ test("owner runs the phase 2 member lifecycle", async ({ page }) => {
     await expect(
       startForm.getByRole("list", { name: "Matching members" }),
     ).toHaveCount(0);
+  });
+
+  await test.step("show a rotating desk code without storing it", async () => {
+    const scans: string[] = [];
+    const recordScan = (request: { url: () => string }): void => {
+      if (request.url().includes("/check-ins/scan")) scans.push(request.url());
+    };
+    page.on("request", recordScan);
+    const issued = page.waitForResponse(
+      (response) =>
+        settledResponse(response) &&
+        response.request().method() === "POST" &&
+        /\/api\/operations\/check-in-challenges\/?$/.test(
+          new URL(response.url()).pathname,
+        ),
+    );
+    await openSection(page, "Check-in QR");
+    const first = await issued;
+    const firstBody = await first.text();
+    expect(first.status(), firstBody).toBe(201);
+    const firstPayload = challengePayload(firstBody);
+    await expectChallengeStaysOnScreen(page, firstPayload);
+
+    const rotated = page.waitForResponse(
+      (response) =>
+        settledResponse(response) &&
+        response.request().method() === "POST" &&
+        /\/api\/operations\/check-in-challenges\/?$/.test(
+          new URL(response.url()).pathname,
+        ),
+    );
+    await page
+      .getByLabel("Display location", { exact: true })
+      .fill("Side entrance");
+    await page
+      .getByRole("button", { name: "Update location", exact: true })
+      .click();
+    const second = await rotated;
+    const secondBody = await second.text();
+    expect(second.status(), secondBody).toBe(201);
+    const secondPayload = challengePayload(secondBody);
+    expect(secondPayload).not.toBe(firstPayload);
+    await expectChallengeStaysOnScreen(page, secondPayload);
+    await expectChallengeStaysOnScreen(page, firstPayload);
+    expect(scans).toEqual([]);
+    page.off("request", recordScan);
+    await expectNoAlert(page);
   });
 
   const html = await page.content();

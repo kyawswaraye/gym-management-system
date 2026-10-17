@@ -115,8 +115,16 @@ def test_file_migrations_are_linear_and_follow_the_tenants_leaf() -> None:
     assert initial == [("tenants", "0020_retire_platform_settings_manage")]
     assert security == [("files", "0001_initial")]
     assert ("files", "0002_rls_integrity_and_grants") in profile
+    assert ("tenants", "0021_security_definer_least_privilege") in profile
     assert _leaves(nodes)["files"] == [("files", "0003_profile_photo_contract")]
-    assert _leaves(nodes)["tenants"] == [("tenants", "0021_security_definer_least_privilege")]
+    assert _leaves(nodes)["tenants"] == [("tenants", "0023_member_bootstrap")]
+    assert nodes[("tenants", "0022_check_in_challenge_permission")] == [
+        ("tenants", "0021_security_definer_least_privilege")
+    ]
+    assert nodes[("tenants", "0023_member_bootstrap")] == [
+        ("tenants", "0022_check_in_challenge_permission"),
+        ("members", "0007_member_profile_foundation"),
+    ]
     assert all(len(leaves) == 1 for leaves in _leaves(nodes).values())
 
 

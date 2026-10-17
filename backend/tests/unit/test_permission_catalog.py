@@ -24,6 +24,12 @@ def test_reception_cash_grants_are_conditional_baseline_only() -> None:
     )
 
 
+def test_historical_catalog_omits_check_in_challenge_issue() -> None:
+    assert "checkins.challenge.issue" not in seed.PERMISSION_CODES
+    for key in ("OWNER", "MANAGER", "RECEPTIONIST", "ACCOUNTANT", "TRAINER"):
+        assert "checkins.challenge.issue" not in seed.TEMPLATES[key]
+
+
 def test_historical_catalog_omits_retail_approve() -> None:
     assert "retail.approve" not in seed.PERMISSION_CODES
     assert "retail.approve" not in seed.OWNER

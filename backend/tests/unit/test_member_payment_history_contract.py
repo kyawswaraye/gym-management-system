@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from django.core import signing
 from django.http import QueryDict
-from django.urls import Resolver404, resolve
+from django.urls import resolve
 from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 
@@ -270,18 +270,26 @@ def test_payment_history_permissions_fail_closed_without_weakening_single_checks
     assert RequiresPermission in MemberSummaryView.permission_classes
 
 
-def test_schema_allowlist_publishes_only_the_nested_payment_history() -> None:
+def test_schema_allowlist_publishes_nested_member_history() -> None:
     endpoints = [
         ("/api/v1/members/{id}/payments/", "", "GET", lambda: None),
         ("/api/v1/members/{id}/check-ins/", "", "GET", lambda: None),
         ("/api/v1/payments/", "", "GET", lambda: None),
         ("/api/v1/payments/{id}/refund/", "", "POST", lambda: None),
         ("/api/v1/receipts/", "", "GET", lambda: None),
+        ("/api/v1/check-in-challenges/", "", "POST", lambda: None),
+        ("/api/v1/check-ins/scan/", "", "POST", lambda: None),
+        ("/api/v1/member/check-ins/scan/", "", "POST", lambda: None),
     ]
     published = {path for path, *_rest in phase_1a_endpoints(endpoints)}
 
-    assert published == {"/api/v1/members/{id}/payments/"}
-    match = resolve(f"/api/v1/members/{MEMBER_ID}/payments/")
-    assert match.url_name == "member-payment-history"
-    with pytest.raises(Resolver404):
-        resolve(f"/api/v1/members/{MEMBER_ID}/check-ins/")
+    assert published == {
+        "/api/v1/members/{id}/payments/",
+        "/api/v1/members/{id}/check-ins/",
+        "/api/v1/check-in-challenges/",
+        "/api/v1/member/check-ins/scan/",
+    }
+    payments = resolve(f"/api/v1/members/{MEMBER_ID}/payments/")
+    check_ins = resolve(f"/api/v1/members/{MEMBER_ID}/check-ins/")
+    assert payments.url_name == "member-payment-history"
+    assert check_ins.url_name == "member-check-in-history"

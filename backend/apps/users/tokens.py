@@ -39,6 +39,21 @@ PLATFORM_REQUIRED_CLAIMS = {
     "jti",
 }
 
+MEMBER_REQUIRED_CLAIMS = {
+    "iss",
+    "aud",
+    "sub",
+    "gym_id",
+    "member_id",
+    "session_id",
+    "authz_version",
+    "token_type",
+    "iat",
+    "nbf",
+    "exp",
+    "jti",
+}
+
 
 def _b64json(segment: str) -> dict[str, Any]:
     try:
@@ -113,6 +128,39 @@ def issue_platform_access_token(
     return token, expires
 
 
+def issue_member_access_token(
+    *,
+    user_id: uuid.UUID,
+    gym_id: uuid.UUID,
+    member_id: uuid.UUID,
+    session_id: uuid.UUID,
+    authz_version: int,
+) -> tuple[str, datetime]:
+    now = datetime.now(UTC).replace(microsecond=0)
+    expires = now + timedelta(seconds=600)
+    claims = {
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_MEMBER_AUDIENCE,
+        "sub": str(user_id),
+        "gym_id": str(gym_id),
+        "member_id": str(member_id),
+        "session_id": str(session_id),
+        "authz_version": authz_version,
+        "token_type": "member_access",
+        "iat": int(now.timestamp()),
+        "nbf": int(now.timestamp()),
+        "exp": int(expires.timestamp()),
+        "jti": str(uuid.uuid4()),
+    }
+    token = jwt.encode(
+        claims,
+        settings.JWT_PRIVATE_KEY,
+        algorithm="RS256",
+        headers={"typ": "JWT", "kid": settings.JWT_KEY_ID},
+    )
+    return token, expires
+
+
 def _decode_access_token(
     token: str,
     *,
@@ -156,7 +204,8 @@ def _decode_access_token(
         or claims["iat"] > now + settings.JWT_CLOCK_SKEW_SECONDS
     ):
         raise AuthenticationFailed()
-    for field in required_claims & {"sub", "gym_id", "gym_membership_id", "session_id", "jti"}:
+    uuid_fields = {"sub", "gym_id", "gym_membership_id", "member_id", "session_id", "jti"}
+    for field in required_claims & uuid_fields:
         try:
             uuid.UUID(claims[field])
         except (ValueError, TypeError, AttributeError) as exc:
@@ -183,3 +232,15 @@ def decode_platform_access_token(token: str) -> dict[str, Any]:
         audience=settings.JWT_PLATFORM_AUDIENCE,
         token_type="platform_access",
     )
+
+
+def decode_member_access_token(token: str) -> dict[str, Any]:
+    claims = _decode_access_token(
+        token,
+        required_claims=MEMBER_REQUIRED_CLAIMS,
+        audience=settings.JWT_MEMBER_AUDIENCE,
+        token_type="member_access",
+    )
+    if not isinstance(claims.get("authz_version"), int) or claims["authz_version"] < 1:
+        raise AuthenticationFailed()
+    return claims

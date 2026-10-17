@@ -268,7 +268,13 @@ def test_member_summary_is_scoped_permissioned_and_query_strict() -> None:
     assert data["days_remaining"] is None
     assert data["membership_history"] == []
     assert data["membership_history_has_more"] is False
-    assert data["check_in_summary"] == {"available": False}
+    assert data["check_in_summary"] == {
+        "available": True,
+        "currently_checked_in": False,
+        "open_check_in_id": None,
+        "last_check_in_at": None,
+        "last_check_out_at": None,
+    }
     assert set(data["payment_summary"]) == PAYMENT_FIELDS
     assert data["payment_summary"]["available"] is True
     assert data["payment_summary"]["currency"] == gym_a.currency

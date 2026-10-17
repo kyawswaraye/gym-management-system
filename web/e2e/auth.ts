@@ -28,6 +28,14 @@ export const ownerAccount: E2EAccount = {
   totpSecret: requiredEnv("E2E_OWNER_TOTP_SECRET"),
 };
 
+export function memberAccount(): E2EAccount {
+  return {
+    email: "e2e-member@example.test",
+    password: requiredEnv("E2E_MEMBER_PASSWORD"),
+    totpSecret: "",
+  };
+}
+
 const SECRET_RESPONSE =
   /"(?:access_token|refresh_token|mfa_challenge_token|invitation_token|gym_selection_ticket)"/;
 

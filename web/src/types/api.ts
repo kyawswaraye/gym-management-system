@@ -80,6 +80,17 @@ export type ProfilePhotoDownload = {
   url: string;
   contentType: ProfilePhotoContentType;
 };
+export type CheckInChallengeIssued = {
+  id: string;
+  payload: string;
+  display_location: string;
+  issued_at: string;
+  expires_at: string;
+  max_uses: number;
+  status: string;
+};
+export type CheckInRecord = components["schemas"]["CheckIn"];
+export type CheckInListMeta = components["schemas"]["CheckInCollectionMeta"];
 export type MemberPaymentHistoryItem =
   components["schemas"]["MemberPaymentHistoryItem"];
 export type MemberPaymentHistoryMeta =

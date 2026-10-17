@@ -17,6 +17,13 @@ def test_health_does_not_require_bff_secret() -> None:
 
 
 @override_settings(BFF_SHARED_SECRET=SECRET)
+def test_member_auth_does_not_require_the_bff_secret() -> None:
+    request = RequestFactory().post("/api/v1/member-auth/login/")
+    response = _middleware()(request)
+    assert response.status_code == 200
+
+
+@override_settings(BFF_SHARED_SECRET=SECRET)
 def test_auth_without_bff_secret_is_rejected() -> None:
     request = RequestFactory().post("/api/v1/auth/login/")
     response = _middleware()(request)

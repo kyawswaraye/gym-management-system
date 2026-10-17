@@ -160,6 +160,11 @@ class RefreshSession(UUIDTimestampModel):
             models.Index(
                 fields=["selected_gym", "gym_membership"], name="refresh_staff_context_idx"
             ),
+            models.Index(
+                fields=["selected_gym", "member_id"],
+                name="refresh_member_ctx_idx",
+                condition=models.Q(member_id__isnull=False),
+            ),
         ]
         constraints = [
             models.CheckConstraint(

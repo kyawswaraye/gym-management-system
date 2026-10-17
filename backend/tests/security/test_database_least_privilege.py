@@ -34,6 +34,8 @@ pytestmark = [
 
 DIRECT_FUNCTIONS = frozenset(
     {
+        "app_check_in_device(text)",
+        "app_linked_members()",
         "app_owner_invitation(text)",
         "app_staff_invitation(text)",
         "app_staff_memberships()",
@@ -155,6 +157,48 @@ def _assert_least_privilege(cursor: CatalogCursor) -> None:
         if select:
             readable.add(str(table))
     assert readable == BOOTSTRAP_TABLES
+    cursor.execute(
+        """
+        SELECT has_column_privilege(
+                 'gym_auth_bootstrap', 'members_member', 'id', 'SELECT'
+               ),
+               has_column_privilege(
+                 'gym_auth_bootstrap', 'members_member', 'gym_id', 'SELECT'
+               ),
+               has_column_privilege(
+                 'gym_auth_bootstrap', 'members_member', 'linked_user_id', 'SELECT'
+               ),
+               has_column_privilege(
+                 'gym_auth_bootstrap', 'members_member', 'status', 'SELECT'
+               ),
+               has_column_privilege(
+                 'gym_auth_bootstrap', 'members_member', 'authz_version', 'SELECT'
+               ),
+               has_column_privilege(
+                 'gym_auth_bootstrap', 'members_member', 'first_name', 'SELECT'
+               ),
+               has_column_privilege(
+                 'gym_auth_bootstrap', 'members_member', 'email', 'SELECT'
+               ),
+               has_table_privilege('gym_auth_bootstrap', 'members_member', 'SELECT'),
+               has_table_privilege('gym_auth_bootstrap', 'members_member', 'INSERT'),
+               has_table_privilege('gym_auth_bootstrap', 'members_member', 'UPDATE'),
+               has_table_privilege('gym_auth_bootstrap', 'members_member', 'DELETE')
+        """
+    )
+    assert cursor.fetchone() == (
+        True,
+        True,
+        True,
+        True,
+        True,
+        False,
+        False,
+        False,
+        False,
+        False,
+        False,
+    )
 
     cursor.execute(
         """

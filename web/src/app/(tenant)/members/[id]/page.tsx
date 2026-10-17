@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { MemberDetail } from "@/features/operations/member-detail";
 import {
+  canOpenCheckIns,
   hasTenantCapability,
   memberPhotoAccess,
   tenantHomePath,
@@ -29,6 +30,7 @@ export default async function MemberDetailPage({
         canDeletePhoto={photo.canDelete}
         canUpdate={session.permissions.includes("members.update")}
         canUploadPhoto={photo.canUpload}
+        canViewCheckIns={canOpenCheckIns(session)}
         canViewPayments={hasTenantCapability(
           session,
           "payments.view",
@@ -36,6 +38,7 @@ export default async function MemberDetailPage({
         )}
         canViewPhoto={photo.canView}
         memberId={id}
+        timeZone={session.gym?.timezone ?? "Asia/Yangon"}
       />
     </section>
   );

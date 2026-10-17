@@ -32,11 +32,28 @@ PUBLISHED_PATHS = {
     "/api/v1/auth/select-gym/",
     "/api/v1/gym/",
     "/api/v1/gym-memberships/{id}/roles/",
+    "/api/v1/member-auth/login/",
+    "/api/v1/member-auth/logout/",
+    "/api/v1/member-auth/refresh/",
+    "/api/v1/member/check-ins/scan/",
     "/api/v1/members/",
     "/api/v1/members/{id}/",
     "/api/v1/members/{id}/archive/",
+    "/api/v1/members/{id}/check-ins/",
     "/api/v1/members/{id}/payments/",
     "/api/v1/members/{id}/summary/",
+    "/api/v1/check-ins/",
+    "/api/v1/check-ins/{id}/",
+    "/api/v1/check-ins/{id}/check-out/",
+    "/api/v1/check-in-challenges/",
+    "/api/v1/check-in-display-devices/",
+    "/api/v1/check-in-display-devices/{id}/revoke/",
+    "/api/v1/check-in-display-devices/{id}/rotate-credential/",
+    "/api/v1/device/check-in-challenges/",
+    "/api/v1/check-in-integration-devices/",
+    "/api/v1/check-in-integration-devices/{id}/revoke/",
+    "/api/v1/check-in-integration-devices/{id}/rotate-credential/",
+    "/api/v1/device/check-ins/",
     "/api/v1/membership-plans/",
     "/api/v1/membership-plans/{id}/",
     "/api/v1/membership-plans/{id}/archive/",
@@ -101,16 +118,18 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
     assert "/api/v1/members/{id}/" in schema["paths"]
     assert "/api/v1/members/{id}/archive/" in schema["paths"]
     unpublished = (
-        "/api/v1/members/{id}/check-ins/",
+        "/api/v1/check-ins/scan/",
+        "/api/v1/member/me/",
         "/api/v1/notifications/",
         "/api/v1/payments/",
         "/api/v1/receipts/",
     )
     assert "/api/v1/members/{id}/summary/" in schema["paths"]
     assert "/api/v1/members/{id}/payments/" in schema["paths"]
+    assert "/api/v1/members/{id}/check-ins/" in schema["paths"]
+    assert "/api/v1/check-ins/" in schema["paths"]
     assert all(path not in schema["paths"] for path in unpublished)
     assert not any(path.startswith(unpublished) for path in schema["paths"])
-    assert not any("check-ins" in path for path in schema["paths"])
     assert "/api/v1/payments/" not in schema["paths"]
     assert "/api/v1/receipts/" not in schema["paths"]
     assert "/api/v1/dashboard/" not in schema["paths"]
@@ -415,7 +434,16 @@ def test_openapi_documents_member_summary() -> None:
         assert payment["properties"][name]["type"] == "string"
         assert payment["properties"][name]["format"] == "decimal"
     check_in = _schema_component(document, data["properties"]["check_in_summary"])
-    assert set(check_in["properties"]) == {"available"}
+    assert set(check_in["properties"]) == {
+        "available",
+        "currently_checked_in",
+        "open_check_in_id",
+        "last_check_in_at",
+        "last_check_out_at",
+    }
+    assert check_in["properties"]["open_check_in_id"]["nullable"] is True
+    assert check_in["properties"]["last_check_in_at"]["nullable"] is True
+    assert check_in["properties"]["last_check_out_at"]["nullable"] is True
     rendered = json.dumps(payment)
     for secret in (
         "receipt",
@@ -529,6 +557,137 @@ def test_openapi_documents_bff_staff_and_platform_authentication_boundaries() ->
         "bearerFormat": "JWT",
     }
     assert document["components"]["securitySchemes"]["staffOrPlatformBearerAuth"] == {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+    }
+
+
+def test_openapi_documents_member_auth_without_a_selector_or_bff_gate() -> None:
+    document = generated_schema()
+    login = document["paths"]["/api/v1/member-auth/login/"]["post"]
+    refresh = document["paths"]["/api/v1/member-auth/refresh/"]["post"]
+    logout = document["paths"]["/api/v1/member-auth/logout/"]["post"]
+    parameters = login.get("parameters", [])
+    assert not any(parameter["name"] == "X-Gym-BFF-Secret" for parameter in parameters)
+    assert login.get("security", []) == []
+    assert refresh.get("security", []) == []
+    assert logout.get("security", []) == []
+    body = login["requestBody"]["content"]["application/json"]["schema"]
+    if "$ref" in body:
+        body = document["components"]["schemas"][body["$ref"].rsplit("/", 1)[-1]]
+    assert set(body["properties"]) == {"email", "password", "device_name"}
+    assert "member_id" not in body["properties"]
+    assert "gym_id" not in body["properties"]
+    assert "200" in login["responses"]
+    assert "200" in refresh["responses"]
+    assert "204" in logout["responses"]
+    assert "/api/v1/member/me/" not in document["paths"]
+    assert "/api/v1/check-ins/scan/" not in document["paths"]
+
+
+def test_openapi_documents_display_devices_without_a_sample_secret() -> None:
+    document = generated_schema()
+    rendered = json.dumps(
+        {
+            "devices": document["paths"]["/api/v1/check-in-display-devices/"],
+            "rotate": document["paths"]["/api/v1/check-in-display-devices/{id}/rotate-credential/"],
+            "revoke": document["paths"]["/api/v1/check-in-display-devices/{id}/revoke/"],
+            "issue": document["paths"]["/api/v1/device/check-in-challenges/"],
+        }
+    )
+    assert "gms-device:" not in rendered
+    assert "pbkdf2" not in rendered
+    listing = document["paths"]["/api/v1/check-in-display-devices/"]
+    assert {"staffBearerAuth": []} in listing["get"]["security"]
+    assert {"staffBearerAuth": []} in listing["post"]["security"]
+    enroll = _schema(
+        document, listing["post"]["requestBody"]["content"]["application/json"]["schema"]
+    )
+    assert set(enroll["properties"]) == {"label", "location"}
+    issue = document["paths"]["/api/v1/device/check-in-challenges/"]["post"]
+    assert issue.get("security", []) == []
+    assert "requestBody" not in issue
+    assert any(parameter["name"] == "Authorization" for parameter in issue["parameters"])
+    assert not any(
+        parameter["name"] == "X-Gym-BFF-Secret" for parameter in issue.get("parameters", [])
+    )
+
+
+def test_openapi_documents_device_ingestion_without_a_secret() -> None:
+    document = generated_schema()
+    rendered = json.dumps(
+        {
+            "devices": document["paths"]["/api/v1/check-in-integration-devices/"],
+            "rotate": document["paths"][
+                "/api/v1/check-in-integration-devices/{id}/rotate-credential/"
+            ],
+            "revoke": document["paths"]["/api/v1/check-in-integration-devices/{id}/revoke/"],
+            "ingest": document["paths"]["/api/v1/device/check-ins/"],
+        }
+    )
+    assert "gms-device:" not in rendered
+    assert "pbkdf2" not in rendered
+    assert "credential_hash" not in rendered
+    listing = document["paths"]["/api/v1/check-in-integration-devices/"]
+    assert {"staffBearerAuth": []} in listing["get"]["security"]
+    assert {"staffBearerAuth": []} in listing["post"]["security"]
+    enroll = _schema(
+        document, listing["post"]["requestBody"]["content"]["application/json"]["schema"]
+    )
+    assert set(enroll["properties"]) == {"label", "location", "kind"}
+    device = document["components"]["schemas"]["DisplayDevice"]
+    assert "kind" in device["properties"]
+    assert "credential_hash" not in device["properties"]
+    ingest = document["paths"]["/api/v1/device/check-ins/"]["post"]
+    assert ingest.get("security", []) == []
+    assert not any(parameter["name"] == "X-Gym-BFF-Secret" for parameter in ingest["parameters"])
+    assert not any(parameter["name"] == "Idempotency-Key" for parameter in ingest["parameters"])
+    body = _schema(document, ingest["requestBody"]["content"]["application/json"]["schema"])
+    assert set(body["properties"]) == {"member_id", "event_id"}
+    result = document["components"]["schemas"]["DeviceIngestResult"]
+    assert set(result["properties"]) == {"id", "member_id", "method", "check_in_at", "status"}
+
+
+def _schema(document: dict[str, object], body: dict[str, object]) -> dict[str, object]:
+    if "$ref" not in body:
+        return body
+    name = str(body["$ref"]).rsplit("/", 1)[-1]
+    schemas = document["components"]["schemas"]
+    assert isinstance(schemas, dict)
+    resolved = schemas[name]
+    assert isinstance(resolved, dict)
+    return resolved
+
+
+def test_openapi_documents_member_scan_payload_only() -> None:
+    document = generated_schema()
+    assert "/api/v1/check-ins/scan/" not in document["paths"]
+    operation = document["paths"]["/api/v1/member/check-ins/scan/"]["post"]
+    parameters = operation.get("parameters", [])
+    assert not any(parameter["name"] == "X-Gym-BFF-Secret" for parameter in parameters)
+    assert not any(parameter["name"] == "Idempotency-Key" for parameter in parameters)
+    assert {"memberBearerAuth": []} in operation["security"]
+    assert "staffBearerAuth" not in {next(iter(item)) for item in operation["security"]}
+    body = operation["requestBody"]["content"]["application/json"]["schema"]
+    if "$ref" in body:
+        body = document["components"]["schemas"][body["$ref"].rsplit("/", 1)[-1]]
+    assert set(body["properties"]) == {"payload"}
+    assert body.get("additionalProperties") is not True
+    for rejected in (
+        "member_id",
+        "gym_id",
+        "membership_id",
+        "method",
+        "occurred_at",
+        "device_id",
+        "source_metadata",
+        "status",
+    ):
+        assert rejected not in body["properties"]
+    assert "201" in operation["responses"]
+    assert "409" in operation["responses"]
+    assert document["components"]["securitySchemes"]["memberBearerAuth"] == {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",

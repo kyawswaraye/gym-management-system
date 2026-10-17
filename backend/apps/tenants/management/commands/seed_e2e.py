@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+from decimal import Decimal
 from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
@@ -11,11 +12,27 @@ from django.db.models import Q, QuerySet
 from apps.audit.models import AuditLog, PlatformAuditLog
 from apps.common.db.tenant_context import set_gym_context
 from apps.files.models import FileAsset
-from apps.members.models import Member, Membership, MembershipPlan, Payment
+from apps.members.models import (
+    CheckIn,
+    CheckInChallenge,
+    CheckInDevice,
+    Member,
+    Membership,
+    MembershipPlan,
+    Payment,
+)
+from apps.members.services import (
+    create_member,
+    create_membership,
+    create_plan,
+    gym_today,
+    link_member_identity,
+)
 from apps.notifications.models import Notification
 from apps.tenants.e2e import (
     E2E_DATABASE_NAME,
     GYM_CODE_PREFIX,
+    MEMBER_EMAIL,
     OWNER_EMAIL,
     PLATFORM_EMAIL,
     SEEDED_GYM_CODE,
@@ -95,6 +112,7 @@ def _delete_payments(gym_id: Any) -> None:
 def _delete_gym_tree(gym: Gym) -> None:
     set_gym_context(gym_id=gym.id)
     Notification.objects.filter(gym_id=gym.id).delete()
+    CheckIn.objects.filter(gym_id=gym.id).delete()
     _delete_payments(gym.id)
     Membership.objects.filter(gym_id=gym.id).delete()
     MembershipPlan.objects.filter(gym_id=gym.id).delete()
@@ -118,6 +136,8 @@ def _delete_gym_tree(gym: Gym) -> None:
     RefreshSession.objects.filter(selected_gym_id=gym.id).delete()
     PlatformAuditLog.objects.filter(Q(target_gym_id=gym.id) | Q(effective_gym_id=gym.id)).delete()
     GymProvisioningRequest.objects.filter(gym_id=gym.id).delete()
+    CheckInChallenge.objects.filter(gym_id=gym.id).delete()
+    CheckInDevice.objects.filter(gym_id=gym.id).delete()
     GymMembership.objects.filter(gym_id=gym.id).delete()
     gym.delete()
 
@@ -194,7 +214,69 @@ def _seed_platform_admin(password: str, secret: str) -> None:
     _enable_mfa(admin, password=password, secret=secret)
 
 
-def _seed_owner_gym(password: str, secret: str) -> None:
+def _seed_linked_member(gym: Gym, actor: GymMembership, password: str) -> None:
+    """Seed one already-linked member. Public linking stays unpublished."""
+
+    user = User.objects.create_user(
+        email=MEMBER_EMAIL,
+        password=password,
+        first_name="E2Escan",
+        last_name="Visitor",
+    )
+    user.is_platform_admin = False
+    user.is_superuser = False
+    user.mfa_enabled = False
+    user.mfa_secret_encrypted = None
+    user.save(
+        update_fields=[
+            "is_platform_admin",
+            "is_superuser",
+            "mfa_enabled",
+            "mfa_secret_encrypted",
+            "updated_at",
+        ]
+    )
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        member = create_member(
+            gym=gym,
+            actor=actor,
+            member_number="",
+            first_name="E2Escan",
+            last_name="Visitor",
+            phone=None,
+            email=None,
+            gender=None,
+            date_of_birth=None,
+            address={},
+            join_date=gym_today(gym),
+            emergency_contact_name="",
+            emergency_contact_phone="",
+            notes="",
+            profile_photo_asset_id=None,
+        )
+        link_member_identity(gym=gym, member_id=member.id, user=user)
+        plan = create_plan(
+            gym=gym,
+            actor=actor,
+            code="E2ESCAN",
+            name="E2E Scan Plan",
+            description="E2E linked member plan",
+            duration_value=30,
+            duration_unit="DAY",
+            price=Decimal("0.00"),
+        )
+        create_membership(
+            gym=gym,
+            actor=actor,
+            member=member,
+            plan=plan,
+            start_date=gym_today(gym),
+            discount_amount=Decimal("0.00"),
+        )
+
+
+def _seed_owner_gym(password: str, secret: str, member_password: str) -> None:
     result = provision_gym(
         code=SEEDED_GYM_CODE,
         name=SEEDED_GYM_NAME,
@@ -254,6 +336,7 @@ def _seed_owner_gym(password: str, secret: str) -> None:
         settings.class_no_show_consumes_session = True
         settings.require_separate_finance_approval = True
         settings.save()
+    _seed_linked_member(gym, result.owner_membership, member_password)
 
 
 class Command(BaseCommand):
@@ -274,11 +357,12 @@ class Command(BaseCommand):
             raise CommandError("E2E object keys must stay unique across seeds.")
         platform_password = _env_secret("E2E_PLATFORM_PASSWORD", minimum=12)
         owner_password = _env_secret("E2E_OWNER_PASSWORD", minimum=12)
+        member_password = _env_secret("E2E_MEMBER_PASSWORD", minimum=12)
         platform_secret = _totp_secret("E2E_PLATFORM_TOTP_SECRET")
         owner_secret = _totp_secret("E2E_OWNER_TOTP_SECRET")
         removed = _purge_e2e_rows()
         _seed_platform_admin(platform_password, platform_secret)
-        _seed_owner_gym(owner_password, owner_secret)
+        _seed_owner_gym(owner_password, owner_secret, member_password)
         self.stdout.write(
             self.style.SUCCESS(
                 f"Seeded {PLATFORM_EMAIL} and gym {SEEDED_GYM_CODE} "
