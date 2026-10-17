@@ -91,6 +91,27 @@ function memberTableLabel(
   return `${member.first_name} ${member.last_name}`.trim() || memberId;
 }
 
+const DURATION_UNIT_LABELS: Record<MembershipPlan["duration_unit"], string> = {
+  DAY: "Day",
+  WEEK: "Week",
+  MONTH: "Month",
+  YEAR: "Year",
+};
+
+function planDurationLabel(row: MembershipPlan): string {
+  const unit = DURATION_UNIT_LABELS[row.duration_unit];
+  const suffix = row.duration_value === 1 ? "" : "s";
+  return `${row.duration_value} ${unit}${suffix}`;
+}
+
+function planStatusLabel(row: MembershipPlan): string {
+  return row.is_active ? "Active" : "Archived";
+}
+
+function planArchiveActionName(row: MembershipPlan): string {
+  return `Archive ${row.name} (${row.code}) plan`;
+}
+
 function uniqueById<T extends { id: string }>(rows: T[]): T[] {
   const seen = new Set<string>();
   return rows.filter((row) => {
@@ -161,6 +182,10 @@ export function MembershipsManager({
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [planError, setPlanError] = useState("");
   const [planGeneration, setPlanGeneration] = useState(0);
+  const [plansLoading, setPlansLoading] = useState(canCreate || canUpdate);
+  const [archivingPlanIdList, setArchivingPlanIdList] = useState<
+    readonly string[]
+  >([]);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [nextAfter, setNextAfter] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -183,7 +208,9 @@ export function MembershipsManager({
   const requestVersion = useRef(0);
   const appliedCursors = useRef(new Set<string>());
   const planRequest = useRef(0);
+  const archivingPlanIds = useRef(new Set<string>());
   const memberSearchVersion = useRef(0);
+  const canManagePlans = canCreate || canUpdate;
   const filters = { listMode, status, paymentStatus };
 
   function publishPage(
@@ -247,7 +274,7 @@ export function MembershipsManager({
   }
 
   useEffect(() => {
-    if (!canCreate) return;
+    if (!canManagePlans) return;
     const version = ++planRequest.current;
     void listAllMembershipPlans()
       .then((rows) => {
@@ -259,11 +286,14 @@ export function MembershipsManager({
         if (version !== planRequest.current) return;
         setPlans([]);
         setPlanError(errorText(caught, "Unable to load membership plans."));
+      })
+      .finally(() => {
+        if (version === planRequest.current) setPlansLoading(false);
       });
     return () => {
       planRequest.current += 1;
     };
-  }, [canCreate, planGeneration]);
+  }, [canManagePlans, planGeneration]);
 
   useEffect(() => {
     const version = ++requestVersion.current;
@@ -375,6 +405,47 @@ export function MembershipsManager({
     void refreshMemberships();
   }
 
+  function retryPlanCatalog() {
+    setPlans([]);
+    setPlanError("");
+    setPlansLoading(true);
+    setPlanGeneration((current) => current + 1);
+  }
+
+  async function archivePlan(target: MembershipPlan) {
+    if (
+      !canUpdate ||
+      !target.is_active ||
+      archivingPlanIds.current.has(target.id)
+    ) {
+      return;
+    }
+    archivingPlanIds.current.add(target.id);
+    setArchivingPlanIdList([...archivingPlanIds.current]);
+    if (!window.confirm(`Archive plan ${target.name} (${target.code})?`)) {
+      archivingPlanIds.current.delete(target.id);
+      setArchivingPlanIdList([...archivingPlanIds.current]);
+      return;
+    }
+    setError("");
+    setErrorScope(null);
+    try {
+      const archived = await operationMutation<MembershipPlan>(
+        `membership-plans/${target.id}/archive/`,
+        {},
+      );
+      setPlans((current) =>
+        current.map((row) => (row.id === target.id ? archived : row)),
+      );
+    } catch (caught) {
+      setError(errorText(caught, "Unable to archive plan."));
+      setErrorScope(null);
+    } finally {
+      archivingPlanIds.current.delete(target.id);
+      setArchivingPlanIdList([...archivingPlanIds.current]);
+    }
+  }
+
   function selectMember(member: Member) {
     setSelectedMember(member);
     setKnownMembers((current) => rememberMembers(current, [member]));
@@ -451,7 +522,8 @@ export function MembershipsManager({
     }
   }
 
-  const activePlans = plans.filter((plan) => plan.is_active);
+  const activePlans = planError ? [] : plans.filter((plan) => plan.is_active);
+  const showPlanTable = !planError && plans.length > 0;
   const trimmedMemberQuery = memberQuery.trim();
 
   return (
@@ -467,6 +539,104 @@ export function MembershipsManager({
             </button>
           ) : null}
         </div>
+      ) : null}
+      {canManagePlans ? (
+        <section
+          aria-busy={plansLoading}
+          aria-labelledby="membership-plans-title"
+          className="card overflow-hidden"
+        >
+          <div className="border-b border-slate-200 p-4">
+            <h2 className="text-lg font-bold" id="membership-plans-title">
+              Membership plans
+            </h2>
+          </div>
+          {plansLoading && !planError && plans.length === 0 ? (
+            <p className="muted m-4" role="status">
+              Loading membership plans.
+            </p>
+          ) : null}
+          {planError ? (
+            <div className="grid gap-3 p-4">
+              <p className="error" role="alert">
+                {planError}
+              </p>
+              <button
+                className="button"
+                onClick={retryPlanCatalog}
+                type="button"
+              >
+                Retry loading plans
+              </button>
+            </div>
+          ) : null}
+          {!plansLoading && !planError && plans.length === 0 ? (
+            <p className="muted m-4" role="status">
+              No membership plans.
+            </p>
+          ) : null}
+          {showPlanTable ? (
+            <div className="overflow-x-auto">
+              <table
+                aria-label="Membership plans"
+                className="w-full text-left text-sm"
+              >
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="p-3" scope="col">
+                      Code
+                    </th>
+                    <th className="p-3" scope="col">
+                      Name
+                    </th>
+                    <th className="p-3" scope="col">
+                      Duration
+                    </th>
+                    <th className="p-3" scope="col">
+                      Price
+                    </th>
+                    <th className="p-3" scope="col">
+                      Status
+                    </th>
+                    {canUpdate ? (
+                      <th className="p-3" scope="col">
+                        Action
+                      </th>
+                    ) : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {plans.map((plan) => (
+                    <tr className="border-t border-slate-100" key={plan.id}>
+                      <td className="p-3">{plan.code}</td>
+                      <td className="p-3">{plan.name}</td>
+                      <td className="p-3">{planDurationLabel(plan)}</td>
+                      <td className="p-3">
+                        {plan.price} {plan.currency}
+                      </td>
+                      <td className="p-3">{planStatusLabel(plan)}</td>
+                      {canUpdate ? (
+                        <td className="p-3">
+                          {plan.is_active ? (
+                            <button
+                              aria-label={planArchiveActionName(plan)}
+                              className="underline"
+                              disabled={archivingPlanIdList.includes(plan.id)}
+                              onClick={() => void archivePlan(plan)}
+                              type="button"
+                            >
+                              Archive {plan.name} plan
+                            </button>
+                          ) : null}
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
       ) : null}
       {canCreate && (
         <div className="grid gap-6 xl:grid-cols-2">
@@ -527,11 +697,6 @@ export function MembershipsManager({
           </form>
           <form className="card grid gap-4 p-5" onSubmit={createMembership}>
             <h2 className="text-lg font-bold">Start membership</h2>
-            {planError ? (
-              <p className="error" role="alert">
-                {planError}
-              </p>
-            ) : null}
             <fieldset className="grid gap-3">
               <legend className="font-semibold">Member</legend>
               <label className="field">
@@ -700,7 +865,7 @@ export function MembershipsManager({
           </p>
         ) : null}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table aria-label="Memberships" className="w-full text-left text-sm">
             <thead className="bg-slate-50">
               <tr>
                 <th className="p-3" scope="col">

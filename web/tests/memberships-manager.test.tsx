@@ -1,6 +1,12 @@
 import type { ComponentProps } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   listAllMembershipPlans,
@@ -167,6 +173,12 @@ describe("Memberships manager", () => {
     vi.mocked(operationMutation).mockResolvedValue({});
   });
 
+  afterEach(() => {
+    if (vi.isMockFunction(window.confirm)) {
+      vi.mocked(window.confirm).mockRestore();
+    }
+  });
+
   it("renders published plan and membership fields and the member id until search", async () => {
     renderManager();
 
@@ -174,7 +186,28 @@ describe("Memberships manager", () => {
       await screen.findByRole("option", { name: "Monthly — 1500.00 THB" }),
     ).toBeInTheDocument();
     expect(await screen.findByText("ACTIVE / UNPAID")).toBeInTheDocument();
-    expect(screen.getAllByText("Monthly").length).toBeGreaterThan(0);
+    expect(
+      within(screen.getByRole("table", { name: "Memberships" })).getByRole(
+        "cell",
+        { name: "Monthly" },
+      ),
+    ).toBeInTheDocument();
+    const planCatalog = screen.getByRole("table", { name: "Membership plans" });
+    expect(
+      within(planCatalog).getByRole("cell", { name: "MONTH" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "Monthly" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "1 Month" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "1500.00 THB" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "Active" }),
+    ).toBeInTheDocument();
     expect(screen.getByText(MEMBER_ID)).toBeInTheDocument();
     expect(screen.getByText("2026-01-31 – 2026-02-27")).toBeInTheDocument();
     expect(screen.getByText("1399.50 THB")).toBeInTheDocument();
@@ -380,14 +413,16 @@ describe("Memberships manager", () => {
       );
     renderManager();
 
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Loading memberships.",
-    );
+    expect(screen.getByText("Loading memberships.")).toBeInTheDocument();
     fireEvent.click(
       await screen.findByRole("button", { name: "Load more memberships" }),
     );
     expect(await screen.findByText("Annual")).toBeInTheDocument();
-    expect(screen.getAllByText("Monthly")).toHaveLength(1);
+    expect(
+      within(screen.getByRole("table", { name: "Memberships" })).getAllByText(
+        "Monthly",
+      ),
+    ).toHaveLength(1);
     expect(
       screen.queryByRole("button", { name: "Load more memberships" }),
     ).not.toBeInTheDocument();
@@ -456,6 +491,22 @@ describe("Memberships manager", () => {
     expect(
       screen.queryByRole("option", { name: /Old/ }),
     ).not.toBeInTheDocument();
+    const planCatalog = screen.getByRole("table", { name: "Membership plans" });
+    expect(
+      within(planCatalog).getByRole("cell", { name: "Old" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "Archived" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive Old (MONTH) plan" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive Monthly (MONTH) plan" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive Annual (YEAR) plan" }),
+    ).toBeInTheDocument();
     expect(listMembershipPlans).not.toHaveBeenCalled();
 
     vi.mocked(listAllMembershipPlans).mockRejectedValue(
@@ -478,6 +529,15 @@ describe("Memberships manager", () => {
     expect(
       await screen.findByText("The membership plan list is too large to load."),
     ).toBeInTheDocument();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(
+      screen.queryByRole("table", { name: "Membership plans" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("No membership plans.")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Retry loading plans" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Plan")).toBeDisabled();
     expect(
       screen.queryByRole("option", { name: "Monthly — 1500.00 THB" }),
     ).not.toBeInTheDocument();
@@ -541,6 +601,12 @@ describe("Memberships manager", () => {
     expect(
       screen.queryByRole("heading", { name: "New plan" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Membership plans" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive Monthly (MONTH) plan" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Search members")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Suspend" }),
@@ -563,7 +629,11 @@ describe("Memberships manager", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Membership page unavailable.",
     );
-    expect(screen.getByText("Monthly")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("table", { name: "Memberships" })).getByText(
+        "Monthly",
+      ),
+    ).toBeInTheDocument();
     expect(
       screen.queryByText("Loading more memberships."),
     ).not.toBeInTheDocument();
@@ -576,5 +646,358 @@ describe("Memberships manager", () => {
       screen.getByRole("button", { name: "Retry loading memberships" }),
     );
     expect(await screen.findByText("Annual")).toBeInTheDocument();
+  });
+
+  it("loads the plan catalog for update-only staff and hides create forms", async () => {
+    const pending = deferred<MembershipPlan[]>();
+    vi.mocked(listAllMembershipPlans).mockReturnValue(pending.promise);
+    renderManager({ canCreate: false, canUpdate: true });
+
+    expect(screen.getByText("Loading membership plans.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", { name: "Membership plans" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "New plan" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Start membership" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Search members")).not.toBeInTheDocument();
+    expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
+
+    pending.resolve([
+      plan(),
+      plan({
+        id: LATER_PLAN_ID,
+        code: "YEAR",
+        name: "Annual",
+        duration_value: 12,
+        duration_unit: "MONTH",
+        price: "9000.00",
+      }),
+    ]);
+
+    const planCatalog = await screen.findByRole("table", {
+      name: "Membership plans",
+    });
+    expect(
+      screen.queryByText("Loading membership plans."),
+    ).not.toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "MONTH" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "Monthly" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "1 Month" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "1500.00 THB" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "12 Months" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "9000.00 THB" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getAllByRole("cell", { name: "Active" }),
+    ).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: "Archive Monthly (MONTH) plan" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive Annual (YEAR) plan" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Plan")).not.toBeInTheDocument();
+  });
+
+  it("shows an empty plan catalog without treating it as a load failure", async () => {
+    vi.mocked(listAllMembershipPlans).mockResolvedValue([]);
+    renderManager({ canCreate: false, canUpdate: true });
+
+    expect(await screen.findByText("No membership plans.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", { name: "Membership plans" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "New plan" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides archive actions when update permission is absent", async () => {
+    vi.mocked(listAllMembershipPlans).mockResolvedValue([
+      plan(),
+      plan({
+        id: LATER_PLAN_ID,
+        code: "OLD",
+        name: "Legacy",
+        is_active: false,
+        archived_at: "2026-09-01T00:00:00Z",
+      }),
+    ]);
+    renderManager({ canUpdate: false });
+
+    const planCatalog = await screen.findByRole("table", {
+      name: "Membership plans",
+    });
+    expect(
+      within(planCatalog).getByRole("cell", { name: "Legacy" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "Archived" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "Active" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive Monthly (MONTH) plan" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive Legacy (OLD) plan" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "New plan" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Monthly — 1500.00 THB" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /Legacy/ }),
+    ).not.toBeInTheDocument();
+    expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not archive a plan when confirmation is cancelled", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderManager({ canCreate: false, canUpdate: true });
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Archive Monthly (MONTH) plan",
+      }),
+    );
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(confirm).toHaveBeenCalledWith("Archive plan Monthly (MONTH)?");
+    expect(operationMutation).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Archive Monthly (MONTH) plan" }),
+    ).toBeEnabled();
+    expect(
+      within(screen.getByRole("table", { name: "Membership plans" })).getByRole(
+        "cell",
+        { name: "Active" },
+      ),
+    ).toBeInTheDocument();
+    expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
+  });
+
+  it("merges an authoritative archived plan without reloading the catalog", async () => {
+    vi.mocked(listAllMembershipPlans).mockResolvedValue([
+      plan(),
+      plan({
+        id: LATER_PLAN_ID,
+        code: "YEAR",
+        name: "Annual",
+        price: "9000.00",
+      }),
+    ]);
+    vi.mocked(operationMutation).mockResolvedValue(
+      plan({
+        is_active: false,
+        archived_at: "2026-10-17T12:00:00Z",
+        price: "1499.00",
+        updated_at: "2026-10-17T12:00:00Z",
+      }),
+    );
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderManager();
+    await screen.findByText("ACTIVE / UNPAID");
+    const membershipLoads = vi.mocked(listMemberships).mock.calls.length;
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Archive Monthly (MONTH) plan",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith(
+        `membership-plans/${PLAN_ID}/archive/`,
+        {},
+      ),
+    );
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    expect(confirm).toHaveBeenCalledWith("Archive plan Monthly (MONTH)?");
+    expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(listMemberships).mock.calls.length).toBe(membershipLoads);
+
+    const planCatalog = screen.getByRole("table", { name: "Membership plans" });
+    expect(
+      within(planCatalog).getByRole("cell", { name: "1499.00 THB" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "Archived" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).queryByRole("cell", { name: "1500.00 THB" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive Monthly (MONTH) plan" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive Annual (YEAR) plan" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "Monthly — 1500.00 THB" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "Monthly — 1499.00 THB" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Annual — 9000.00 THB" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Restore|Delete/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ignores a second archive click while the command is pending", async () => {
+    const pending = deferred<MembershipPlan>();
+    vi.mocked(operationMutation).mockReturnValue(pending.promise);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderManager({ canCreate: false, canUpdate: true });
+
+    const button = await screen.findByRole("button", {
+      name: "Archive Monthly (MONTH) plan",
+    });
+    button.click();
+    button.click();
+
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    expect(operationMutation).toHaveBeenCalledWith(
+      `membership-plans/${PLAN_ID}/archive/`,
+      {},
+    );
+    await waitFor(() => expect(button).toBeDisabled());
+    pending.resolve(
+      plan({
+        is_active: false,
+        archived_at: "2026-10-17T12:00:00Z",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Archive Monthly (MONTH) plan" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
+    expect(
+      within(screen.getByRole("table", { name: "Membership plans" })).getByRole(
+        "cell",
+        { name: "Archived" },
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the active plan and shows an alert when archive fails", async () => {
+    vi.mocked(operationMutation).mockRejectedValue(
+      new Error("Plan archive was rejected."),
+    );
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderManager();
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Archive Monthly (MONTH) plan",
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Plan archive was rejected.",
+    );
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(
+      screen.getByRole("button", { name: "Archive Monthly (MONTH) plan" }),
+    ).toBeEnabled();
+    expect(
+      within(screen.getByRole("table", { name: "Membership plans" })).getByRole(
+        "cell",
+        { name: "Active" },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Monthly — 1500.00 THB" }),
+    ).toBeInTheDocument();
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a plan catalog failure without showing a partial catalog", async () => {
+    vi.mocked(listAllMembershipPlans)
+      .mockRejectedValueOnce(
+        new Error("The membership plan list is too large to load."),
+      )
+      .mockResolvedValueOnce([
+        plan(),
+        plan({
+          id: LATER_PLAN_ID,
+          code: "YEAR",
+          name: "Annual",
+          price: "9000.00",
+          is_active: false,
+          archived_at: "2026-09-01T00:00:00Z",
+        }),
+      ]);
+    renderManager({ canCreate: false, canUpdate: true });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The membership plan list is too large to load.",
+    );
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(
+      screen.queryByRole("table", { name: "Membership plans" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("No membership plans.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("cell", { name: "MONTH" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "New plan" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Search members")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry loading plans" }),
+    );
+
+    const planCatalog = await screen.findByRole("table", {
+      name: "Membership plans",
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "MONTH" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "YEAR" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "Active" }),
+    ).toBeInTheDocument();
+    expect(
+      within(planCatalog).getByRole("cell", { name: "Archived" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive Monthly (MONTH) plan" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive Annual (YEAR) plan" }),
+    ).not.toBeInTheDocument();
+    expect(listAllMembershipPlans).toHaveBeenCalledTimes(2);
   });
 });
