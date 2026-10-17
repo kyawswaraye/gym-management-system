@@ -61,6 +61,7 @@ export type Permission = components["schemas"]["Permission"];
 export type MembershipRole = components["schemas"]["MembershipRole"];
 export type CollectionMeta = components["schemas"]["CollectionMeta"];
 export type Member = components["schemas"]["Member"];
+export type MemberSummary = components["schemas"]["MemberSummary"];
 export type MembershipPlan = components["schemas"]["MembershipPlan"];
 export type Membership = components["schemas"]["Membership"];
 

@@ -23,7 +23,7 @@ urlpatterns = [
     path("members/", MemberListCreateView.as_view(), name="member-list"),
     path("members/<uuid:id>/", MemberDetailView.as_view(), name="member-detail"),
     path("members/<uuid:id>/archive/", MemberArchiveView.as_view(), name="member-archive"),
-    path("members/<uuid:member_id>/summary/", MemberSummaryView.as_view(), name="member-summary"),
+    path("members/<uuid:id>/summary/", MemberSummaryView.as_view(), name="member-summary"),
     path("membership-plans/", PlanListCreateView.as_view(), name="membership-plan-list"),
     path(
         "membership-plans/<uuid:id>/",

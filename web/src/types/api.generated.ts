@@ -453,6 +453,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/members/{id}/summary/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["members_summary"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/membership-plans/": {
     parameters: {
       query?: never;
@@ -1115,6 +1131,9 @@ export interface components {
       data: components["schemas"]["AdminSubscription"][];
       message: string;
     };
+    CheckInSummary: {
+      available: boolean;
+    };
     CollectionMeta: {
       has_more: boolean;
       next_after: string | null;
@@ -1496,6 +1515,22 @@ export interface components {
      */
     MemberStatusEnum:
       "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED" | "ARCHIVED";
+    MemberSummary: {
+      member: components["schemas"]["Member"];
+      current_membership: components["schemas"]["Membership"] | null;
+      days_remaining: number | null;
+      readonly is_pt_client: boolean;
+      membership_history: components["schemas"]["Membership"][];
+      membership_history_has_more: boolean;
+      payment_summary: components["schemas"]["PaymentSummary"];
+      check_in_summary: components["schemas"]["CheckInSummary"];
+    };
+    MemberSummaryEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MemberSummary"];
+      message: string;
+    };
     Membership: {
       /** Format: uuid */
       id: string;
@@ -1822,6 +1857,18 @@ export interface components {
      */
     PaymentStatusEnum:
       "UNPAID" | "PARTIAL" | "PAID" | "PARTIALLY_REFUNDED" | "REFUNDED";
+    PaymentSummary: {
+      available: boolean;
+      currency: string;
+      /** Format: decimal */
+      total_charged: string;
+      /** Format: decimal */
+      total_refunded: string;
+      /** Format: decimal */
+      net_paid: string;
+      /** Format: decimal */
+      outstanding_membership_balance: string;
+    };
     Permission: {
       /** Format: uuid */
       id: string;
@@ -3879,6 +3926,59 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["MemberEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  members_summary: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberSummaryEnvelope"];
         };
       };
       400: {

@@ -6,7 +6,6 @@ from decimal import Decimal
 from uuid import UUID
 
 from django.db import transaction
-from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -42,6 +41,9 @@ from apps.members.serializers import (
     MembershipPlanUpdateSerializer,
     MembershipSerializer,
     MembershipUpdateSerializer,
+    MemberSummaryEnvelopeSerializer,
+    MemberSummaryQuerySerializer,
+    MemberSummarySerializer,
     MemberUpdateSerializer,
     PaymentCreateSerializer,
     PaymentSerializer,
@@ -57,6 +59,7 @@ from apps.members.services import (
     create_membership,
     create_plan,
     gym_today,
+    member_summary,
     page_members,
     page_membership_expiry,
     page_membership_plans,
@@ -91,18 +94,6 @@ class FinanceFeatureAPIView(TenantAPIView):
 
 class ReportsFeatureAPIView(TenantAPIView):
     required_feature = "reports"
-
-
-def _with_balance_payments(queryset):
-    return queryset.prefetch_related(
-        Prefetch(
-            "payments",
-            queryset=Payment.objects.filter(
-                status__in=[Payment.Status.POSTED, Payment.Status.VOID]
-            ).only("membership_id", "amount", "entry_type"),
-            to_attr="_balance_payments",
-        )
-    )
 
 
 class MemberListCreateView(MemberFeatureAPIView):
@@ -250,44 +241,21 @@ class MemberArchiveView(MemberFeatureAPIView):
 class MemberSummaryView(MemberFeatureAPIView):
     required_permission = "members.view"
 
-    def get(self, request, member_id):
-        member = get_object_or_404(Member, gym=request.gym, id=member_id)
-        today = gym_today(request.gym)
-        memberships = _with_balance_payments(
-            member.memberships.select_related("plan").order_by("-start_date")
-        )
-        current_membership = memberships.filter(
-            status__in=[
-                Membership.Status.PENDING,
-                Membership.Status.ACTIVE,
-                Membership.Status.SUSPENDED,
-            ],
-            start_date__lte=today,
-            expiry_date__gte=today,
-        ).first()
-        membership_history = list(memberships[:20])
-        payments = member.payments.select_related("receipt").order_by("-received_at")
-        return success_response(
-            {
-                "member": MemberSerializer(member).data,
-                "current_membership": MembershipSerializer(current_membership).data
-                if current_membership
-                else None,
-                "days_remaining": max(
-                    0,
-                    (current_membership.expiry_date - today).days + 1,
-                )
-                if current_membership
-                else None,
-                "is_pt_client": False,
-                "membership_history": MembershipSerializer(
-                    membership_history,
-                    many=True,
-                ).data,
-                "payment_history": PaymentSerializer(payments[:20], many=True).data,
-                "check_in_summary": {"available": False},
-            }
-        )
+    @extend_schema(
+        operation_id="members_summary",
+        responses={
+            200: MemberSummaryEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request, id: UUID) -> Response:
+        MemberSummaryQuerySerializer(data=request.query_params).is_valid(raise_exception=True)
+        member = get_object_or_404(Member, gym=request.gym, id=id)
+        payload = member_summary(gym=request.gym, member=member)
+        return success_response(MemberSummarySerializer(payload).data)
 
 
 class PlanListCreateView(MembershipFeatureAPIView):

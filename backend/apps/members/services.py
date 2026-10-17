@@ -3,13 +3,26 @@ from __future__ import annotations
 import calendar
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, TypedDict
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from django.core import signing
 from django.db import IntegrityError, transaction
-from django.db.models import Q, QuerySet, Sum
+from django.db.models import (
+    Case,
+    DecimalField,
+    ExpressionWrapper,
+    F,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+    Sum,
+    Value,
+    When,
+)
+from django.db.models.functions import Coalesce, Greatest
 from django.http import Http404
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
@@ -79,6 +92,185 @@ _PROFILE_PHOTO_ERROR = "Select a clean profile photo from this gym."
 
 def gym_today(gym: Gym) -> date:
     return timezone.localdate(timezone=ZoneInfo(gym.timezone))
+
+
+MEMBERSHIP_SUMMARY_ORDER = ("-start_date", "-created_at", "-id")
+MEMBERSHIP_SUMMARY_HISTORY_LIMIT = 20
+_MEMBERSHIP_SUMMARY_FETCH_LIMIT = MEMBERSHIP_SUMMARY_HISTORY_LIMIT + 1
+_FINALIZED_PAYMENT_STATUSES = (Payment.Status.POSTED, Payment.Status.VOID)
+_MONEY_OUTPUT: DecimalField[Any, Any] = DecimalField(max_digits=18, decimal_places=2)
+
+
+def _zero_money() -> Value:
+    return Value(Decimal("0.00"), output_field=_MONEY_OUTPUT)
+
+
+class MemberPaymentSummary(TypedDict):
+    available: bool
+    currency: str
+    total_charged: Decimal
+    total_refunded: Decimal
+    net_paid: Decimal
+    outstanding_membership_balance: Decimal
+
+
+def inclusive_days_remaining(expiry: date, today: date) -> int:
+    """Inclusive gym-local days from today through expiry, never below zero."""
+
+    return max(0, (expiry - today).days + 1)
+
+
+def _money(value: object) -> Decimal:
+    if value is None:
+        return Decimal("0.00")
+    if isinstance(value, Decimal):
+        return value.quantize(_MONEY)
+    return Decimal(str(value)).quantize(_MONEY)
+
+
+def current_membership_for_summary(*, gym: Gym, member: Member, today: date) -> Membership | None:
+    """Choose the membership valid on the gym-local today.
+
+    Pending, active, and suspended ranges cannot overlap, so this is normally
+    unique. The order still makes a concurrent or repaired tie deterministic.
+    """
+
+    return (
+        Membership.objects.filter(
+            gym=gym,
+            member=member,
+            status__in=(
+                Membership.Status.PENDING,
+                Membership.Status.ACTIVE,
+                Membership.Status.SUSPENDED,
+            ),
+            start_date__lte=today,
+            expiry_date__gte=today,
+        )
+        .order_by(*MEMBERSHIP_SUMMARY_ORDER)
+        .first()
+    )
+
+
+def membership_history_for_summary(*, gym: Gym, member: Member) -> tuple[list[Membership], bool]:
+    """Return the latest 20 memberships and whether an older row exists.
+
+    One query fetches 21 rows. The extra row sets ``has_more`` and is not loaded
+    into the response, so history length cannot add queries or payload rows.
+    """
+
+    rows = list(
+        Membership.objects.filter(gym=gym, member=member).order_by(*MEMBERSHIP_SUMMARY_ORDER)[
+            :_MEMBERSHIP_SUMMARY_FETCH_LIMIT
+        ]
+    )
+    return rows[:MEMBERSHIP_SUMMARY_HISTORY_LIMIT], len(rows) > MEMBERSHIP_SUMMARY_HISTORY_LIMIT
+
+
+def _linked_payment_total() -> Subquery:
+    signed = Sum(
+        Case(
+            When(entry_type=Payment.EntryType.CHARGE, then=F("amount")),
+            When(
+                entry_type__in=(Payment.EntryType.REFUND, Payment.EntryType.REVERSAL),
+                then=-F("amount"),
+            ),
+            default=_zero_money(),
+            output_field=_MONEY_OUTPUT,
+        )
+    )
+    totals = (
+        Payment.objects.filter(
+            gym_id=OuterRef("gym_id"),
+            membership_id=OuterRef("pk"),
+            status__in=_FINALIZED_PAYMENT_STATUSES,
+        )
+        .order_by()
+        .values("membership_id")
+        .annotate(signed=signed)
+        .values("signed")[:1]
+    )
+    return Subquery(totals, output_field=_MONEY_OUTPUT)
+
+
+def member_payment_summary(*, gym: Gym, member: Member) -> MemberPaymentSummary:
+    """Aggregate finalized ledger totals without loading payment rows.
+
+    Two queries stay constant as history grows. The first conditionally sums the
+    member's POSTED and VOID charges, refunds, and reversals. The second sums
+    ``max(0, final_amount - signed linked payments)`` across non-cancelled
+    memberships. Unlinked payments are absent from that correlated sum, so they
+    cannot reduce outstanding. Draft, pending, rejected, and cancelled payments
+    are excluded. ``available`` is true because Payment and Membership are the
+    authoritative migrated tables; this read does not publish payment rows.
+    """
+
+    totals = Payment.objects.filter(
+        gym=gym,
+        member=member,
+        status__in=_FINALIZED_PAYMENT_STATUSES,
+    ).aggregate(
+        charged=Coalesce(
+            Sum("amount", filter=Q(entry_type=Payment.EntryType.CHARGE)),
+            _zero_money(),
+        ),
+        refunded=Coalesce(
+            Sum(
+                "amount",
+                filter=Q(entry_type__in=(Payment.EntryType.REFUND, Payment.EntryType.REVERSAL)),
+            ),
+            _zero_money(),
+        ),
+    )
+    charged = _money(totals["charged"])
+    refunded = _money(totals["refunded"])
+    signed_paid = Coalesce(_linked_payment_total(), _zero_money())
+    balance = Greatest(
+        ExpressionWrapper(F("final_amount") - signed_paid, output_field=_MONEY_OUTPUT),
+        _zero_money(),
+    )
+    outstanding = (
+        Membership.objects.filter(gym=gym, member=member)
+        .exclude(status=Membership.Status.CANCELLED)
+        .annotate(balance=balance)
+        .aggregate(total=Coalesce(Sum("balance"), _zero_money()))
+    )
+    return {
+        "available": True,
+        "currency": gym.currency,
+        "total_charged": charged,
+        "total_refunded": refunded,
+        "net_paid": _money(max(Decimal("0.00"), charged - refunded)),
+        "outstanding_membership_balance": _money(outstanding["total"]),
+    }
+
+
+def member_summary(*, gym: Gym, member: Member) -> dict[str, object]:
+    """Assemble the published summary with a fixed query budget.
+
+    After the caller loads the same-gym member, this performs four queries:
+    the current-membership lookup (LIMIT 1), the 21-row history fetch, the
+    finalized payment aggregate, and the outstanding-balance aggregate.
+    Check-in data is not queried; that summary stays unavailable until Phase 3.
+    ``is_pt_client`` is not stored here. The summary serializer derives it with
+    the same helper as the member serializer.
+    """
+
+    today = gym_today(gym)
+    current = current_membership_for_summary(gym=gym, member=member, today=today)
+    history, has_more = membership_history_for_summary(gym=gym, member=member)
+    days_remaining = (
+        inclusive_days_remaining(current.expiry_date, today) if current is not None else None
+    )
+    return {
+        "member": member,
+        "current_membership": current,
+        "days_remaining": days_remaining,
+        "membership_history": history,
+        "membership_history_has_more": has_more,
+        "payment_summary": member_payment_summary(gym=gym, member=member),
+        "check_in_summary": {"available": False},
+    }
 
 
 def inclusive_expiry_date(start: date, value: int, unit: str) -> date:

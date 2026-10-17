@@ -2755,6 +2755,82 @@
                 }
             }
         },
+        "/api/v1/members/{id}/summary/": {
+            "get": {
+                "operationId": "members_summary",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "members"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberSummaryEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/membership-plans/": {
             "get": {
                 "operationId": "membership_plans_list",
@@ -6525,6 +6601,17 @@
                     "message"
                 ]
             },
+            "CheckInSummary": {
+                "type": "object",
+                "properties": {
+                    "available": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "available"
+                ]
+            },
             "CollectionMeta": {
                 "type": "object",
                 "properties": {
@@ -7781,6 +7868,75 @@
                 "type": "string",
                 "description": "* `ACTIVE` - Active\n* `EXPIRED` - Expired\n* `SUSPENDED` - Suspended\n* `CANCELLED` - Cancelled\n* `ARCHIVED` - Archived"
             },
+            "MemberSummary": {
+                "type": "object",
+                "properties": {
+                    "member": {
+                        "$ref": "#/components/schemas/Member"
+                    },
+                    "current_membership": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Membership"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "days_remaining": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "nullable": true
+                    },
+                    "is_pt_client": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "membership_history": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Membership"
+                        }
+                    },
+                    "membership_history_has_more": {
+                        "type": "boolean"
+                    },
+                    "payment_summary": {
+                        "$ref": "#/components/schemas/PaymentSummary"
+                    },
+                    "check_in_summary": {
+                        "$ref": "#/components/schemas/CheckInSummary"
+                    }
+                },
+                "required": [
+                    "check_in_summary",
+                    "current_membership",
+                    "days_remaining",
+                    "is_pt_client",
+                    "member",
+                    "membership_history",
+                    "membership_history_has_more",
+                    "payment_summary"
+                ]
+            },
+            "MemberSummaryEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/MemberSummary"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message"
+                ]
+            },
             "Membership": {
                 "type": "object",
                 "properties": {
@@ -8890,6 +9046,46 @@
                 ],
                 "type": "string",
                 "description": "* `UNPAID` - Unpaid\n* `PARTIAL` - Partial\n* `PAID` - Paid\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `REFUNDED` - Refunded"
+            },
+            "PaymentSummary": {
+                "type": "object",
+                "properties": {
+                    "available": {
+                        "type": "boolean"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "maxLength": 3
+                    },
+                    "total_charged": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "total_refunded": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "net_paid": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "outstanding_membership_balance": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    }
+                },
+                "required": [
+                    "available",
+                    "currency",
+                    "net_paid",
+                    "outstanding_membership_balance",
+                    "total_charged",
+                    "total_refunded"
+                ]
             },
             "Permission": {
                 "type": "object",

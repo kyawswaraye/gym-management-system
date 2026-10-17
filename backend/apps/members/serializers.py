@@ -28,6 +28,12 @@ def _member_name(value: str) -> str:
     return cleaned
 
 
+def member_is_pt_client(_member: object) -> bool:
+    """False until Phase 5 derives the badge from an active trainer assignment."""
+
+    return False
+
+
 def _optional_phone(value: str | None) -> str | None:
     try:
         return normalize_member_phone(value)
@@ -105,7 +111,7 @@ class MemberSerializer(serializers.Serializer):
     updated_at = serializers.DateTimeField()
 
     def get_is_pt_client(self, obj: object) -> bool:
-        return False
+        return member_is_pt_client(obj)
 
 
 class MemberCreateSerializer(StrictSerializer):
@@ -489,6 +495,43 @@ class MembershipListEnvelopeSerializer(serializers.Serializer):
     success = serializers.BooleanField(default=True)
     data = MembershipSerializer(many=True)
     meta = MembershipCollectionMetaSerializer()
+    message = serializers.CharField()
+
+
+class MemberSummaryQuerySerializer(StrictSerializer):
+    """Member summary accepts no query parameters."""
+
+
+class PaymentSummarySerializer(serializers.Serializer):
+    available = serializers.BooleanField()
+    currency = serializers.CharField(max_length=3)
+    total_charged = serializers.DecimalField(max_digits=18, decimal_places=2)
+    total_refunded = serializers.DecimalField(max_digits=18, decimal_places=2)
+    net_paid = serializers.DecimalField(max_digits=18, decimal_places=2)
+    outstanding_membership_balance = serializers.DecimalField(max_digits=18, decimal_places=2)
+
+
+class CheckInSummarySerializer(serializers.Serializer):
+    available = serializers.BooleanField()
+
+
+class MemberSummarySerializer(serializers.Serializer):
+    member = MemberSerializer()
+    current_membership = MembershipSerializer(allow_null=True)
+    days_remaining = serializers.IntegerField(allow_null=True, min_value=0)
+    is_pt_client = serializers.SerializerMethodField()
+    membership_history = MembershipSerializer(many=True)
+    membership_history_has_more = serializers.BooleanField()
+    payment_summary = PaymentSummarySerializer()
+    check_in_summary = CheckInSummarySerializer()
+
+    def get_is_pt_client(self, obj: dict[str, object]) -> bool:
+        return member_is_pt_client(obj["member"])
+
+
+class MemberSummaryEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    data = MemberSummarySerializer()
     message = serializers.CharField()
 
 

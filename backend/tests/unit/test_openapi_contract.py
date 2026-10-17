@@ -35,6 +35,7 @@ PUBLISHED_PATHS = {
     "/api/v1/members/",
     "/api/v1/members/{id}/",
     "/api/v1/members/{id}/archive/",
+    "/api/v1/members/{id}/summary/",
     "/api/v1/membership-plans/",
     "/api/v1/membership-plans/{id}/",
     "/api/v1/membership-plans/{id}/archive/",
@@ -95,16 +96,16 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
     assert "/api/v1/members/{id}/" in schema["paths"]
     assert "/api/v1/members/{id}/archive/" in schema["paths"]
     unpublished = (
-        "/api/v1/members/{id}/summary/",
         "/api/v1/members/{id}/payments/",
         "/api/v1/members/{id}/check-ins/",
         "/api/v1/notifications/",
         "/api/v1/payments/",
         "/api/v1/receipts/",
     )
+    assert "/api/v1/members/{id}/summary/" in schema["paths"]
     assert all(path not in schema["paths"] for path in unpublished)
     assert not any(path.startswith(unpublished) for path in schema["paths"])
-    assert not any("summary" in path or "check-ins" in path for path in schema["paths"])
+    assert not any("check-ins" in path for path in schema["paths"])
     assert "/api/v1/payments/" not in schema["paths"]
     assert "/api/v1/receipts/" not in schema["paths"]
     assert "/api/v1/dashboard/" not in schema["paths"]
@@ -350,7 +351,81 @@ def test_openapi_documents_members() -> None:
         }
     )
     assert "object_key" not in rendered_members
-    assert "/api/v1/members/{id}/summary/" not in document["paths"]
+
+
+def _schema_component(document: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
+    if "$ref" in schema:
+        return document["components"]["schemas"][schema["$ref"].rsplit("/", 1)[-1]]
+    for item in schema.get("allOf", []):
+        if isinstance(item, dict) and "$ref" in item:
+            return document["components"]["schemas"][item["$ref"].rsplit("/", 1)[-1]]
+    return schema
+
+
+def test_openapi_documents_member_summary() -> None:
+    document = generated_schema()
+    operation = document["paths"]["/api/v1/members/{id}/summary/"]
+    assert set(operation) == {"get"}
+    summary = operation["get"]
+    parameters = summary.get("parameters", [])
+    assert [parameter["name"] for parameter in parameters] == ["id"]
+    assert parameters[0]["in"] == "path"
+    assert not any(parameter["in"] == "query" for parameter in parameters)
+    assert {"staffBearerAuth": []} in summary["security"]
+    assert set(summary["responses"]) >= {"200", "400", "401", "403", "404"}
+    schemas = document["components"]["schemas"]
+    envelope = schemas["MemberSummaryEnvelope"]["properties"]
+    assert set(envelope) == {"success", "data", "message"}
+    data = _schema_component(document, envelope["data"])
+    assert set(data["properties"]) == {
+        "member",
+        "current_membership",
+        "days_remaining",
+        "is_pt_client",
+        "membership_history",
+        "membership_history_has_more",
+        "payment_summary",
+        "check_in_summary",
+    }
+    assert data["properties"]["current_membership"].get("nullable") is True
+    assert data["properties"]["days_remaining"]["nullable"] is True
+    assert data["properties"]["days_remaining"]["minimum"] == 0
+    assert data["properties"]["is_pt_client"]["type"] == "boolean"
+    member = _schema_component(document, data["properties"]["member"])
+    assert set(member["properties"]) == set(schemas["Member"]["properties"])
+    current = _schema_component(document, data["properties"]["current_membership"])
+    assert set(current["properties"]) == set(schemas["Membership"]["properties"])
+    history_item = _schema_component(document, data["properties"]["membership_history"]["items"])
+    assert set(history_item["properties"]) == set(schemas["Membership"]["properties"])
+    payment = _schema_component(document, data["properties"]["payment_summary"])
+    assert set(payment["properties"]) == {
+        "available",
+        "currency",
+        "total_charged",
+        "total_refunded",
+        "net_paid",
+        "outstanding_membership_balance",
+    }
+    for name in ("total_charged", "total_refunded", "net_paid", "outstanding_membership_balance"):
+        assert payment["properties"][name]["type"] == "string"
+        assert payment["properties"][name]["format"] == "decimal"
+    check_in = _schema_component(document, data["properties"]["check_in_summary"])
+    assert set(check_in["properties"]) == {"available"}
+    rendered = json.dumps(payment)
+    for secret in (
+        "receipt",
+        "reference",
+        "description",
+        "method",
+        "entry_type",
+        "received_at",
+        "business_date",
+        "approved_by",
+        "actor",
+    ):
+        assert secret not in rendered
+    assert "payment_history" not in data["properties"]
+    assert "check_in_history" not in data["properties"]
 
 
 def test_openapi_documents_bff_staff_and_platform_authentication_boundaries() -> None:

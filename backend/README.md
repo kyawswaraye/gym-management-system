@@ -12,10 +12,11 @@ earlier work. MembershipPlan list, create, detail, update, and archive are
 published. Member list, create, detail, update, and archive are published.
 Membership list, create, detail, note update, cancel, suspend, resume, and
 expiry buckets are published. Membership-expiry scheduling and delivery
-commands are implemented. Member summary and history, notification HTTP
-routes, payment, and receipt HTTP endpoints remain unpublished. Production
-expiry delivery remains gated on an idempotency-capable transactional
-provider. Phase 2 stays open until its development-plan exit criteria pass.
+commands are implemented. The member summary API is published. Nested member
+payment and check-in history, notification HTTP routes, and payment and
+receipt HTTP endpoints remain unpublished. Production expiry delivery remains
+gated on an idempotency-capable transactional provider. Phase 2 stays open
+until its development-plan exit criteria pass.
 
 ## Runtime
 
@@ -105,9 +106,10 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   cookie; `/auth/select-gym/` consumes it atomically and then issues the
   selected-gym session. Browser JavaScript never receives the ticket.
 - Member authentication is configuration-only. MembershipPlan and Member list,
-  create, detail, update, and archive are published. Member summary and
-  history, membership, notification, and payment routes stay out of the
-  published OpenAPI contract until their own Phase 2 increments.
+  create, detail, update, and archive are published, as are membership sale,
+  lifecycle, and expiry routes and the member summary. Nested member payment
+  and check-in history, notification, and payment routes stay out of the
+  published OpenAPI contract until their own increments.
 - Platform gym provisioning, lifecycle, owner invitation, platform audit reads,
   tenant audit reads, staff invitation/acceptance, staff profiles, staff
   activate/suspend, and tenant role/permission management are in place.
@@ -141,9 +143,10 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   MANAGER permissions and must keep the hard-reserved approvals. Custom roles
   cannot receive those approvals or `settings.manage`. Published OpenAPI
   includes role create, update, archive, permission replacement, the permission
-  catalog, and membership-role assignment, plus MembershipPlan and Member
-  list, create, detail, update, and archive. It leaves member summary and
-  history, membership, notification, and payment routes unpublished.
+  catalog, and membership-role assignment, plus MembershipPlan, Member list,
+  create, detail, update, and archive, membership sale and lifecycle, and the
+  member summary. It leaves nested member payment and check-in history,
+  notification, and payment routes unpublished.
   `profile_photo_asset_id` remains a nullable identifier with no foreign key to
   `FileAsset`. The staff API does not accept or return it. Attaching it later
   requires a same-gym asset whose scan status is CLEAN.
