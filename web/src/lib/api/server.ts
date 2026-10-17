@@ -29,6 +29,9 @@ const ALLOWED_PATHS = new Set([
   "/api/v1/staff/invitations/accept/",
 ]);
 
+const MEMBER_PAYMENT_HISTORY_PATH =
+  /^\/api\/v1\/members\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/payments\/$/;
+
 const ALLOWED_TENANT_PATHS = [
   /^\/api\/v1\/gym\/$/,
   /^\/api\/v1\/settings\/$/,
@@ -47,6 +50,7 @@ const ALLOWED_TENANT_PATHS = [
   /^\/api\/v1\/permissions\/$/,
   /^\/api\/v1\/gym-memberships\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/roles\/$/,
   /^\/api\/v1\/members\/(?:[0-9a-f-]+\/(?:summary\/|archive\/)?)?$/,
+  MEMBER_PAYMENT_HISTORY_PATH,
   /^\/api\/v1\/membership-plans\/(?:[0-9a-f-]+\/(?:archive\/)?)?$/,
   /^\/api\/v1\/memberships\/(?:expiry\/|[0-9a-f-]+\/(?:cancel\/|suspend\/|resume\/)?)?$/,
   /^\/api\/v1\/payments\/(?:[0-9a-f-]+\/(?:submit|approve|reject|cancel|void|refund)\/)?$/,
@@ -82,6 +86,7 @@ const TENANT_AUDIT_FILTERS = new Set([
   "limit",
   "after",
 ]);
+const MEMBER_PAYMENT_HISTORY_FILTERS = new Set(["limit", "after"]);
 
 const ALLOWED_PLATFORM_PATHS = [
   /^\/api\/v1\/admin\/gyms\/$/,
@@ -268,6 +273,16 @@ function allowsBoundedText(
   );
 }
 
+function allowsMemberPaymentHistoryQuery(search: string): boolean {
+  const values = strictQueryValues(search, MEMBER_PAYMENT_HISTORY_FILTERS);
+  if (!values) return false;
+  const limit = values.get("limit");
+  if (limit !== undefined && !AUDIT_LIMIT.test(limit)) return false;
+  const after = values.get("after");
+  if (after !== undefined && !AUDIT_CURSOR.test(after)) return false;
+  return true;
+}
+
 function allowsTenantAuditListQuery(search: string): boolean {
   const values = strictQueryValues(search, TENANT_AUDIT_FILTERS);
   if (!values) return false;
@@ -292,6 +307,9 @@ function allowsForwardedQuery(
 ): boolean {
   if (pathname === TENANT_AUDIT_LIST_PATH) {
     return method === "GET" && allowsTenantAuditListQuery(search);
+  }
+  if (MEMBER_PAYMENT_HISTORY_PATH.test(pathname)) {
+    return method === "GET" && allowsMemberPaymentHistoryQuery(search);
   }
   return allowsExactPlatformQuery(pathname, search);
 }

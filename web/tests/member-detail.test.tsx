@@ -1,17 +1,30 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { operationGet, operationMutation } from "@/features/operations/client";
+import {
+  listMemberPayments,
+  operationGet,
+  operationMutation,
+} from "@/features/operations/client";
 import { MemberDetail } from "@/features/operations/member-detail";
-import type { Member, Membership, MemberSummary } from "@/types/api";
+import type {
+  Member,
+  MemberPaymentHistoryItem,
+  Membership,
+  MemberSummary,
+} from "@/types/api";
 
 vi.mock("@/features/operations/client", () => ({
   operationGet: vi.fn(),
   operationMutation: vi.fn(),
+  listMemberPayments: vi.fn(),
 }));
 
 const MEMBER_ID = "11111111-1111-4111-8111-111111111111";
+const OTHER_MEMBER_ID = "66666666-6666-4666-8666-666666666666";
 const MEMBERSHIP_ID = "22222222-2222-4222-8222-222222222222";
+const PAYMENT_ID = "55555555-5555-4555-8555-555555555555";
+const OLDER_PAYMENT_ID = "77777777-7777-4777-8777-777777777777";
 
 function member(overrides: Partial<Member> = {}): Member {
   return {
@@ -97,6 +110,35 @@ function summary(overrides: Partial<MemberSummary> = {}): MemberSummary {
   };
 }
 
+function payment(
+  overrides: Partial<MemberPaymentHistoryItem> = {},
+): MemberPaymentHistoryItem {
+  return {
+    id: PAYMENT_ID,
+    membership_id: null,
+    original_payment_id: null,
+    entry_type: "CHARGE",
+    purpose: "MEMBERSHIP",
+    description: "May dues",
+    amount: "40.10",
+    currency: "THB",
+    method: "CASH",
+    business_date: "2024-06-03",
+    received_at: "2024-06-03T08:00:00Z",
+    status: "POSTED",
+    receipt_number: "RCPT-100",
+    ...overrides,
+  };
+}
+
+function deferred<T>() {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 describe("Member detail summary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -105,7 +147,13 @@ describe("Member detail summary", () => {
   it("shows a loading status before the summary arrives", () => {
     vi.mocked(operationGet).mockReturnValue(new Promise(() => undefined));
 
-    render(<MemberDetail canUpdate={false} memberId={MEMBER_ID} />);
+    render(
+      <MemberDetail
+        canUpdate={false}
+        canViewPayments={false}
+        memberId={MEMBER_ID}
+      />,
+    );
 
     expect(screen.getByRole("status")).toHaveTextContent(
       "Loading member summary.",
@@ -117,7 +165,13 @@ describe("Member detail summary", () => {
       summary({ is_pt_client: true, membership_history_has_more: true }),
     );
 
-    render(<MemberDetail canUpdate={false} memberId={MEMBER_ID} />);
+    render(
+      <MemberDetail
+        canUpdate={false}
+        canViewPayments={false}
+        memberId={MEMBER_ID}
+      />,
+    );
 
     expect(
       await screen.findByRole("heading", { name: "Current membership" }),
@@ -152,6 +206,10 @@ describe("Member detail summary", () => {
       screen.getByText("Check-in summary is not available yet."),
     ).toBeInTheDocument();
     expect(operationGet).toHaveBeenCalledWith(`members/${MEMBER_ID}/summary/`);
+    expect(listMemberPayments).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("heading", { name: "Payment history" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows empty membership, payment, and history states", async () => {
@@ -172,7 +230,9 @@ describe("Member detail summary", () => {
       }),
     );
 
-    render(<MemberDetail canUpdate memberId={MEMBER_ID} />);
+    render(
+      <MemberDetail canUpdate canViewPayments={false} memberId={MEMBER_ID} />,
+    );
 
     expect(
       await screen.findByText("No current membership."),
@@ -193,7 +253,13 @@ describe("Member detail summary", () => {
       new Error("Unable to load member."),
     );
 
-    render(<MemberDetail canUpdate={false} memberId={MEMBER_ID} />);
+    render(
+      <MemberDetail
+        canUpdate={false}
+        canViewPayments={false}
+        memberId={MEMBER_ID}
+      />,
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Unable to load member.",
@@ -209,7 +275,9 @@ describe("Member detail summary", () => {
       new Error("Unable to update member."),
     );
 
-    render(<MemberDetail canUpdate memberId={MEMBER_ID} />);
+    render(
+      <MemberDetail canUpdate canViewPayments={false} memberId={MEMBER_ID} />,
+    );
     expect(
       await screen.findByRole("button", { name: "Save changes" }),
     ).toBeInTheDocument();
@@ -220,5 +288,137 @@ describe("Member detail summary", () => {
     );
     expect(screen.getByText("Total charged")).toBeInTheDocument();
     await waitFor(() => expect(operationMutation).toHaveBeenCalled());
+  });
+
+  it("loads payment history and older pages without duplicating a cursor", async () => {
+    const older = deferred<Awaited<ReturnType<typeof listMemberPayments>>>();
+    vi.mocked(operationGet).mockResolvedValue(summary());
+    vi.mocked(listMemberPayments).mockImplementation(
+      async (_memberId, after) => {
+        if (!after) {
+          return {
+            data: [payment()],
+            meta: { has_more: true, next_after: "cursor-1" },
+          };
+        }
+        return older.promise;
+      },
+    );
+
+    render(
+      <MemberDetail canUpdate={false} canViewPayments memberId={MEMBER_ID} />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Payment history" }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText(/May dues/)).toHaveTextContent("POSTED");
+    expect(screen.getByText(/Receipt RCPT-100/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Payment summary" }),
+    ).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: "Load older payments" });
+    button.click();
+    button.click();
+
+    expect(listMemberPayments).toHaveBeenCalledTimes(2);
+    expect(listMemberPayments).toHaveBeenLastCalledWith(MEMBER_ID, "cursor-1");
+    older.resolve({
+      data: [
+        payment(),
+        payment({
+          id: OLDER_PAYMENT_ID,
+          description: "April dues",
+          receipt_number: null,
+          status: "VOID",
+        }),
+      ],
+      meta: { has_more: false, next_after: null },
+    });
+
+    expect(await screen.findByText(/April dues/)).toHaveTextContent("VOID");
+    expect(screen.getAllByText(/May dues/)).toHaveLength(1);
+    expect(
+      screen.queryByRole("button", { name: "Load older payments" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows an empty payment history without hiding the summary", async () => {
+    vi.mocked(operationGet).mockResolvedValue(summary());
+    vi.mocked(listMemberPayments).mockResolvedValue({
+      data: [],
+      meta: { has_more: false, next_after: null },
+    });
+
+    render(
+      <MemberDetail canUpdate={false} canViewPayments memberId={MEMBER_ID} />,
+    );
+
+    expect(await screen.findByText("No payments.")).toBeInTheDocument();
+    expect(screen.getByText("Total charged")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Load older payments" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the summary usable when payment history fails", async () => {
+    vi.mocked(operationGet).mockResolvedValue(summary());
+    vi.mocked(listMemberPayments).mockRejectedValue(
+      new Error("Unable to load payment history."),
+    );
+
+    render(
+      <MemberDetail canUpdate={false} canViewPayments memberId={MEMBER_ID} />,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Unable to load payment history.",
+    );
+    expect(screen.getByText("Net paid")).toBeInTheDocument();
+    expect(screen.queryByText("No payments.")).not.toBeInTheDocument();
+  });
+
+  it("ignores a stale older-page response after the member changes", async () => {
+    const older = deferred<Awaited<ReturnType<typeof listMemberPayments>>>();
+    vi.mocked(operationGet).mockResolvedValue(summary());
+    vi.mocked(listMemberPayments).mockImplementation(
+      async (memberId, after) => {
+        if (after) return older.promise;
+        if (memberId === OTHER_MEMBER_ID) {
+          return {
+            data: [payment({ id: OTHER_MEMBER_ID, description: "Other dues" })],
+            meta: { has_more: false, next_after: null },
+          };
+        }
+        return {
+          data: [payment()],
+          meta: { has_more: true, next_after: "cursor-1" },
+        };
+      },
+    );
+    const view = render(
+      <MemberDetail canUpdate={false} canViewPayments memberId={MEMBER_ID} />,
+    );
+    const button = await screen.findByRole("button", {
+      name: "Load older payments",
+    });
+    button.click();
+    view.rerender(
+      <MemberDetail
+        canUpdate={false}
+        canViewPayments
+        memberId={OTHER_MEMBER_ID}
+      />,
+    );
+
+    expect(await screen.findByText(/Other dues/)).toBeInTheDocument();
+    older.resolve({
+      data: [payment({ id: OLDER_PAYMENT_ID, description: "Stale dues" })],
+      meta: { has_more: true, next_after: "cursor-1" },
+    });
+    await waitFor(() =>
+      expect(screen.queryByText(/Stale dues/)).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Other dues/)).toBeInTheDocument();
   });
 });

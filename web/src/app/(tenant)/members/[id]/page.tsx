@@ -21,6 +21,11 @@ export default async function MemberDetailPage({
       </h1>
       <MemberDetail
         canUpdate={session.permissions.includes("members.update")}
+        canViewPayments={hasTenantCapability(
+          session,
+          "payments.view",
+          "finance",
+        )}
         memberId={id}
       />
     </section>

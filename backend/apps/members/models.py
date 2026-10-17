@@ -434,7 +434,10 @@ class Payment(TenantModel):
             models.Index(
                 fields=["gym", "status", "business_date"], name="payment_gym_status_date_idx"
             ),
-            models.Index(fields=["gym", "member"], name="payment_gym_member_idx"),
+            models.Index(
+                fields=["gym", "member", "-received_at", "-id"],
+                name="payment_gym_member_hist_idx",
+            ),
         ]
 
 

@@ -35,6 +35,7 @@ PUBLISHED_PATHS = {
     "/api/v1/members/",
     "/api/v1/members/{id}/",
     "/api/v1/members/{id}/archive/",
+    "/api/v1/members/{id}/payments/",
     "/api/v1/members/{id}/summary/",
     "/api/v1/membership-plans/",
     "/api/v1/membership-plans/{id}/",
@@ -96,13 +97,13 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
     assert "/api/v1/members/{id}/" in schema["paths"]
     assert "/api/v1/members/{id}/archive/" in schema["paths"]
     unpublished = (
-        "/api/v1/members/{id}/payments/",
         "/api/v1/members/{id}/check-ins/",
         "/api/v1/notifications/",
         "/api/v1/payments/",
         "/api/v1/receipts/",
     )
     assert "/api/v1/members/{id}/summary/" in schema["paths"]
+    assert "/api/v1/members/{id}/payments/" in schema["paths"]
     assert all(path not in schema["paths"] for path in unpublished)
     assert not any(path.startswith(unpublished) for path in schema["paths"])
     assert not any("check-ins" in path for path in schema["paths"])
@@ -426,6 +427,88 @@ def test_openapi_documents_member_summary() -> None:
         assert secret not in rendered
     assert "payment_history" not in data["properties"]
     assert "check_in_history" not in data["properties"]
+
+
+def test_openapi_documents_member_payment_history() -> None:
+    document = generated_schema()
+    operation = document["paths"]["/api/v1/members/{id}/payments/"]
+    assert set(operation) == {"get"}
+    history = operation["get"]
+    parameters = {parameter["name"]: parameter for parameter in history["parameters"]}
+    schemas = document["components"]["schemas"]
+    envelope = schemas["MemberPaymentHistoryEnvelope"]["properties"]
+    item = _schema_component(document, envelope["data"]["items"])
+    meta = _schema_component(document, envelope["meta"])
+    status_schema = _schema_component(document, item["properties"]["status"])
+
+    assert set(parameters) == {"after", "id", "limit"}
+    assert parameters["id"]["in"] == "path"
+    assert parameters["limit"]["in"] == "query"
+    assert parameters["after"]["in"] == "query"
+    assert parameters["limit"]["schema"]["default"] == 25
+    assert parameters["limit"]["schema"]["minimum"] == 1
+    assert parameters["limit"]["schema"]["maximum"] == 100
+    assert parameters["after"].get("required", False) is False
+    assert parameters["after"]["schema"]["maxLength"] == 2048
+    assert "gym_id" not in parameters
+    assert {"staffBearerAuth": []} in history["security"]
+    assert set(history["responses"]) >= {"200", "400", "401", "403", "404"}
+    assert set(envelope) == {"success", "data", "meta", "message"}
+    assert set(item["properties"]) == {
+        "id",
+        "membership_id",
+        "original_payment_id",
+        "entry_type",
+        "purpose",
+        "description",
+        "amount",
+        "currency",
+        "method",
+        "business_date",
+        "received_at",
+        "status",
+        "receipt_number",
+    }
+    for name in ("membership_id", "original_payment_id", "receipt_number"):
+        assert item["properties"][name]["nullable"] is True
+    assert item["properties"]["amount"]["type"] == "string"
+    assert item["properties"]["amount"]["format"] == "decimal"
+    assert set(status_schema["enum"]) == {
+        "DRAFT",
+        "PENDING_APPROVAL",
+        "POSTED",
+        "REJECTED",
+        "CANCELLED",
+        "VOID",
+    }
+    assert set(meta["properties"]) == {"has_more", "next_after"}
+    assert meta["properties"]["next_after"]["nullable"] is True
+    assert set(item["properties"]).isdisjoint(
+        {
+            "gym",
+            "gym_id",
+            "member",
+            "member_id",
+            "member_name",
+            "reference_number",
+            "submitted_at",
+            "submitted_by_membership_id",
+            "approved_at",
+            "approved_by_membership_id",
+            "rejected_at",
+            "rejected_by_membership_id",
+            "rejection_reason",
+            "cancelled_at",
+            "cancellation_reason",
+            "voided_at",
+            "void_reason",
+            "created_by_membership_id",
+            "updated_by_membership_id",
+            "created_at",
+            "updated_at",
+            "receipt",
+        }
+    )
 
 
 def test_openapi_documents_bff_staff_and_platform_authentication_boundaries() -> None:

@@ -453,6 +453,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/members/{id}/payments/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["members_payment_history"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/members/{id}/summary/": {
     parameters: {
       query?: never;
@@ -1188,6 +1204,13 @@ export interface components {
      * @enum {string}
      */
     DurationUnitEnum: "DAY" | "WEEK" | "MONTH" | "YEAR";
+    /**
+     * @description * `CHARGE` - Charge
+     *     * `REFUND` - Refund
+     *     * `REVERSAL` - Reversal
+     * @enum {string}
+     */
+    EntryTypeEnum: "CHARGE" | "REFUND" | "REVERSAL";
     ErrorDetail: {
       code: string;
       message: string;
@@ -1505,6 +1528,54 @@ export interface components {
       meta: components["schemas"]["MemberCollectionMeta"];
       message: string;
     };
+    MemberPaymentHistoryEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MemberPaymentHistoryItem"][];
+      meta: components["schemas"]["MemberPaymentHistoryMeta"];
+      message: string;
+    };
+    MemberPaymentHistoryItem: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      membership_id: string | null;
+      /** Format: uuid */
+      original_payment_id: string | null;
+      entry_type: components["schemas"]["EntryTypeEnum"];
+      purpose: components["schemas"]["PurposeEnum"];
+      description: string;
+      /** Format: decimal */
+      amount: string;
+      currency: string;
+      method: components["schemas"]["MethodEnum"];
+      /** Format: date */
+      business_date: string;
+      /** Format: date-time */
+      received_at: string;
+      status: components["schemas"]["MemberPaymentHistoryItemStatusEnum"];
+      readonly receipt_number: string | null;
+    };
+    /**
+     * @description * `DRAFT` - Draft
+     *     * `PENDING_APPROVAL` - Pending Approval
+     *     * `POSTED` - Posted
+     *     * `REJECTED` - Rejected
+     *     * `CANCELLED` - Cancelled
+     *     * `VOID` - Void
+     * @enum {string}
+     */
+    MemberPaymentHistoryItemStatusEnum:
+      | "DRAFT"
+      | "PENDING_APPROVAL"
+      | "POSTED"
+      | "REJECTED"
+      | "CANCELLED"
+      | "VOID";
+    MemberPaymentHistoryMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
     /**
      * @description * `ACTIVE` - Active
      *     * `EXPIRED` - Expired
@@ -1674,6 +1745,15 @@ export interface components {
      */
     MembershipStatusEnum:
       "PENDING" | "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED";
+    /**
+     * @description * `CASH` - Cash
+     *     * `BANK_TRANSFER` - Bank Transfer
+     *     * `CARD` - Card
+     *     * `MOBILE_PAYMENT` - Mobile Payment
+     *     * `OTHER` - Other
+     * @enum {string}
+     */
+    MethodEnum: "CASH" | "BANK_TRANSFER" | "CARD" | "MOBILE_PAYMENT" | "OTHER";
     /** @enum {unknown} */
     NullEnum: null;
     OwnerAcceptInputRequest: {
@@ -1924,6 +2004,14 @@ export interface components {
      * @enum {string}
      */
     PrincipalTypeEnum: "PLATFORM" | "STAFF";
+    /**
+     * @description * `MEMBERSHIP` - Membership
+     *     * `PT` - Pt
+     *     * `PRODUCT` - Product
+     *     * `OTHER` - Other
+     * @enum {string}
+     */
+    PurposeEnum: "MEMBERSHIP" | "PT" | "PRODUCT" | "OTHER";
     ReadinessData: {
       status: string;
       database: string;
@@ -3926,6 +4014,62 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["MemberEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  members_payment_history: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberPaymentHistoryEnvelope"];
         };
       };
       400: {

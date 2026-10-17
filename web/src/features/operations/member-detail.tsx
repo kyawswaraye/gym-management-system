@@ -1,20 +1,184 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
-import { operationGet, operationMutation } from "@/features/operations/client";
-import type { Member, MemberSummary } from "@/types/api";
+import {
+  listMemberPayments,
+  operationGet,
+  operationMutation,
+} from "@/features/operations/client";
+import type {
+  Member,
+  MemberPaymentHistoryItem,
+  MemberSummary,
+} from "@/types/api";
 
 function dayLabel(days: number): string {
   return days === 1 ? "1 day remaining" : `${days} days remaining`;
 }
 
+function appendPayments(
+  current: MemberPaymentHistoryItem[],
+  incoming: MemberPaymentHistoryItem[],
+): MemberPaymentHistoryItem[] {
+  const seen = new Set(current.map((payment) => payment.id));
+  const next = incoming.filter((payment) => !seen.has(payment.id));
+  return next.length === 0 ? current : [...current, ...next];
+}
+
+function PaymentHistory({ memberId }: { memberId: string }) {
+  const [payments, setPayments] = useState<MemberPaymentHistoryItem[]>([]);
+  const [nextAfter, setNextAfter] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [paging, setPaging] = useState(false);
+  const [error, setError] = useState("");
+  const generation = useRef(0);
+  const appliedCursors = useRef(new Set<string>());
+
+  useEffect(() => {
+    const request = ++generation.current;
+    appliedCursors.current = new Set();
+    const timer = window.setTimeout(() => {
+      setPayments([]);
+      setNextAfter(null);
+      setHasMore(false);
+      setLoading(true);
+      setError("");
+      void listMemberPayments(memberId)
+        .then((page) => {
+          if (request !== generation.current) return;
+          setPayments(page.data);
+          setNextAfter(page.meta.next_after);
+          setHasMore(page.meta.has_more && Boolean(page.meta.next_after));
+          setError("");
+        })
+        .catch((caught: unknown) => {
+          if (request !== generation.current) return;
+          setPayments([]);
+          setNextAfter(null);
+          setHasMore(false);
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Unable to load payment history.",
+          );
+        })
+        .finally(() => {
+          if (request === generation.current) setLoading(false);
+        });
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      generation.current += 1;
+    };
+  }, [memberId]);
+
+  async function loadOlder() {
+    if (
+      !hasMore ||
+      !nextAfter ||
+      paging ||
+      appliedCursors.current.has(nextAfter)
+    ) {
+      return;
+    }
+    const cursor = nextAfter;
+    const request = ++generation.current;
+    appliedCursors.current.add(cursor);
+    setPaging(true);
+    setError("");
+    try {
+      const page = await listMemberPayments(memberId, cursor);
+      if (request !== generation.current) return;
+      setPayments((current) => appendPayments(current, page.data));
+      const next = page.meta.next_after;
+      if (!page.meta.has_more || !next || next === cursor) {
+        setHasMore(false);
+        setNextAfter(null);
+      } else {
+        setHasMore(true);
+        setNextAfter(next);
+      }
+    } catch (caught) {
+      appliedCursors.current.delete(cursor);
+      if (request === generation.current) {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Unable to load payment history.",
+        );
+      }
+    } finally {
+      if (request === generation.current) setPaging(false);
+    }
+  }
+
+  return (
+    <section aria-labelledby="payment-history-title" className="card p-5">
+      <h2 className="font-bold" id="payment-history-title">
+        Payment history
+      </h2>
+      {loading ? (
+        <p className="muted mt-3" role="status">
+          Loading payment history.
+        </p>
+      ) : null}
+      {error ? (
+        <p className="error mt-3" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {!loading && payments.length === 0 && !error ? (
+        <p className="muted mt-3">No payments.</p>
+      ) : null}
+      {payments.length > 0 ? (
+        <ul className="mt-3 grid gap-2">
+          {payments.map((payment) => (
+            <li key={payment.id}>
+              {payment.business_date} · {payment.entry_type} · {payment.purpose}{" "}
+              · {payment.description} · {payment.amount} {payment.currency} ·{" "}
+              {payment.method} · {payment.status}
+              {payment.receipt_number
+                ? ` · Receipt ${payment.receipt_number}`
+                : ""}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {paging ? (
+        <p className="muted mt-3" role="status">
+          Loading older payments.
+        </p>
+      ) : null}
+      {hasMore && nextAfter ? (
+        <button
+          className="button mt-3"
+          disabled={paging}
+          onClick={() => void loadOlder()}
+          type="button"
+        >
+          Load older payments
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
 export function MemberDetail({
   memberId,
   canUpdate,
+  canViewPayments,
 }: {
   memberId: string;
   canUpdate: boolean;
+  canViewPayments: boolean;
 }) {
   const [summary, setSummary] = useState<MemberSummary | null>(null);
   const [error, setError] = useState("");
@@ -200,6 +364,7 @@ export function MemberDetail({
             <p className="muted mt-3">No finalized payments.</p>
           ) : null}
         </section>
+        {canViewPayments ? <PaymentHistory memberId={memberId} /> : null}
         <section
           aria-labelledby="membership-history-title"
           className="card p-5"

@@ -59,6 +59,57 @@ class RequiresEntitlement(BasePermission):
         ).exists()
 
 
+def _requirement_codes(raw: object) -> tuple[str, ...] | None:
+    if isinstance(raw, str) or not isinstance(raw, tuple | list) or len(raw) == 0:
+        return None
+    codes: list[str] = []
+    for code in raw:
+        if not isinstance(code, str) or not code:
+            return None
+        codes.append(code)
+    return tuple(codes)
+
+
+class RequiresPermissions(BasePermission):
+    """Require every live permission named by ``required_permissions``.
+
+    Empty requirements fail closed. Single-permission views keep using
+    ``RequiresPermission``.
+    """
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        codes = _requirement_codes(getattr(view, "required_permissions", ()))
+        granted: object = getattr(request, "permission_codes", frozenset())
+        if codes is None or isinstance(granted, str) or not isinstance(granted, frozenset | set):
+            return False
+        return all(code in granted for code in codes)
+
+
+class RequiresEntitlements(BasePermission):
+    """Require every active feature named by ``required_features``.
+
+    Empty requirements and a missing gym fail closed. Single-feature views keep
+    using ``RequiresEntitlement``.
+    """
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        codes = _requirement_codes(getattr(view, "required_features", ()))
+        gym = getattr(request, "gym", None)
+        if codes is None or gym is None:
+            return False
+        now = timezone.now()
+        entitled = set(
+            GymFeatureEntitlement.objects.filter(
+                Q(effective_from__isnull=True) | Q(effective_from__lte=now),
+                Q(effective_until__isnull=True) | Q(effective_until__gt=now),
+                gym=gym,
+                feature__code__in=codes,
+                enabled=True,
+            ).values_list("feature__code", flat=True)
+        )
+        return all(code in entitled for code in codes)
+
+
 class IsActiveOwner(BasePermission):
     def has_permission(self, request: Request, view: APIView) -> bool:
         membership = getattr(request, "gym_membership", None)

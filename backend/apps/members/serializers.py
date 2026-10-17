@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any, cast
 
 from rest_framework import serializers
+from rest_framework.utils import html
 
 from apps.members.models import Member, Membership, MembershipPlan, Payment, Receipt
 from apps.members.normalization import (
@@ -532,6 +533,74 @@ class MemberSummarySerializer(serializers.Serializer):
 class MemberSummaryEnvelopeSerializer(serializers.Serializer):
     success = serializers.BooleanField(default=True)
     data = MemberSummarySerializer()
+    message = serializers.CharField()
+
+
+class OpaqueCursorField(serializers.CharField):
+    """Reject a present blank cursor.
+
+    QueryDict treats an optional non-blank CharField's empty value as omitted.
+    A blank ``after`` is not an opaque cursor and must stay a 400.
+    """
+
+    def get_value(self, dictionary: Any) -> Any:
+        if html.is_html_input(dictionary) and self.field_name in dictionary:
+            value = dictionary[self.field_name]
+            if isinstance(value, str) and (
+                value == "" or (self.trim_whitespace and value.strip() == "")
+            ):
+                return ""
+        return super().get_value(dictionary)
+
+
+class MemberPaymentHistoryQuerySerializer(StrictSerializer):
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=100, default=25)
+    after = OpaqueCursorField(required=False, allow_blank=False, max_length=2048)
+
+
+class SameGymReceiptNumberField(serializers.CharField):
+    def __init__(self, **kwargs: Any) -> None:
+        kwargs["allow_null"] = True
+        kwargs["read_only"] = True
+        kwargs["max_length"] = 64
+        kwargs["source"] = "*"
+        super().__init__(**kwargs)
+
+    def to_representation(self, value: Payment) -> str | None:  # type: ignore[override]
+        receipt = getattr(value, "receipt", None)
+        if receipt is None or getattr(receipt, "gym_id", None) != value.gym_id:
+            return None
+        number = getattr(receipt, "receipt_number", None)
+        if not isinstance(number, str):
+            return None
+        return number
+
+
+class MemberPaymentHistoryItemSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    membership_id = serializers.UUIDField(allow_null=True)
+    original_payment_id = serializers.UUIDField(allow_null=True)
+    entry_type = serializers.ChoiceField(choices=Payment.EntryType.choices)
+    purpose = serializers.ChoiceField(choices=Payment.Purpose.choices)
+    description = serializers.CharField()
+    amount = serializers.DecimalField(max_digits=18, decimal_places=2, coerce_to_string=True)
+    currency = serializers.CharField(max_length=3)
+    method = serializers.ChoiceField(choices=Payment.Method.choices)
+    business_date = serializers.DateField()
+    received_at = serializers.DateTimeField()
+    status = serializers.ChoiceField(choices=Payment.Status.choices)
+    receipt_number = SameGymReceiptNumberField()
+
+
+class MemberPaymentHistoryMetaSerializer(serializers.Serializer):
+    has_more = serializers.BooleanField()
+    next_after = serializers.CharField(allow_null=True)
+
+
+class MemberPaymentHistoryEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    data = MemberPaymentHistoryItemSerializer(many=True)
+    meta = MemberPaymentHistoryMetaSerializer()
     message = serializers.CharField()
 
 

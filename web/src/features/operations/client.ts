@@ -12,6 +12,8 @@ import type {
   GymProfileUpdate,
   GymSettings,
   GymSettingsUpdate,
+  MemberPaymentHistoryItem,
+  MemberPaymentHistoryMeta,
   MembershipRole,
   Permission,
   Role,
@@ -48,6 +50,41 @@ export type StaffListPage = {
   data: StaffRecord[];
   meta: StaffListMeta;
 };
+
+export type MemberPaymentHistoryPage = {
+  data: MemberPaymentHistoryItem[];
+  meta: MemberPaymentHistoryMeta;
+};
+
+const PAYMENT_HISTORY_CURSOR = /^[A-Za-z0-9._:~+=-]{1,2048}$/;
+const PAYMENT_HISTORY_MEMBER =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+export async function listMemberPayments(
+  memberId: string,
+  after?: string,
+): Promise<MemberPaymentHistoryPage> {
+  if (!PAYMENT_HISTORY_MEMBER.test(memberId)) {
+    throw new OperationError("Member is unavailable.");
+  }
+  const params = new URLSearchParams();
+  if (after !== undefined) {
+    if (!PAYMENT_HISTORY_CURSOR.test(after)) {
+      throw new OperationError("Payment history cursor is invalid.", {
+        after: "Payment history cursor is invalid.",
+      });
+    }
+    params.set("after", after);
+  }
+  const suffix = params.size ? `?${params.toString()}` : "";
+  const response = await fetch(
+    `/api/operations/members/${memberId}/payments/${suffix}`,
+    { credentials: "same-origin", cache: "no-store" },
+  );
+  const body: unknown = await response.json();
+  if (!response.ok) throw readOperationError(body);
+  return readMemberPaymentPage(body);
+}
 
 export async function operationGet<T>(path: string): Promise<T> {
   const response = await fetch(`/api/operations/${path}`, {
@@ -438,6 +475,27 @@ function readCollection<T>(body: unknown): CollectionPage<T> {
   const nextAfter = envelope.meta?.next_after;
   return {
     data: envelope.data as T[],
+    meta: {
+      has_more: envelope.meta?.has_more === true,
+      next_after: typeof nextAfter === "string" && nextAfter ? nextAfter : null,
+    },
+  };
+}
+
+function readMemberPaymentPage(body: unknown): MemberPaymentHistoryPage {
+  if (typeof body !== "object" || body === null || !("data" in body)) {
+    throw new OperationError("Unable to load payment history.");
+  }
+  const envelope = body as {
+    data?: unknown;
+    meta?: { has_more?: unknown; next_after?: unknown };
+  };
+  if (!Array.isArray(envelope.data)) {
+    throw new OperationError("Unable to load payment history.");
+  }
+  const nextAfter = envelope.meta?.next_after;
+  return {
+    data: envelope.data as MemberPaymentHistoryItem[],
     meta: {
       has_more: envelope.meta?.has_more === true,
       next_after: typeof nextAfter === "string" && nextAfter ? nextAfter : null,

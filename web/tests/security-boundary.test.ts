@@ -253,6 +253,83 @@ describe("browser credential boundary", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("allowlists only the nested member payment history GET", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () =>
+        Response.json({
+          success: true,
+          data: [],
+          meta: { has_more: false, next_after: null },
+        }),
+      );
+    const memberId = "f52030c1-18af-4e18-a1ec-50997d892ef4";
+    const request = new NextRequest(
+      "https://app.example.com/api/operations/members",
+      { headers: { cookie: "gms_access=access" } },
+    );
+    const cursor = "opaque.cursor:1700000000:signature";
+
+    expect(
+      (await authenticatedGet(request, `/api/v1/members/${memberId}/payments/`))
+        .status,
+    ).toBe(200);
+    expect(
+      (
+        await authenticatedGet(
+          request,
+          `/api/v1/members/${memberId}/payments/?limit=25&after=${cursor}`,
+        )
+      ).status,
+    ).toBe(200);
+    expect((await authenticatedGet(request, "/api/v1/payments/")).status).toBe(
+      200,
+    );
+
+    const rejected = [
+      `/api/v1/members/${memberId}/payments/?gym_id=${memberId}`,
+      `/api/v1/members/${memberId}/payments/?status=POSTED`,
+      `/api/v1/members/${memberId}/payments/?limit=101`,
+      `/api/v1/members/${memberId}/payments/?limit=0`,
+      `/api/v1/members/${memberId}/payments/?limit=25&limit=10`,
+      `/api/v1/members/${memberId}/payments/?after=`,
+      `/api/v1/members/${memberId}/check-ins/`,
+      `/api/v1/members/${memberId}/payments/extra/`,
+      `/api/v1/members/${memberId.toUpperCase()}/payments/`,
+      "/api/v1/receipts/",
+    ];
+    for (const path of rejected) {
+      expect((await authenticatedGet(request, path)).status).toBe(503);
+    }
+
+    const csrf = "x".repeat(43);
+    const mutation = new NextRequest(
+      "https://app.example.com/api/operations/members",
+      {
+        method: "POST",
+        headers: {
+          cookie: `gms_access=access; gms_csrf=${csrf}`,
+          origin: "https://app.example.com",
+          "x-csrf-token": csrf,
+          "content-type": "application/json",
+        },
+        body: "{}",
+      },
+    );
+    expect(
+      (
+        await authenticatedMutation(
+          mutation,
+          `/api/v1/members/${memberId}/payments/`,
+        )
+      ).status,
+    ).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `https://api.example.com/api/v1/members/${memberId}/payments/`,
+    );
+  });
+
   it("allows only approved platform paths and forwards idempotency on retry", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")

@@ -5,6 +5,7 @@ from apps.members.views import (
     MemberArchiveView,
     MemberDetailView,
     MemberListCreateView,
+    MemberPaymentHistoryView,
     MembershipCancelView,
     MembershipDetailView,
     MembershipExpiryView,
@@ -24,6 +25,11 @@ urlpatterns = [
     path("members/<uuid:id>/", MemberDetailView.as_view(), name="member-detail"),
     path("members/<uuid:id>/archive/", MemberArchiveView.as_view(), name="member-archive"),
     path("members/<uuid:id>/summary/", MemberSummaryView.as_view(), name="member-summary"),
+    path(
+        "members/<uuid:id>/payments/",
+        MemberPaymentHistoryView.as_view(),
+        name="member-payment-history",
+    ),
     path("membership-plans/", PlanListCreateView.as_view(), name="membership-plan-list"),
     path(
         "membership-plans/<uuid:id>/",

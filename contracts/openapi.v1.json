@@ -2755,6 +2755,101 @@
                 }
             }
         },
+        "/api/v1/members/{id}/payments/": {
+            "get": {
+                "operationId": "members_payment_history",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "after",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1,
+                            "default": 25
+                        }
+                    }
+                ],
+                "tags": [
+                    "members"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberPaymentHistoryEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/members/{id}/summary/": {
             "get": {
                 "operationId": "members_summary",
@@ -6798,6 +6893,15 @@
                 "type": "string",
                 "description": "* `DAY` - Day\n* `WEEK` - Week\n* `MONTH` - Month\n* `YEAR` - Year"
             },
+            "EntryTypeEnum": {
+                "enum": [
+                    "CHARGE",
+                    "REFUND",
+                    "REVERSAL"
+                ],
+                "type": "string",
+                "description": "* `CHARGE` - Charge\n* `REFUND` - Refund\n* `REVERSAL` - Reversal"
+            },
             "ErrorDetail": {
                 "type": "object",
                 "properties": {
@@ -7857,6 +7961,132 @@
                     "meta"
                 ]
             },
+            "MemberPaymentHistoryEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MemberPaymentHistoryItem"
+                        }
+                    },
+                    "meta": {
+                        "$ref": "#/components/schemas/MemberPaymentHistoryMeta"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "meta"
+                ]
+            },
+            "MemberPaymentHistoryItem": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "original_payment_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "entry_type": {
+                        "$ref": "#/components/schemas/EntryTypeEnum"
+                    },
+                    "purpose": {
+                        "$ref": "#/components/schemas/PurposeEnum"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "maxLength": 3
+                    },
+                    "method": {
+                        "$ref": "#/components/schemas/MethodEnum"
+                    },
+                    "business_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "received_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/MemberPaymentHistoryItemStatusEnum"
+                    },
+                    "receipt_number": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true,
+                        "maxLength": 64
+                    }
+                },
+                "required": [
+                    "amount",
+                    "business_date",
+                    "currency",
+                    "description",
+                    "entry_type",
+                    "id",
+                    "membership_id",
+                    "method",
+                    "original_payment_id",
+                    "purpose",
+                    "receipt_number",
+                    "received_at",
+                    "status"
+                ]
+            },
+            "MemberPaymentHistoryItemStatusEnum": {
+                "enum": [
+                    "DRAFT",
+                    "PENDING_APPROVAL",
+                    "POSTED",
+                    "REJECTED",
+                    "CANCELLED",
+                    "VOID"
+                ],
+                "type": "string",
+                "description": "* `DRAFT` - Draft\n* `PENDING_APPROVAL` - Pending Approval\n* `POSTED` - Posted\n* `REJECTED` - Rejected\n* `CANCELLED` - Cancelled\n* `VOID` - Void"
+            },
+            "MemberPaymentHistoryMeta": {
+                "type": "object",
+                "properties": {
+                    "has_more": {
+                        "type": "boolean"
+                    },
+                    "next_after": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "has_more",
+                    "next_after"
+                ]
+            },
             "MemberStatusEnum": {
                 "enum": [
                     "ACTIVE",
@@ -8391,6 +8621,17 @@
                 ],
                 "type": "string",
                 "description": "* `PENDING` - Pending\n* `ACTIVE` - Active\n* `EXPIRED` - Expired\n* `SUSPENDED` - Suspended\n* `CANCELLED` - Cancelled"
+            },
+            "MethodEnum": {
+                "enum": [
+                    "CASH",
+                    "BANK_TRANSFER",
+                    "CARD",
+                    "MOBILE_PAYMENT",
+                    "OTHER"
+                ],
+                "type": "string",
+                "description": "* `CASH` - Cash\n* `BANK_TRANSFER` - Bank Transfer\n* `CARD` - Card\n* `MOBILE_PAYMENT` - Mobile Payment\n* `OTHER` - Other"
             },
             "NullEnum": {
                 "enum": [
@@ -9262,6 +9503,16 @@
                 ],
                 "type": "string",
                 "description": "* `PLATFORM` - PLATFORM\n* `STAFF` - STAFF"
+            },
+            "PurposeEnum": {
+                "enum": [
+                    "MEMBERSHIP",
+                    "PT",
+                    "PRODUCT",
+                    "OTHER"
+                ],
+                "type": "string",
+                "description": "* `MEMBERSHIP` - Membership\n* `PT` - Pt\n* `PRODUCT` - Product\n* `OTHER` - Other"
             },
             "ReadinessData": {
                 "type": "object",

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import UTC, date, datetime
+from collections.abc import Callable
+from datetime import UTC, date, datetime, tzinfo
+from functools import wraps
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -182,6 +185,34 @@ def _legacy_values() -> dict[str, object]:
 
 def _headers(membership: GymMembership) -> dict[str, str]:
     return auth_headers(staff_token(membership))
+
+
+# Access tokens last 10 minutes. Issuance and PyJWT expiry both read
+# ``datetime.now(UTC)``; session rows and cursor signatures read the other two
+# clocks. One frozen instant keeps a bootstrap token valid for the whole test.
+_FROZEN_NOW = datetime(2026, 10, 17, 8, 0, tzinfo=UTC)
+
+
+class _FrozenDateTime(datetime):
+    @classmethod
+    def now(cls, tz: tzinfo | None = None) -> datetime:
+        if tz is None:
+            return _FROZEN_NOW.replace(microsecond=0)
+        return _FROZEN_NOW.astimezone(tz).replace(microsecond=0)
+
+
+def _freeze_clock(test: Callable[[], None]) -> Callable[[], None]:
+    @wraps(test)
+    def run() -> None:
+        with (
+            patch("django.utils.timezone.now", return_value=_FROZEN_NOW),
+            patch("time.time", return_value=_FROZEN_NOW.timestamp()),
+            patch("apps.users.tokens.datetime", _FrozenDateTime),
+            patch("jwt.api_jwt.datetime", _FrozenDateTime),
+        ):
+            test()
+
+    return run
 
 
 def _list(
@@ -387,6 +418,7 @@ def test_owner_sees_the_gym_and_conditional_roles_see_only_themselves() -> None:
 
 
 @override_settings(**jwt_settings())
+@_freeze_clock
 def test_cursors_are_bound_and_invalid_queries_fail_closed() -> None:
     world = _bootstrap("AU2")
     client = world["client"]

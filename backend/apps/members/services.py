@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import calendar
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, TypedDict
 from uuid import UUID
@@ -73,6 +73,10 @@ _PLAN_MUTABLE_FIELDS = ("code", "name", "description", "duration_value", "durati
 MEMBER_LIST_CURSOR_SALT = "member-list"
 MEMBER_LIST_CURSOR_ORDERING = "normalized_full_name,id"
 _MEMBER_CURSOR_MAX_AGE = 24 * 60 * 60
+MEMBER_PAYMENT_HISTORY_CURSOR_SALT = "member-payment-history"
+MEMBER_PAYMENT_HISTORY_ORDERING = "received_at DESC,id DESC"
+_MEMBER_PAYMENT_HISTORY_CURSOR_MAX_AGE = 24 * 60 * 60
+_MEMBER_PAYMENT_HISTORY_POSITION_KEYS = frozenset({"received_at", "id"})
 _MEMBER_MUTABLE_FIELDS = (
     "first_name",
     "last_name",
@@ -271,6 +275,93 @@ def member_summary(*, gym: Gym, member: Member) -> dict[str, object]:
         "payment_summary": member_payment_summary(gym=gym, member=member),
         "check_in_summary": {"available": False},
     }
+
+
+def member_payment_history_scope(*, gym_id: UUID, member_id: UUID, limit: int) -> dict[str, str]:
+    return {
+        "gym_id": str(gym_id),
+        "member_id": str(member_id),
+        "limit": str(limit),
+        "ordering": MEMBER_PAYMENT_HISTORY_ORDERING,
+    }
+
+
+def encode_member_payment_cursor(
+    *, received_at: datetime, payment_id: UUID, scope: dict[str, str]
+) -> str:
+    """Return an HMAC-signed cursor. Django's timestamp signer supplies the MAC."""
+
+    return signing.dumps(
+        {"received_at": received_at.isoformat(), "id": str(payment_id), **scope},
+        salt=MEMBER_PAYMENT_HISTORY_CURSOR_SALT,
+        compress=True,
+    )
+
+
+def decode_member_payment_cursor(token: str, *, scope: dict[str, str]) -> tuple[datetime, UUID]:
+    try:
+        loaded = signing.loads(
+            token,
+            salt=MEMBER_PAYMENT_HISTORY_CURSOR_SALT,
+            max_age=_MEMBER_PAYMENT_HISTORY_CURSOR_MAX_AGE,
+        )
+        if not isinstance(loaded, dict):
+            raise signing.BadSignature
+        expected_keys = set(scope) | _MEMBER_PAYMENT_HISTORY_POSITION_KEYS
+        if set(loaded) != expected_keys or any(
+            loaded.get(key) != value for key, value in scope.items()
+        ):
+            raise signing.BadSignature
+        received_raw = loaded["received_at"]
+        if not isinstance(received_raw, str):
+            raise TypeError
+        received_at = datetime.fromisoformat(received_raw)
+        if received_at.tzinfo is None:
+            raise ValueError
+        payment_id = UUID(str(loaded["id"]))
+    except (signing.BadSignature, KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise ValidationError({"after": ["Invalid cursor."]}) from exc
+    return received_at, payment_id
+
+
+def page_member_payments(
+    *,
+    gym_id: UUID,
+    member_id: UUID,
+    limit: int,
+    after: str,
+) -> tuple[list[Payment], dict[str, Any]]:
+    """Return one history page ordered by received_at DESC, id DESC.
+
+    The cursor binds the gym, member, that order, and the page limit. One query
+    fetches ``limit + 1`` rows and joins the same-gym receipt.
+    ``payment_gym_member_hist_idx`` matches that order so the limit can stop
+    without sorting the member's full history.
+    """
+
+    scope = member_payment_history_scope(gym_id=gym_id, member_id=member_id, limit=limit)
+    received_at: datetime | None = None
+    payment_id: UUID | None = None
+    if after:
+        received_at, payment_id = decode_member_payment_cursor(after, scope=scope)
+    queryset = Payment.objects.filter(gym_id=gym_id, member_id=member_id).select_related("receipt")
+    queryset = queryset.order_by("-received_at", "-id")
+    if received_at is not None and payment_id is not None:
+        queryset = queryset.filter(
+            Q(received_at__lt=received_at) | Q(received_at=received_at, id__lt=payment_id)
+        )
+    rows = list(queryset[: limit + 1])
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_after = None
+    if has_more and rows:
+        last = rows[-1]
+        next_after = encode_member_payment_cursor(
+            received_at=last.received_at,
+            payment_id=last.id,
+            scope=scope,
+        )
+    return rows, {"has_more": has_more, "next_after": next_after}
 
 
 def inclusive_expiry_date(start: date, value: int, unit: str) -> date:

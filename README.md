@@ -12,8 +12,9 @@ and dashboard policies already specified in the canonical contracts. Phase 2
 publishes the MembershipPlan and Member list, create, detail, update, and
 archive APIs, the Membership sale, lifecycle, and expiry API, and the member
 summary API. Membership-expiry scheduling and delivery commands are
-implemented. Nested member payment and check-in history, notification HTTP
-routes, and payment and receipt endpoints remain unpublished. Phase 2 is not
+implemented. Nested member payment history is published. Nested check-in
+history, notification HTTP routes, and general payment and receipt endpoints
+remain unpublished. Phase 2 is not
 complete. Production expiry delivery remains gated on an approved
 transactional provider that honors the idempotency header. Earlier persistence
 for those areas stays outside the closed Phase 1B gate.
@@ -118,8 +119,9 @@ MembershipPlan and Member list, create, detail, update, and archive are
 published. Membership list, create, detail, note update, cancel, suspend,
 resume, and expiry buckets are published. The member summary is published.
 Membership-expiry scheduling and delivery commands are implemented. Nested
-member payment and check-in history, notification HTTP routes, and payment and
-receipt endpoints remain unpublished. Production expiry delivery remains gated
+member payment history is published. Nested check-in history, notification HTTP
+routes, and general payment and receipt endpoints remain unpublished.
+Production expiry delivery remains gated
 on an idempotency-capable transactional provider.
 Check-in, finance, PT, reports, and
 mobile routes stay excluded until their own phases.

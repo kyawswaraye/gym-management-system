@@ -24,6 +24,9 @@ from apps.members.serializers import (
     MemberEnvelopeSerializer,
     MemberListEnvelopeSerializer,
     MemberListQuerySerializer,
+    MemberPaymentHistoryEnvelopeSerializer,
+    MemberPaymentHistoryItemSerializer,
+    MemberPaymentHistoryQuerySerializer,
     MemberSerializer,
     MembershipCancelSerializer,
     MembershipCommandSerializer,
@@ -60,6 +63,7 @@ from apps.members.services import (
     create_plan,
     gym_today,
     member_summary,
+    page_member_payments,
     page_members,
     page_membership_expiry,
     page_membership_plans,
@@ -73,7 +77,12 @@ from apps.members.services import (
     update_plan,
     void_payment,
 )
-from apps.users.permissions import RequiresEntitlement, RequiresPermission
+from apps.users.permissions import (
+    RequiresEntitlement,
+    RequiresEntitlements,
+    RequiresPermission,
+    RequiresPermissions,
+)
 
 
 class TenantAPIView(APIView):
@@ -256,6 +265,39 @@ class MemberSummaryView(MemberFeatureAPIView):
         member = get_object_or_404(Member, gym=request.gym, id=id)
         payload = member_summary(gym=request.gym, member=member)
         return success_response(MemberSummarySerializer(payload).data)
+
+
+class MemberPaymentHistoryView(APIView):
+    permission_classes = [IsAuthenticated, RequiresPermissions, RequiresEntitlements]
+    required_permissions = ("members.view", "payments.view")
+    required_features = ("members", "finance")
+
+    @extend_schema(
+        operation_id="members_payment_history",
+        parameters=[MemberPaymentHistoryQuerySerializer],
+        responses={
+            200: MemberPaymentHistoryEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request, id: UUID) -> Response:
+        query = MemberPaymentHistoryQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        filters = query.validated_data
+        member = get_object_or_404(Member, gym=request.gym, id=id)
+        payments, meta = page_member_payments(
+            gym_id=request.gym.id,
+            member_id=member.id,
+            limit=int(filters["limit"]),
+            after=str(filters.get("after", "")),
+        )
+        return success_response(
+            MemberPaymentHistoryItemSerializer(payments, many=True).data,
+            meta=meta,
+        )
 
 
 class PlanListCreateView(MembershipFeatureAPIView):
