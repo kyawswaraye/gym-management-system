@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from rest_framework import status
 from rest_framework.exceptions import APIException, ErrorDetail
 from rest_framework.response import Response
+
+logger = logging.getLogger(__name__)
 
 
 class CodedAPIException(APIException):
@@ -37,6 +40,7 @@ def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
     request = context.get("request")
     request_id = getattr(request, "request_id", "req_unknown")
     if response is None:
+        logger.exception("Unhandled API exception", extra={"request_id": request_id}, exc_info=exc)
         return Response(
             {
                 "success": False,

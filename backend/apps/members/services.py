@@ -7,13 +7,49 @@ from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+from django.core import signing
 from django.db import IntegrityError, transaction
-from django.db.models import Q, Sum
+from django.db.models import Q, QuerySet, Sum
+from django.http import Http404
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from apps.common.db.tenant_context import set_gym_context
+from apps.files.models import FileAsset
+from apps.members.exceptions import MemberConflict, MembershipPlanConflict
 from apps.members.models import Member, Membership, MembershipPlan, Payment, Receipt
+from apps.members.normalization import (
+    canonical_address,
+    manual_sequence_value,
+    normalize_member_email,
+    normalize_member_gender,
+    normalize_member_name,
+    normalize_member_phone,
+)
 from apps.tenants.models import Gym, GymMembership, GymSettings
+
+PLAN_LIST_CURSOR_SALT = "membership-plan-list"
+PLAN_LIST_CURSOR_ORDERING = "code,id"
+_PLAN_CURSOR_MAX_AGE = 24 * 60 * 60
+_PLAN_MUTABLE_FIELDS = ("code", "name", "description", "duration_value", "duration_unit", "price")
+MEMBER_LIST_CURSOR_SALT = "member-list"
+MEMBER_LIST_CURSOR_ORDERING = "normalized_full_name,id"
+_MEMBER_CURSOR_MAX_AGE = 24 * 60 * 60
+_MEMBER_MUTABLE_FIELDS = (
+    "first_name",
+    "last_name",
+    "phone",
+    "email",
+    "gender",
+    "date_of_birth",
+    "address",
+    "join_date",
+    "emergency_contact_name",
+    "emergency_contact_phone",
+    "notes",
+    "profile_photo_asset_id",
+)
+_PROFILE_PHOTO_ERROR = "Select a clean profile photo from this gym."
 
 
 def gym_today(gym: Gym) -> date:
@@ -33,36 +69,452 @@ def _add_duration(start: date, value: int, unit: str) -> date:
     return date(year, month, day) - timedelta(days=1)
 
 
-@transaction.atomic
-def create_member(*, gym: Gym, actor: GymMembership, data: dict[str, Any]) -> Member:
-    settings = GymSettings.objects.select_for_update().get(gym=gym)
-    member_number = data.pop("member_number", "").strip()
-    if not member_number:
-        member_number = f"{settings.member_number_prefix}-{settings.next_member_number:06d}"
-        settings.next_member_number += 1
-        settings.updated_by_membership_id = actor.id
-        settings.save(
-            update_fields=["next_member_number", "updated_by_membership_id", "updated_at"]
+def _validate_member_dates(date_of_birth: date | None, join_date: date) -> None:
+    if date_of_birth is not None and date_of_birth > join_date:
+        raise ValidationError({"date_of_birth": ["Date of birth cannot be after the join date."]})
+
+
+def _member_conflict(exc: IntegrityError) -> MemberConflict | None:
+    message = str(exc)
+    if "member_gym_number_uniq" in message:
+        return MemberConflict("A member with this number already exists.")
+    if "member_gym_linked_user_uniq" in message:
+        return MemberConflict()
+    return None
+
+
+def _require_profile_photo(gym: Gym, asset_id: UUID | None) -> UUID | None:
+    if asset_id is None:
+        return None
+    asset = FileAsset.objects.select_for_update().filter(gym=gym, id=asset_id).first()
+    if (
+        asset is None
+        or asset.scan_status != FileAsset.ScanStatus.CLEAN
+        or asset.retention_status != FileAsset.RetentionStatus.ACTIVE
+        or asset.deleted_at is not None
+    ):
+        raise ValidationError({"profile_photo_asset_id": [_PROFILE_PHOTO_ERROR]})
+    return asset.id
+
+
+def _prepare_member_changes(changes: dict[str, Any]) -> dict[str, Any]:
+    prepared = {field: changes[field] for field in _MEMBER_MUTABLE_FIELDS if field in changes}
+    if "first_name" in prepared:
+        prepared["first_name"] = normalize_member_name(str(prepared["first_name"]))
+    if "last_name" in prepared:
+        prepared["last_name"] = normalize_member_name(str(prepared["last_name"]))
+    if "phone" in prepared:
+        prepared["phone"] = normalize_member_phone(prepared["phone"])
+    if "email" in prepared:
+        prepared["email"] = normalize_member_email(prepared["email"])
+    if "gender" in prepared:
+        prepared["gender"] = normalize_member_gender(prepared["gender"])
+    if "address" in prepared:
+        prepared["address"] = canonical_address(prepared["address"])
+    if "emergency_contact_name" in prepared:
+        prepared["emergency_contact_name"] = normalize_member_name(
+            str(prepared["emergency_contact_name"])
         )
-    return Member.objects.create(
-        gym=gym,
-        member_number=member_number,
-        created_by_membership_id=actor.id,
-        updated_by_membership_id=actor.id,
-        **data,
+    if "emergency_contact_phone" in prepared:
+        prepared["emergency_contact_phone"] = (
+            normalize_member_phone(prepared["emergency_contact_phone"]) or ""
+        )
+    if "notes" in prepared:
+        prepared["notes"] = str(prepared["notes"]).strip()
+    return prepared
+
+
+def member_list_cursor_scope(
+    *,
+    gym_id: UUID,
+    status: str,
+    search: str,
+    joined_from: date | None,
+    joined_to: date | None,
+    is_pt_client: bool | None,
+) -> dict[str, str]:
+    if is_pt_client is None:
+        pt_client = ""
+    else:
+        pt_client = "true" if is_pt_client else "false"
+    return {
+        "gym_id": str(gym_id),
+        "status": status,
+        "search": search,
+        "joined_from": joined_from.isoformat() if joined_from else "",
+        "joined_to": joined_to.isoformat() if joined_to else "",
+        "is_pt_client": pt_client,
+        "ordering": MEMBER_LIST_CURSOR_ORDERING,
+    }
+
+
+def encode_member_cursor(
+    *, normalized_full_name: str, member_id: UUID, scope: dict[str, str]
+) -> str:
+    return signing.dumps(
+        {"normalized_full_name": normalized_full_name, "id": str(member_id), **scope},
+        salt=MEMBER_LIST_CURSOR_SALT,
+        compress=True,
     )
+
+
+def decode_member_cursor(token: str, *, scope: dict[str, str]) -> tuple[str, UUID]:
+    try:
+        cursor = signing.loads(token, salt=MEMBER_LIST_CURSOR_SALT, max_age=_MEMBER_CURSOR_MAX_AGE)
+        if not isinstance(cursor, dict) or any(
+            cursor.get(key) != value for key, value in scope.items()
+        ):
+            raise signing.BadSignature
+        normalized_full_name = cursor["normalized_full_name"]
+        if not isinstance(normalized_full_name, str):
+            raise TypeError
+        member_id = UUID(str(cursor["id"]))
+    except (signing.BadSignature, KeyError, TypeError, ValueError) as exc:
+        raise ValidationError({"after": ["Invalid cursor."]}) from exc
+    return normalized_full_name, member_id
+
+
+def _member_search_filter(search: str) -> Q:
+    folded = " ".join(search.split()).casefold()
+    query = Q(normalized_full_name__icontains=folded) | Q(member_number__icontains=search.strip())
+    lowered = search.strip().lower()
+    if lowered:
+        query |= Q(email__icontains=lowered)
+    try:
+        phone = normalize_member_phone(search)
+    except ValueError:
+        phone = None
+    if phone:
+        query |= Q(phone__icontains=phone)
+    return query
+
+
+def page_members(
+    queryset: QuerySet[Member],
+    *,
+    gym_id: UUID,
+    status: str,
+    search: str,
+    joined_from: date | None,
+    joined_to: date | None,
+    is_pt_client: bool | None,
+    limit: int,
+    after: str,
+) -> tuple[list[Member], dict[str, Any]]:
+    scope = member_list_cursor_scope(
+        gym_id=gym_id,
+        status=status,
+        search=search,
+        joined_from=joined_from,
+        joined_to=joined_to,
+        is_pt_client=is_pt_client,
+    )
+    if after:
+        decode_member_cursor(after, scope=scope)
+    if is_pt_client is True:
+        return [], {"has_more": False, "next_after": None}
+    queryset = queryset.order_by("normalized_full_name", "id")
+    if status:
+        queryset = queryset.filter(status=status)
+    if joined_from is not None:
+        queryset = queryset.filter(join_date__gte=joined_from)
+    if joined_to is not None:
+        queryset = queryset.filter(join_date__lte=joined_to)
+    if search.strip():
+        queryset = queryset.filter(_member_search_filter(search))
+    if after:
+        normalized_full_name, member_id = decode_member_cursor(after, scope=scope)
+        queryset = queryset.filter(
+            Q(normalized_full_name__gt=normalized_full_name)
+            | Q(normalized_full_name=normalized_full_name, id__gt=member_id)
+        )
+    rows = list(queryset[: limit + 1])
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_after = None
+    if has_more and rows:
+        last = rows[-1]
+        next_after = encode_member_cursor(
+            normalized_full_name=last.normalized_full_name,
+            member_id=last.id,
+            scope=scope,
+        )
+    return rows, {"has_more": has_more, "next_after": next_after}
+
+
+def _locked_member(*, gym: Gym, member_id: UUID) -> Member:
+    try:
+        return Member.objects.select_for_update().get(gym=gym, id=member_id)
+    except Member.DoesNotExist as exc:
+        raise Http404 from exc
 
 
 @transaction.atomic
-def create_plan(*, gym: Gym, actor: GymMembership, data: dict[str, Any]) -> MembershipPlan:
-    if data["currency"] != gym.currency:
-        raise ValidationError({"currency": ["Currency must match the selected gym."]})
-    return MembershipPlan.objects.create(
-        gym=gym,
-        created_by_membership_id=actor.id,
-        updated_by_membership_id=actor.id,
-        **data,
+def create_member(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    member_number: str,
+    first_name: str,
+    last_name: str,
+    phone: str | None,
+    email: str | None,
+    gender: str | None,
+    date_of_birth: date | None,
+    address: dict[str, Any],
+    join_date: date,
+    emergency_contact_name: str,
+    emergency_contact_phone: str,
+    notes: str,
+    profile_photo_asset_id: UUID | None,
+) -> Member:
+    set_gym_context(gym_id=gym.id)
+    _validate_member_dates(date_of_birth, join_date)
+    settings = GymSettings.objects.select_for_update().get(gym=gym)
+    requested_number = member_number.strip()
+    advance_sequence = False
+    if requested_number:
+        if not settings.allow_manual_member_numbers:
+            raise ValidationError({"member_number": ["Manual member numbers are disabled."]})
+        assigned_number = requested_number
+        consumed = manual_sequence_value(settings.member_number_prefix, assigned_number)
+        if consumed is not None and consumed >= settings.next_member_number:
+            settings.next_member_number = consumed + 1
+            advance_sequence = True
+    else:
+        assigned_number = f"{settings.member_number_prefix}-{settings.next_member_number:06d}"
+        settings.next_member_number += 1
+        advance_sequence = True
+    photo_id = _require_profile_photo(gym, profile_photo_asset_id)
+    prepared = _prepare_member_changes(
+        {
+            "first_name": first_name,
+            "last_name": last_name,
+            "phone": phone,
+            "email": email,
+            "gender": gender,
+            "date_of_birth": date_of_birth,
+            "address": address,
+            "join_date": join_date,
+            "emergency_contact_name": emergency_contact_name,
+            "emergency_contact_phone": emergency_contact_phone,
+            "notes": notes,
+            "profile_photo_asset_id": photo_id,
+        }
     )
+    try:
+        with transaction.atomic():
+            if advance_sequence:
+                settings.updated_by_membership_id = actor.id
+                settings.save(
+                    update_fields=[
+                        "next_member_number",
+                        "updated_by_membership_id",
+                        "updated_at",
+                    ]
+                )
+            return Member.objects.create(
+                gym=gym,
+                member_number=assigned_number,
+                created_by_membership_id=actor.id,
+                updated_by_membership_id=actor.id,
+                **prepared,
+            )
+    except IntegrityError as exc:
+        conflict = _member_conflict(exc)
+        if conflict is not None:
+            raise conflict from exc
+        raise
+
+
+@transaction.atomic
+def update_member(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    member_id: UUID,
+    changes: dict[str, Any],
+) -> Member:
+    set_gym_context(gym_id=gym.id)
+    member = _locked_member(gym=gym, member_id=member_id)
+    prepared = _prepare_member_changes(changes)
+    if "profile_photo_asset_id" in prepared:
+        prepared["profile_photo_asset_id"] = _require_profile_photo(
+            gym, prepared["profile_photo_asset_id"]
+        )
+    _validate_member_dates(
+        prepared["date_of_birth"] if "date_of_birth" in prepared else member.date_of_birth,
+        prepared["join_date"] if "join_date" in prepared else member.join_date,
+    )
+    applied = {field: value for field, value in prepared.items() if getattr(member, field) != value}
+    if not applied:
+        return member
+    for field, value in applied.items():
+        setattr(member, field, value)
+    member.updated_by_membership_id = actor.id
+    try:
+        with transaction.atomic():
+            member.save(update_fields=[*applied.keys(), "updated_by_membership_id", "updated_at"])
+    except IntegrityError as exc:
+        conflict = _member_conflict(exc)
+        if conflict is not None:
+            raise conflict from exc
+        raise
+    return member
+
+
+@transaction.atomic
+def archive_member(*, gym: Gym, actor: GymMembership, member_id: UUID) -> Member:
+    set_gym_context(gym_id=gym.id)
+    member = _locked_member(gym=gym, member_id=member_id)
+    if member.status == Member.Status.ARCHIVED and member.archived_at is not None:
+        return member
+    member.status = Member.Status.ARCHIVED
+    if member.archived_at is None:
+        member.archived_at = timezone.now()
+    member.authz_version += 1
+    member.updated_by_membership_id = actor.id
+    member.save(
+        update_fields=[
+            "status",
+            "archived_at",
+            "authz_version",
+            "updated_by_membership_id",
+            "updated_at",
+        ]
+    )
+    return member
+
+
+def _plan_conflict(exc: IntegrityError) -> MembershipPlanConflict:
+    if "mplan_gym_code_uniq" in str(exc):
+        return MembershipPlanConflict("A membership plan with this code already exists.")
+    return MembershipPlanConflict()
+
+
+def encode_plan_cursor(*, code: str, plan_id: UUID, gym_id: UUID) -> str:
+    return signing.dumps(
+        {
+            "code": code,
+            "id": str(plan_id),
+            "gym_id": str(gym_id),
+            "ordering": PLAN_LIST_CURSOR_ORDERING,
+        },
+        salt=PLAN_LIST_CURSOR_SALT,
+        compress=True,
+    )
+
+
+def decode_plan_cursor(token: str, *, gym_id: UUID) -> tuple[str, UUID]:
+    try:
+        cursor = signing.loads(token, salt=PLAN_LIST_CURSOR_SALT, max_age=_PLAN_CURSOR_MAX_AGE)
+        if (
+            not isinstance(cursor, dict)
+            or cursor.get("gym_id") != str(gym_id)
+            or cursor.get("ordering") != PLAN_LIST_CURSOR_ORDERING
+        ):
+            raise signing.BadSignature
+        code = cursor["code"]
+        if not isinstance(code, str):
+            raise TypeError
+        plan_id = UUID(str(cursor["id"]))
+    except (signing.BadSignature, KeyError, TypeError, ValueError) as exc:
+        raise ValidationError({"after": ["Invalid cursor."]}) from exc
+    return code, plan_id
+
+
+def page_membership_plans(
+    queryset: QuerySet[MembershipPlan], *, gym_id: UUID, limit: int, after: str
+) -> tuple[list[MembershipPlan], dict[str, Any]]:
+    queryset = queryset.order_by("code", "id")
+    if after:
+        code, plan_id = decode_plan_cursor(after, gym_id=gym_id)
+        queryset = queryset.filter(Q(code__gt=code) | Q(code=code, id__gt=plan_id))
+    rows = list(queryset[: limit + 1])
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_after = None
+    if has_more and rows:
+        last = rows[-1]
+        next_after = encode_plan_cursor(code=last.code, plan_id=last.id, gym_id=gym_id)
+    return rows, {"has_more": has_more, "next_after": next_after}
+
+
+def _locked_plan(*, gym: Gym, plan_id: UUID) -> MembershipPlan:
+    try:
+        return MembershipPlan.objects.select_for_update().get(gym=gym, id=plan_id)
+    except MembershipPlan.DoesNotExist as exc:
+        raise Http404 from exc
+
+
+@transaction.atomic
+def create_plan(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    code: str,
+    name: str,
+    description: str,
+    duration_value: int,
+    duration_unit: str,
+    price: Decimal,
+) -> MembershipPlan:
+    try:
+        with transaction.atomic():
+            return MembershipPlan.objects.create(
+                gym=gym,
+                code=code,
+                name=name,
+                description=description,
+                duration_value=duration_value,
+                duration_unit=duration_unit,
+                price=price,
+                currency=gym.currency,
+                created_by_membership_id=actor.id,
+                updated_by_membership_id=actor.id,
+            )
+    except IntegrityError as exc:
+        raise _plan_conflict(exc) from exc
+
+
+@transaction.atomic
+def update_plan(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    plan_id: UUID,
+    changes: dict[str, Any],
+) -> MembershipPlan:
+    plan = _locked_plan(gym=gym, plan_id=plan_id)
+    applied = {
+        field: changes[field]
+        for field in _PLAN_MUTABLE_FIELDS
+        if field in changes and getattr(plan, field) != changes[field]
+    }
+    if not applied:
+        return plan
+    for field, value in applied.items():
+        setattr(plan, field, value)
+    plan.updated_by_membership_id = actor.id
+    try:
+        with transaction.atomic():
+            plan.save(update_fields=[*applied.keys(), "updated_by_membership_id", "updated_at"])
+    except IntegrityError as exc:
+        raise _plan_conflict(exc) from exc
+    return plan
+
+
+@transaction.atomic
+def archive_plan(*, gym: Gym, actor: GymMembership, plan_id: UUID) -> MembershipPlan:
+    plan = _locked_plan(gym=gym, plan_id=plan_id)
+    if not plan.is_active and plan.archived_at is not None:
+        return plan
+    plan.is_active = False
+    if plan.archived_at is None:
+        plan.archived_at = timezone.now()
+    plan.updated_by_membership_id = actor.id
+    plan.save(update_fields=["is_active", "archived_at", "updated_by_membership_id", "updated_at"])
+    return plan
 
 
 @transaction.atomic

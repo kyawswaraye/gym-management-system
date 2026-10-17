@@ -4,7 +4,7 @@
 
 This document is the Phase 0 schema contract. PostgreSQL is authoritative; Django models, migrations, services, APIs, tests, and fixtures must conform to it. Reports and dashboards are query/service outputs, never mutable report tables in Phase 0.
 
-Phase 1A implements only foundation identity, tenancy, authorization, session, audit, and RLS persistence. It does not create member, check-in, finance, PT, report, or mobile feature tables ahead of their roadmap phases.
+The migrated schema includes the Phase 1A foundation (identity, tenancy, authorization, sessions, audit, and RLS), the Phase 1B provisioning, settings, entitlement, staff, platform-audit, MFA enrollment and challenge, and `files_file_asset` tables, and the earlier `Member`, `MembershipPlan`, `Membership`, `Payment`, `Receipt`, and `Notification` tables. Check-in, the remaining finance and inventory tables, PT and classes, announcements, devices, and idempotency records in the inventory below remain contract-only until their phases. The MembershipPlan HTTP API and the Member list, create, detail, update, and archive API are published. Member summary and history, membership, notification, payment, and receipt HTTP endpoints remain unpublished.
 
 ## 1. Non-negotiable conventions
 
@@ -66,7 +66,7 @@ No table has mixed global/tenant scope. In particular, `Role.gym_id` is never nu
 
 At gym provisioning, each active template is copied into a tenant `Role`; its permission mappings are copied into tenant `RolePermission` rows in the same transaction. Later template changes never silently change existing gyms. An explicit, audited upgrade command may diff and apply a newer template version.
 
-The complete canonical stable permission catalog is below. Tenant permission codes intentionally have no `tenant.` prefix. Feature-entitlement codes remain a separate catalog and never substitute for permissions.
+The complete canonical stable permission catalog is below. A listed code is not deleted when it is retired; `is_active` records whether it can still authorize. Tenant permission codes intentionally have no `tenant.` prefix. Feature-entitlement codes remain a separate catalog and never substitute for permissions.
 
 ```text
 platform.dashboard.view
@@ -163,6 +163,8 @@ notifications.manage
 announcements.view
 announcements.manage
 ```
+
+`platform.settings.manage` stays in this historical catalog and is not removed from migration `0003`. Migration `0020_retire_platform_settings_manage` marks that existing row inactive and records that it has no approved HTTP route. The reverse is a no-op, so reactivation requires an approved decision. The inactive row must not be assigned to a tenant role and must never authorize tenant `settings.manage`. Platform sessions load only active `platform.*` permissions, so the retired code is absent from a newly authenticated session while the row remains.
 
 ## 4. Entity definitions
 
@@ -380,6 +382,8 @@ Fields: common tenant columns; opaque `object_key`; `original_name`; detected `c
 
 Constraints: `UNIQUE (gym_id, object_key)`; byte size nonnegative; SHA-256 format valid; composite uploader FK; owner is an opaque association and must be service-validated under the same gym. Object keys include the gym UUID plus a random UUID so they remain globally collision-resistant without a non-tenant-leading database index. The bucket is private. Physical deletion follows retention policy; metadata remains when needed for audit/finance.
 
+Phase 1B persists this table as `files_file_asset` with `UNIQUE (gym_id, id)`, the checks above, a database check that `object_key` is `{gym_id}/{random_uuid}`, forced RLS using `app_current_gym_id()` for select, insert, update, and delete, and runtime grants for `SELECT`, `INSERT`, and `UPDATE` only. Runtime `DELETE` is not granted. `deleted_at` is required exactly when `retention_status` is `DELETED`; `DELETE_PENDING` and the other non-deleted states keep `deleted_at` null. `owner_type`/`owner_id` stay an opaque pair with no foreign key. `StaffProfile.profile_photo_asset_id` is not a cross-app foreign key: the staff API does not accept or return it, and a future service must prove the asset is same-gym and `CLEAN` before attaching it. Upload, download, signed-URL, and storage-provider APIs are deferred.
+
 ### Notification
 
 Fields: common tenant columns; nullable global `recipient_user_id`; nullable tenant `recipient_member_id`; `type`; `channel` (`IN_APP`, `EMAIL`, `SMS`, `PUSH`); `template_key`, `template_version`; size-limited safe `payload JSONB`; `scheduled_at`; nullable `sent_at`, `failed_at`; `status` (`PENDING`, `SENT`, `FAILED`, `CANCELLED`); nullable `provider_id`; `deduplication_key`; `attempt_count`; `created_by_membership_id` nullable for system-generated notices.
@@ -396,7 +400,7 @@ Membership-expiry email uses `type = MEMBERSHIP_EXPIRY`, `channel = EMAIL`, a ve
 
 Fields: common tenant columns; nullable global `actor_user_id`; nullable tenant `actor_membership_id`, `impersonator_membership_id`; `action`, `module`, `target_type`, `target_id UUID`; redacted `old_values JSONB`, `new_values JSONB`; `request_id`; nullable `ip_address`, `user_agent`; `outcome` (`SUCCESS`, `DENIED`, `ERROR`); `occurred_at`.
 
-Constraints: composite membership FKs; append-only trigger rejects `UPDATE` and `DELETE`; runtime grants permit insert/select only as authorized. Platform-only events belong in `PlatformAuditLog`, never in this tenant table with a nullable `gym_id`.
+Constraints: composite membership FKs; append-only trigger rejects `UPDATE` and `DELETE`; runtime grants permit insert/select only as authorized. Tenant audit pages use `(gym_id, occurred_at DESC, id DESC)` so a gym-scoped keyset does not sort the table. Target lookup keeps `(gym_id, target_type, target_id, occurred_at DESC)`. Platform-only events belong in `PlatformAuditLog`, never in this tenant table with a nullable `gym_id`.
 
 ### RefreshSession (global)
 
@@ -493,6 +497,8 @@ $$;
 
 The migration owner owns this function; the runtime role may execute but not replace it. A missing setting returns `NULL` and therefore matches no tenant row; malformed values are rejected rather than selecting a default.
 
+Six `SECURITY DEFINER` functions set `row_security=off` and are owned by `gym_auth_bootstrap` (`NOLOGIN NOINHERIT BYPASSRLS`): `app_staff_memberships()`, `app_owner_invitation(text)`, `app_staff_invitation(text)`, `enforce_invitation_role_owner_boundary()`, `app_protect_owner_role_permissions()`, and `app_protect_membership_role_owner()`. Each locks `search_path` to `pg_catalog, public` and contains no dynamic SQL. That role may `SELECT` only `tenants_gym`, `tenants_gym_membership`, `tenants_staff_invitation`, `tenants_staff_invitation_role`, `tenants_role`, `tenants_permission`, `tenants_system_role_template`, and `tenants_system_role_template_permission`. It has no insert, update, or delete grant. `PUBLIC` cannot execute the functions. Runtime may execute the membership and invitation lookups. The three integrity functions are triggers and are not directly executable. Runtime has no table-level `INSERT` or `UPDATE` on `users_user`. It may update only `mfa_enabled`, `mfa_secret_encrypted`, `mfa_last_used_step`, and `updated_at` directly. `app_create_invited_identity(text, text, text, text)` creates an ordinary unusable-password identity, `app_accept_invitation_password(text, text, timestamptz)` performs the one invitation password transition and accepts only the current `pbkdf2_sha256` encoding, and `app_confirm_invited_profile(text, text, text, text, timestamptz)` confirms that invited user's name and phone. Insert and update triggers reject direct runtime writes outside those boundaries. These functions are not `row_security=off` and are not owned by `gym_auth_bootstrap`.
+
 For every tenant table listed in section 2, migrations execute:
 
 ```sql
@@ -538,6 +544,7 @@ Every FK has an index. Every tenant operational index starts with `gym_id`; glob
 - `(gym_id, status, outstanding_amount)` on PT commissions;
 - `(gym_id, status, period_start, period_end)` on salary periods and `(gym_id, salary_period_id, staff_profile_id)` on salary lines;
 - `(gym_id, scheduled_at, status)` on notifications;
+- `(gym_id, purpose)`, `(gym_id, owner_type, owner_id)`, `(gym_id, scan_status)`, `(gym_id, retention_status)`, and `(gym_id, uploaded_by_membership_id)` on file assets; object-key access uses unique `(gym_id, object_key)` and has no index led by `object_key`;
 - `(gym_id, target_type, target_id, occurred_at DESC)` on audit logs;
 - partial indexes for active/non-archived records and open cash sessions.
 
@@ -592,6 +599,6 @@ The exact integration credential/device persistence model is intentionally defer
 
 ## 11. Compatibility and accepted decisions
 
-The approved implementation pins are Python 3.14.7, Django 5.2.17 LTS, Django REST Framework 3.18.0, Node.js 24.20.0 LTS, Next.js 16.3.3 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. Database compatibility is established against PostgreSQL 18.6 with the selected Python driver, Django migrations, composite constraints, transaction-local `set_config`, forced RLS, lock, and rollback tests; version labels alone are not evidence.
+The approved implementation pins are Python 3.14.7, Django 5.2.17 LTS, Django REST Framework 3.18.0, Node.js 24.20.0 LTS, Next.js 16.4.1 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. Next.js 16.4.1 is an approved security compatibility update. `docs/DEVELOPMENT_PLAN.md` remains the immutable historical baseline and still records Next.js 16.3.3. Database compatibility is established against PostgreSQL 18.6 with the selected Python driver, Django migrations, composite constraints, transaction-local `set_config`, forced RLS, lock, and rollback tests; version labels alone are not evidence.
 
-[ADR 0001](./adr/0001-single-vps-production-topology.md) accepts the single-VPS topology that the retention, backup, and restore rules in sections 9 and 10 depend on. [ADR 0002](./adr/0002-nextjs-bff-browser-authentication.md) governs the BFF/session lifecycle, including the global `GymSelectionTicket` foundation, without changing JWT claims. [ADR 0003](./adr/0003-reception-cash-session-authority.md) governs the object condition already supported by `CashSession.opened_by_membership_id`. Provider/MFA policy remains deferred to Phase 1B, jurisdiction and general retention must be resolved before production, device persistence remains Phase 3, and Expo versus bare React Native remains Phase 7.
+[ADR 0001](./adr/0001-single-vps-production-topology.md) accepts the single-VPS topology that the retention, backup, and restore rules in sections 9 and 10 depend on. [ADR 0002](./adr/0002-nextjs-bff-browser-authentication.md) governs the BFF/session lifecycle, including the global `GymSelectionTicket` foundation, without changing JWT claims. [ADR 0003](./adr/0003-reception-cash-session-authority.md) governs the object condition already supported by `CashSession.opened_by_membership_id`. MFA is TOTP, mandatory for platform administrators and Owners, with recent step-up for protected owner operations, encrypted secrets, and replay protection. Broader role-based MFA may be decided later. Email uses Django's configurable email backend. Tests and end-to-end runs use non-delivery backends. Production must configure an approved transactional provider before invitation, password-recovery, or Phase 2 expiry delivery is production-ready; vendor selection and that deployment configuration remain deferred. Jurisdiction and general retention must be resolved before production, device persistence remains Phase 3, and Expo versus bare React Native remains Phase 7.

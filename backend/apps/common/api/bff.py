@@ -8,6 +8,10 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 
 BFF_SECRET_HEADER = "X-Gym-BFF-Secret"
 AUTH_API_PREFIX = "/api/v1/auth/"
+TRUSTED_BFF_PATHS = {
+    "/api/v1/owners/invitations/accept/",
+    "/api/v1/staff/invitations/accept/",
+}
 MIN_BFF_SECRET_LENGTH = 32
 
 
@@ -29,9 +33,9 @@ class BffTrustMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
-        if request.path.startswith(AUTH_API_PREFIX) and not request_has_trusted_bff(
-            request, settings.BFF_SHARED_SECRET
-        ):
+        if (
+            request.path.startswith(AUTH_API_PREFIX) or request.path in TRUSTED_BFF_PATHS
+        ) and not request_has_trusted_bff(request, settings.BFF_SHARED_SECRET):
             return JsonResponse(
                 {
                     "success": False,

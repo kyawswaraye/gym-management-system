@@ -9,7 +9,7 @@ def test_login_dispatch_is_non_atomic_and_post_opens_explicit_atomic() -> None:
     assert "default" in getattr(LoginView.dispatch, "_non_atomic_requests", set())
     source = inspect.getsource(LoginView.post)
     assert "with transaction.atomic():" in source
-    assert source.index("with transaction.atomic():") < source.index("set_identity_context")
+    assert source.index("with transaction.atomic():") < source.index("_complete_login")
 
 
 def test_select_gym_jwt_path_opens_explicit_atomic() -> None:

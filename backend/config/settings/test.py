@@ -3,8 +3,17 @@ import os
 from .base import *  # noqa: F403
 
 DEBUG = False
-PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+# MD5 keeps ordinary password setup fast. PBKDF2 stays installed so tests can
+# verify invitation passwords, which the application always stores with it.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.MD5PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
 BFF_SHARED_SECRET = os.environ.get("BFF_SHARED_SECRET", "test-bff-shared-secret-32-chars-min")
+MFA_TOKEN_PEPPER = "test-mfa-token-pepper"
+MFA_ENCRYPTION_KEY = "test-mfa-encryption-key"
+INVITATION_TOKEN_PEPPER = "test-invitation-token-pepper"
+EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 # Disposable verification uses a CREATEDB role, typically gym_admin. Runtime
 # RLS proofs still SET LOCAL ROLE gym_runtime inside PostgreSQL tests.

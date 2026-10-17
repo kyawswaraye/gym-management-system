@@ -28,24 +28,38 @@ from apps.common.api.schema import ErrorEnvelopeSerializer
 from apps.common.db.tenant_context import set_gym_context, set_identity_context
 from apps.tenants.models import GymFeatureEntitlement, GymMembership
 
-from .authentication import StaffJWTAuthentication
+from .authentication import StaffJWTAuthentication, StaffOrPlatformJWTAuthentication
+from .mfa import (
+    begin_enrollment,
+    confirm_enrollment,
+    consume_mfa_challenge,
+    create_mfa_challenge,
+    has_recent_mfa,
+)
 from .models import RefreshSession, User
 from .schema import (
     CurrentUserEnvelopeSerializer,
     DirectLoginEnvelopeSerializer,
     GymMembershipListEnvelopeSerializer,
+    MFAEnrollmentEnvelopeSerializer,
+    MFARequiredEnvelopeSerializer,
+    MFAStatusEnvelopeSerializer,
     SelectionLoginEnvelopeSerializer,
     TokenEnvelopeSerializer,
 )
 from .serializers import (
     LoginInputSerializer,
     LogoutInputSerializer,
+    MFAChallengeInputSerializer,
+    MFAConfirmInputSerializer,
+    MFAEnrollInputSerializer,
     RefreshInputSerializer,
     SelectGymInputSerializer,
 )
 from .services import (
     TokenPair,
     consume_gym_selection_ticket,
+    create_platform_session,
     create_staff_session,
     issue_gym_selection_ticket,
     revoke_all_user_sessions,
@@ -108,6 +122,73 @@ def _token_data(pair: TokenPair) -> dict[str, Any]:
     }
 
 
+def _complete_login(
+    *,
+    user: User,
+    device_name: str,
+    ip_address: str | None,
+    user_agent: str,
+    request_id: str,
+    mfa_verified: bool,
+) -> Response:
+    set_identity_context(user_id=user.id, request_id=request_id)
+    if user.is_platform_admin:
+        pair = create_platform_session(
+            user=user,
+            device_name=device_name,
+            ip_address=ip_address,
+            mfa_verified=mfa_verified,
+        )
+        return success_response(
+            {
+                **_token_data(pair),
+                "requires_gym_selection": False,
+                "available_gym_memberships": [],
+            }
+        )
+    memberships = _membership_rows(user.id)
+    if not memberships:
+        raise AuthenticationFailed()
+    if len(memberships) != 1:
+        ticket, expires_at = issue_gym_selection_ticket(
+            user=user,
+            memberships=memberships,
+            request_id=request_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            mfa_verified=mfa_verified,
+        )
+        return success_response(
+            {
+                "requires_gym_selection": True,
+                "gym_selection_ticket": ticket,
+                "gym_selection_expires_at": expires_at,
+                "available_gym_memberships": _safe_membership_choices(memberships),
+            }
+        )
+    selected = memberships[0]
+    set_gym_context(gym_id=uuid.UUID(selected["gym_id"]))
+    membership = GymMembership.objects.get(
+        id=selected["gym_membership_id"],
+        user=user,
+        status=GymMembership.Status.ACTIVE,
+    )
+    pair = create_staff_session(
+        user=user,
+        membership=membership,
+        device_name=device_name,
+        ip_address=ip_address,
+        mfa_verified=mfa_verified,
+    )
+    return success_response(
+        {
+            **_token_data(pair),
+            "requires_gym_selection": False,
+            "available_gym_memberships": _safe_membership_choices(memberships),
+        }
+    )
+
+
 @method_decorator(non_atomic_requests, name="dispatch")
 class LoginView(APIView):
     authentication_classes: list[type] = []
@@ -121,7 +202,11 @@ class LoginView(APIView):
         responses={
             200: PolymorphicProxySerializer(
                 component_name="LoginEnvelope",
-                serializers=[DirectLoginEnvelopeSerializer, SelectionLoginEnvelopeSerializer],
+                serializers=[
+                    DirectLoginEnvelopeSerializer,
+                    SelectionLoginEnvelopeSerializer,
+                    MFARequiredEnvelopeSerializer,
+                ],
                 resource_type_field_name=None,
             ),
             400: ErrorEnvelopeSerializer,
@@ -147,47 +232,121 @@ class LoginView(APIView):
             if not user.check_password(str(serializer.validated_data["password"])):
                 raise AuthenticationFailed()
             if user.mfa_enabled:
-                raise ProviderNotConfigured()
-            set_identity_context(user_id=user.id, request_id=request.request_id)
-            memberships = _membership_rows(user.id)
-            if not memberships:
-                raise AuthenticationFailed()
-            if len(memberships) != 1:
-                ticket, expires_at = issue_gym_selection_ticket(
+                token, expires_at = create_mfa_challenge(
                     user=user,
-                    memberships=memberships,
-                    request_id=request.request_id,
+                    device_name=str(serializer.validated_data.get("device_name", "")),
                     ip_address=request.META.get("REMOTE_ADDR"),
                     user_agent=request.META.get("HTTP_USER_AGENT", ""),
+                    request_id=request.request_id,
                 )
                 return success_response(
                     {
-                        "requires_gym_selection": True,
-                        "gym_selection_ticket": ticket,
-                        "gym_selection_expires_at": expires_at,
-                        "available_gym_memberships": _safe_membership_choices(memberships),
+                        "requires_mfa": True,
+                        "mfa_challenge_token": token,
+                        "mfa_challenge_expires_at": expires_at,
                     }
                 )
-            selected = memberships[0]
-            set_gym_context(gym_id=uuid.UUID(selected["gym_id"]))
-            membership = GymMembership.objects.get(
-                id=selected["gym_membership_id"],
+            return _complete_login(
                 user=user,
-                status=GymMembership.Status.ACTIVE,
-            )
-            pair = create_staff_session(
-                user=user,
-                membership=membership,
                 device_name=str(serializer.validated_data.get("device_name", "")),
                 ip_address=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+                request_id=request.request_id,
+                mfa_verified=False,
             )
-            return success_response(
-                {
-                    **_token_data(pair),
-                    "requires_gym_selection": False,
-                    "available_gym_memberships": _safe_membership_choices(memberships),
-                }
+
+
+@method_decorator(non_atomic_requests, name="dispatch")
+class MFAChallengeView(APIView):
+    authentication_classes: list[type] = []
+    permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle]
+
+    @extend_schema(
+        operation_id="auth_mfa_challenge",
+        request=MFAChallengeInputSerializer,
+        parameters=[BFF_HEADER_PARAMETER],
+        responses={
+            200: PolymorphicProxySerializer(
+                component_name="MFAChallengeEnvelope",
+                serializers=[DirectLoginEnvelopeSerializer, SelectionLoginEnvelopeSerializer],
+                resource_type_field_name=None,
+            ),
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
+        },
+        auth=[],
+    )
+    def post(self, request: Request) -> Response:
+        serializer = MFAChallengeInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        challenge = consume_mfa_challenge(
+            token=str(serializer.validated_data.get("challenge_token", "")),
+            code=str(serializer.validated_data["code"]),
+        )
+        with transaction.atomic():
+            return _complete_login(
+                user=challenge.user,
+                device_name=challenge.device_name,
+                ip_address=challenge.ip_address,
+                user_agent=challenge.user_agent,
+                request_id=request.request_id,
+                mfa_verified=True,
             )
+
+
+class MFAEnrollView(APIView):
+    authentication_classes = [StaffOrPlatformJWTAuthentication]
+
+    @extend_schema(
+        operation_id="auth_mfa_enroll",
+        request=MFAEnrollInputSerializer,
+        responses={
+            200: MFAEnrollmentEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request) -> Response:
+        serializer = MFAEnrollInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = begin_enrollment(
+            user=request.user,
+            current_password=str(serializer.validated_data["current_password"]),
+        )
+        return success_response(
+            {
+                "enrollment_token": result.token,
+                "secret": result.secret,
+                "otpauth_uri": result.otpauth_uri,
+                "expires_at": result.expires_at,
+            }
+        )
+
+
+class MFAConfirmView(APIView):
+    authentication_classes = [StaffOrPlatformJWTAuthentication]
+
+    @extend_schema(
+        operation_id="auth_mfa_enroll_confirm",
+        request=MFAConfirmInputSerializer,
+        responses={
+            200: MFAStatusEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request) -> Response:
+        serializer = MFAConfirmInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        confirm_enrollment(
+            user=request.user,
+            enrollment_token=str(serializer.validated_data["enrollment_token"]),
+            code=str(serializer.validated_data["code"]),
+            current_session_id=request.refresh_session.id,
+        )
+        return success_response({"mfa_enabled": True, "mfa_recent": True})
 
 
 @method_decorator(non_atomic_requests, name="dispatch")
@@ -240,6 +399,8 @@ class LogoutView(APIView):
 
 
 class LogoutAllView(APIView):
+    authentication_classes = [StaffOrPlatformJWTAuthentication]
+
     @extend_schema(
         operation_id="auth_logout_all",
         request=None,
@@ -339,6 +500,8 @@ class SelectGymView(APIView):
 
 
 class MeView(APIView):
+    authentication_classes = [StaffOrPlatformJWTAuthentication]
+
     @extend_schema(
         operation_id="auth_me",
         parameters=[BFF_HEADER_PARAMETER],
@@ -349,6 +512,25 @@ class MeView(APIView):
         },
     )
     def get(self, request: Request) -> Response:
+        if request.principal_type == RefreshSession.PrincipalType.PLATFORM:
+            return success_response(
+                {
+                    "principal_type": RefreshSession.PrincipalType.PLATFORM,
+                    "user": {
+                        "id": str(request.user.id),
+                        "email": request.user.email,
+                        "first_name": request.user.first_name,
+                        "last_name": request.user.last_name,
+                    },
+                    "gym": None,
+                    "gym_membership": None,
+                    "permissions": sorted(request.permission_codes),
+                    "features": [],
+                    "authz_version": None,
+                    "mfa_enabled": request.user.mfa_enabled,
+                    "mfa_recent": has_recent_mfa(request.refresh_session),
+                }
+            )
         membership = request.gym_membership
         now = timezone.now()
         roles = list(
@@ -368,6 +550,7 @@ class MeView(APIView):
         )
         return success_response(
             {
+                "principal_type": RefreshSession.PrincipalType.STAFF,
                 "user": {
                     "id": str(request.user.id),
                     "email": request.user.email,
@@ -390,6 +573,8 @@ class MeView(APIView):
                 "permissions": sorted(request.permission_codes),
                 "features": entitlements,
                 "authz_version": membership.authz_version,
+                "mfa_enabled": request.user.mfa_enabled,
+                "mfa_recent": has_recent_mfa(request.refresh_session),
             }
         )
 

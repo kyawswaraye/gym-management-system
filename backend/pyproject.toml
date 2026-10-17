@@ -9,6 +9,8 @@ select = ["E", "F", "I", "B", "UP", "DJ", "RUF"]
 [tool.ruff.lint.per-file-ignores]
 "apps/*/models.py" = ["DJ001", "RUF012"]
 "apps/*/views.py" = ["RUF012"]
+"apps/*/staff_views.py" = ["RUF012"]
+"apps/*/role_views.py" = ["RUF012"]
 "apps/common/api/views.py" = ["RUF012"]
 
 [tool.ruff.format]
@@ -29,12 +31,16 @@ module = ["apps.*.models"]
 disable_error_code = ["misc", "var-annotated"]
 
 [[tool.mypy.overrides]]
-module = ["apps.common.api.exceptions"]
+module = ["apps.common.api.exceptions", "apps.members.exceptions", "apps.tenants.exceptions"]
 disable_error_code = ["assignment"]
 
 [[tool.mypy.overrides]]
 module = [
   "apps.common.api.schema",
+  "apps.audit.serializers",
+  "apps.tenants.serializers",
+  "apps.tenants.staff_serializers",
+  "apps.tenants.role_serializers",
   "apps.users.schema",
   "apps.users.serializers",
 ]
@@ -42,12 +48,15 @@ disable_error_code = ["assignment", "no-untyped-call", "type-arg"]
 
 [[tool.mypy.overrides]]
 module = ["apps.members.serializers"]
-disable_error_code = ["type-arg"]
+disable_error_code = ["assignment", "type-arg"]
 
 [[tool.mypy.overrides]]
 module = [
   "apps.common.api.middleware",
   "apps.members.views",
+  "apps.tenants.staff_views",
+  "apps.tenants.role_views",
+  "apps.tenants.views",
   "apps.users.authentication",
   "apps.users.views",
 ]

@@ -16,5 +16,13 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],
     coverage: { reporter: ["text", "html"] },
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.{idea,git,cache,output,temp}/**",
+      "e2e/**",
+      "playwright.config.ts",
+      ".next/**",
+    ],
   },
 });

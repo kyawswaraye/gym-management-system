@@ -2,21 +2,29 @@
 
 Multi-tenant gym management SaaS under phased development.
 
-The repository contains the Phase 1A security foundation plus an initial,
-incomplete slice of member, membership, payment, and owner-dashboard
-operations. Passing tests for that slice does not mean the full roadmap is
-implemented.
+Phase 1A (security foundation) and Phase 1B (Super Admin provisioning and gym
+prerequisites) are complete. The Phase 1B gate closed on 2026-10-17 on the
+local CI-equivalent evidence in [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md).
+CI still enforces those check classes on push and pull request.
 
-- Django REST Framework API foundations;
-- staff authentication and rotating sessions;
+Phase 2 prerequisites are approved as the member, membership, expiry, file,
+and dashboard policies already specified in the canonical contracts. Phase 2
+publishes the MembershipPlan and Member list, create, detail, update, and
+archive APIs. Member summary and history, membership, notification, and
+payment endpoints remain unpublished. Earlier persistence
+for those areas stays outside the closed Phase 1B gate.
+
+- Django REST Framework API for the published foundation and Phase 1B contracts;
+- staff authentication, TOTP MFA, and rotating sessions;
 - server-selected gym context;
 - explicit Django tenant scoping and PostgreSQL forced RLS;
 - permission and entitlement foundations;
 - a Next.js browser BFF and application shell;
-- initial tenant-scoped member, membership, payment, and dashboard paths;
+- platform administration, gym provisioning, owners, staff, roles, settings,
+  and audit reads;
 - automated security and contract checks.
 
-The target product additionally includes administration, attendance and
+The target product additionally includes membership management, attendance and
 unattended onsite QR check-in, trainer/PT and classes with remaining sessions,
 product inventory and retail sales, reports, announcements/reminders, and a
 member mobile application. These remain incomplete until their
@@ -29,12 +37,14 @@ the approved target contract, not proof that a feature exists at runtime.
 - Django 5.2.17 LTS
 - Django REST Framework 3.18.0
 - Node.js 24.20.0 LTS
-- Next.js 16.3.3 Active LTS
+- Next.js 16.4.1 Active LTS
 - PostgreSQL 18.6
 - TypeScript 7.0.2
 
 Use the exact versions in `.python-version`, `.nvmrc`, dependency locks, CI,
-and container definitions.
+and container definitions. Next.js 16.4.1 is an approved security
+compatibility update. `docs/DEVELOPMENT_PLAN.md` remains the immutable
+historical baseline and still records Next.js 16.3.3.
 
 ## Local setup
 
@@ -61,14 +71,50 @@ Django listens on loopback and requires `BFF_SHARED_SECRET`.
 `Secure` authentication cookies are mandatory outside isolated localhost
 development. Browser JavaScript never receives authentication tokens.
 
+## Browser smoke tests
+
+`make e2e` runs two Playwright Chromium journeys against the real Next.js pages,
+the same-origin BFF, and the Django API on PostgreSQL. It uses only the
+disposable `gym_platform_e2e` database. Unit tests do not install or launch a
+browser.
+
+Prerequisites are the local PostgreSQL roles from `make db-up`, Python 3.14.7,
+Node.js 24.20.0, and `npm --prefix web ci`. The script installs Chromium through
+Playwright, builds the web app, migrates as `gym_migration`, seeds MFA-backed
+E2E identities, and serves Django as `gym_runtime` on `127.0.0.1:8010`. Next.js
+listens on `localhost:3010`. Login still requires the BFF secret, password, and
+a real TOTP code. Placeholder passwords and TOTP secrets live in `scripts/e2e-env.sh`
+and can be overridden with `E2E_*` variables; they are not production secrets.
+Migrations run as `gym_migration` with ordinary `manage.py migrate`. After
+migrate, only `gym_platform_e2e` grants `gym_runtime` `SELECT` on
+`django_migrations` so Django's runserver migration check can read that table.
+Application table and function privileges come from the migrations.
+
+```sh
+make e2e
+```
+
+Set `E2E_RESET=1` to drop and recreate `gym_platform_e2e` before migrating.
+Screenshots, traces, and video are off. A failure log can include the obvious
+E2E placeholder password or a one-time authenticator code when the failure is
+on the sign-in form.
+
 ## API contract
 
-The implemented Phase 1A foundation contract is committed at
-`contracts/openapi.v1.json`. Its generated TypeScript definitions are committed
-at `web/src/types/api.generated.ts`. Run `make openapi-check` with the approved
-Python and Node versions to regenerate both artifacts and fail on contract drift.
-Later-phase business routes remain excluded until their contracts and exit
-criteria are approved.
+The published contract is committed at `contracts/openapi.v1.json`. It includes
+the Phase 1A foundation and the gate-closed Phase 1B routes: platform
+administration, gym provisioning and lifecycle, owners, staff, settings, audit
+reads, role create, update, and archive, permission replacement, the permission
+catalog, and membership-role assignment. Generated TypeScript definitions are
+committed at `web/src/types/api.generated.ts`. Run `make openapi-check` with
+the approved Python and Node versions to regenerate both artifacts and fail on
+contract drift.
+
+MembershipPlan and Member list, create, detail, update, and archive are
+published. Member summary and history, membership, notification, payment, and
+receipt endpoints remain unpublished.
+Check-in, finance, PT, reports, and
+mobile routes stay excluded until their own phases.
 
 ## Documentation
 

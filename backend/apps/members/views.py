@@ -3,25 +3,39 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
+from uuid import UUID
 
 from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.api.responses import success_response
+from apps.common.api.schema import ErrorEnvelopeSerializer
 from apps.members.models import Member, Membership, MembershipPlan, Payment
 from apps.members.serializers import (
+    MemberArchiveSerializer,
     MemberCreateSerializer,
+    MemberEnvelopeSerializer,
+    MemberListEnvelopeSerializer,
     MemberListQuerySerializer,
     MemberSerializer,
     MembershipCreateSerializer,
+    MembershipPlanArchiveSerializer,
     MembershipPlanCreateSerializer,
+    MembershipPlanEnvelopeSerializer,
+    MembershipPlanListEnvelopeSerializer,
+    MembershipPlanListQuerySerializer,
     MembershipPlanSerializer,
+    MembershipPlanUpdateSerializer,
     MembershipSerializer,
+    MemberUpdateSerializer,
     PaymentCreateSerializer,
     PaymentSerializer,
     ReasonSerializer,
@@ -29,15 +43,21 @@ from apps.members.serializers import (
 )
 from apps.members.services import (
     approve_payment,
+    archive_member,
+    archive_plan,
     cancel_membership,
     create_member,
     create_membership,
     create_plan,
     gym_today,
+    page_members,
+    page_membership_plans,
     refund_payment,
     resume_membership,
     submit_payment,
     suspend_membership,
+    update_member,
+    update_plan,
     void_payment,
 )
 from apps.users.permissions import RequiresEntitlement, RequiresPermission
@@ -84,36 +104,64 @@ class MemberListCreateView(MemberFeatureAPIView):
         )
         return super().get_permissions()
 
-    def get(self, request):
+    @extend_schema(
+        operation_id="members_list",
+        parameters=[MemberListQuerySerializer],
+        responses={
+            200: MemberListEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request) -> Response:
         query = MemberListQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         filters = query.validated_data
-        queryset = Member.objects.filter(gym=request.gym).order_by("-created_at")
-        if value := filters.get("status"):
-            queryset = queryset.filter(status=value)
-        if joined_from := filters.get("joined_from"):
-            queryset = queryset.filter(join_date__gte=joined_from)
-        if joined_to := filters.get("joined_to"):
-            queryset = queryset.filter(join_date__lte=joined_to)
-        if filters.get("is_pt_client") is True:
-            queryset = queryset.none()
-        if search := filters.get("search"):
-            queryset = queryset.filter(
-                Q(member_number__icontains=search)
-                | Q(first_name__icontains=search)
-                | Q(last_name__icontains=search)
-                | Q(phone__icontains=search)
-                | Q(email__icontains=search)
-            )
-        return success_response(MemberSerializer(queryset[:200], many=True).data)
+        members, meta = page_members(
+            Member.objects.filter(gym=request.gym),
+            gym_id=request.gym.id,
+            status=str(filters.get("status", "")),
+            search=str(filters.get("search", "")),
+            joined_from=filters.get("joined_from"),
+            joined_to=filters.get("joined_to"),
+            is_pt_client=filters.get("is_pt_client"),
+            limit=int(filters["limit"]),
+            after=str(filters.get("after", "")),
+        )
+        return success_response(MemberSerializer(members, many=True).data, meta=meta)
 
-    def post(self, request):
+    @extend_schema(
+        operation_id="members_create",
+        request=MemberCreateSerializer,
+        responses={
+            201: MemberEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request) -> Response:
         serializer = MemberCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
         member = create_member(
             gym=request.gym,
             actor=request.gym_membership,
-            data=dict(serializer.validated_data),
+            member_number=str(payload.get("member_number", "")),
+            first_name=str(payload["first_name"]),
+            last_name=str(payload["last_name"]),
+            phone=payload.get("phone"),
+            email=payload.get("email"),
+            gender=payload.get("gender"),
+            date_of_birth=payload.get("date_of_birth"),
+            address=dict(payload.get("address") or {}),
+            join_date=payload["join_date"],
+            emergency_contact_name=str(payload.get("emergency_contact_name", "")),
+            emergency_contact_phone=str(payload.get("emergency_contact_phone", "")),
+            notes=str(payload.get("notes", "")),
+            profile_photo_asset_id=payload.get("profile_photo_asset_id"),
         )
         return success_response(
             MemberSerializer(member).data,
@@ -130,31 +178,62 @@ class MemberDetailView(MemberFeatureAPIView):
             self.required_permission = "members.update"
         return super().get_permissions()
 
-    def get_object(self):
-        return get_object_or_404(Member, gym=self.request.gym, id=self.kwargs["member_id"])
+    def get_object(self) -> Member:
+        return get_object_or_404(Member, gym=self.request.gym, id=self.kwargs["id"])
 
-    def get(self, request, member_id):
+    @extend_schema(
+        operation_id="members_retrieve",
+        responses={
+            200: MemberEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request, id: UUID) -> Response:
         return success_response(MemberSerializer(self.get_object()).data)
 
-    def patch(self, request, member_id):
-        member = self.get_object()
-        serializer = MemberSerializer(member, data=request.data, partial=True)
+    @extend_schema(
+        operation_id="members_update",
+        request=MemberUpdateSerializer,
+        responses={
+            200: MemberEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+        },
+    )
+    def patch(self, request: Request, id: UUID) -> Response:
+        serializer = MemberUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(updated_by_membership_id=request.gym_membership.id)
-        return success_response(serializer.data, message="Member updated")
+        member = update_member(
+            gym=request.gym,
+            actor=request.gym_membership,
+            member_id=id,
+            changes=dict(serializer.validated_data),
+        )
+        return success_response(MemberSerializer(member).data, message="Member updated")
 
 
 class MemberArchiveView(MemberFeatureAPIView):
     required_permission = "members.archive"
 
-    def post(self, request, member_id):
-        member = get_object_or_404(Member, gym=request.gym, id=member_id)
-        member.status = Member.Status.ARCHIVED
-        member.archived_at = timezone.now()
-        member.updated_by_membership_id = request.gym_membership.id
-        member.save(
-            update_fields=["status", "archived_at", "updated_by_membership_id", "updated_at"]
-        )
+    @extend_schema(
+        operation_id="members_archive",
+        request=MemberArchiveSerializer,
+        responses={
+            200: MemberEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, id: UUID) -> Response:
+        MemberArchiveSerializer(data=request.data).is_valid(raise_exception=True)
+        member = archive_member(gym=request.gym, actor=request.gym_membership, member_id=id)
         return success_response(MemberSerializer(member).data, message="Member archived")
 
 
@@ -210,15 +289,52 @@ class PlanListCreateView(MembershipFeatureAPIView):
         )
         return super().get_permissions()
 
-    def get(self, request):
-        plans = MembershipPlan.objects.filter(gym=request.gym).order_by("name")
-        return success_response(MembershipPlanSerializer(plans, many=True).data)
+    @extend_schema(
+        operation_id="membership_plans_list",
+        parameters=[MembershipPlanListQuerySerializer],
+        responses={
+            200: MembershipPlanListEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request) -> Response:
+        query = MembershipPlanListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        filters = query.validated_data
+        plans, meta = page_membership_plans(
+            MembershipPlan.objects.filter(gym=request.gym),
+            gym_id=request.gym.id,
+            limit=int(filters["limit"]),
+            after=str(filters.get("after", "")),
+        )
+        return success_response(MembershipPlanSerializer(plans, many=True).data, meta=meta)
 
-    def post(self, request):
+    @extend_schema(
+        operation_id="membership_plans_create",
+        request=MembershipPlanCreateSerializer,
+        responses={
+            201: MembershipPlanEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request) -> Response:
         serializer = MembershipPlanCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
         plan = create_plan(
-            gym=request.gym, actor=request.gym_membership, data=dict(serializer.validated_data)
+            gym=request.gym,
+            actor=request.gym_membership,
+            code=str(payload["code"]),
+            name=str(payload["name"]),
+            description=str(payload.get("description", "")),
+            duration_value=int(payload["duration_value"]),
+            duration_unit=str(payload["duration_unit"]),
+            price=payload["price"],
         )
         return success_response(
             MembershipPlanSerializer(plan).data,
@@ -235,42 +351,67 @@ class PlanDetailView(MembershipFeatureAPIView):
             self.required_permission = "memberships.update"
         return super().get_permissions()
 
-    def get_object(self):
-        return get_object_or_404(MembershipPlan, gym=self.request.gym, id=self.kwargs["plan_id"])
+    def get_object(self) -> MembershipPlan:
+        return get_object_or_404(MembershipPlan, gym=self.request.gym, id=self.kwargs["id"])
 
-    def get(self, request, plan_id):
+    @extend_schema(
+        operation_id="membership_plans_retrieve",
+        responses={
+            200: MembershipPlanEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request, id: UUID) -> Response:
         return success_response(MembershipPlanSerializer(self.get_object()).data)
 
-    def patch(self, request, plan_id):
-        plan = self.get_object()
-        serializer = MembershipPlanSerializer(
-            plan,
-            data=request.data,
-            partial=True,
-            context={"gym": request.gym},
-        )
+    @extend_schema(
+        operation_id="membership_plans_update",
+        request=MembershipPlanUpdateSerializer,
+        responses={
+            200: MembershipPlanEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+        },
+    )
+    def patch(self, request: Request, id: UUID) -> Response:
+        serializer = MembershipPlanUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(updated_by_membership_id=request.gym_membership.id)
-        return success_response(serializer.data, message="Membership plan updated")
+        plan = update_plan(
+            gym=request.gym,
+            actor=request.gym_membership,
+            plan_id=id,
+            changes=dict(serializer.validated_data),
+        )
+        return success_response(
+            MembershipPlanSerializer(plan).data, message="Membership plan updated"
+        )
 
 
 class PlanArchiveView(MembershipFeatureAPIView):
     required_permission = "memberships.update"
 
-    def post(self, request, plan_id):
-        plan = get_object_or_404(MembershipPlan, gym=request.gym, id=plan_id)
-        plan.is_active = False
-        plan.archived_at = timezone.now()
-        plan.updated_by_membership_id = request.gym_membership.id
-        plan.save(
-            update_fields=[
-                "is_active",
-                "archived_at",
-                "updated_by_membership_id",
-                "updated_at",
-            ]
+    @extend_schema(
+        operation_id="membership_plans_archive",
+        request=MembershipPlanArchiveSerializer,
+        responses={
+            200: MembershipPlanEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, id: UUID) -> Response:
+        MembershipPlanArchiveSerializer(data=request.data).is_valid(raise_exception=True)
+        plan = archive_plan(gym=request.gym, actor=request.gym_membership, plan_id=id)
+        return success_response(
+            MembershipPlanSerializer(plan).data, message="Membership plan archived"
         )
-        return success_response(MembershipPlanSerializer(plan).data, message="Plan archived")
 
 
 class MembershipListCreateView(MembershipFeatureAPIView):

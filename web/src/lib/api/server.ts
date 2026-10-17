@@ -3,6 +3,7 @@ import "server-only";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+import { redactTenantAuditValue } from "@/features/operations/audit-policy";
 import {
   AUTH_COOKIES,
   SELECTION_COOKIE_MAX_AGE,
@@ -21,15 +22,78 @@ const ALLOWED_PATHS = new Set([
   "/api/v1/auth/me/",
   "/api/v1/auth/gyms/",
   "/api/v1/auth/select-gym/",
+  "/api/v1/auth/mfa/enroll/",
+  "/api/v1/auth/mfa/enroll/confirm/",
+  "/api/v1/auth/mfa/challenge/",
+  "/api/v1/owners/invitations/accept/",
+  "/api/v1/staff/invitations/accept/",
 ]);
 
 const ALLOWED_TENANT_PATHS = [
+  /^\/api\/v1\/gym\/$/,
+  /^\/api\/v1\/settings\/$/,
+  /^\/api\/v1\/owners\/$/,
+  /^\/api\/v1\/owners\/invitations\/$/,
+  /^\/api\/v1\/owners\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/revoke\/$/,
+  /^\/api\/v1\/staff\/$/,
+  /^\/api\/v1\/staff\/invitations\/$/,
+  /^\/api\/v1\/staff\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/$/,
+  /^\/api\/v1\/staff\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/activate\/$/,
+  /^\/api\/v1\/staff\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/suspend\/$/,
+  /^\/api\/v1\/roles\/$/,
+  /^\/api\/v1\/roles\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/$/,
+  /^\/api\/v1\/roles\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/archive\/$/,
+  /^\/api\/v1\/roles\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/permissions\/$/,
+  /^\/api\/v1\/permissions\/$/,
+  /^\/api\/v1\/gym-memberships\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/roles\/$/,
   /^\/api\/v1\/members\/(?:[0-9a-f-]+\/(?:summary\/|archive\/)?)?$/,
   /^\/api\/v1\/membership-plans\/(?:[0-9a-f-]+\/(?:archive\/)?)?$/,
   /^\/api\/v1\/memberships\/(?:expiry\/|[0-9a-f-]+\/(?:cancel|suspend|resume)\/)?$/,
   /^\/api\/v1\/payments\/(?:[0-9a-f-]+\/(?:submit|approve|reject|cancel|void|refund)\/)?$/,
   /^\/api\/v1\/dashboard\/$/,
+  /^\/api\/v1\/audit-logs\/$/,
 ];
+
+const PLATFORM_DASHBOARD_PATH = /^\/api\/v1\/admin\/dashboard\/$/;
+const PLATFORM_SUBSCRIPTION_LIST_PATH = "/api/v1/admin/subscriptions/";
+const PLATFORM_AUDIT_LIST_PATH = "/api/v1/admin/audit-logs/";
+const PLATFORM_SUBSCRIPTION_DETAIL_PATH =
+  /^\/api\/v1\/admin\/subscriptions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/$/;
+const SUBSCRIPTION_LIST_STATUS = new Set(["ACTIVE", "RETIRED", "ALL"]);
+const AUDIT_OUTCOMES = new Set(["SUCCESS", "DENIED", "ERROR"]);
+const AUDIT_FILTERS = new Set([
+  "target_gym_id",
+  "action",
+  "outcome",
+  "limit",
+  "after",
+]);
+const CANONICAL_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const AUDIT_LIMIT = /^(?:[1-9]|[1-9]\d|100)$/;
+const AUDIT_CURSOR = /^[A-Za-z0-9._:~+=-]{1,2048}$/;
+const TENANT_AUDIT_LIST_PATH = "/api/v1/audit-logs/";
+const TENANT_AUDIT_FILTERS = new Set([
+  "action",
+  "module",
+  "outcome",
+  "target_type",
+  "target_id",
+  "limit",
+  "after",
+]);
+
+const ALLOWED_PLATFORM_PATHS = [
+  /^\/api\/v1\/admin\/gyms\/$/,
+  /^\/api\/v1\/admin\/gyms\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(?:activate\/|suspend\/)?$/,
+  /^\/api\/v1\/admin\/gyms\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/owners\/$/,
+  /^\/api\/v1\/admin\/subscriptions\/$/,
+  PLATFORM_DASHBOARD_PATH,
+  PLATFORM_SUBSCRIPTION_DETAIL_PATH,
+  /^\/api\/v1\/admin\/audit-logs\/$/,
+];
+
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{16,128}$/;
 
 const SECRET_KEYS = new Set([
   "access_token",
@@ -37,6 +101,8 @@ const SECRET_KEYS = new Set([
   "token",
   "refresh_session",
   "gym_selection_ticket",
+  "mfa_challenge_token",
+  "invitation_token",
 ]);
 
 const INBOUND_SECRET_KEYS = new Set([
@@ -45,6 +111,7 @@ const INBOUND_SECRET_KEYS = new Set([
   "token",
   "refresh_session",
   "gym_selection_ticket",
+  "mfa_challenge_token",
 ]);
 
 export const BFF_SECRET_HEADER = "X-Gym-BFF-Secret";
@@ -127,13 +194,119 @@ function canonicalDjangoPath(path: string): string {
   return `${parsed.pathname}${parsed.search}`;
 }
 
+function strictQueryValues(
+  search: string,
+  allowed: ReadonlySet<string>,
+): Map<string, string> | null {
+  if (search.length === 0) return new Map();
+  const values = new Map<string, string>();
+  for (const [key, value] of new URLSearchParams(search).entries()) {
+    if (!allowed.has(key) || values.has(key)) return null;
+    values.set(key, value);
+  }
+  return values;
+}
+
+function allowsSubscriptionListQuery(search: string): boolean {
+  const values = strictQueryValues(search, new Set(["status"]));
+  if (!values) return false;
+  const status = values.get("status");
+  if (status === undefined) return values.size === 0;
+  return (
+    status.length > 0 &&
+    status.length <= 16 &&
+    SUBSCRIPTION_LIST_STATUS.has(status)
+  );
+}
+
+function allowsAuditListQuery(search: string): boolean {
+  const values = strictQueryValues(search, AUDIT_FILTERS);
+  if (!values) return false;
+  const targetGymId = values.get("target_gym_id");
+  if (targetGymId !== undefined && !CANONICAL_UUID.test(targetGymId)) {
+    return false;
+  }
+  const action = values.get("action");
+  if (
+    action !== undefined &&
+    (action.length === 0 || action.length > 100 || action.trim().length === 0)
+  ) {
+    return false;
+  }
+  const outcome = values.get("outcome");
+  if (outcome !== undefined && !AUDIT_OUTCOMES.has(outcome)) return false;
+  const limit = values.get("limit");
+  if (limit !== undefined && !AUDIT_LIMIT.test(limit)) return false;
+  const after = values.get("after");
+  if (after !== undefined && !AUDIT_CURSOR.test(after)) return false;
+  return true;
+}
+
+function allowsExactPlatformQuery(pathname: string, search: string): boolean {
+  if (
+    PLATFORM_DASHBOARD_PATH.test(pathname) ||
+    PLATFORM_SUBSCRIPTION_DETAIL_PATH.test(pathname)
+  ) {
+    return search.length === 0;
+  }
+  if (pathname === PLATFORM_SUBSCRIPTION_LIST_PATH) {
+    return allowsSubscriptionListQuery(search);
+  }
+  if (pathname === PLATFORM_AUDIT_LIST_PATH) {
+    return allowsAuditListQuery(search);
+  }
+  return true;
+}
+
+function allowsBoundedText(
+  value: string | undefined,
+  maxLength: number,
+): boolean {
+  if (value === undefined) return true;
+  return (
+    value.length > 0 && value.length <= maxLength && value.trim().length > 0
+  );
+}
+
+function allowsTenantAuditListQuery(search: string): boolean {
+  const values = strictQueryValues(search, TENANT_AUDIT_FILTERS);
+  if (!values) return false;
+  if (!allowsBoundedText(values.get("action"), 100)) return false;
+  if (!allowsBoundedText(values.get("module"), 50)) return false;
+  const outcome = values.get("outcome");
+  if (outcome !== undefined && !AUDIT_OUTCOMES.has(outcome)) return false;
+  if (!allowsBoundedText(values.get("target_type"), 100)) return false;
+  const targetId = values.get("target_id");
+  if (targetId !== undefined && !CANONICAL_UUID.test(targetId)) return false;
+  const limit = values.get("limit");
+  if (limit !== undefined && !AUDIT_LIMIT.test(limit)) return false;
+  const after = values.get("after");
+  if (after !== undefined && !AUDIT_CURSOR.test(after)) return false;
+  return true;
+}
+
+function allowsForwardedQuery(
+  pathname: string,
+  search: string,
+  method: string | undefined,
+): boolean {
+  if (pathname === TENANT_AUDIT_LIST_PATH) {
+    return method === "GET" && allowsTenantAuditListQuery(search);
+  }
+  return allowsExactPlatformQuery(pathname, search);
+}
+
 async function callDjango(path: string, init: RequestInit): Promise<Response> {
   const canonicalPath = canonicalDjangoPath(path);
-  const pathname = new URL(canonicalPath, "http://internal").pathname;
+  const parsed = new URL(canonicalPath, "http://internal");
+  const pathname = parsed.pathname;
   const allowed =
     ALLOWED_PATHS.has(pathname) ||
-    ALLOWED_TENANT_PATHS.some((pattern) => pattern.test(pathname));
-  if (!allowed) throw new Error("Django route is not allowed.");
+    ALLOWED_TENANT_PATHS.some((pattern) => pattern.test(pathname)) ||
+    ALLOWED_PLATFORM_PATHS.some((pattern) => pattern.test(pathname));
+  if (!allowed || !allowsForwardedQuery(pathname, parsed.search, init.method)) {
+    throw new Error("Django route is not allowed.");
+  }
   const { djangoApiUrl, bffSharedSecret } = getServerEnv();
   return fetch(`${djangoApiUrl}${canonicalPath}`, {
     ...init,
@@ -146,7 +319,13 @@ async function callDjango(path: string, init: RequestInit): Promise<Response> {
   });
 }
 
-function responseFromUpstream(status: number, body: unknown): NextResponse {
+type UpstreamPresenter = (status: number, body: unknown) => unknown;
+
+function responseFromUpstream(
+  status: number,
+  body: unknown,
+  present?: UpstreamPresenter,
+): NextResponse {
   const headers = { "Cache-Control": "no-store, private" };
   if (status === 204) return new NextResponse(null, { status, headers });
   if (body === null) {
@@ -161,7 +340,13 @@ function responseFromUpstream(status: number, body: unknown): NextResponse {
       { status: 502, headers },
     );
   }
-  return NextResponse.json(stripCredentials(body), { status, headers });
+  return NextResponse.json(
+    present ? present(status, body) : stripCredentials(body),
+    {
+      status,
+      headers,
+    },
+  );
 }
 
 function setTokenCookies(response: NextResponse, body: unknown): void {
@@ -169,6 +354,7 @@ function setTokenCookies(response: NextResponse, body: unknown): void {
   const access = findString(body, "access_token");
   const refresh = findString(body, "refresh_token");
   const ticket = findString(body, "gym_selection_ticket");
+  const mfaChallenge = findString(body, "mfa_challenge_token");
   if (access) {
     response.cookies.set(
       AUTH_COOKIES.access,
@@ -226,6 +412,26 @@ function setTokenCookies(response: NextResponse, body: unknown): void {
       );
     }
   }
+  if (mfaChallenge) {
+    response.cookies.set(
+      AUTH_COOKIES.mfaChallenge,
+      mfaChallenge,
+      authCookieOptions(
+        secureCookies,
+        Math.min(
+          maxAge(findString(body, "mfa_challenge_expires_at")) ?? 300,
+          300,
+        ),
+      ),
+    );
+  }
+  if (access) {
+    response.cookies.set(
+      AUTH_COOKIES.mfaChallenge,
+      "",
+      clearCookieOptions(secureCookies, true),
+    );
+  }
 }
 
 function clearSelectionCookies(response: NextResponse): void {
@@ -255,6 +461,11 @@ export function clearAuthCookies(response: NextResponse): void {
     clearCookieOptions(secureCookies, true),
   );
   clearSelectionCookies(response);
+  response.cookies.set(
+    AUTH_COOKIES.mfaChallenge,
+    "",
+    clearCookieOptions(secureCookies, true),
+  );
 }
 
 export async function parseRequestBody(
@@ -278,6 +489,7 @@ export async function authMutation(
     includeAccess?: boolean;
     includeRefresh?: boolean;
     includeSelectionTicket?: boolean;
+    includeMfaChallenge?: boolean;
     clearAfter?: boolean;
   } = {},
 ): Promise<NextResponse> {
@@ -301,11 +513,15 @@ export async function authMutation(
   const selectionTicket = request.cookies.get(
     AUTH_COOKIES.selectionTicket,
   )?.value;
+  const mfaChallenge = request.cookies.get(AUTH_COOKIES.mfaChallenge)?.value;
   const upstreamBody = {
     ...stripInboundSecrets(body),
     ...(options.includeRefresh && refresh ? { refresh_token: refresh } : {}),
     ...(options.includeSelectionTicket && selectionTicket
       ? { gym_selection_ticket: selectionTicket }
+      : {}),
+    ...(options.includeMfaChallenge && mfaChallenge
+      ? { challenge_token: mfaChallenge }
       : {}),
   };
 
@@ -362,11 +578,14 @@ async function refreshAndRetry(
   request: NextRequest,
   expiredBody: unknown,
   retry: (accessToken: string) => Promise<Response>,
+  present?: UpstreamPresenter,
 ): Promise<NextResponse> {
   const env = getServerEnv();
   const verified = verifyMutationRequest(request, env.allowedOrigins);
   const refresh = request.cookies.get(AUTH_COOKIES.refresh)?.value;
-  if (!verified.ok || !refresh) return responseFromUpstream(401, expiredBody);
+  if (!verified.ok || !refresh) {
+    return responseFromUpstream(401, expiredBody, present);
+  }
 
   const refreshed = await callDjango("/api/v1/auth/refresh/", {
     method: "POST",
@@ -375,14 +594,18 @@ async function refreshAndRetry(
   });
   const refreshedBody = await parseJson(refreshed);
   if (!refreshed.ok) {
-    const failed = responseFromUpstream(refreshed.status, refreshedBody);
+    const failed = responseFromUpstream(
+      refreshed.status,
+      refreshedBody,
+      present,
+    );
     clearAuthCookies(failed);
     return failed;
   }
 
   const newAccess = findString(refreshedBody, "access_token");
   if (!newAccess) {
-    const invalid = responseFromUpstream(502, null);
+    const invalid = responseFromUpstream(502, null, present);
     clearAuthCookies(invalid);
     return invalid;
   }
@@ -392,6 +615,7 @@ async function refreshAndRetry(
     const response = responseFromUpstream(
       upstream.status,
       await parseJson(upstream),
+      present,
     );
     if (upstream.status === 401) {
       clearAuthCookies(response);
@@ -400,13 +624,17 @@ async function refreshAndRetry(
     }
     return response;
   } catch {
-    const unavailable = responseFromUpstream(503, {
-      success: false,
-      error: {
-        code: "UPSTREAM_UNAVAILABLE",
-        message: "The service is temporarily unavailable. Please try again.",
-      },
-    } satisfies ApiErrorBody);
+    const unavailable = responseFromUpstream(
+      503,
+      {
+        success: false,
+        error: {
+          code: "UPSTREAM_UNAVAILABLE",
+          message: "The service is temporarily unavailable. Please try again.",
+        },
+      } satisfies ApiErrorBody,
+      present,
+    );
     setTokenCookies(unavailable, refreshedBody);
     return unavailable;
   }
@@ -415,6 +643,7 @@ async function refreshAndRetry(
 export async function authenticatedGet(
   request: NextRequest,
   path: string,
+  present?: UpstreamPresenter,
 ): Promise<NextResponse> {
   const access = request.cookies.get(AUTH_COOKIES.access)?.value;
   if (!access) {
@@ -432,14 +661,18 @@ export async function authenticatedGet(
     const body = await parseJson(upstream);
     const env = getServerEnv();
     if (upstream.status === 401 && errorCode(body) === env.accessExpiredCode) {
-      return refreshAndRetry(request, body, (newAccess) =>
-        callDjango(path, {
-          method: "GET",
-          headers: { Authorization: `Bearer ${newAccess}` },
-        }),
+      return refreshAndRetry(
+        request,
+        body,
+        (newAccess) =>
+          callDjango(path, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${newAccess}` },
+          }),
+        present,
       );
     }
-    return responseFromUpstream(upstream.status, body);
+    return responseFromUpstream(upstream.status, body, present);
   } catch {
     return responseFromUpstream(503, {
       success: false,
@@ -454,7 +687,7 @@ export async function authenticatedGet(
 export async function authenticatedMutation(
   request: NextRequest,
   path: string,
-  method: "POST" | "PATCH" = "POST",
+  method: "POST" | "PATCH" | "PUT" = "POST",
 ): Promise<NextResponse> {
   const body = await parseRequestBody(request);
   if (body === null) {
@@ -478,6 +711,16 @@ export async function authenticatedMutation(
       error: { code: "AUTHENTICATION_REQUIRED", message: "Please sign in." },
     });
   }
+  const idempotencyKey = request.headers.get("Idempotency-Key");
+  if (idempotencyKey && !IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
+    return responseFromUpstream(400, {
+      success: false,
+      error: {
+        code: "INVALID_IDEMPOTENCY_KEY",
+        message: "The idempotency key is invalid.",
+      },
+    });
+  }
   try {
     const perform = (accessToken: string) =>
       callDjango(path, {
@@ -485,6 +728,7 @@ export async function authenticatedMutation(
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
+          ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
         },
         body: JSON.stringify(body),
       });
@@ -506,6 +750,408 @@ export async function authenticatedMutation(
       },
     });
   }
+}
+
+export function getTenantGymProfile(
+  request: NextRequest,
+): Promise<NextResponse> {
+  return authenticatedGet(request, "/api/v1/gym/");
+}
+
+export function updateTenantGymProfile(
+  request: NextRequest,
+): Promise<NextResponse> {
+  return authenticatedMutation(request, "/api/v1/gym/", "PATCH");
+}
+
+export function getTenantGymSettings(
+  request: NextRequest,
+): Promise<NextResponse> {
+  return authenticatedGet(request, "/api/v1/settings/");
+}
+
+export function updateTenantGymSettings(
+  request: NextRequest,
+): Promise<NextResponse> {
+  return authenticatedMutation(request, "/api/v1/settings/", "PATCH");
+}
+
+const STAFF_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const STAFF_LIST_FILTERS = ["status", "membership_status", "search"] as const;
+const STAFF_LIST_LIMIT = /^(?:[1-9]|[1-9]\d|100)$/;
+const STAFF_LIST_CURSOR = /^[A-Za-z0-9._:~+=-]{1,2048}$/;
+
+export function normalizeResourceId(value: string): string | null {
+  const resourceId = value.toLowerCase();
+  return STAFF_ID_PATTERN.test(resourceId) ? resourceId : null;
+}
+
+export function normalizeStaffId(value: string): string | null {
+  return normalizeResourceId(value);
+}
+
+export function unknownStaffResponse(): NextResponse {
+  return NextResponse.json(
+    {
+      success: false,
+      error: { code: "NOT_FOUND", message: "Staff was not found." },
+    },
+    { status: 404, headers: { "Cache-Control": "no-store, private" } },
+  );
+}
+
+function invalidStaffListQuery(field: "limit" | "after"): NextResponse {
+  const message =
+    field === "limit" ? "Limit must be from 1 to 100." : "Invalid cursor.";
+  return responseFromUpstream(400, {
+    success: false,
+    error: {
+      code: "INVALID_REQUEST",
+      message,
+      fields: { [field]: [message] },
+    },
+  });
+}
+
+export function listTenantStaff(
+  request: NextRequest,
+): Promise<NextResponse> | NextResponse {
+  const params = new URLSearchParams();
+  const source = request.nextUrl.searchParams;
+  for (const key of STAFF_LIST_FILTERS) {
+    const value = source.get(key);
+    if (value) params.set(key, value);
+  }
+  const limits = source.getAll("limit");
+  if (limits.length > 1) return invalidStaffListQuery("limit");
+  const limit = limits[0];
+  if (limit) {
+    if (!STAFF_LIST_LIMIT.test(limit)) return invalidStaffListQuery("limit");
+    params.set("limit", limit);
+  }
+  const cursors = source.getAll("after");
+  if (cursors.length > 1) return invalidStaffListQuery("after");
+  const after = cursors[0];
+  if (after) {
+    if (!STAFF_LIST_CURSOR.test(after)) return invalidStaffListQuery("after");
+    params.set("after", after);
+  }
+  const query = params.size ? `?${params.toString()}` : "";
+  return authenticatedGet(request, `/api/v1/staff/${query}`);
+}
+
+export function getTenantStaff(
+  request: NextRequest,
+  staffId: string,
+): Promise<NextResponse> {
+  return authenticatedGet(request, `/api/v1/staff/${staffId}/`);
+}
+
+export function updateTenantStaff(
+  request: NextRequest,
+  staffId: string,
+): Promise<NextResponse> {
+  return authenticatedMutation(request, `/api/v1/staff/${staffId}/`, "PATCH");
+}
+
+export function inviteTenantStaff(request: NextRequest): Promise<NextResponse> {
+  return authenticatedMutation(request, "/api/v1/staff/invitations/", "POST");
+}
+
+export function activateTenantStaff(
+  request: NextRequest,
+  staffId: string,
+): Promise<NextResponse> {
+  return authenticatedMutation(
+    request,
+    `/api/v1/staff/${staffId}/activate/`,
+    "POST",
+  );
+}
+
+export function suspendTenantStaff(
+  request: NextRequest,
+  staffId: string,
+): Promise<NextResponse> {
+  return authenticatedMutation(
+    request,
+    `/api/v1/staff/${staffId}/suspend/`,
+    "POST",
+  );
+}
+
+function invalidCollectionQuery(field: "limit" | "after"): NextResponse {
+  const message =
+    field === "limit" ? "Limit must be from 1 to 100." : "Invalid cursor.";
+  return responseFromUpstream(400, {
+    success: false,
+    error: {
+      code: "INVALID_REQUEST",
+      message,
+      fields: { [field]: [message] },
+    },
+  });
+}
+
+function collectionPath(
+  request: NextRequest,
+  pathname: string,
+): string | NextResponse {
+  const params = new URLSearchParams();
+  const source = request.nextUrl.searchParams;
+  const limits = source.getAll("limit");
+  if (limits.length > 1) return invalidCollectionQuery("limit");
+  const limit = limits[0];
+  if (limit) {
+    if (!STAFF_LIST_LIMIT.test(limit)) return invalidCollectionQuery("limit");
+    params.set("limit", limit);
+  }
+  const cursors = source.getAll("after");
+  if (cursors.length > 1) return invalidCollectionQuery("after");
+  const after = cursors[0];
+  if (after) {
+    if (!STAFF_LIST_CURSOR.test(after)) return invalidCollectionQuery("after");
+    params.set("after", after);
+  }
+  const query = params.size ? `?${params.toString()}` : "";
+  return `${pathname}${query}`;
+}
+
+export function unknownRoleResponse(): NextResponse {
+  return NextResponse.json(
+    {
+      success: false,
+      error: { code: "NOT_FOUND", message: "Role was not found." },
+    },
+    { status: 404, headers: { "Cache-Control": "no-store, private" } },
+  );
+}
+
+export function unknownMembershipResponse(): NextResponse {
+  return NextResponse.json(
+    {
+      success: false,
+      error: { code: "NOT_FOUND", message: "Membership was not found." },
+    },
+    { status: 404, headers: { "Cache-Control": "no-store, private" } },
+  );
+}
+
+export function listTenantRoles(
+  request: NextRequest,
+): Promise<NextResponse> | NextResponse {
+  const path = collectionPath(request, "/api/v1/roles/");
+  if (typeof path !== "string") return path;
+  return authenticatedGet(request, path);
+}
+
+export function createTenantRole(request: NextRequest): Promise<NextResponse> {
+  return authenticatedMutation(request, "/api/v1/roles/", "POST");
+}
+
+export function getTenantRole(
+  request: NextRequest,
+  roleId: string,
+): Promise<NextResponse> {
+  return authenticatedGet(request, `/api/v1/roles/${roleId}/`);
+}
+
+export function updateTenantRole(
+  request: NextRequest,
+  roleId: string,
+): Promise<NextResponse> {
+  return authenticatedMutation(request, `/api/v1/roles/${roleId}/`, "PATCH");
+}
+
+export function archiveTenantRole(
+  request: NextRequest,
+  roleId: string,
+): Promise<NextResponse> {
+  return authenticatedMutation(
+    request,
+    `/api/v1/roles/${roleId}/archive/`,
+    "POST",
+  );
+}
+
+export function replaceTenantRolePermissions(
+  request: NextRequest,
+  roleId: string,
+): Promise<NextResponse> {
+  return authenticatedMutation(
+    request,
+    `/api/v1/roles/${roleId}/permissions/`,
+    "PUT",
+  );
+}
+
+export function listTenantPermissions(
+  request: NextRequest,
+): Promise<NextResponse> | NextResponse {
+  const path = collectionPath(request, "/api/v1/permissions/");
+  if (typeof path !== "string") return path;
+  return authenticatedGet(request, path);
+}
+
+export function getMembershipRoles(
+  request: NextRequest,
+  membershipId: string,
+): Promise<NextResponse> {
+  return authenticatedGet(
+    request,
+    `/api/v1/gym-memberships/${membershipId}/roles/`,
+  );
+}
+
+export function replaceMembershipRoles(
+  request: NextRequest,
+  membershipId: string,
+): Promise<NextResponse> {
+  return authenticatedMutation(
+    request,
+    `/api/v1/gym-memberships/${membershipId}/roles/`,
+    "PUT",
+  );
+}
+
+const TENANT_AUDIT_STRING_FIELDS = [
+  "id",
+  "action",
+  "module",
+  "target_type",
+  "target_id",
+  "request_id",
+  "outcome",
+  "occurred_at",
+] as const;
+const ERROR_CODE_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/;
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
+const TENANT_AUDIT_SUCCESS_MESSAGE = "Success";
+const TENANT_AUDIT_PUBLIC_ERROR_MESSAGE = "The request could not be completed.";
+
+function redactExactSecretKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactExactSecretKeys);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [
+      key,
+      SECRET_KEYS.has(key) ? "[REDACTED]" : redactExactSecretKeys(child),
+    ]),
+  );
+}
+
+function redactTenantAuditPayload(value: unknown): unknown {
+  return redactExactSecretKeys(redactTenantAuditValue(value));
+}
+
+function copyContractString(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length === 0 || value.length > 512) {
+    return undefined;
+  }
+  return value;
+}
+
+function projectTenantAuditItem(row: JsonRecord): JsonRecord {
+  const projected: JsonRecord = {};
+  for (const key of TENANT_AUDIT_STRING_FIELDS) {
+    const value = copyContractString(row[key]);
+    if (value !== undefined) projected[key] = value;
+  }
+  for (const key of [
+    "actor_membership_id",
+    "impersonator_membership_id",
+  ] as const) {
+    const value = row[key];
+    if (value === null) projected[key] = null;
+    else {
+      const copied = copyContractString(value);
+      if (copied !== undefined) projected[key] = copied;
+    }
+  }
+  if ("old_values" in row) projected.old_values = row.old_values;
+  if ("new_values" in row) projected.new_values = row.new_values;
+  return projected;
+}
+
+function projectTenantAuditMeta(value: unknown): JsonRecord {
+  const meta = isRecord(value) ? value : {};
+  const nextAfter = meta.next_after;
+  const projected: JsonRecord = {
+    has_more: meta.has_more === true,
+    next_after:
+      typeof nextAfter === "string" &&
+      nextAfter.length > 0 &&
+      nextAfter.length <= 2048
+        ? nextAfter
+        : null,
+  };
+  if (meta.scope === "GYM" || meta.scope === "SELF")
+    projected.scope = meta.scope;
+  return projected;
+}
+
+function projectTenantAuditSuccess(body: JsonRecord): unknown {
+  const projected: JsonRecord = {
+    success: true,
+    data: Array.isArray(body.data)
+      ? body.data.filter(isRecord).map(projectTenantAuditItem)
+      : [],
+    meta: projectTenantAuditMeta(body.meta),
+  };
+  if (body.message === TENANT_AUDIT_SUCCESS_MESSAGE) {
+    projected.message = TENANT_AUDIT_SUCCESS_MESSAGE;
+  }
+  return redactTenantAuditPayload(projected);
+}
+
+function presentTenantAuditError(body: unknown): ApiErrorBody {
+  const requestId =
+    isRecord(body) &&
+    typeof body.request_id === "string" &&
+    REQUEST_ID_PATTERN.test(body.request_id)
+      ? body.request_id
+      : undefined;
+  const code =
+    isRecord(body) && isRecord(body.error) ? body.error.code : undefined;
+  const projected: ApiErrorBody = {
+    success: false,
+    error: {
+      code:
+        typeof code === "string" && ERROR_CODE_PATTERN.test(code)
+          ? code
+          : "INVALID_UPSTREAM_RESPONSE",
+      message: TENANT_AUDIT_PUBLIC_ERROR_MESSAGE,
+    },
+    ...(requestId ? { request_id: requestId } : {}),
+  };
+  return projected;
+}
+
+function presentTenantAuditBody(status: number, body: unknown): unknown {
+  if (
+    status >= 200 &&
+    status < 300 &&
+    isRecord(body) &&
+    body.success !== false &&
+    Array.isArray(body.data)
+  ) {
+    return projectTenantAuditSuccess(body);
+  }
+  if (status >= 200 && status < 300) {
+    throw new Error("Invalid tenant audit response.");
+  }
+  return presentTenantAuditError(body);
+}
+
+export function listTenantAuditLogs(
+  request: NextRequest,
+): Promise<NextResponse> {
+  return authenticatedGet(
+    request,
+    `/api/v1/audit-logs/${request.nextUrl.search}`,
+    presentTenantAuditBody,
+  );
 }
 
 export async function serverAuthMe(accessToken: string): Promise<Response> {

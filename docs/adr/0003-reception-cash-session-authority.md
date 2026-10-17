@@ -59,7 +59,7 @@ Concurrent reconcile/close requests produce one committed close through row lock
 
 No schema field is added because `opened_by_membership_id` already exists. The permission template/default data changes for Reception, while API response fields and stable permission codes remain unchanged. Existing gyms receive the change only through the explicit, audited role-template upgrade/backfill mechanism; tenant-customized roles are not silently rewritten.
 
-The approved runtime pins remain Python 3.14.7, Django 5.2.17 LTS, DRF 3.18.0, Node.js 24.20.0 LTS, Next.js 16.3.3 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. PostgreSQL 18.6 lock, RLS, immutability, and race tests are compatibility evidence for this decision.
+The approved runtime pins remain Python 3.14.7, Django 5.2.17 LTS, DRF 3.18.0, Node.js 24.20.0 LTS, Next.js 16.4.1 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. Next.js 16.4.1 is an approved security compatibility update. `docs/DEVELOPMENT_PLAN.md` remains the immutable historical baseline and still records Next.js 16.3.3. PostgreSQL 18.6 lock, RLS, immutability, and race tests are compatibility evidence for this decision.
 
 ## Alternatives considered
 

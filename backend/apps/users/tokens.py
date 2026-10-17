@@ -12,7 +12,7 @@ from django.conf import settings
 
 from apps.common.api.exceptions import AccessTokenExpired, AuthenticationFailed
 
-REQUIRED_CLAIMS = {
+STAFF_REQUIRED_CLAIMS = {
     "iss",
     "aud",
     "sub",
@@ -20,6 +20,18 @@ REQUIRED_CLAIMS = {
     "gym_membership_id",
     "session_id",
     "authz_version",
+    "token_type",
+    "iat",
+    "nbf",
+    "exp",
+    "jti",
+}
+
+PLATFORM_REQUIRED_CLAIMS = {
+    "iss",
+    "aud",
+    "sub",
+    "session_id",
     "token_type",
     "iat",
     "nbf",
@@ -76,13 +88,44 @@ def issue_access_token(
     return token, expires
 
 
-def decode_access_token(token: str) -> dict[str, Any]:
+def issue_platform_access_token(
+    *, user_id: uuid.UUID, session_id: uuid.UUID
+) -> tuple[str, datetime]:
+    now = datetime.now(UTC).replace(microsecond=0)
+    expires = now + timedelta(seconds=settings.JWT_ACCESS_TTL_SECONDS)
+    claims = {
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_PLATFORM_AUDIENCE,
+        "sub": str(user_id),
+        "session_id": str(session_id),
+        "token_type": "platform_access",
+        "iat": int(now.timestamp()),
+        "nbf": int(now.timestamp()),
+        "exp": int(expires.timestamp()),
+        "jti": str(uuid.uuid4()),
+    }
+    token = jwt.encode(
+        claims,
+        settings.JWT_PRIVATE_KEY,
+        algorithm="RS256",
+        headers={"typ": "JWT", "kid": settings.JWT_KEY_ID},
+    )
+    return token, expires
+
+
+def _decode_access_token(
+    token: str,
+    *,
+    required_claims: set[str],
+    audience: str,
+    token_type: str,
+) -> dict[str, Any]:
     if token.count(".") != 2:
         raise AuthenticationFailed()
     encoded_header, encoded_payload, _ = token.split(".")
     header = _b64json(encoded_header)
     unverified = _b64json(encoded_payload)
-    if set(unverified) != REQUIRED_CLAIMS:
+    if set(unverified) != required_claims:
         raise AuthenticationFailed()
     if header.get("typ") != "JWT" or header.get("alg") != "RS256":
         raise AuthenticationFailed()
@@ -96,18 +139,16 @@ def decode_access_token(token: str) -> dict[str, Any]:
             token,
             settings.JWT_PUBLIC_KEYS[kid],
             algorithms=["RS256"],
-            audience=settings.JWT_STAFF_AUDIENCE,
+            audience=audience,
             issuer=settings.JWT_ISSUER,
             leeway=settings.JWT_CLOCK_SKEW_SECONDS,
-            options={"require": sorted(REQUIRED_CLAIMS)},
+            options={"require": sorted(required_claims)},
         )
     except jwt.ExpiredSignatureError as exc:
         raise AccessTokenExpired() from exc
     except jwt.PyJWTError as exc:
         raise AuthenticationFailed() from exc
-    if claims.get("aud") != settings.JWT_STAFF_AUDIENCE or claims.get("token_type") != "access":
-        raise AuthenticationFailed()
-    if not isinstance(claims.get("authz_version"), int) or claims["authz_version"] < 1:
+    if claims.get("aud") != audience or claims.get("token_type") != token_type:
         raise AuthenticationFailed()
     now = int(datetime.now(UTC).timestamp())
     if (
@@ -115,9 +156,30 @@ def decode_access_token(token: str) -> dict[str, Any]:
         or claims["iat"] > now + settings.JWT_CLOCK_SKEW_SECONDS
     ):
         raise AuthenticationFailed()
-    for field in ("sub", "gym_id", "gym_membership_id", "session_id", "jti"):
+    for field in required_claims & {"sub", "gym_id", "gym_membership_id", "session_id", "jti"}:
         try:
             uuid.UUID(claims[field])
         except (ValueError, TypeError, AttributeError) as exc:
             raise AuthenticationFailed() from exc
     return claims
+
+
+def decode_access_token(token: str) -> dict[str, Any]:
+    claims = _decode_access_token(
+        token,
+        required_claims=STAFF_REQUIRED_CLAIMS,
+        audience=settings.JWT_STAFF_AUDIENCE,
+        token_type="access",
+    )
+    if not isinstance(claims.get("authz_version"), int) or claims["authz_version"] < 1:
+        raise AuthenticationFailed()
+    return claims
+
+
+def decode_platform_access_token(token: str) -> dict[str, Any]:
+    return _decode_access_token(
+        token,
+        required_claims=PLATFORM_REQUIRED_CLAIMS,
+        audience=settings.JWT_PLATFORM_AUDIENCE,
+        token_type="platform_access",
+    )

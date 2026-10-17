@@ -31,6 +31,17 @@ def test_auth_with_trusted_bff_secret_is_accepted() -> None:
     assert response.status_code == 200
 
 
+@override_settings(BFF_SHARED_SECRET=SECRET)
+def test_staff_invitation_accept_requires_bff_secret() -> None:
+    denied = RequestFactory().post("/api/v1/staff/invitations/accept/")
+    assert _middleware()(denied).status_code == 403
+    allowed = RequestFactory().post(
+        "/api/v1/staff/invitations/accept/",
+        HTTP_X_GYM_BFF_SECRET=SECRET,
+    )
+    assert _middleware()(allowed).status_code == 200
+
+
 @override_settings(BFF_SHARED_SECRET="")
 def test_missing_configured_secret_fails_closed() -> None:
     request = RequestFactory().post("/api/v1/auth/select-gym/", HTTP_X_GYM_BFF_SECRET=SECRET)

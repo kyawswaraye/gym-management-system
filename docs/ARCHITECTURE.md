@@ -9,12 +9,12 @@ This document defines the Phase 0 target architecture for a multi-tenant gym man
 The system has three deployable applications — one authoritative server and two clients:
 
 - A Django REST Framework (DRF) API under `/api/v1` containing all authorization and business rules. This is the server, not a client.
-- A Next.js 16.3.3 web application using the App Router, TypeScript 7.0.2, Tailwind CSS, and React Server Components (RSC) for platform and gym staff. It is also the browser backend-for-frontend (BFF).
+- A Next.js 16.4.1 web application using the App Router, TypeScript 7.0.2, Tailwind CSS, and React Server Components (RSC) for platform and gym staff. It is also the browser backend-for-frontend (BFF).
 - A separate React Native member application using the same versioned API.
 
 The primary design goal is fail-closed tenant isolation. UI filtering is never a security control.
 
-Phase 1A is foundation only. It creates authentication, tenancy, authorization, RLS, API infrastructure, and minimal web shells; it does not implement members, check-in, finance, PT, reports, or mobile features.
+Phase 1A is foundation only. It creates authentication, tenancy, authorization, RLS, API infrastructure, and minimal web shells; it does not implement members, check-in, finance, PT, reports, or mobile features. Phase 1B platform administration, provisioning, staff, roles, settings, audit reads, and file-metadata persistence are in place and gate-closed. Phase 2 publishes the MembershipPlan and Member list, create, detail, update, and archive APIs. Member summary and history, membership, notification, and payment endpoints remain unpublished.
 
 ## 2. Architecture principles
 
@@ -61,7 +61,7 @@ Next.js is the browser backend-for-frontend (BFF) for authentication cookies and
 
 ### Web frontend
 
-- Next.js 16.3.3 with TypeScript 7.0.2, Tailwind CSS, the App Router, and React Server Components by default.
+- Next.js 16.4.1 with TypeScript 7.0.2, Tailwind CSS, the App Router, and React Server Components by default.
 - Client Components only for browser-only interaction or local transient state.
 - Feature modules consume typed API contracts.
 - Route layouts separate `(auth)`, tenant routes, and `super-admin`.
@@ -258,7 +258,7 @@ Inventory uses an append-only stock-movement ledger. Approved retail sale postin
 
 Unattended mobile check-in uses an authenticated member or authorized trainer principal plus a short-lived, single-use or tightly replay-bounded onsite challenge for exactly one gym. The challenge is not authority by itself. The server verifies challenge gym/expiry/state, principal gym/self or trainer scope, membership eligibility, and duplicate-window rules in one transaction before writing a check-in. A static reusable poster QR is not sufficient for unattended admission.
 
-Membership-expiry email runs as two bounded, idempotent Django management commands scheduled on the VPS: one creates due `Notification` rows from each gym's local date and configured warning days, and one delivers pending email rows through the approved transactional-email provider. A notification is created only when expiry email is enabled and the member currently has a nonblank email address; missing email is a normal skip with no SMS/phone fallback. The delivery command resolves the current member email again, cancels safely if it was removed or the membership is no longer eligible, records provider outcomes, and retries transient failures with a strict attempt limit. A deterministic database uniqueness key prevents duplicate warning emails across repeated scheduler runs, retries, or restarts. This limited durable notification queue does not require Celery; Celery remains deferred until measured workload justifies it.
+Membership-expiry email runs as two bounded, idempotent Django management commands scheduled on the VPS: one creates due `Notification` rows from each gym's local date and configured warning days, and one delivers pending email rows through Django's configured email backend. Production must point that backend at an approved transactional provider before this delivery is production-ready; vendor selection remains a deployment decision. A notification is created only when expiry email is enabled and the member currently has a nonblank email address; missing email is a normal skip with no SMS/phone fallback. The delivery command resolves the current member email again, cancels safely if it was removed or the membership is no longer eligible, records provider outcomes, and retries transient failures with a strict attempt limit. A deterministic database uniqueness key prevents duplicate warning emails across repeated scheduler runs, retries, or restarts. This limited durable notification queue does not require Celery; Celery remains deferred until measured workload justifies it.
 
 Member push reminders and gym event/promotion announcements reuse the tenant-owned notification boundary. Announcement audience selection resolves to explicit same-gym recipients; device push tokens are scoped to a member, gym, device, and revocable session. Delivery failure never changes authoritative membership, booking, or payment state.
 
@@ -340,7 +340,7 @@ sequenceDiagram
 
 ## 12. Deployment architecture
 
-The approved compatibility baseline is Python 3.14.7, Django 5.2.17 LTS, Django REST Framework 3.18.0, Node.js 24.20.0 LTS, Next.js 16.3.3 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. Phase 1A pins these exact versions in runtime, lock, container, and CI configuration. The selected Django LTS and DRF releases support the Python baseline; Next.js and TypeScript run on the selected Node LTS; PostgreSQL compatibility is exercised through the actual driver, migrations, constraints, transaction-local settings, and forced-RLS test suite rather than inferred from version labels.
+The approved compatibility baseline is Python 3.14.7, Django 5.2.17 LTS, Django REST Framework 3.18.0, Node.js 24.20.0 LTS, Next.js 16.4.1 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. Next.js 16.4.1 is an approved security compatibility update. `docs/DEVELOPMENT_PLAN.md` remains the immutable historical baseline and still records Next.js 16.3.3. Phase 1A pins these exact versions in runtime, lock, container, and CI configuration. The selected Django LTS and DRF releases support the Python baseline; Next.js and TypeScript run on the selected Node LTS; PostgreSQL compatibility is exercised through the actual driver, migrations, constraints, transaction-local settings, and forced-RLS test suite rather than inferred from version labels.
 
 - Cloudflare provides DNS, edge TLS, WAF, bot/rate controls, and origin protection; the free tier is the budget baseline.
 - One production VPS provides 4–8 vCPU, 8–16 GiB RAM, and 80–160 GiB NVMe storage, subject to measured load. It runs a pinned Linux release, host firewall, automatic security patches, and Docker Compose.
@@ -418,4 +418,4 @@ Redis and Celery are not Phase 0 baseline dependencies. Until evidence justifies
 - [ADR 0002](./adr/0002-nextjs-bff-browser-authentication.md) accepts the Next.js BFF browser authentication boundary and lifecycle.
 - [ADR 0003](./adr/0003-reception-cash-session-authority.md) accepts Reception's conditional own-opened cash-session authority without finance approval or posting authority.
 
-The provider and broader MFA policy is deferred to Phase 1B and is nonblocking for Phase 1A. Jurisdiction must be decided before production, the device model remains a Phase 3 decision, and Expo versus bare React Native remains a Phase 7 decision. None is represented as resolved.
+The current MFA policy is TOTP. It is mandatory for platform administrators and Owners. Protected owner operations require a recently verified MFA session. Secrets are encrypted, and authenticator codes are replay-protected. Broader role-based MFA may be decided later. Email uses Django's configurable email backend. Tests and end-to-end runs use non-delivery backends. Production must configure an approved transactional provider before invitation, password-recovery, or Phase 2 expiry delivery is production-ready. Vendor selection and that deployment configuration remain deferred. Jurisdiction must be decided before production, the device model remains a Phase 3 decision, and Expo versus bare React Native remains a Phase 7 decision.

@@ -13,7 +13,12 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from django.test import override_settings
 
 from apps.common.api.exceptions import AuthenticationFailed
-from apps.users.tokens import decode_access_token, issue_access_token
+from apps.users.tokens import (
+    decode_access_token,
+    decode_platform_access_token,
+    issue_access_token,
+    issue_platform_access_token,
+)
 
 
 @pytest.fixture
@@ -50,6 +55,21 @@ def claims() -> dict[str, object]:
     }
 
 
+def platform_claims() -> dict[str, object]:
+    now = datetime.now(UTC).replace(microsecond=0)
+    return {
+        "iss": "gym-platform-api",
+        "aud": "gym-platform-admin",
+        "sub": str(uuid.uuid4()),
+        "session_id": str(uuid.uuid4()),
+        "token_type": "platform_access",
+        "iat": int(now.timestamp()),
+        "nbf": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=10)).timestamp()),
+        "jti": str(uuid.uuid4()),
+    }
+
+
 def encode(private: str, payload: dict[str, object], *, kid: str = "test-key") -> str:
     return jwt.encode(payload, private, algorithm="RS256", headers={"typ": "JWT", "kid": kid})
 
@@ -66,6 +86,46 @@ def test_access_token_has_exact_claims_and_ten_minute_ttl(keys: tuple[str, str])
         decoded = decode_access_token(token)
     assert decoded["exp"] - decoded["iat"] == 600
     assert set(decoded) == set(claims())
+
+
+def test_platform_token_has_no_tenant_claims_and_uses_separate_audience(
+    keys: tuple[str, str],
+) -> None:
+    private, public = keys
+    with override_settings(
+        JWT_PRIVATE_KEY=private,
+        JWT_PUBLIC_KEYS={"test-key": public},
+        JWT_KEY_ID="test-key",
+        JWT_PLATFORM_AUDIENCE="gym-platform-admin",
+    ):
+        token, _ = issue_platform_access_token(
+            user_id=uuid.uuid4(),
+            session_id=uuid.uuid4(),
+        )
+        decoded = decode_platform_access_token(token)
+        with pytest.raises(AuthenticationFailed):
+            decode_access_token(token)
+    assert decoded["exp"] - decoded["iat"] == 600
+    assert set(decoded) == set(platform_claims())
+    assert {"gym_id", "gym_membership_id", "authz_version"}.isdisjoint(decoded)
+
+
+def test_staff_token_cannot_be_used_as_platform_token(keys: tuple[str, str]) -> None:
+    private, public = keys
+    membership = SimpleNamespace(id=uuid.uuid4(), gym_id=uuid.uuid4(), authz_version=1)
+    with override_settings(
+        JWT_PRIVATE_KEY=private,
+        JWT_PUBLIC_KEYS={"test-key": public},
+        JWT_KEY_ID="test-key",
+        JWT_PLATFORM_AUDIENCE="gym-platform-admin",
+    ):
+        token, _ = issue_access_token(
+            user_id=uuid.uuid4(),
+            membership=membership,
+            session_id=uuid.uuid4(),
+        )
+        with pytest.raises(AuthenticationFailed):
+            decode_platform_access_token(token)
 
 
 @pytest.mark.parametrize(

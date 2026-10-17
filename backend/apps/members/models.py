@@ -1,13 +1,27 @@
 from __future__ import annotations
 
+from typing import Any
+
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import RangeOperators
 from django.db import models
 
 from apps.common.db.models import TenantModel
+from apps.members.normalization import apply_member_normalization
 
 
 class Member(TenantModel):
+    """Tenant member profile.
+
+    ``linked_user`` and ``authz_version`` are read-only foundations for a later
+    member session. This model does not authenticate members. Migration 0007
+    adds the same-gym profile-photo foreign key, the address shape check, and
+    ``member_linked_user_fk`` with ``ON DELETE RESTRICT``. Django cannot
+    express the composite photo reference, so that foreign key is declared in
+    SQL. ``linked_user`` uses ``db_constraint=False`` so Django does not add a
+    second foreign key beside that SQL ``ON DELETE RESTRICT`` constraint.
+    """
+
     class Status(models.TextChoices):
         ACTIVE = "ACTIVE"
         EXPIRED = "EXPIRED"
@@ -15,18 +29,35 @@ class Member(TenantModel):
         CANCELLED = "CANCELLED"
         ARCHIVED = "ARCHIVED"
 
+    class Gender(models.TextChoices):
+        FEMALE = "FEMALE"
+        MALE = "MALE"
+        OTHER = "OTHER"
+        UNSPECIFIED = "UNSPECIFIED"
+
     member_number = models.CharField(max_length=32)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100, blank=True)
-    phone = models.CharField(max_length=32, blank=True)
-    email = models.EmailField(blank=True)
-    gender = models.CharField(max_length=20, blank=True)
+    normalized_full_name = models.CharField(max_length=201)
+    phone = models.CharField(max_length=32, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
+    gender = models.CharField(max_length=20, choices=Gender.choices, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     join_date = models.DateField()
     address = models.JSONField(default=dict, blank=True)
     emergency_contact_name = models.CharField(max_length=150, blank=True)
     emergency_contact_phone = models.CharField(max_length=32, blank=True)
     notes = models.TextField(blank=True)
+    profile_photo_asset_id = models.UUIDField(null=True, blank=True)
+    linked_user = models.ForeignKey(
+        "users.User",
+        null=True,
+        blank=True,
+        on_delete=models.RESTRICT,
+        related_name="linked_members",
+        db_constraint=False,
+    )
+    authz_version = models.PositiveIntegerField(default=1, db_default=1)
     status = models.CharField(max_length=12, choices=Status, default=Status.ACTIVE)
     archived_at = models.DateTimeField(null=True, blank=True)
     created_by_membership_id = models.UUIDField()
@@ -37,16 +68,95 @@ class Member(TenantModel):
         constraints = [
             models.UniqueConstraint(fields=["gym", "id"], name="member_gym_id_uniq"),
             models.UniqueConstraint(fields=["gym", "member_number"], name="member_gym_number_uniq"),
+            models.UniqueConstraint(
+                fields=["gym", "linked_user"],
+                condition=models.Q(linked_user__isnull=False),
+                name="member_gym_linked_user_uniq",
+            ),
             models.CheckConstraint(
                 condition=~models.Q(first_name=""), name="member_name_nonblank_ck"
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(first_name__regex=r"^[[:space:]]*$"),
+                name="member_first_name_trimmed_ck",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(member_number__regex=r"^[[:space:]]*$"),
+                name="member_number_nonblank_ck",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(normalized_full_name__regex=r"^[[:space:]]*$"),
+                name="member_normalized_name_nonblank_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(authz_version__gt=0),
+                name="member_authz_version_positive_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(date_of_birth__isnull=True)
+                    | models.Q(date_of_birth__lte=models.F("join_date"))
+                ),
+                name="member_birth_not_after_join_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(status="ARCHIVED", archived_at__isnull=False)
+                    | (~models.Q(status="ARCHIVED") & models.Q(archived_at__isnull=True))
+                ),
+                name="member_archive_state_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(phone__isnull=True) | models.Q(phone__regex=r"^\+?[0-9]{1,32}$")
+                ),
+                name="member_phone_normalized_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(email__isnull=True)
+                    | models.Q(email__regex=r"^[^[:space:][:upper:]]+@[^[:space:][:upper:]]+$")
+                ),
+                name="member_email_normalized_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(gender__isnull=True)
+                    | models.Q(gender__in=["FEMALE", "MALE", "OTHER", "UNSPECIFIED"])
+                ),
+                name="member_gender_normalized_ck",
             ),
         ]
         indexes = [
             models.Index(
                 fields=["gym", "status", "member_number"], name="member_gym_status_no_idx"
             ),
-            models.Index(fields=["gym", "join_date"], name="member_gym_joined_idx"),
+            models.Index(fields=["gym", "-join_date"], name="member_gym_joined_idx"),
+            models.Index(fields=["gym", "normalized_full_name"], name="member_gym_name_idx"),
+            models.Index(fields=["gym", "phone"], name="member_gym_phone_idx"),
+            models.Index(fields=["gym", "email"], name="member_gym_email_idx"),
         ]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        apply_member_normalization(self)
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            fields = list(update_fields)
+            for name in (
+                "first_name",
+                "last_name",
+                "normalized_full_name",
+                "phone",
+                "email",
+                "gender",
+                "emergency_contact_name",
+                "emergency_contact_phone",
+                "address",
+            ):
+                if name not in fields:
+                    fields.append(name)
+            kwargs["update_fields"] = fields
+        super().save(*args, **kwargs)
 
     @property
     def display_name(self) -> str:

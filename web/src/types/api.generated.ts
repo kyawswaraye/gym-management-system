@@ -4,6 +4,166 @@
  */
 
 export interface paths {
+  "/api/v1/admin/audit-logs/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["admin_audit_logs_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/admin/dashboard/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["admin_dashboard_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/admin/gyms/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["admin_gyms_list"];
+    put?: never;
+    post: operations["admin_gyms_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/admin/gyms/{gym_id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["admin_gym_detail"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["admin_gym_update"];
+    trace?: never;
+  };
+  "/api/v1/admin/gyms/{gym_id}/activate/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["admin_gym_activate"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/admin/gyms/{gym_id}/owners/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["admin_gym_owner_invite"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/admin/gyms/{gym_id}/suspend/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["admin_gym_suspend"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/admin/subscriptions/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["admin_subscriptions_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/admin/subscriptions/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["admin_subscriptions_update"];
+    trace?: never;
+  };
+  "/api/v1/audit-logs/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["audit_logs_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/auth/gyms/": {
     parameters: {
       query?: never;
@@ -93,7 +253,39 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["auth_mfa_challenge_create"];
+    post: operations["auth_mfa_challenge"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/mfa/enroll/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["auth_mfa_enroll"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/mfa/enroll/confirm/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["auth_mfa_enroll_confirm"];
     delete?: never;
     options?: never;
     head?: never;
@@ -165,6 +357,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/gym/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["gym_profile_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["gym_profile_update"];
+    trace?: never;
+  };
+  "/api/v1/gym-memberships/{id}/roles/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["membership_roles_retrieve"];
+    put: operations["membership_roles_replace"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/health/": {
     parameters: {
       query?: never;
@@ -173,6 +397,182 @@ export interface paths {
       cookie?: never;
     };
     get: operations["health"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/members/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["members_list"];
+    put?: never;
+    post: operations["members_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/members/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["members_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["members_update"];
+    trace?: never;
+  };
+  "/api/v1/members/{id}/archive/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["members_archive"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/membership-plans/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["membership_plans_list"];
+    put?: never;
+    post: operations["membership_plans_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/membership-plans/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["membership_plans_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["membership_plans_update"];
+    trace?: never;
+  };
+  "/api/v1/membership-plans/{id}/archive/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["membership_plans_archive"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/owners/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["owners_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/owners/{gym_membership_id}/revoke/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["owners_revoke"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/owners/invitations/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["owners_invite"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/owners/invitations/accept/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["owners_invitation_accept"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/permissions/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["permissions_list"];
     put?: never;
     post?: never;
     delete?: never;
@@ -197,17 +597,442 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/roles/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["roles_list"];
+    put?: never;
+    post: operations["roles_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/roles/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["roles_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["roles_update"];
+    trace?: never;
+  };
+  "/api/v1/roles/{id}/archive/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["roles_archive"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/roles/{id}/permissions/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["roles_permissions_replace"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/settings/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["gym_settings_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["gym_settings_update"];
+    trace?: never;
+  };
+  "/api/v1/staff/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["staff_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/staff/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["staff_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["staff_update"];
+    trace?: never;
+  };
+  "/api/v1/staff/{id}/activate/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["staff_activate"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/staff/{id}/suspend/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["staff_suspend"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/staff/invitations/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["staff_invite"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/staff/invitations/accept/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["staff_invitation_accept"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AdminDashboard: {
+      gym_statuses: components["schemas"]["GymStatusCounts"];
+      gym_subscription_statuses: components["schemas"]["GymSubscriptionStatusCounts"];
+      subscription_plan_statuses: components["schemas"]["SubscriptionPlanStatusCounts"];
+    };
+    AdminDashboardEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["AdminDashboard"];
+      message: string;
+    };
+    AdminGymDetail: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      name: string;
+      legal_name: string;
+      status: string;
+      email: string;
+      phone: string;
+      address_line1: string;
+      address_line2: string;
+      city: string;
+      region: string;
+      postal_code: string;
+      country_code: string;
+      timezone: string;
+      currency: string;
+      /** Format: uuid */
+      subscription_plan_id: string | null;
+      subscription_plan_name: string | null;
+      subscription_status: string;
+      /** Format: date-time */
+      subscription_starts_at: string | null;
+      /** Format: date-time */
+      subscription_ends_at: string | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    AdminGymDetailEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["AdminGymDetail"];
+      message: string;
+    };
+    AdminGymInputRequest: {
+      code: string;
+      name: string;
+      legal_name?: string;
+      email?: string;
+      phone?: string;
+      address_line1?: string;
+      address_line2?: string;
+      city?: string;
+      region?: string;
+      postal_code?: string;
+      country_code?: string;
+      /** @default Asia/Yangon */
+      timezone: string;
+      /** @default THB */
+      currency: string;
+      /** Format: uuid */
+      subscription_plan_id: string;
+      /** @default TRIAL */
+      subscription_status: components["schemas"]["AdminGymInputSubscriptionStatusEnum"];
+      /** Format: date-time */
+      subscription_starts_at?: string | null;
+      /** Format: date-time */
+      subscription_ends_at?: string | null;
+    };
+    /**
+     * @description * `TRIAL` - TRIAL
+     *     * `ACTIVE` - ACTIVE
+     * @enum {string}
+     */
+    AdminGymInputSubscriptionStatusEnum: "TRIAL" | "ACTIVE";
+    AdminGymLifecycleInputRequest: {
+      reason: string;
+    };
+    AdminGymListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["AdminGymListItem"][];
+      meta: {
+        [key: string]: unknown;
+      };
+      message: string;
+    };
+    AdminGymListItem: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      name: string;
+      status: string;
+      timezone: string;
+      currency: string;
+      /** Format: uuid */
+      subscription_plan_id: string | null;
+      subscription_plan_name: string | null;
+      subscription_status: string;
+      /** Format: date-time */
+      created_at: string;
+    };
+    /**
+     * @description * `TRIAL` - TRIAL
+     *     * `ACTIVE` - ACTIVE
+     *     * `PAST_DUE` - PAST_DUE
+     *     * `CANCELLED` - CANCELLED
+     * @enum {string}
+     */
+    AdminGymPatchSubscriptionStatusEnum:
+      "TRIAL" | "ACTIVE" | "PAST_DUE" | "CANCELLED";
+    AdminGymProvisionData: {
+      gym: components["schemas"]["AdminProvisionedGym"];
+      owner: components["schemas"]["AdminProvisionedOwner"];
+      roles: components["schemas"]["AdminProvisionedRole"][];
+      feature_entitlements: components["schemas"]["AdminProvisionedEntitlement"][];
+      expense_categories: components["schemas"]["AdminProvisionedExpenseCategory"][];
+    };
+    AdminGymProvisionEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["AdminGymProvisionData"];
+      message: string;
+    };
+    AdminGymProvisionRequestRequest: {
+      gym: components["schemas"]["AdminGymInputRequest"];
+      owner: components["schemas"]["AdminOwnerInputRequest"];
+    };
+    AdminOwnerInputRequest: {
+      /** Format: email */
+      email: string;
+      first_name: string;
+      last_name: string;
+      phone?: string;
+      /** @default true */
+      send_invitation: boolean;
+    };
+    AdminProvisionedEntitlement: {
+      feature: string;
+      enabled: boolean;
+      limit_value: number | null;
+      source: string;
+    };
+    AdminProvisionedExpenseCategory: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      system_key: string;
+      name: string;
+      is_active: boolean;
+    };
+    AdminProvisionedGym: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      name: string;
+      legal_name: string;
+      status: string;
+      email: string;
+      phone: string;
+      address_line1: string;
+      address_line2: string;
+      city: string;
+      region: string;
+      postal_code: string;
+      country_code: string;
+      timezone: string;
+      currency: string;
+      /** Format: uuid */
+      subscription_plan_id: string;
+      subscription_status: string;
+      /** Format: date-time */
+      subscription_starts_at: string | null;
+      /** Format: date-time */
+      subscription_ends_at: string | null;
+    };
+    AdminProvisionedMembership: {
+      /** Format: uuid */
+      id: string;
+      status: string;
+      is_owner: boolean;
+    };
+    AdminProvisionedOwner: {
+      user: components["schemas"]["AdminProvisionedUser"];
+      gym_membership: components["schemas"]["AdminProvisionedMembership"];
+    };
+    AdminProvisionedRole: {
+      /** Format: uuid */
+      id: string;
+      key: string;
+      name: string;
+    };
+    AdminProvisionedUser: {
+      /** Format: uuid */
+      id: string;
+      /** Format: email */
+      email: string;
+      first_name: string;
+      last_name: string;
+      phone: string;
+    };
+    AdminSubscription: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      name: string;
+      status: components["schemas"]["SubscriptionPlanStatusEnum"];
+      /** Format: decimal */
+      price: string;
+      currency: string;
+      billing_interval: string;
+    };
+    AdminSubscriptionDetail: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      name: string;
+      status: components["schemas"]["SubscriptionPlanStatusEnum"];
+      /** Format: decimal */
+      price: string;
+      currency: string;
+      billing_interval: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    AdminSubscriptionDetailEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["AdminSubscriptionDetail"];
+      message: string;
+    };
+    AdminSubscriptionListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["AdminSubscription"][];
+      message: string;
+    };
+    CollectionMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
     CurrentUserData: {
+      principal_type: components["schemas"]["PrincipalTypeEnum"];
       user: components["schemas"]["CurrentUserIdentity"];
-      gym: components["schemas"]["SelectedGym"];
-      gym_membership: components["schemas"]["SelectedMembership"];
+      gym: components["schemas"]["SelectedGym"] | null;
+      gym_membership: components["schemas"]["SelectedMembership"] | null;
       permissions: string[];
       features: components["schemas"]["FeatureEntitlement"][];
-      authz_version: number;
+      authz_version: number | null;
+      mfa_enabled: boolean;
+      mfa_recent: boolean;
     };
     CurrentUserEnvelope: {
       /** @default true */
@@ -240,6 +1065,14 @@ export interface components {
       data: components["schemas"]["DirectLoginData"];
       message: string;
     };
+    /**
+     * @description * `DAY` - Day
+     *     * `WEEK` - Week
+     *     * `MONTH` - Month
+     *     * `YEAR` - Year
+     * @enum {string}
+     */
+    DurationUnitEnum: "DAY" | "WEEK" | "MONTH" | "YEAR";
     ErrorDetail: {
       code: string;
       message: string;
@@ -257,6 +1090,14 @@ export interface components {
       feature__code: string;
       limit_value: number | null;
     };
+    /**
+     * @description * `FEMALE` - Female
+     *     * `MALE` - Male
+     *     * `OTHER` - Other
+     *     * `UNSPECIFIED` - Unspecified
+     * @enum {string}
+     */
+    GenderEnum: "FEMALE" | "MALE" | "OTHER" | "UNSPECIFIED";
     GymDisplay: {
       code: string;
       name: string;
@@ -284,6 +1125,88 @@ export interface components {
       is_owner: boolean;
       authz_version: number;
     };
+    /** @description Safe gym profile. Lifecycle and subscription are read-only for tenants. */
+    GymProfile: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      name: string;
+      legal_name: string;
+      status: string;
+      email: string;
+      phone: string;
+      address_line1: string;
+      address_line2: string;
+      city: string;
+      region: string;
+      postal_code: string;
+      country_code: string;
+      timezone: string;
+      currency: string;
+      /** Format: uuid */
+      subscription_plan_id: string | null;
+      subscription_plan_name: string | null;
+      subscription_status: string;
+      /** Format: date-time */
+      subscription_starts_at: string | null;
+      /** Format: date-time */
+      subscription_ends_at: string | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    GymProfileEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["GymProfile"];
+      message: string;
+    };
+    GymSettings: {
+      /** Format: uuid */
+      gym_id: string;
+      week_starts_on: number;
+      allow_manual_member_numbers: boolean;
+      member_number_prefix: string;
+      receipt_number_prefix: string;
+      check_in_duplicate_window_seconds: number;
+      check_in_challenge_ttl_seconds: number;
+      check_in_challenge_max_uses: number;
+      membership_expiry_warning_days: number[];
+      membership_expiry_email_enabled: boolean;
+      membership_expiry_push_enabled: boolean;
+      class_cancellation_cutoff_minutes: number;
+      class_no_show_consumes_session: boolean;
+      require_separate_finance_approval: boolean;
+      next_member_number: number;
+      /** Format: uuid */
+      created_by_membership_id: string | null;
+      /** Format: uuid */
+      updated_by_membership_id: string | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    GymSettingsEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["GymSettings"];
+      message: string;
+    };
+    GymStatusCounts: {
+      total: number;
+      PENDING: number;
+      ACTIVE: number;
+      SUSPENDED: number;
+      CLOSED: number;
+    };
+    GymSubscriptionStatusCounts: {
+      TRIAL: number;
+      ACTIVE: number;
+      PAST_DUE: number;
+      CANCELLED: number;
+    };
     HealthData: {
       status: string;
     };
@@ -295,7 +1218,8 @@ export interface components {
     };
     LoginEnvelope:
       | components["schemas"]["DirectLoginEnvelope"]
-      | components["schemas"]["SelectionLoginEnvelope"];
+      | components["schemas"]["SelectionLoginEnvelope"]
+      | components["schemas"]["MFARequiredEnvelope"];
     LoginInputRequest: {
       /** Format: email */
       email: string;
@@ -306,6 +1230,462 @@ export interface components {
     LogoutInputRequest: {
       refresh_token: string;
     };
+    MFAChallengeEnvelope:
+      | components["schemas"]["DirectLoginEnvelope"]
+      | components["schemas"]["SelectionLoginEnvelope"];
+    MFAChallengeInputRequest: {
+      challenge_token?: string;
+      code: string;
+    };
+    MFAConfirmInputRequest: {
+      enrollment_token: string;
+      code: string;
+    };
+    MFAEnrollInputRequest: {
+      current_password: string;
+    };
+    MFAEnrollmentData: {
+      enrollment_token: string;
+      secret: string;
+      otpauth_uri: string;
+      /** Format: date-time */
+      expires_at: string;
+    };
+    MFAEnrollmentEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MFAEnrollmentData"];
+      message: string;
+    };
+    MFARequiredData: {
+      /** @default true */
+      requires_mfa: boolean;
+      mfa_challenge_token: string;
+      /** Format: date-time */
+      mfa_challenge_expires_at: string;
+    };
+    MFARequiredEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MFARequiredData"];
+      message: string;
+    };
+    MFAStatusData: {
+      mfa_enabled: boolean;
+      mfa_recent: boolean;
+    };
+    MFAStatusEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MFAStatusData"];
+      message: string;
+    };
+    Member: {
+      /** Format: uuid */
+      id: string;
+      member_number: string;
+      first_name: string;
+      last_name: string;
+      normalized_full_name: string;
+      phone: string | null;
+      /** Format: email */
+      email: string | null;
+      gender:
+        | (
+            | components["schemas"]["GenderEnum"]
+            | components["schemas"]["NullEnum"]
+          )
+        | null;
+      /** Format: date */
+      date_of_birth: string | null;
+      address: components["schemas"]["MemberAddress"];
+      /** Format: date */
+      join_date: string;
+      emergency_contact_name: string;
+      emergency_contact_phone: string;
+      notes: string;
+      /** Format: uuid */
+      profile_photo_asset_id: string | null;
+      /** Format: uuid */
+      linked_user_id: string | null;
+      readonly is_pt_client: boolean;
+      authz_version: number;
+      status: components["schemas"]["MemberStatusEnum"];
+      /** Format: date-time */
+      archived_at: string | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    MemberAddress: {
+      /** @default  */
+      address_line1: string;
+      /** @default  */
+      address_line2: string;
+      /** @default  */
+      city: string;
+      /** @default  */
+      region: string;
+      /** @default  */
+      postal_code: string;
+      /** @default  */
+      country_code: string;
+    };
+    MemberAddressRequest: {
+      /** @default  */
+      address_line1: string;
+      /** @default  */
+      address_line2: string;
+      /** @default  */
+      city: string;
+      /** @default  */
+      region: string;
+      /** @default  */
+      postal_code: string;
+      /** @default  */
+      country_code: string;
+    };
+    MemberCollectionMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    MemberCreateRequest: {
+      /** @default  */
+      member_number: string;
+      first_name: string;
+      last_name: string;
+      phone?: string | null;
+      email?: string | null;
+      gender?:
+        | (
+            | components["schemas"]["GenderEnum"]
+            | components["schemas"]["NullEnum"]
+          )
+        | null;
+      /** Format: date */
+      date_of_birth?: string | null;
+      address?: components["schemas"]["MemberAddressRequest"];
+      /** Format: date */
+      join_date: string;
+      /** @default  */
+      emergency_contact_name: string;
+      /** @default  */
+      emergency_contact_phone: string;
+      /** @default  */
+      notes: string;
+      /** Format: uuid */
+      profile_photo_asset_id?: string | null;
+    };
+    MemberEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["Member"];
+      message: string;
+    };
+    MemberListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["Member"][];
+      meta: components["schemas"]["MemberCollectionMeta"];
+      message: string;
+    };
+    /**
+     * @description * `ACTIVE` - Active
+     *     * `EXPIRED` - Expired
+     *     * `SUSPENDED` - Suspended
+     *     * `CANCELLED` - Cancelled
+     *     * `ARCHIVED` - Archived
+     * @enum {string}
+     */
+    MemberStatusEnum:
+      "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED" | "ARCHIVED";
+    MembershipPlan: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      name: string;
+      description: string;
+      duration_value: number;
+      duration_unit: components["schemas"]["DurationUnitEnum"];
+      /** Format: decimal */
+      price: string;
+      currency: string;
+      is_active: boolean;
+      /** Format: date-time */
+      archived_at: string | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    MembershipPlanCollectionMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    MembershipPlanCreateRequest: {
+      code: string;
+      name: string;
+      /** @default  */
+      description: string;
+      duration_value: number;
+      duration_unit: components["schemas"]["DurationUnitEnum"];
+      /** Format: decimal */
+      price: string;
+    };
+    MembershipPlanEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MembershipPlan"];
+      message: string;
+    };
+    MembershipPlanListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MembershipPlan"][];
+      meta: components["schemas"]["MembershipPlanCollectionMeta"];
+      message: string;
+    };
+    MembershipRole: {
+      /** Format: uuid */
+      gym_membership_id: string;
+      roles: components["schemas"]["Role"][];
+      authz_version: number;
+    };
+    MembershipRoleEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MembershipRole"];
+      message: string;
+    };
+    MembershipRoleReplaceRequest: {
+      role_ids: string[];
+    };
+    /** @enum {unknown} */
+    NullEnum: null;
+    OwnerAcceptInputRequest: {
+      invitation_token: string;
+      password: string;
+      password_confirmation: string;
+    };
+    OwnerInvitation: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      gym_membership_id: string;
+      /** Format: email */
+      email: string;
+      status: string;
+      /** Format: date-time */
+      expires_at: string;
+    };
+    OwnerInvitationEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["OwnerInvitation"];
+      message: string;
+    };
+    OwnerInviteInputRequest: {
+      /** Format: email */
+      email: string;
+      first_name: string;
+      last_name: string;
+      phone?: string;
+      /** @default true */
+      send_invitation: boolean;
+    };
+    OwnerItem: {
+      /** Format: uuid */
+      gym_membership_id: string;
+      /** Format: uuid */
+      user_id: string;
+      /** Format: email */
+      email: string;
+      first_name: string;
+      last_name: string;
+      phone: string;
+      status: string;
+      is_owner: boolean;
+      authz_version: number;
+      /** Format: date-time */
+      invited_at: string | null;
+      /** Format: date-time */
+      activated_at: string | null;
+    };
+    OwnerItemEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["OwnerItem"];
+      message: string;
+    };
+    OwnerListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["OwnerItem"][];
+      message: string;
+    };
+    OwnerRevokeInputRequest: {
+      reason: string;
+    };
+    PatchedAdminGymPatchRequest: {
+      name?: string;
+      legal_name?: string;
+      email?: string;
+      phone?: string;
+      address_line1?: string;
+      address_line2?: string;
+      city?: string;
+      region?: string;
+      postal_code?: string;
+      country_code?: string;
+      timezone?: string;
+      currency?: string;
+      /** Format: uuid */
+      subscription_plan_id?: string;
+      subscription_status?: components["schemas"]["AdminGymPatchSubscriptionStatusEnum"];
+      /** Format: date-time */
+      subscription_starts_at?: string | null;
+      /** Format: date-time */
+      subscription_ends_at?: string | null;
+    };
+    PatchedAdminSubscriptionUpdateRequest: {
+      name?: string;
+      status?: components["schemas"]["SubscriptionPlanStatusEnum"];
+      /** Format: decimal */
+      price?: string;
+      billing_interval?: string;
+    };
+    PatchedGymProfileUpdateRequest: {
+      name?: string;
+      legal_name?: string;
+      email?: string;
+      phone?: string;
+      address_line1?: string;
+      address_line2?: string;
+      city?: string;
+      region?: string;
+      postal_code?: string;
+      country_code?: string;
+      timezone?: string;
+      currency?: string;
+    };
+    PatchedGymSettingsUpdateRequest: {
+      week_starts_on?: number;
+      allow_manual_member_numbers?: boolean;
+      member_number_prefix?: string;
+      receipt_number_prefix?: string;
+      check_in_duplicate_window_seconds?: number;
+      check_in_challenge_ttl_seconds?: number;
+      check_in_challenge_max_uses?: number;
+      membership_expiry_warning_days?: number[];
+      membership_expiry_email_enabled?: boolean;
+      membership_expiry_push_enabled?: boolean;
+      class_cancellation_cutoff_minutes?: number;
+      class_no_show_consumes_session?: boolean;
+      require_separate_finance_approval?: boolean;
+    };
+    PatchedMemberUpdateRequest: {
+      first_name?: string;
+      last_name?: string;
+      phone?: string | null;
+      email?: string | null;
+      gender?:
+        | (
+            | components["schemas"]["GenderEnum"]
+            | components["schemas"]["NullEnum"]
+          )
+        | null;
+      /** Format: date */
+      date_of_birth?: string | null;
+      address?: components["schemas"]["MemberAddressRequest"];
+      /** Format: date */
+      join_date?: string;
+      emergency_contact_name?: string;
+      emergency_contact_phone?: string;
+      notes?: string;
+      /** Format: uuid */
+      profile_photo_asset_id?: string | null;
+    };
+    PatchedMembershipPlanUpdateRequest: {
+      code?: string;
+      name?: string;
+      description?: string;
+      duration_value?: number;
+      duration_unit?: components["schemas"]["DurationUnitEnum"];
+      /** Format: decimal */
+      price?: string;
+    };
+    PatchedRoleUpdateRequest: {
+      key?: string;
+      name?: string;
+      description?: string;
+      is_active?: boolean;
+    };
+    PatchedStaffUpdateRequest: {
+      staff_code?: string;
+      display_name?: string;
+      phone?: string;
+      /** Format: date */
+      joined_date?: string;
+      employment_title?: string;
+      /** Format: decimal */
+      default_commission_percent?: string;
+    };
+    Permission: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      module: string;
+      description: string;
+      risk_level: string;
+      is_active: boolean;
+    };
+    PermissionListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["Permission"][];
+      meta: components["schemas"]["CollectionMeta"];
+      message: string;
+    };
+    PlatformAuditItem: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      actor_user_id: string;
+      /** Format: email */
+      actor_email: string;
+      /** Format: uuid */
+      target_gym_id: string | null;
+      target_gym_code: string | null;
+      target_type: string;
+      /** Format: uuid */
+      target_id: string | null;
+      action: string;
+      module: string;
+      outcome: string;
+      old_values: unknown;
+      new_values: unknown;
+      request_id: string;
+      /** Format: date-time */
+      occurred_at: string;
+    };
+    PlatformAuditListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["PlatformAuditItem"][];
+      meta: components["schemas"]["PlatformAuditMeta"];
+      message: string;
+    };
+    PlatformAuditMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    /**
+     * @description * `PLATFORM` - PLATFORM
+     *     * `STAFF` - STAFF
+     * @enum {string}
+     */
+    PrincipalTypeEnum: "PLATFORM" | "STAFF";
     ReadinessData: {
       status: string;
       database: string;
@@ -320,6 +1700,56 @@ export interface components {
     RefreshInputRequest: {
       refresh_token: string;
     };
+    Role: {
+      /** Format: uuid */
+      id: string;
+      key: string;
+      name: string;
+      description: string;
+      is_active: boolean;
+      is_protected: boolean;
+      is_template: boolean;
+      /** Format: uuid */
+      source_template_id: string | null;
+      source_template_version: number | null;
+      permission_codes: string[];
+      permission_count: number;
+      assignment_count: number;
+      /** Format: uuid */
+      created_by_membership_id: string | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    RoleCreateRequest: {
+      key: string;
+      name: string;
+      description?: string;
+      is_active?: boolean;
+    };
+    RoleEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["Role"];
+      message: string;
+    };
+    RoleListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["Role"][];
+      meta: components["schemas"]["CollectionMeta"];
+      message: string;
+    };
+    RolePermissionReplaceRequest: {
+      permission_codes: string[];
+    };
+    /**
+     * @description * `GYM` - GYM
+     *     * `SELF` - SELF
+     * @enum {string}
+     */
+    ScopeEnum: "GYM" | "SELF";
     SelectGymInputRequest: {
       /** Format: uuid */
       gym_membership_id: string;
@@ -354,6 +1784,169 @@ export interface components {
       data: components["schemas"]["SelectionLoginData"];
       message: string;
     };
+    Staff: {
+      /** Format: uuid */
+      id: string;
+      staff_code: string;
+      display_name: string;
+      phone: string;
+      /** Format: date */
+      joined_date: string;
+      status: components["schemas"]["StaffStatusEnum"];
+      employment_title: string;
+      /** Format: decimal */
+      default_commission_percent: string;
+      /** Format: date */
+      terminated_date: string | null;
+      /** Format: date-time */
+      archived_at: string | null;
+      membership: components["schemas"]["StaffMembership"];
+      role_ids: string[];
+      invited_role_ids: string[];
+    };
+    StaffAcceptInputRequest: {
+      invitation_token: string;
+      password: string;
+      password_confirmation: string;
+      first_name?: string;
+      last_name?: string;
+      phone?: string;
+      display_name?: string;
+    };
+    StaffEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["Staff"];
+      message: string;
+    };
+    StaffInvitation: {
+      /** Format: uuid */
+      id: string;
+      /** Format: email */
+      email: string;
+      status: string;
+      /** Format: date-time */
+      expires_at: string;
+      role_ids: string[];
+      membership: components["schemas"]["StaffMembership"];
+      staff: components["schemas"]["Staff"];
+    };
+    StaffInvitationEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["StaffInvitation"];
+      message: string;
+    };
+    StaffInviteInputRequest: {
+      /** Format: email */
+      email: string;
+      first_name: string;
+      last_name: string;
+      phone?: string;
+      staff_code: string;
+      display_name: string;
+      /** Format: date */
+      joined_date: string;
+      employment_title?: string;
+      /** Format: decimal */
+      default_commission_percent?: string;
+      role_ids: string[];
+    };
+    StaffLifecycleRequest: {
+      reason: string;
+    };
+    StaffListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["Staff"][];
+      meta: components["schemas"]["StaffListMeta"];
+      message: string;
+    };
+    StaffListMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    StaffMembership: {
+      /** Format: uuid */
+      gym_membership_id: string;
+      /** Format: uuid */
+      user_id: string;
+      /** Format: email */
+      email: string;
+      first_name: string;
+      last_name: string;
+      status: string;
+      is_owner: boolean;
+      authz_version: number;
+      /** Format: date-time */
+      invited_at: string | null;
+      /** Format: date-time */
+      activated_at: string | null;
+    };
+    StaffSession: {
+      access_token: string;
+      /** Format: date-time */
+      access_expires_at: string;
+      refresh_token: string;
+      /** Format: date-time */
+      refresh_expires_at: string;
+      requires_gym_selection: boolean;
+    };
+    StaffSessionEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["StaffSession"];
+      message: string;
+    };
+    /**
+     * @description * `ACTIVE` - Active
+     *     * `ON_LEAVE` - On Leave
+     *     * `TERMINATED` - Terminated
+     *     * `ARCHIVED` - Archived
+     * @enum {string}
+     */
+    StaffStatusEnum: "ACTIVE" | "ON_LEAVE" | "TERMINATED" | "ARCHIVED";
+    SubscriptionPlanStatusCounts: {
+      ACTIVE: number;
+      RETIRED: number;
+    };
+    /**
+     * @description * `ACTIVE` - Active
+     *     * `RETIRED` - Retired
+     * @enum {string}
+     */
+    SubscriptionPlanStatusEnum: "ACTIVE" | "RETIRED";
+    TenantAuditItem: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      actor_membership_id: string | null;
+      /** Format: uuid */
+      impersonator_membership_id: string | null;
+      action: string;
+      module: string;
+      target_type: string;
+      /** Format: uuid */
+      target_id: string;
+      old_values: unknown;
+      new_values: unknown;
+      request_id: string;
+      outcome: string;
+      /** Format: date-time */
+      occurred_at: string;
+    };
+    TenantAuditListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["TenantAuditItem"][];
+      meta: components["schemas"]["TenantAuditMeta"];
+      message: string;
+    };
+    TenantAuditMeta: {
+      has_more: boolean;
+      next_after: string | null;
+      scope: components["schemas"]["ScopeEnum"];
+    };
     TokenEnvelope: {
       /** @default true */
       success: boolean;
@@ -377,6 +1970,703 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  admin_audit_logs_list: {
+    parameters: {
+      query?: {
+        action?: string;
+        after?: string;
+        limit?: number;
+        /**
+         * @description * `SUCCESS` - SUCCESS
+         *     * `DENIED` - DENIED
+         *     * `ERROR` - ERROR
+         */
+        outcome?: "SUCCESS" | "DENIED" | "ERROR";
+        target_gym_id?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformAuditListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  admin_dashboard_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminDashboardEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  admin_gyms_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+        search?: string;
+        /**
+         * @description * `PENDING` - PENDING
+         *     * `ACTIVE` - ACTIVE
+         *     * `SUSPENDED` - SUSPENDED
+         *     * `CLOSED` - CLOSED
+         */
+        status?: "PENDING" | "ACTIVE" | "SUSPENDED" | "CLOSED";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminGymListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  admin_gyms_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of the same provisioning request. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AdminGymProvisionRequestRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["AdminGymProvisionRequestRequest"];
+        "multipart/form-data": components["schemas"]["AdminGymProvisionRequestRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminGymProvisionEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  admin_gym_detail: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        gym_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminGymDetailEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  admin_gym_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        gym_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedAdminGymPatchRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedAdminGymPatchRequest"];
+        "multipart/form-data": components["schemas"]["PatchedAdminGymPatchRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminGymDetailEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  admin_gym_activate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        gym_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AdminGymLifecycleInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["AdminGymLifecycleInputRequest"];
+        "multipart/form-data": components["schemas"]["AdminGymLifecycleInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminGymDetailEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  admin_gym_owner_invite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        gym_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["OwnerInviteInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["OwnerInviteInputRequest"];
+        "multipart/form-data": components["schemas"]["OwnerInviteInputRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OwnerInvitationEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  admin_gym_suspend: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        gym_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AdminGymLifecycleInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["AdminGymLifecycleInputRequest"];
+        "multipart/form-data": components["schemas"]["AdminGymLifecycleInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminGymDetailEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  admin_subscriptions_list: {
+    parameters: {
+      query?: {
+        /**
+         * @description * `ACTIVE` - ACTIVE
+         *     * `RETIRED` - RETIRED
+         *     * `ALL` - ALL
+         */
+        status?: "ACTIVE" | "RETIRED" | "ALL";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminSubscriptionListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  admin_subscriptions_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedAdminSubscriptionUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedAdminSubscriptionUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedAdminSubscriptionUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminSubscriptionDetailEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  audit_logs_list: {
+    parameters: {
+      query?: {
+        action?: string;
+        after?: string;
+        limit?: number;
+        module?: string;
+        /**
+         * @description * `SUCCESS` - SUCCESS
+         *     * `DENIED` - DENIED
+         *     * `ERROR` - ERROR
+         */
+        outcome?: "SUCCESS" | "DENIED" | "ERROR";
+        target_id?: string;
+        target_type?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TenantAuditListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   auth_gyms: {
     parameters: {
       query?: never;
@@ -601,7 +2891,7 @@ export interface operations {
       };
     };
   };
-  auth_mfa_challenge_create: {
+  auth_mfa_challenge: {
     parameters: {
       query?: never;
       header: {
@@ -611,21 +2901,23 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
-        "application/json": {
-          [key: string]: unknown;
-        };
-        "application/x-www-form-urlencoded": {
-          [key: string]: unknown;
-        };
-        "multipart/form-data": {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["MFAChallengeInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MFAChallengeInputRequest"];
+        "multipart/form-data": components["schemas"]["MFAChallengeInputRequest"];
       };
     };
     responses: {
-      403: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MFAChallengeEnvelope"];
+        };
+      };
+      400: {
         headers: {
           [name: string]: unknown;
         };
@@ -633,7 +2925,97 @@ export interface operations {
           "application/json": components["schemas"]["ErrorEnvelope"];
         };
       };
-      501: {
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  auth_mfa_enroll: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MFAEnrollInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MFAEnrollInputRequest"];
+        "multipart/form-data": components["schemas"]["MFAEnrollInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MFAEnrollmentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  auth_mfa_enroll_confirm: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MFAConfirmInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MFAConfirmInputRequest"];
+        "multipart/form-data": components["schemas"]["MFAConfirmInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MFAStatusEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
         headers: {
           [name: string]: unknown;
         };
@@ -839,6 +3221,210 @@ export interface operations {
       };
     };
   };
+  gym_profile_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GymProfileEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  gym_profile_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedGymProfileUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedGymProfileUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedGymProfileUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GymProfileEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  membership_roles_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipRoleEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  membership_roles_replace: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MembershipRoleReplaceRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MembershipRoleReplaceRequest"];
+        "multipart/form-data": components["schemas"]["MembershipRoleReplaceRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipRoleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   health: {
     parameters: {
       query?: never;
@@ -854,6 +3440,810 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HealthEnvelope"];
+        };
+      };
+    };
+  };
+  members_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        is_pt_client?: boolean | null;
+        joined_from?: string;
+        joined_to?: string;
+        limit?: number;
+        search?: string;
+        /**
+         * @description * `ACTIVE` - Active
+         *     * `EXPIRED` - Expired
+         *     * `SUSPENDED` - Suspended
+         *     * `CANCELLED` - Cancelled
+         *     * `ARCHIVED` - Archived
+         */
+        status?: "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED" | "ARCHIVED";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  members_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MemberCreateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MemberCreateRequest"];
+        "multipart/form-data": components["schemas"]["MemberCreateRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  members_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  members_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedMemberUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedMemberUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedMemberUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  members_archive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  membership_plans_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipPlanListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  membership_plans_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MembershipPlanCreateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MembershipPlanCreateRequest"];
+        "multipart/form-data": components["schemas"]["MembershipPlanCreateRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipPlanEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  membership_plans_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipPlanEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  membership_plans_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedMembershipPlanUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedMembershipPlanUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedMembershipPlanUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipPlanEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  membership_plans_archive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipPlanEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  owners_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OwnerListEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  owners_revoke: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        gym_membership_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["OwnerRevokeInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["OwnerRevokeInputRequest"];
+        "multipart/form-data": components["schemas"]["OwnerRevokeInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OwnerItemEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  owners_invite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["OwnerInviteInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["OwnerInviteInputRequest"];
+        "multipart/form-data": components["schemas"]["OwnerInviteInputRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OwnerInvitationEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  owners_invitation_accept: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["OwnerAcceptInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["OwnerAcceptInputRequest"];
+        "multipart/form-data": components["schemas"]["OwnerAcceptInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  permissions_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PermissionListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
         };
       };
     };
@@ -876,6 +4266,889 @@ export interface operations {
         };
       };
       503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  roles_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoleListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  roles_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RoleCreateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["RoleCreateRequest"];
+        "multipart/form-data": components["schemas"]["RoleCreateRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  roles_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoleEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  roles_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedRoleUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedRoleUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedRoleUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  roles_archive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  roles_permissions_replace: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RolePermissionReplaceRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["RolePermissionReplaceRequest"];
+        "multipart/form-data": components["schemas"]["RolePermissionReplaceRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  gym_settings_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GymSettingsEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  gym_settings_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedGymSettingsUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedGymSettingsUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedGymSettingsUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GymSettingsEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  staff_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+        /**
+         * @description * `INVITED` - Invited
+         *     * `ACTIVE` - Active
+         *     * `SUSPENDED` - Suspended
+         *     * `REVOKED` - Revoked
+         */
+        membership_status?: "INVITED" | "ACTIVE" | "SUSPENDED" | "REVOKED";
+        search?: string;
+        /**
+         * @description * `ACTIVE` - Active
+         *     * `ON_LEAVE` - On Leave
+         *     * `TERMINATED` - Terminated
+         *     * `ARCHIVED` - Archived
+         */
+        status?: "ACTIVE" | "ON_LEAVE" | "TERMINATED" | "ARCHIVED";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StaffListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  staff_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StaffEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  staff_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedStaffUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedStaffUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedStaffUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StaffEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  staff_activate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StaffLifecycleRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["StaffLifecycleRequest"];
+        "multipart/form-data": components["schemas"]["StaffLifecycleRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StaffEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  staff_suspend: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StaffLifecycleRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["StaffLifecycleRequest"];
+        "multipart/form-data": components["schemas"]["StaffLifecycleRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StaffEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  staff_invite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StaffInviteInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["StaffInviteInputRequest"];
+        "multipart/form-data": components["schemas"]["StaffInviteInputRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StaffInvitationEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  staff_invitation_accept: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Shared secret presented only by the trusted browser BFF. */
+        "X-Gym-BFF-Secret": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StaffAcceptInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["StaffAcceptInputRequest"];
+        "multipart/form-data": components["schemas"]["StaffAcceptInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StaffSessionEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
         headers: {
           [name: string]: unknown;
         };

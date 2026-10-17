@@ -20,6 +20,7 @@ export function LoginForm({
     sessionExpired ? "Your session expired. Please sign in again." : null,
   );
   const [pending, setPending] = useState(false);
+  const [mfaRequired, setMfaRequired] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -27,7 +28,12 @@ export function LoginForm({
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
-    if (!email || !password) {
+    const code = String(form.get("code") ?? "").trim();
+    if (mfaRequired && !/^\d{6}$/.test(code)) {
+      setError("Enter the six-digit authenticator code.");
+      return;
+    }
+    if (!mfaRequired && (!email || !password)) {
       setError("Enter both your email and password.");
       return;
     }
@@ -35,19 +41,30 @@ export function LoginForm({
     setPending(true);
     try {
       const csrf = await getCsrfToken();
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: mutationHeaders(csrf),
-        body: JSON.stringify({ email, password, device_name: "Web browser" }),
-      });
+      const response = await fetch(
+        mfaRequired ? "/api/auth/mfa/challenge" : "/api/auth/login",
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: mutationHeaders(csrf),
+          body: JSON.stringify(
+            mfaRequired
+              ? { code }
+              : { email, password, device_name: "Web browser" },
+          ),
+        },
+      );
       if (!response.ok) {
         setError(await errorMessage(response, "Sign-in failed."));
         return;
       }
       const body = (await response.json()) as {
-        data?: { requires_gym_selection?: boolean };
+        data?: { requires_gym_selection?: boolean; requires_mfa?: boolean };
       };
+      if (body.data?.requires_mfa) {
+        setMfaRequired(true);
+        return;
+      }
       const destination = body.data?.requires_gym_selection
         ? "/select-gym"
         : await authenticatedHomePath();
@@ -67,30 +84,49 @@ export function LoginForm({
           {error}
         </p>
       )}
-      <label className="field">
-        <span>Email</span>
-        <input
-          className="input"
-          name="email"
-          type="email"
-          autoComplete="username"
-          required
-          disabled={pending}
-        />
-      </label>
-      <label className="field">
-        <span>Password</span>
-        <input
-          className="input"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          disabled={pending}
-        />
-      </label>
+      {!mfaRequired && (
+        <label className="field">
+          <span>Email</span>
+          <input
+            className="input"
+            name="email"
+            type="email"
+            autoComplete="username"
+            required
+            disabled={pending}
+          />
+        </label>
+      )}
+      {!mfaRequired && (
+        <label className="field">
+          <span>Password</span>
+          <input
+            className="input"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            disabled={pending}
+          />
+        </label>
+      )}
+      {mfaRequired && (
+        <label className="field">
+          <span>Authenticator code</span>
+          <input
+            className="input"
+            name="code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]{6}"
+            maxLength={6}
+            required
+            disabled={pending}
+          />
+        </label>
+      )}
       <button className="button" type="submit" disabled={pending}>
-        {pending ? "Signing in…" : "Sign in"}
+        {pending ? "Verifying…" : mfaRequired ? "Verify code" : "Sign in"}
       </button>
     </form>
   );

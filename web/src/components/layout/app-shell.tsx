@@ -2,7 +2,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { LogoutButton } from "@/features/auth/logout-button";
-import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
+import {
+  canOpenGymSettings,
+  hasPermission,
+  hasTenantCapability,
+  platformHomePath,
+  tenantHomePath,
+} from "@/lib/auth/authorization";
 import type { CurrentUser } from "@/types/api";
 
 export function AppShell({
@@ -19,8 +25,17 @@ export function AppShell({
   );
   const gymName = session.gym?.name ?? "Selected gym";
   const homePath = platform
-    ? "/super-admin/dashboard"
+    ? platformHomePath(session)
     : tenantHomePath(session);
+  const canViewPlatformDashboard = hasPermission(
+    session,
+    "platform.dashboard.view",
+  );
+  const canManageSubscriptions = hasPermission(
+    session,
+    "platform.subscriptions.manage",
+  );
+  const canViewPlatformAudit = hasPermission(session, "platform.audit.view");
   const canViewDashboard = hasTenantCapability(
     session,
     "reports.view",
@@ -41,6 +56,9 @@ export function AppShell({
     "payments.view",
     "finance",
   );
+  const canViewStaff = hasPermission(session, "staff.view");
+  const canViewRoles = hasPermission(session, "roles.view");
+  const canViewTenantAudit = hasPermission(session, "audit.view");
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[15rem_1fr]">
@@ -52,12 +70,44 @@ export function AppShell({
           {platform ? "Platform workspace" : gymName}
         </p>
         <nav className="mt-6 flex flex-wrap gap-2 md:grid" aria-label="Primary">
-          {(platform || canViewDashboard) && (
+          {!platform && canViewDashboard && (
             <Link
               className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href={platform ? "/super-admin/dashboard" : "/dashboard"}
+              href="/dashboard"
             >
               Dashboard
+            </Link>
+          )}
+          {platform && canViewPlatformDashboard && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/super-admin/dashboard"
+            >
+              Dashboard
+            </Link>
+          )}
+          {platform && hasPermission(session, "platform.gyms.view") && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/super-admin/gyms"
+            >
+              Gyms
+            </Link>
+          )}
+          {platform && canManageSubscriptions && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/super-admin/subscriptions"
+            >
+              Subscriptions
+            </Link>
+          )}
+          {platform && canViewPlatformAudit && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/super-admin/audit-logs"
+            >
+              Audit logs
             </Link>
           )}
           {!platform && canViewMembers && (
@@ -84,10 +134,58 @@ export function AppShell({
               Payments
             </Link>
           )}
+          {!platform && canViewStaff && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/staff"
+            >
+              Staff
+            </Link>
+          )}
+          {!platform && canViewRoles && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/roles"
+            >
+              Roles
+            </Link>
+          )}
+          {!platform && canOpenGymSettings(session) && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/settings"
+            >
+              Settings
+            </Link>
+          )}
+          {!platform && canViewTenantAudit && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/audit-logs"
+            >
+              Audit logs
+            </Link>
+          )}
+          {!platform && session.gym_membership?.is_owner && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/owners"
+            >
+              Owners
+            </Link>
+          )}
+          {!session.mfa_enabled && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/mfa-setup"
+            >
+              Set up MFA
+            </Link>
+          )}
           {!platform && canUsePlatform && (
             <Link
               className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/super-admin/dashboard"
+              href={platformHomePath(session)}
             >
               Super admin
             </Link>

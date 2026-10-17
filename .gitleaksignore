@@ -1,0 +1,21 @@
+# Public RFC 6238 Appendix B SHA-1 test vector. Not a credential.
+# web/tests/e2e-totp.test.ts checks the published authenticator codes.
+web/tests/e2e-totp.test.ts:generic-api-key:5
+
+# Disposable E2E placeholder encryption key. Not a production secret.
+.github/workflows/ci.yml:generic-api-key:168
+
+# Disposable E2E placeholder invitation pepper. Not a production secret.
+.github/workflows/ci.yml:generic-api-key:171
+
+# Idempotency-key fixture UUID. Not an API credential.
+backend/tests/security/test_gym_provisioning.py:generic-api-key:274
+
+# Idempotency-key fixture UUID for the conflicting-body case. Not an API credential.
+backend/tests/security/test_gym_provisioning.py:generic-api-key:320
+
+# Idempotency-key fixture UUID in the BFF boundary test. Not an API credential.
+web/tests/security-boundary.test.ts:generic-api-key:281
+
+# Same idempotency-key fixture UUID in the cross-origin BFF test. Not an API credential.
+web/tests/security-boundary.test.ts:generic-api-key:1629

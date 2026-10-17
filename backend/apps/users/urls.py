@@ -6,6 +6,9 @@ from .views import (
     LogoutAllView,
     LogoutView,
     MeView,
+    MFAChallengeView,
+    MFAConfirmView,
+    MFAEnrollView,
     ProviderNeutralUnavailableView,
     RefreshView,
     SelectGymView,
@@ -21,5 +24,7 @@ urlpatterns = [
     path("select-gym/", SelectGymView.as_view(), name="select-gym"),
     path("password/forgot/", ProviderNeutralUnavailableView.as_view(), name="password-forgot"),
     path("password/reset/", ProviderNeutralUnavailableView.as_view(), name="password-reset"),
-    path("mfa/challenge/", ProviderNeutralUnavailableView.as_view(), name="mfa-challenge"),
+    path("mfa/challenge/", MFAChallengeView.as_view(), name="mfa-challenge"),
+    path("mfa/enroll/", MFAEnrollView.as_view(), name="mfa-enroll"),
+    path("mfa/enroll/confirm/", MFAConfirmView.as_view(), name="mfa-enroll-confirm"),
 ]

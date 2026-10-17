@@ -147,7 +147,7 @@ Complex financial calculations do not live in signals. Signals are limited to no
 
 ## 3. Next.js web
 
-The web workspace uses Next.js 16.3.3 with the App Router, TypeScript 7.0.2 in strict mode, and Tailwind CSS. React Server Components (RSC) are the default; Client Components are explicit boundaries used only where browser interaction or local transient state requires them.
+The web workspace uses Next.js 16.4.1 with the App Router, TypeScript 7.0.2 in strict mode, and Tailwind CSS. React Server Components (RSC) are the default; Client Components are explicit boundaries used only where browser interaction or local transient state requires them.
 
 ```text
 web/
@@ -373,8 +373,9 @@ Domain unit/API tests remain in each app. Security tests use real PostgreSQL.
 - Runtime configuration is validated at startup.
 - Secrets come from local ignored development files or production Docker secrets/root-readable encrypted host files; they never enter Compose files, images, logs, or source control.
 - Dependencies are added only for a current requirement and reviewed for maintenance/security.
-- Phase 1A pins Python 3.14.7, Django 5.2.17 LTS, Django REST Framework 3.18.0, Node.js 24.20.0 LTS, Next.js 16.3.3 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2.
+- Phase 1A pins Python 3.14.7, Django 5.2.17 LTS, Django REST Framework 3.18.0, Node.js 24.20.0 LTS, Next.js 16.4.1 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. Next.js 16.4.1 is an approved security compatibility update. `docs/DEVELOPMENT_PLAN.md` remains the immutable historical baseline and still records Next.js 16.3.3.
 - Compatibility is verified by clean dependency installation, Django checks and migrations against PostgreSQL 18.6, the forced-RLS/transaction suite, DRF schema tests, and Next.js strict type/test/build checks on Node 24.20.0. Pins are changed only through an approved compatibility update.
+- Web ESLint keeps ESLint core, React Hooks, Babel/TypeScript parsing, `no-debugger`, `no-var`, and `prefer-const`. Framework-specific Next.js lint rules are temporarily not loaded; the reason and the remaining type, build, and E2E gates are recorded in [`SECURITY.md`](./SECURITY.md).
 - Formatting, lint, type check, tests, migration checks, and API schema checks run in CI.
 
 ## 8. Naming rules
@@ -413,4 +414,4 @@ docs/adr/
 └── 0003-reception-cash-session-authority.md
 ```
 
-Each ADR states context, decision, alternatives, security impact, migration impact, and status. ADR 0002 fixes the browser BFF lifecycle; ADR 0003 fixes Reception's own-opened cash-session object scope while preserving denial of adjustment, approval, and posting. Provider/MFA policy is deferred to Phase 1B, jurisdiction to the production gate, device design to Phase 3, and Expo versus bare React Native to Phase 7; these remain unresolved, nonblocking decisions at their stated gates.
+Each ADR states context, decision, alternatives, security impact, migration impact, and status. ADR 0002 fixes the browser BFF lifecycle; ADR 0003 fixes Reception's own-opened cash-session object scope while preserving denial of adjustment, approval, and posting. MFA is TOTP and is mandatory for platform administrators and Owners, with recent step-up, encrypted secrets, and replay protection; broader role-based MFA may be decided later. Email uses Django's configurable email backend, with non-delivery backends in test and end-to-end runs. Production must configure an approved transactional provider before invitation, password-recovery, or Phase 2 expiry delivery is production-ready; vendor selection and that deployment configuration remain deferred. Jurisdiction remains a production-gate decision, device design remains Phase 3, and Expo versus bare React Native remains Phase 7.

@@ -79,7 +79,7 @@ Gym-selection tests cover 5-minute expiry boundaries, single use, concurrent sel
 
 ## Compatibility consequences
 
-The approved baseline is Python 3.14.7, Django 5.2.17 LTS, DRF 3.18.0, Node.js 24.20.0 LTS, Next.js 16.3.3 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. Phase 1A verifies the BFF route/cookie behavior, Django/DRF token contracts, strict TypeScript build, and real-PostgreSQL refresh-session transactions on those exact pins.
+The approved baseline is Python 3.14.7, Django 5.2.17 LTS, DRF 3.18.0, Node.js 24.20.0 LTS, Next.js 16.4.1 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. Next.js 16.4.1 is an approved security compatibility update. `docs/DEVELOPMENT_PLAN.md` remains the immutable historical baseline and still records Next.js 16.3.3. Phase 1A verifies the BFF route/cookie behavior, Django/DRF token contracts, strict TypeScript build, and real-PostgreSQL refresh-session transactions on those exact pins.
 
 Mobile is not routed through this browser BFF and remains Phase 7. Its separate member audience and secure-storage contract are unchanged.
 

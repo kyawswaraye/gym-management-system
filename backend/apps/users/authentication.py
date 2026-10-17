@@ -7,27 +7,31 @@ from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
 from rest_framework.request import Request
 
-from apps.common.api.exceptions import AuthenticationFailed
+from apps.common.api.exceptions import AccessTokenExpired, AuthenticationFailed
 from apps.common.db.tenant_context import set_gym_context, set_identity_context
-from apps.tenants.models import Gym, GymMembership, RolePermission
+from apps.tenants.models import Gym, GymMembership, Permission, RolePermission
 
 from .models import RefreshSession
-from .tokens import decode_access_token
+from .tokens import decode_access_token, decode_platform_access_token
+
+
+def _bearer_token(request: Request) -> str | None:
+    parts = get_authorization_header(request).split()
+    if not parts:
+        return None
+    if len(parts) != 2 or parts[0] != b"Bearer":
+        raise AuthenticationFailed()
+    try:
+        return parts[1].decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise AuthenticationFailed() from exc
 
 
 class StaffJWTAuthentication(BaseAuthentication):
-    keyword = b"Bearer"
-
     def authenticate(self, request: Request) -> tuple[Any, dict[str, Any]] | None:
-        parts = get_authorization_header(request).split()
-        if not parts:
+        token = _bearer_token(request)
+        if token is None:
             return None
-        if len(parts) != 2 or parts[0] != self.keyword:
-            raise AuthenticationFailed()
-        try:
-            token = parts[1].decode("ascii")
-        except UnicodeDecodeError as exc:
-            raise AuthenticationFailed() from exc
         claims = decode_access_token(token)
         user_id = uuid.UUID(claims["sub"])
         gym_id = uuid.UUID(claims["gym_id"])
@@ -76,4 +80,56 @@ class StaffJWTAuthentication(BaseAuthentication):
         request.gym_membership = membership
         request.permission_codes = permission_codes
         request.refresh_session = session
+        request.principal_type = RefreshSession.PrincipalType.STAFF
         return session.user, claims
+
+
+class PlatformJWTAuthentication(BaseAuthentication):
+    def authenticate(self, request: Request) -> tuple[Any, dict[str, Any]] | None:
+        token = _bearer_token(request)
+        if token is None:
+            return None
+        claims = decode_platform_access_token(token)
+        user_id = uuid.UUID(claims["sub"])
+        session_id = uuid.UUID(claims["session_id"])
+
+        set_identity_context(user_id=user_id, request_id=request.request_id)
+        try:
+            session = RefreshSession.objects.select_related("user").get(
+                id=session_id,
+                user_id=user_id,
+                principal_type=RefreshSession.PrincipalType.PLATFORM,
+                selected_gym__isnull=True,
+                gym_membership__isnull=True,
+                member_id__isnull=True,
+                revoked_at__isnull=True,
+                expires_at__gt=timezone.now(),
+                user__is_active=True,
+                user__is_platform_admin=True,
+            )
+        except RefreshSession.DoesNotExist as exc:
+            raise AuthenticationFailed() from exc
+
+        request.permission_codes = frozenset(
+            Permission.objects.filter(
+                code__startswith="platform.",
+                is_active=True,
+            ).values_list("code", flat=True)
+        )
+        request.refresh_session = session
+        request.principal_type = RefreshSession.PrincipalType.PLATFORM
+        return session.user, claims
+
+
+class StaffOrPlatformJWTAuthentication(BaseAuthentication):
+    def authenticate(self, request: Request) -> tuple[Any, dict[str, Any]] | None:
+        token = _bearer_token(request)
+        if token is None:
+            return None
+        try:
+            decode_platform_access_token(token)
+        except AccessTokenExpired:
+            raise
+        except AuthenticationFailed:
+            return StaffJWTAuthentication().authenticate(request)
+        return PlatformJWTAuthentication().authenticate(request)

@@ -21,7 +21,7 @@ from apps.common.db.tenant_context import set_gym_context, set_identity_context
 from apps.tenants.models import GymMembership
 
 from .models import GymSelectionTicket, RefreshSession, User
-from .tokens import issue_access_token
+from .tokens import issue_access_token, issue_platform_access_token
 
 
 @dataclass(frozen=True)
@@ -44,16 +44,56 @@ def _new_refresh_token() -> str:
     return secrets.token_urlsafe(48)
 
 
-def _pair(session: RefreshSession, membership: GymMembership, plaintext: str) -> TokenPair:
+def _staff_pair(session: RefreshSession, membership: GymMembership, plaintext: str) -> TokenPair:
     access, access_expiry = issue_access_token(
         user_id=session.user_id, membership=membership, session_id=session.id
     )
     return TokenPair(access, access_expiry, plaintext, session.expires_at)
 
 
+def _platform_pair(session: RefreshSession, plaintext: str) -> TokenPair:
+    access, access_expiry = issue_platform_access_token(
+        user_id=session.user_id, session_id=session.id
+    )
+    return TokenPair(access, access_expiry, plaintext, session.expires_at)
+
+
+@transaction.atomic
+def create_platform_session(
+    *,
+    user: User,
+    device_name: str = "",
+    ip_address: str | None = None,
+    mfa_verified: bool = False,
+) -> TokenPair:
+    if not user.is_active or not user.is_platform_admin:
+        raise AuthenticationFailed()
+    plaintext = _new_refresh_token()
+    now = timezone.now()
+    session = RefreshSession.objects.create(
+        principal_type=RefreshSession.PrincipalType.PLATFORM,
+        user=user,
+        selected_gym=None,
+        gym_membership=None,
+        member_id=None,
+        token_hash=hash_refresh_token(plaintext),
+        issued_at=now,
+        expires_at=now + timedelta(seconds=settings.REFRESH_TTL_SECONDS),
+        device_id=device_name[:255],
+        ip_address=ip_address,
+        mfa_verified_at=now if mfa_verified else None,
+    )
+    return _platform_pair(session, plaintext)
+
+
 @transaction.atomic
 def create_staff_session(
-    *, user: User, membership: GymMembership, device_name: str = "", ip_address: str | None = None
+    *,
+    user: User,
+    membership: GymMembership,
+    device_name: str = "",
+    ip_address: str | None = None,
+    mfa_verified: bool = False,
 ) -> TokenPair:
     plaintext = _new_refresh_token()
     now = timezone.now()
@@ -67,8 +107,9 @@ def create_staff_session(
         expires_at=now + timedelta(seconds=settings.REFRESH_TTL_SECONDS),
         device_id=device_name[:255],
         ip_address=ip_address,
+        mfa_verified_at=now if mfa_verified else None,
     )
-    return _pair(session, membership, plaintext)
+    return _staff_pair(session, membership, plaintext)
 
 
 @transaction.atomic
@@ -77,7 +118,7 @@ def _rotate_refresh_token(plaintext: str, *, request_id: str) -> TokenPair | Non
     try:
         current = (
             RefreshSession.objects.select_for_update()
-            .select_related("user", "selected_gym")
+            .select_related("user")
             .get(token_hash=token_hash)
         )
     except RefreshSession.DoesNotExist as exc:
@@ -88,22 +129,51 @@ def _rotate_refresh_token(plaintext: str, *, request_id: str) -> TokenPair | Non
             revoked_at=now, revocation_reason="REFRESH_REPLAY"
         )
         return None
+    if current.revoked_at or current.expires_at <= now or not current.user.is_active:
+        raise AuthenticationFailed()
+    set_identity_context(user_id=current.user_id, request_id=request_id)
+    if current.principal_type == RefreshSession.PrincipalType.PLATFORM:
+        if (
+            not current.user.is_platform_admin
+            or current.selected_gym_id is not None
+            or current.gym_membership_id is not None
+            or current.member_id is not None
+        ):
+            raise AuthenticationFailed()
+        replacement_plaintext = _new_refresh_token()
+        replacement = RefreshSession.objects.create(
+            principal_type=current.principal_type,
+            user_id=current.user_id,
+            selected_gym=None,
+            gym_membership=None,
+            member_id=None,
+            token_hash=hash_refresh_token(replacement_plaintext),
+            family_id=current.family_id,
+            issued_at=now,
+            expires_at=now + timedelta(seconds=settings.REFRESH_TTL_SECONDS),
+            ip_address=current.ip_address,
+            user_agent=current.user_agent,
+            device_id=current.device_id,
+            mfa_verified_at=current.mfa_verified_at,
+        )
+        current.rotated_at = now
+        current.replaced_by_session = replacement
+        current.save(update_fields=["rotated_at", "replaced_by_session", "updated_at"])
+        return _platform_pair(replacement, replacement_plaintext)
     if (
-        current.revoked_at
-        or current.expires_at <= now
-        or not current.user.is_active
-        or current.principal_type != RefreshSession.PrincipalType.STAFF
+        current.principal_type != RefreshSession.PrincipalType.STAFF
         or current.gym_membership_id is None
+        or current.selected_gym is None
         or current.selected_gym.status != "ACTIVE"
         or current.selected_gym.subscription_status not in {"TRIAL", "ACTIVE"}
     ):
         raise AuthenticationFailed()
-    set_identity_context(user_id=current.user_id, request_id=request_id)
-    set_gym_context(gym_id=current.selected_gym_id)
+    selected_gym = current.selected_gym
+    set_gym_context(gym_id=selected_gym.id)
     try:
         membership = GymMembership.objects.get(
             id=current.gym_membership_id,
-            gym_id=current.selected_gym_id,
+            gym_id=selected_gym.id,
             user_id=current.user_id,
             status=GymMembership.Status.ACTIVE,
         )
@@ -113,7 +183,7 @@ def _rotate_refresh_token(plaintext: str, *, request_id: str) -> TokenPair | Non
     replacement = RefreshSession.objects.create(
         principal_type=current.principal_type,
         user_id=current.user_id,
-        selected_gym_id=current.selected_gym_id,
+        selected_gym_id=selected_gym.id,
         gym_membership_id=current.gym_membership_id,
         token_hash=hash_refresh_token(replacement_plaintext),
         family_id=current.family_id,
@@ -122,11 +192,12 @@ def _rotate_refresh_token(plaintext: str, *, request_id: str) -> TokenPair | Non
         ip_address=current.ip_address,
         user_agent=current.user_agent,
         device_id=current.device_id,
+        mfa_verified_at=current.mfa_verified_at,
     )
     current.rotated_at = now
     current.replaced_by_session = replacement
     current.save(update_fields=["rotated_at", "replaced_by_session", "updated_at"])
-    return _pair(replacement, membership, replacement_plaintext)
+    return _staff_pair(replacement, membership, replacement_plaintext)
 
 
 def rotate_refresh_token(plaintext: str, *, request_id: str) -> TokenPair:
@@ -192,6 +263,7 @@ def issue_gym_selection_ticket(
     request_id: str,
     ip_address: str | None = None,
     user_agent: str = "",
+    mfa_verified: bool = False,
 ) -> tuple[str, datetime]:
     ids = _selection_membership_ids(memberships)
     if len(ids) < 2:
@@ -229,6 +301,7 @@ def issue_gym_selection_ticket(
         ip_address=ip_address,
         user_agent=user_agent[:512],
         request_id=request_id[:128],
+        mfa_verified_at=now if mfa_verified else None,
     )
     audit_ticket(
         user=user,
@@ -320,7 +393,11 @@ def consume_gym_selection_ticket(
                                 "updated_at",
                             ]
                         )
-                        pair = create_staff_session(user=ticket.user, membership=membership)
+                        pair = create_staff_session(
+                            user=ticket.user,
+                            membership=membership,
+                            mfa_verified=ticket.mfa_verified_at is not None,
+                        )
                         audit_ticket(
                             user=ticket.user,
                             ticket_id=ticket.id,

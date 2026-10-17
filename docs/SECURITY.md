@@ -67,6 +67,19 @@ Non-null `gym_id`, composite unique constraints, and composite foreign keys prev
 
 All tenant-owned tables enable and force RLS. Policies have `USING` and `WITH CHECK`. Missing context matches no tenant rows. The runtime role is not a table owner and has neither superuser nor `BYPASSRLS`.
 
+`gym_migration` owns schema objects and is `NOBYPASSRLS NOINHERIT`. `gym_runtime` is the API role and is `NOBYPASSRLS NOINHERIT`. `gym_auth_bootstrap` is `NOLOGIN NOINHERIT BYPASSRLS` and cannot be assumed by runtime. It owns only the six `row_security=off` security-definer functions. Their `search_path` is `pg_catalog, public`. They contain no dynamic SQL. The role's table privileges are `SELECT` on exactly:
+
+- `tenants_gym`
+- `tenants_gym_membership`
+- `tenants_staff_invitation`
+- `tenants_staff_invitation_role`
+- `tenants_role`
+- `tenants_permission`
+- `tenants_system_role_template`
+- `tenants_system_role_template_permission`
+
+`PUBLIC` has no execute privilege on those functions. Runtime may execute `app_staff_memberships()`, `app_owner_invitation(text)`, and `app_staff_invitation(text)`. `enforce_invitation_role_owner_boundary()`, `app_protect_owner_role_permissions()`, and `app_protect_membership_role_owner()` are triggers. They are not granted to runtime; PostgreSQL fires an existing trigger without a direct execute grant, and a direct call is denied. Runtime has no table-level `INSERT`, `UPDATE`, or `DELETE` on `users_user`. Its direct column update privilege is only `mfa_enabled`, `mfa_secret_encrypted`, `mfa_last_used_step`, and `updated_at`. Password, `is_superuser`, `is_platform_admin`, `is_active`, and the other identity columns are not directly updatable. Invitation identities are created only by `app_create_invited_identity(text, text, text, text)`, which inserts an active, non-platform, non-superuser, MFA-disabled row with an unusable password, a normalized lowercase email, and no login or MFA state. `app_guard_runtime_user_insert` rejects a direct runtime insert that omits or supplies a privileged flag, usable password, MFA or login state, or malformed normalized email. `app_accept_invitation_password(text, text, timestamptz)` performs the only runtime password write: unusable to one current `pbkdf2_sha256` hash, for a non-platform user, when the hash matches a same-gym pending unexpired invitation in the current gym context. `app_confirm_invited_profile(text, text, text, text, timestamptz)` may change only that invited user's name and phone under the same invitation. Those three functions keep row security on and are owned by the `users_user` table owner, not by `gym_auth_bootstrap`. `app_guard_runtime_user_update` rejects any other direct runtime column change.
+
 ### Layer 6: role and object permissions
 
 Stable permission codes grant actions. Object rules further constrain trainer assignments, member self-service, record states, and high-risk financial commands.
@@ -116,7 +129,7 @@ Platform administration cannot use the normal tenant role as an unrestricted byp
 - Use Django's supported password hashing with a production cost setting.
 - Enforce minimum length and compromised-password checks.
 - Do not impose composition rules that encourage predictable passwords.
-- Require MFA for super administrators and owners before production; support policy-based MFA for financial roles.
+- MFA is TOTP. It is mandatory for platform administrators and Owners. Protected owner operations require a recently verified MFA session. Secrets are stored encrypted, and authenticator codes are replay-protected. Broader role-based MFA may be added later as a hardening decision.
 - Login and recovery responses do not reveal whether an account exists.
 
 ### JWT
@@ -154,7 +167,7 @@ Password reset, user suspension, staff gym-membership suspension, role changes, 
 
 Permissions are durable records identified by stable codes. A released code is never renamed or reused for a different meaning; deprecation creates a replacement code and an explicit migration. Authorization checks use permission codes plus object and state rules, not role-name conditionals scattered through views.
 
-Matrix values are defaults:
+Matrix values are defaults. `Retired` means the stable code remains in the historical catalog, is inactive, and authorizes nothing:
 
 - **Allow (A):** the protected role template includes the permission, subject to tenant scope, record-state rules, and normal validation.
 - **Conditional (C):** allowed only under the object, workflow, delegation, or step-up conditions stated below.
@@ -174,8 +187,10 @@ Platform permissions use the `platform.*` namespace and are evaluated outside or
 | `platform.gyms.suspend`         |           A | Suspend a gym with reason, impact checks, and audit.                                                                |
 | `platform.owners.create`        |           C | Create/link the initial or an additional owner only within the audited gym-provisioning or approved owner workflow. |
 | `platform.subscriptions.manage` |           A | Manage plans and tenant entitlements.                                                                               |
-| `platform.settings.manage`      |           A | Manage platform-wide configuration, never tenant-owned settings through a tenant bypass.                            |
+| `platform.settings.manage`      |     Retired | Historical catalog code. Inactive in Phase 1B, no approved HTTP route, and never a substitute for tenant `settings.manage`. |
 | `platform.audit.view`           |           A | View platform audit events and support-access events.                                                               |
+
+`platform.settings.manage` is retained for migration history and is not deleted. The Phase 1B retirement marks it inactive and does not reverse that row back to an active grant. Platform sessions load only active `platform.*` codes, so the retired code is omitted while its row still exists. No route may claim it. It must never authorize tenant `settings.manage` or stand in for dashboard, gym, subscription, or audit permissions. Tenant roles still cannot receive any `platform.*` code.
 
 Platform status does not grant any tenant permission. Time-limited support and break-glass access are governed workflows, not additional stable permission codes: a support session receives only explicitly approved canonical tenant permissions, while refunds, voids, cash adjustments, commission payments, role changes, and OWNER-reserved controls remain denied unless incident policy separately approves each exact action.
 
@@ -367,6 +382,8 @@ Download controls:
 
 An object key containing a gym prefix is organization, not authorization.
 
+The Phase 1B foundation stores that metadata in forced-RLS `FileAsset` and grants the runtime role select, insert, and update only. Direct runtime delete is denied. Signed URL issuance, object-storage credentials, malware scanning, and file HTTP routes are deferred.
+
 ## 10. Financial security
 
 - Use `Decimal`/`DecimalField`, never binary floats.
@@ -518,7 +535,13 @@ Deployment checks also assert that PostgreSQL/MinIO are not publicly reachable, 
 
 Phase 0 is design and documentation only. This document defines required behavior but does not prove that endpoints, database policies, roles, or tests implement it. During Phase 0, permission codes and matrix semantics must be reviewed with product, finance, privacy, and security owners; unresolved cells or workflows are explicit design blockers.
 
-Phase 1A is foundation only and does not implement members, check-in, finance, PT, reports, or mobile features. Its approved pins are Python 3.14.7, Django 5.2.17 LTS, Django REST Framework 3.18.0, Node.js 24.20.0 LTS, Next.js 16.3.3 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. Compatibility must be proven by the real PostgreSQL security suite, Django/DRF checks, and Next.js/TypeScript build tests.
+Phase 1A is foundation only and does not implement members, check-in, finance, PT, reports, or mobile features. Its approved pins are Python 3.14.7, Django 5.2.17 LTS, Django REST Framework 3.18.0, Node.js 24.20.0 LTS, Next.js 16.4.1 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. Next.js 16.4.1 is an approved security compatibility update for the critical October 2026 Next.js advisories. `docs/DEVELOPMENT_PLAN.md` remains the immutable historical baseline and still records Next.js 16.3.3. Compatibility must be proven by the real PostgreSQL security suite, Django/DRF checks, and Next.js/TypeScript build tests.
+
+Phase 1B closed its gate on 2026-10-17 under the local CI-equivalent evidence in `DEVELOPMENT_PLAN.md`. Published OpenAPI includes the Phase 1B administration, staff, role, settings, and audit routes, plus MembershipPlan and Member list, create, detail, update, and archive. Member summary and history, notification, and payment endpoints remain unpublished.
+
+Web lint does not load `@next/eslint-plugin-next`. Releases 16.4.1 and 16.4.2 of that plugin still depend on `fast-glob@3.3.1`, which resolves unfixed high-severity `braces@3.0.3`; npm publishes no later `braces` 3.x release. The independent fork `eslint-plugin-nextjs@1.1.4` depends on `fast-glob@3.3.3` and the same `braces@3.0.3` chain, so it cannot restore the Next.js rules without reintroducing the finding. Older Next-oriented plugins are unmaintained and are not equivalent replacements. ESLint still enforces core JavaScript rules, React Hooks recommended rules, Babel/TypeScript parsing, `no-debugger`, `no-var`, and `prefer-const`. Framework behavior stays gated by strict TypeScript, the Next.js production build, Vitest, and Playwright E2E. The high-severity dependency audit, including development dependencies, is not waived.
+
+Secret scanning uses gitleaks. `.gitleaksignore` lists only global `file:rule:line` fingerprints for documented fixtures: the public RFC 6238 SHA-1 test vector, disposable E2E placeholders, and idempotency-key fixture UUIDs. It does not exclude source directories or real credentials.
 
 No tenant-data feature may pass the Phase 0 security gate until its data ownership, stable permissions, object restrictions, entitlement dependency, Django scoping, forced-RLS policy, transaction context, audit events, and test cases are documented and approved. No documentation status may be represented as a runtime security control.
 
@@ -542,4 +565,4 @@ Before production:
 14. replay and concurrency tests pass for finance approval, payments, receipts, expenses, salaries, cashbook, refunds, voids, PT sales/commissions, and provider callbacks;
 15. firewall, SSH, private Docker networks, container limits, disk/log rotation, external uptime, backup freshness, and offsite-restore controls pass the single-VPS production checklist.
 
-The single-VPS production topology that sections 12 and 15 harden — including its accepted single point of failure and its mandatory encrypted offsite backup and restore-drill controls — is accepted in [ADR 0001](./adr/0001-single-vps-production-topology.md). The browser boundary is accepted in [ADR 0002](./adr/0002-nextjs-bff-browser-authentication.md), and Reception cash-session object authority is accepted in [ADR 0003](./adr/0003-reception-cash-session-authority.md). Provider and broader MFA policy remains a nonblocking Phase 1B decision; jurisdiction is required before production; device design remains Phase 3; and Expo versus bare React Native remains Phase 7.
+The single-VPS production topology that sections 12 and 15 harden — including its accepted single point of failure and its mandatory encrypted offsite backup and restore-drill controls — is accepted in [ADR 0001](./adr/0001-single-vps-production-topology.md). The browser boundary is accepted in [ADR 0002](./adr/0002-nextjs-bff-browser-authentication.md), and Reception cash-session object authority is accepted in [ADR 0003](./adr/0003-reception-cash-session-authority.md). MFA is TOTP and is mandatory for platform administrators and Owners, with recent step-up, encrypted secrets, and replay protection; broader role-based MFA may be decided later. Email uses Django's configurable email backend, with non-delivery backends in test and end-to-end runs. Production must configure an approved transactional provider before invitation, password-recovery, or Phase 2 expiry delivery is production-ready; vendor selection and that deployment configuration remain deferred. Jurisdiction is required before production, device design remains Phase 3, and Expo versus bare React Native remains Phase 7.

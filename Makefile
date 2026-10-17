@@ -1,4 +1,4 @@
-.PHONY: check-python check-node db-up db-down db-logs migrate backend-install backend-check backend-test backend-test-pg web-install web-check web-test openapi-export openapi-generate openapi-check check
+.PHONY: check-python check-node db-up db-down db-logs migrate backend-install backend-check backend-test backend-test-pg web-install web-check web-test e2e openapi-export openapi-generate openapi-check check
 
 ifneq ($(wildcard .env),)
 include .env
@@ -63,6 +63,9 @@ web-check: check-node
 
 web-test: check-node
 	npm --prefix web test -- --run
+
+e2e: check-node check-python
+	bash scripts/e2e.sh
 
 openapi-export: check-python
 	cd backend && .venv/bin/python manage.py spectacular \

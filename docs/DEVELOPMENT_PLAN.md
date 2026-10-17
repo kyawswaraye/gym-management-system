@@ -17,6 +17,19 @@ This is the authoritative implementation roadmap. It must remain consistent with
 
 Work proceeds one approved phase at a time. Phase 1 has two ordered subphases, 1A and 1B; both must pass their own gates. A phase or subphase may not advance while any required migration, test, format check, lint check, type check, schema check, security scan, build, smoke test, or documented manual check is failing. Flaky, skipped, muted, or waived checks are errors unless the waiver, owner, risk, and expiry are explicitly approved.
 
+### Current phase status
+
+Phase 0, Phase 1A, and Phase 1B are complete. The Phase 1B gate closed on 2026-10-17. Phase 2 prerequisites are approved as the policies already specified in the canonical contracts: member numbering, membership overlap and cancellation, calendar expiry, profile-file limits, and the member-dashboard contract. The first Phase 2 increment publishes the MembershipPlan list, create, detail, update, and archive API. Member list, create, detail, update, and archive are now published. Member summary and history, membership, notification, and payment endpoints remain unpublished.
+
+The 2026-10-17 closure is local CI-equivalent gate evidence. CI still enforces these check classes on push and pull request.
+
+- Backend: `ruff` check and format, mypy on 73 files, migration drift, and OpenAPI validate plus diff passed. Pytest passed 102 non-PostgreSQL tests and 105 PostgreSQL tests (207).
+- Web: generated types were stable; format, lint, and typecheck passed; Vitest passed 31 files and 162 tests; the Next.js build passed.
+- Dependency audits passed. Playwright `platform-provision` and `tenant-settings` passed (2).
+- Containerized gitleaks scanned 16 commits, about 3.63 MB, and found no leaks.
+
+The phase sections below keep each phase's approved scope and exit criteria. Historical pins in those sections, including Next.js 16.3.3, stay as the baseline recorded when the phase was specified.
+
 Every implementation increment must:
 
 1. inspect the repository, authoritative documents, and migration history;
@@ -198,12 +211,14 @@ The seven documents together with accepted ADRs must define and cross-reference 
 - Suspended gyms and stale permissions fail closed; platform and tenant authority remain separated.
 - All checks pass and Phase 2 prerequisites are approved.
 
+**Gate status:** Closed on 2026-10-17 under the local CI-equivalent evidence in Current phase status. Phase 2 prerequisites are approved.
+
 ## 4. Phase 2 — Members and memberships
 
 ### Dependencies
 
-- Phase 1B exit criteria.
-- Approved member numbering, membership overlap/cancellation policy, calendar-expiry rules, profile-file limits, and member-dashboard contract.
+- Phase 1B exit criteria. Satisfied by the 2026-10-17 gate closure.
+- Approved member numbering, membership overlap/cancellation policy, calendar-expiry rules, profile-file limits, and member-dashboard contract. Satisfied by the policies already specified in the canonical contracts. The first implementation increment publishes the MembershipPlan list, create, detail, update, and archive API. Member list, create, detail, update, and archive are now published. Member summary and history, membership, notification, and payment endpoints remain unpublished until their own increments.
 
 ### Scope
 
@@ -211,7 +226,7 @@ The seven documents together with accepted ADRs must define and cross-reference 
 - Implement `MembershipPlan` CRUD/archive and immutable plan snapshots on sale.
 - Implement `Membership` create, suspend/resume/cancel, exact amount calculation, overlap prevention, and calendar-aware expiry.
 - Implement expiry buckets: expired, today, within 3, 7, and 30 days; expiry processing remains synchronous/bounded or platform-scheduled without Celery.
-- Implement membership-expiry email at the configured warning days. Create and deliver durable, deduplicated notifications only when the feature is enabled and the member has a current nonblank email; skip members without email and never fall back to SMS/phone. Use bounded scheduled Django commands and the approved transactional-email provider without Celery.
+- Implement membership-expiry email at the configured warning days. Create and deliver durable, deduplicated notifications only when the feature is enabled and the member has a current nonblank email; skip members without email and never fall back to SMS/phone. Use bounded scheduled Django commands and Django's configured email backend, without Celery. Tests and end-to-end runs use non-delivery backends. Production must configure an approved transactional provider before this delivery is production-ready. Vendor selection and that deployment configuration remain deferred.
 - Implement tenant staff web pages and the API-backed member dashboard/summary for profile, current membership, days remaining, PT-client badge, payment summary, and check-in summary. Before Phase 5 assignment data exists the badge is false; React Native remains Phase 7.
 
 ### Migrations and data
@@ -575,8 +590,8 @@ Track each decision with owner, due phase, options, security/data/migration/cost
 1. **Resolved for Phase 0:** Phase 1A is foundation only and implements no members, check-in, finance, PT, reports, or mobile features. JWT identifiers are stable configurable non-secrets: issuer `gym-platform-api`, staff/web audience `gym-platform`, and member audience `gym-platform-member`.
 2. **Resolved for Phase 0:** Runtime pins are Python 3.14.7, Django 5.2.17 LTS, Django REST Framework 3.18.0, Node.js 24.20.0 LTS, Next.js 16.3.3 Active LTS, PostgreSQL 18.6, and TypeScript 7.0.2. Phase 1A compatibility checks remain required evidence, not an open choice.
 3. **Resolved for Phase 0:** Next.js is the browser BFF under [ADR 0002](./adr/0002-nextjs-bff-browser-authentication.md); Django remains authoritative and browser JavaScript never receives JWT/refresh values or the 5-minute single-use multi-gym selection ticket. The ticket grants no authority before atomic membership selection.
-4. **Deferred, nonblocking until Phase 1B:** Email/invitation/recovery/file-scan/notification provider selection and the broader provider policy.
-5. **Deferred, nonblocking until Phase 1B:** MFA provider and rollout policy beyond the already documented protected-role requirements.
+4. **Resolved behavioral contract; vendor deployment deferred:** Email uses Django's configurable email backend. The approved behavior is the existing invitation, password-recovery, and Phase 2 expiry contract: synchronous invitation delivery inside the provisioning transaction with rollback on delivery failure, recovery responses that do not reveal whether an account exists, expiry mail only when the setting is enabled and the member has a current nonblank email, no SMS fallback, deduplicated delivery, and bounded retries. Tests and end-to-end runs use non-delivery backends. Production must configure an approved transactional provider before invitation, password-recovery, or Phase 2 expiry delivery is production-ready. Vendor selection and that deployment configuration remain deferred. File-scan and non-email notification providers remain deferred with the unpublished file and notification routes.
+5. **Resolved current MFA policy:** MFA is TOTP. It is mandatory for platform administrators and Owners. Protected owner operations require a recently verified MFA session. Secrets are encrypted, and authenticator codes are replay-protected. Broader role-based MFA may be required later as a hardening decision.
 6. **Deferred, nonblocking until Phase 1A:** Local-development and single-VPS production runtime/migration/reporting database role strategy; any future managed database requires a new approved architecture decision.
 7. **Resolved for Phase 0:** Every Payment, Expense, Retail Sale, PT Sale, and Salary record uses mandatory `DRAFT → PENDING_APPROVAL → POSTED/REJECTED`; a different MANAGER or OWNER approves and approval is the posting boundary. Approval permissions are hard-reserved to those protected roles. Threshold-based auto-posting and self-approval are not allowed. Future policy changes require an approved migration and security review.
 8. **Deferred but blocking before production:** Jurisdiction, tax/receipt behavior, privacy, retention, RPO/RTO approval evidence, and data residency.
@@ -585,7 +600,7 @@ Track each decision with owner, due phase, options, security/data/migration/cost
 11. **Resolved baseline:** estimated production infrastructure cost is **about $80/month** with the documented single-point-of-failure trade-off and mandatory restore controls. A managed database or high-availability topology requires a new approved budget.
 12. **Resolved for Phase 0:** Under [ADR 0003](./adr/0003-reception-cash-session-authority.md), Reception has conditional `cashbook.view/open/reconcile` only for a session opened by the current Reception `GymMembership`; `cashbook.adjust` and all finance approval/posting remain denied.
 13. **Deferred, nonblocking until Phase 3:** Exact integration credential/device model and vendor policy.
-14. **Deferred but blocking before Phase 1B:** The HTTP routes governed by `platform.settings.manage`. The permission is in the approved catalog and the `SECURITY.md` platform matrix, but `API.md` defines no platform-configuration endpoint. Either specify the routes or retire the code before Phase 1B implementation; no endpoint may claim the permission meanwhile.
+14. **Resolved for Phase 1B:** `platform.settings.manage` has no HTTP routes. The Phase 1B retirement marks the catalog row inactive, omits it from platform sessions, and does not authorize tenant `settings.manage`. Reactivation requires a new approved decision.
 15. **Deferred but blocking before Phase 4:** The stable permission code governing custom `ExpenseCategory` create/update. The protected `system_key` catalog is fixed and immutable, but tenant-defined category mutation currently maps to no code in the catalog. It must not fall back to a broader finance permission.
 
 A blocker remains a blocker until explicitly resolved. Major architecture changes and progression to every next phase require approval.

@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "apps.audit",
     "apps.members",
     "apps.notifications",
+    "apps.files",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -82,15 +83,22 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Gym Management Platform API",
-    "DESCRIPTION": "Implemented Phase 1A foundation API contract.",
+    "DESCRIPTION": (
+        "Implemented Phase 1A foundation, Phase 1B platform access, MembershipPlan, "
+        "and Member CRUD/archive contracts."
+    ),
     "VERSION": "1.0.0",
     "SCHEMA_PATH_PREFIX": r"/api/v1",
     "COMPONENT_SPLIT_REQUEST": True,
+    "ENUM_NAME_OVERRIDES": {
+        "SubscriptionPlanStatusEnum": "apps.tenants.models.SubscriptionPlan.Status",
+    },
     "PREPROCESSING_HOOKS": ["apps.common.api.schema.phase_1a_endpoints"],
 }
 
 JWT_ISSUER = os.environ.get("JWT_ISSUER", "gym-platform-api")
 JWT_STAFF_AUDIENCE = os.environ.get("JWT_STAFF_AUDIENCE", "gym-platform")
+JWT_PLATFORM_AUDIENCE = os.environ.get("JWT_PLATFORM_AUDIENCE", "gym-platform-admin")
 JWT_MEMBER_AUDIENCE = os.environ.get("JWT_MEMBER_AUDIENCE", "gym-platform-member")
 JWT_KEY_ID = os.environ.get("JWT_KEY_ID", "")
 JWT_PRIVATE_KEY = os.environ.get("JWT_PRIVATE_KEY", "").replace("\\n", "\n")
@@ -104,6 +112,23 @@ JWT_ACCESS_TTL_SECONDS = 600
 JWT_CLOCK_SKEW_SECONDS = int(os.environ.get("JWT_CLOCK_SKEW_SECONDS", "30"))
 REFRESH_TTL_SECONDS = int(os.environ.get("REFRESH_TTL_SECONDS", str(30 * 24 * 60 * 60)))
 REFRESH_TOKEN_PEPPER = os.environ.get("REFRESH_TOKEN_PEPPER", "")
+MFA_TOKEN_PEPPER = os.environ.get("MFA_TOKEN_PEPPER", REFRESH_TOKEN_PEPPER)
+MFA_ENCRYPTION_KEY = os.environ.get("MFA_ENCRYPTION_KEY", "")
+MFA_ISSUER = os.environ.get("MFA_ISSUER", "Gym Management System")
+MFA_CHALLENGE_TTL_SECONDS = int(os.environ.get("MFA_CHALLENGE_TTL_SECONDS", "300"))
+MFA_CHALLENGE_MAX_ATTEMPTS = int(os.environ.get("MFA_CHALLENGE_MAX_ATTEMPTS", "5"))
+MFA_ENROLLMENT_TTL_SECONDS = int(os.environ.get("MFA_ENROLLMENT_TTL_SECONDS", "600"))
+MFA_STEP_UP_TTL_SECONDS = int(os.environ.get("MFA_STEP_UP_TTL_SECONDS", "600"))
+INVITATION_TOKEN_PEPPER = os.environ.get("INVITATION_TOKEN_PEPPER", REFRESH_TOKEN_PEPPER)
+INVITATION_TTL_SECONDS = int(os.environ.get("INVITATION_TTL_SECONDS", str(48 * 60 * 60)))
+APP_PUBLIC_URL = os.environ.get("APP_PUBLIC_URL", "http://localhost:3000")
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "no-reply@localhost")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "25"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "").lower() == "true"
 BFF_SHARED_SECRET = os.environ.get("BFF_SHARED_SECRET", "")
 BFF_SECRET_HEADER = "X-Gym-BFF-Secret"
 DJANGO_LISTEN_HOST = os.environ.get("DJANGO_LISTEN_HOST", "127.0.0.1")

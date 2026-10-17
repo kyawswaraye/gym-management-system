@@ -91,6 +91,7 @@ def schedule_membership_expiry_notifications(
                 status=Membership.Status.ACTIVE,
                 expiry_date=expiry_date,
             )
+            .exclude(member__email__isnull=True)
             .exclude(member__email="")
             .exclude(
                 member__status__in=[

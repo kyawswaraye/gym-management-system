@@ -136,6 +136,8 @@ def test_tenant_a_api_cannot_access_tenant_b_core_operations() -> None:
     owner_b = User.objects.create_user("owner-b@example.test", PASSWORD)
     tenant_a = provision_gym(code="ISO-A", name="Tenant A", owner_email=owner_a.email)
     tenant_b = provision_gym(code="ISO-B", name="Tenant B", owner_email=owner_b.email)
+    # Dashboard range=today filters on this gym-local business date.
+    business_date = gym_today(tenant_b.gym)
 
     with transaction.atomic():
         set_gym_context(gym_id=tenant_b.gym.id)
@@ -143,7 +145,7 @@ def test_tenant_a_api_cannot_access_tenant_b_core_operations() -> None:
             gym=tenant_b.gym,
             member_number="B-000001",
             first_name="Tenant B Member",
-            join_date=date.today(),
+            join_date=business_date,
             created_by_membership_id=tenant_b.owner_membership.id,
             updated_by_membership_id=tenant_b.owner_membership.id,
         )
@@ -166,8 +168,8 @@ def test_tenant_a_api_cannot_access_tenant_b_core_operations() -> None:
             plan_name=plan_b.name,
             duration_value=1,
             duration_unit=MembershipPlan.DurationUnit.MONTH,
-            start_date=date.today(),
-            expiry_date=date.today(),
+            start_date=business_date,
+            expiry_date=business_date,
             list_price=Decimal("1000.00"),
             discount_amount=Decimal("0.00"),
             final_amount=Decimal("1000.00"),
@@ -186,7 +188,7 @@ def test_tenant_a_api_cannot_access_tenant_b_core_operations() -> None:
             amount=Decimal("1000.00"),
             currency=tenant_b.gym.currency,
             method=Payment.Method.CASH,
-            business_date=date.today(),
+            business_date=business_date,
             received_at=timezone.now(),
             status=Payment.Status.POSTED,
             created_by_membership_id=tenant_b.owner_membership.id,

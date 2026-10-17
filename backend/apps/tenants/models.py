@@ -1,9 +1,22 @@
 from __future__ import annotations
 
+from decimal import Decimal
+from typing import Any
+
 from django.conf import settings
 from django.db import models
 
 from apps.common.db.models import TenantModel, UUIDTimestampModel
+
+
+def default_expiry_warning_days() -> list[int]:
+    return [0, 3, 7, 30]
+
+
+def normalize_role_name(name: str) -> str:
+    """Collapse whitespace and case so active role names are unique per gym."""
+
+    return " ".join(name.split()).casefold().upper()
 
 
 class Permission(UUIDTimestampModel):
@@ -177,6 +190,7 @@ class GymMembership(TenantModel):
 class Role(TenantModel):
     key = models.CharField(max_length=32)
     name = models.CharField(max_length=100)
+    normalized_name = models.CharField(max_length=100, editable=False)
     description = models.CharField(max_length=255, blank=True)
     is_active = models.BooleanField(default=True)
     source_template = models.ForeignKey(
@@ -190,8 +204,38 @@ class Role(TenantModel):
         constraints = [
             models.UniqueConstraint(fields=["gym", "id"], name="role_gym_id_uniq"),
             models.UniqueConstraint(fields=["gym", "key"], name="role_gym_key_uniq"),
+            models.UniqueConstraint(
+                fields=["gym", "normalized_name"],
+                condition=models.Q(is_active=True),
+                name="role_active_name_uniq",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(key="") & ~models.Q(name="") & ~models.Q(normalized_name=""),
+                name="role_identity_nonblank_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(source_template__isnull=True, source_template_version__isnull=True)
+                    | models.Q(
+                        source_template__isnull=False,
+                        source_template_version__isnull=False,
+                        source_template_version__gt=0,
+                    )
+                ),
+                name="role_source_pair_ck",
+            ),
         ]
-        indexes = [models.Index(fields=["gym", "is_active"], name="role_gym_active_idx")]
+        indexes = [
+            models.Index(fields=["gym", "is_active"], name="role_gym_active_idx"),
+            models.Index(fields=["gym", "key", "id"], name="role_gym_key_cursor_idx"),
+        ]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        self.normalized_name = normalize_role_name(self.name or "")
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = {*update_fields, "normalized_name"}
+        super().save(*args, **kwargs)
 
 
 class RolePermission(TenantModel):
@@ -226,6 +270,136 @@ class GymMembershipRole(TenantModel):
         indexes = [models.Index(fields=["gym", "gym_membership"], name="memberrole_gym_member_idx")]
 
 
+class StaffInvitation(TenantModel):
+    class Status(models.TextChoices):
+        PENDING = "PENDING"
+        ACCEPTED = "ACCEPTED"
+        REVOKED = "REVOKED"
+        EXPIRED = "EXPIRED"
+
+    gym_membership = models.ForeignKey(GymMembership, on_delete=models.RESTRICT)
+    email = models.EmailField()
+    normalized_email = models.EmailField()
+    token_hash = models.CharField(max_length=64, unique=True, editable=False)
+    inviter_membership_id = models.UUIDField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    accepted_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="accepted_staff_invitations",
+    )
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_by_membership_id = models.UUIDField(null=True, blank=True)
+    revocation_reason = models.CharField(max_length=500, blank=True)
+    status = models.CharField(max_length=12, choices=Status, default=Status.PENDING)
+
+    class Meta:
+        db_table = "tenants_staff_invitation"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="invite_gym_id_uniq"),
+            models.UniqueConstraint(
+                fields=["gym", "normalized_email"],
+                condition=models.Q(status="PENDING"),
+                name="invite_pending_email_uniq",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["gym", "status", "expires_at"], name="invite_gym_state_exp_idx")
+        ]
+
+
+class StaffInvitationRole(TenantModel):
+    staff_invitation = models.ForeignKey(StaffInvitation, on_delete=models.RESTRICT)
+    role = models.ForeignKey(Role, on_delete=models.RESTRICT)
+
+    class Meta:
+        db_table = "tenants_staff_invitation_role"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="inviterole_gym_id_uniq"),
+            models.UniqueConstraint(
+                fields=["gym", "staff_invitation", "role"],
+                name="invite_role_gym_uniq",
+            ),
+        ]
+
+
+class StaffProfile(TenantModel):
+    """Gym-specific employment record for one non-owner or future staff membership.
+
+    ``profile_photo_asset_id`` stays a nullable identifier and is not a cross-app
+    foreign key. The foundational ``FileAsset`` table exists, but the staff API
+    intentionally does not accept or return this identifier yet. A future service
+    must validate that a referenced asset is in the same gym and has scan status
+    CLEAN before it can be attached.
+    """
+
+    class Status(models.TextChoices):
+        ACTIVE = "ACTIVE"
+        ON_LEAVE = "ON_LEAVE"
+        TERMINATED = "TERMINATED"
+        ARCHIVED = "ARCHIVED"
+
+    gym_membership = models.ForeignKey(GymMembership, on_delete=models.RESTRICT)
+    staff_code = models.CharField(max_length=32)
+    display_name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=32, blank=True)
+    joined_date = models.DateField()
+    status = models.CharField(max_length=12, choices=Status, default=Status.ACTIVE)
+    profile_photo_asset_id = models.UUIDField(null=True, blank=True)
+    default_commission_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("0.00")
+    )
+    employment_title = models.CharField(max_length=100, blank=True)
+    terminated_date = models.DateField(null=True, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_by_membership_id = models.UUIDField(null=True, blank=True)
+    updated_by_membership_id = models.UUIDField(null=True, blank=True)
+
+    class Meta:
+        db_table = "tenants_staff_profile"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="staffprof_gym_id_uniq"),
+            models.UniqueConstraint(fields=["gym", "staff_code"], name="staffprof_gym_code_uniq"),
+            models.UniqueConstraint(
+                fields=["gym", "gym_membership"], name="staffprof_gym_member_uniq"
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(staff_code="") & ~models.Q(display_name=""),
+                name="staffprof_identity_nonblank_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(default_commission_percent__gte=0)
+                & models.Q(default_commission_percent__lte=100),
+                name="staffprof_commission_range_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status="TERMINATED",
+                        terminated_date__isnull=False,
+                        terminated_date__gte=models.F("joined_date"),
+                    )
+                    | (~models.Q(status="TERMINATED") & models.Q(terminated_date__isnull=True))
+                ),
+                name="staffprof_termination_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(status="ARCHIVED", archived_at__isnull=False)
+                    | (~models.Q(status="ARCHIVED") & models.Q(archived_at__isnull=True))
+                ),
+                name="staffprof_archive_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["gym", "status"], name="staffprof_gym_status_idx"),
+            models.Index(fields=["gym", "display_name", "id"], name="staffprof_gym_name_idx"),
+        ]
+
+
 class GymFeatureEntitlement(TenantModel):
     class Source(models.TextChoices):
         PLAN = "PLAN"
@@ -251,9 +425,19 @@ class GymFeatureEntitlement(TenantModel):
 class GymSettings(TenantModel):
     """Tenant-owned operational defaults used by all business modules."""
 
-    membership_expiry_warning_days = models.JSONField(default=list)
-    membership_expiry_email_enabled = models.BooleanField(default=False)
-    member_number_prefix = models.CharField(max_length=12, default="MEM")
+    week_starts_on = models.PositiveSmallIntegerField(default=1)
+    allow_manual_member_numbers = models.BooleanField(default=False)
+    member_number_prefix = models.CharField(max_length=20, default="MEM")
+    receipt_number_prefix = models.CharField(max_length=20, default="RECEIPT")
+    check_in_duplicate_window_seconds = models.PositiveIntegerField(default=300)
+    check_in_challenge_ttl_seconds = models.PositiveIntegerField(default=120)
+    check_in_challenge_max_uses = models.PositiveIntegerField(default=1)
+    membership_expiry_warning_days = models.JSONField(default=default_expiry_warning_days)
+    membership_expiry_email_enabled = models.BooleanField(default=True)
+    membership_expiry_push_enabled = models.BooleanField(default=False)
+    class_cancellation_cutoff_minutes = models.PositiveIntegerField(default=60)
+    class_no_show_consumes_session = models.BooleanField(default=True)
+    require_separate_finance_approval = models.BooleanField(default=True)
     next_member_number = models.PositiveBigIntegerField(default=1)
     created_by_membership_id = models.UUIDField(null=True, blank=True)
     updated_by_membership_id = models.UUIDField(null=True, blank=True)
@@ -267,4 +451,129 @@ class GymSettings(TenantModel):
                 condition=models.Q(next_member_number__gt=0),
                 name="settings_next_member_number_gt_0_ck",
             ),
+            models.CheckConstraint(
+                condition=models.Q(week_starts_on__lte=6),
+                name="settings_week_start_range_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(check_in_duplicate_window_seconds__lte=86400),
+                name="settings_duplicate_window_range_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(check_in_challenge_ttl_seconds__gte=30)
+                & models.Q(check_in_challenge_ttl_seconds__lte=600),
+                name="settings_challenge_ttl_range_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(check_in_challenge_max_uses__gte=1)
+                & models.Q(check_in_challenge_max_uses__lte=100),
+                name="settings_challenge_uses_range_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(member_number_prefix__regex=r"^[A-Z0-9-]+$"),
+                name="settings_member_prefix_format_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(receipt_number_prefix__regex=r"^[A-Z0-9-]+$"),
+                name="settings_receipt_prefix_format_ck",
+            ),
+        ]
+
+
+class ExpenseCategory(TenantModel):
+    code = models.CharField(max_length=32)
+    name = models.CharField(max_length=120)
+    normalized_name = models.CharField(max_length=120)
+    system_key = models.CharField(max_length=32, null=True, blank=True)
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_by_membership_id = models.UUIDField(null=True, blank=True)
+    updated_by_membership_id = models.UUIDField(null=True, blank=True)
+
+    class Meta:
+        db_table = "tenants_expense_category"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="expcat_gym_id_uniq"),
+            models.UniqueConstraint(fields=["gym", "code"], name="expcat_gym_code_uniq"),
+            models.UniqueConstraint(fields=["gym", "normalized_name"], name="expcat_gym_name_uniq"),
+            models.UniqueConstraint(
+                fields=["gym", "system_key"],
+                condition=models.Q(system_key__isnull=False),
+                name="expcat_gym_system_key_uniq",
+            ),
+        ]
+        indexes = [models.Index(fields=["gym", "is_active"], name="expcat_gym_active_idx")]
+
+
+class TenantSequence(TenantModel):
+    sequence_key = models.CharField(max_length=64)
+    prefix = models.CharField(max_length=20)
+    next_value = models.PositiveBigIntegerField(default=1)
+    padding = models.PositiveSmallIntegerField(default=6)
+    created_by_membership_id = models.UUIDField(null=True, blank=True)
+
+    class Meta:
+        db_table = "tenants_tenant_sequence"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="tenantseq_gym_id_uniq"),
+            models.UniqueConstraint(fields=["gym", "sequence_key"], name="tenantseq_gym_key_uniq"),
+            models.CheckConstraint(
+                condition=models.Q(next_value__gt=0), name="tenantseq_next_value_gt_0_ck"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(padding__gte=1) & models.Q(padding__lte=18),
+                name="tenantseq_padding_range_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(prefix__regex=r"^[A-Z0-9-]+$"),
+                name="tenantseq_prefix_format_ck",
+            ),
+        ]
+
+
+class GymProvisioningRequest(UUIDTimestampModel):
+    class State(models.TextChoices):
+        IN_PROGRESS = "IN_PROGRESS"
+        COMPLETED = "COMPLETED"
+
+    actor_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.RESTRICT,
+        related_name="gym_provisioning_requests",
+    )
+    method = models.CharField(max_length=10, default="POST")
+    route = models.CharField(max_length=128)
+    idempotency_key = models.CharField(max_length=128)
+    request_hash = models.CharField(max_length=64)
+    state = models.CharField(max_length=12, choices=State, default=State.IN_PROGRESS)
+    response_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    response_body = models.JSONField(default=dict)
+    gym = models.ForeignKey(Gym, on_delete=models.RESTRICT, null=True, blank=True)
+
+    class Meta:
+        db_table = "tenants_gym_provisioning_request"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["actor_user", "method", "route", "idempotency_key"],
+                name="gymprov_actor_route_key_uniq",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        state="IN_PROGRESS",
+                        response_status__isnull=True,
+                        gym__isnull=True,
+                    )
+                    | models.Q(
+                        state="COMPLETED",
+                        response_status=201,
+                        gym__isnull=False,
+                    )
+                ),
+                name="gymprov_state_response_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["actor_user", "-created_at"], name="gymprov_actor_time_idx")
         ]

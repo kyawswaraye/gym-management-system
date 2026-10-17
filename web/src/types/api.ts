@@ -23,6 +23,43 @@ export type GymSummary = {
 };
 
 export type CurrentUser = components["schemas"]["CurrentUserData"];
+export type AdminDashboard = components["schemas"]["AdminDashboard"];
+export type PlatformGym = components["schemas"]["AdminGymListItem"];
+export type PlatformGymDetail = components["schemas"]["AdminGymDetail"];
+export type PlatformGymPatch =
+  components["schemas"]["PatchedAdminGymPatchRequest"];
+export type PlatformSubscriptionDetail =
+  components["schemas"]["AdminSubscriptionDetail"];
+export type PlatformSubscriptionUpdate =
+  components["schemas"]["PatchedAdminSubscriptionUpdateRequest"];
+export type PlatformAuditItem = components["schemas"]["PlatformAuditItem"];
+export type PlatformAuditMeta = components["schemas"]["PlatformAuditMeta"];
+export type TenantAuditItem = components["schemas"]["TenantAuditItem"];
+export type TenantAuditMeta = components["schemas"]["TenantAuditMeta"];
+export type GymProfile = components["schemas"]["GymProfile"];
+export type GymProfileUpdate =
+  components["schemas"]["PatchedGymProfileUpdateRequest"];
+export type GymSettings = components["schemas"]["GymSettings"];
+export type GymSettingsUpdate =
+  components["schemas"]["PatchedGymSettingsUpdateRequest"];
+export type OwnerItem = components["schemas"]["OwnerItem"];
+export type OwnerInvitation = components["schemas"]["OwnerInvitation"];
+export type PlatformSubscription = components["schemas"]["AdminSubscription"];
+export type GymProvisionRequest =
+  components["schemas"]["AdminGymProvisionRequestRequest"];
+export type GymProvisionResult = components["schemas"]["AdminGymProvisionData"];
+export type StaffRecord = components["schemas"]["Staff"];
+export type StaffListMeta = components["schemas"]["StaffListMeta"];
+export type StaffInvitation = components["schemas"]["StaffInvitation"];
+export type StaffInviteInput = components["schemas"]["StaffInviteInputRequest"];
+export type StaffUpdate = components["schemas"]["PatchedStaffUpdateRequest"];
+export type StaffAcceptInput = components["schemas"]["StaffAcceptInputRequest"];
+export type Role = components["schemas"]["Role"];
+export type RoleCreate = components["schemas"]["RoleCreateRequest"];
+export type RoleUpdate = components["schemas"]["PatchedRoleUpdateRequest"];
+export type Permission = components["schemas"]["Permission"];
+export type MembershipRole = components["schemas"]["MembershipRole"];
+export type CollectionMeta = components["schemas"]["CollectionMeta"];
 
 export type Member = {
   id: string;

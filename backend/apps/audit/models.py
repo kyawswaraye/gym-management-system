@@ -37,7 +37,13 @@ class AuditLog(TenantModel):
             models.Index(
                 fields=["gym", "target_type", "target_id", "-occurred_at"],
                 name="audit_gym_target_time_idx",
-            )
+            ),
+            # The target index cannot serve a gym-scoped keyset ordered by
+            # occurred_at DESC, id DESC. This index matches that predicate.
+            models.Index(
+                fields=["gym", "-occurred_at", "-id"],
+                name="audit_gym_time_id_idx",
+            ),
         ]
 
 

@@ -38,6 +38,7 @@ class User(AbstractBaseUser, PermissionsMixin, UUIDTimestampModel):
     is_platform_admin = models.BooleanField(default=False)
     mfa_enabled = models.BooleanField(default=False)
     mfa_secret_encrypted = models.TextField(null=True, blank=True)
+    mfa_last_used_step = models.BigIntegerField(null=True, blank=True)
     last_login_at = models.DateTimeField(null=True, blank=True)
     password_changed_at = models.DateTimeField(default=timezone.now)
 
@@ -78,6 +79,7 @@ class GymSelectionTicket(UUIDTimestampModel):
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=512, blank=True)
     request_id = models.CharField(max_length=128, blank=True)
+    mfa_verified_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "users_gym_selection_ticket"
@@ -87,8 +89,38 @@ class GymSelectionTicket(UUIDTimestampModel):
         ]
 
 
+class MFAEnrollment(UUIDTimestampModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="mfa_enrollments")
+    token_hash = models.CharField(max_length=64, unique=True, editable=False)
+    secret_encrypted = models.TextField()
+    expires_at = models.DateTimeField()
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "users_mfa_enrollment"
+        indexes = [models.Index(fields=["user", "expires_at"], name="mfaenroll_user_exp_idx")]
+
+
+class MFAChallenge(UUIDTimestampModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="mfa_challenges")
+    token_hash = models.CharField(max_length=64, unique=True, editable=False)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    max_attempts = models.PositiveSmallIntegerField(default=5)
+    device_name = models.CharField(max_length=255, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=512, blank=True)
+    request_id = models.CharField(max_length=128, blank=True)
+
+    class Meta:
+        db_table = "users_mfa_challenge"
+        indexes = [models.Index(fields=["user", "expires_at"], name="mfachal_user_exp_idx")]
+
+
 class RefreshSession(UUIDTimestampModel):
     class PrincipalType(models.TextChoices):
+        PLATFORM = "PLATFORM"
         STAFF = "STAFF"
         MEMBER = "MEMBER"
 
@@ -96,7 +128,9 @@ class RefreshSession(UUIDTimestampModel):
         max_length=10, choices=PrincipalType, default=PrincipalType.STAFF
     )
     user = models.ForeignKey(User, on_delete=models.RESTRICT, related_name="refresh_sessions")
-    selected_gym = models.ForeignKey("tenants.Gym", on_delete=models.RESTRICT)
+    selected_gym = models.ForeignKey(
+        "tenants.Gym", on_delete=models.RESTRICT, null=True, blank=True
+    )
     gym_membership = models.ForeignKey(
         "tenants.GymMembership", on_delete=models.RESTRICT, null=True, blank=True
     )
@@ -114,6 +148,7 @@ class RefreshSession(UUIDTimestampModel):
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=512, blank=True)
     device_id = models.CharField(max_length=255, blank=True)
+    mfa_verified_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "users_refresh_session"
@@ -134,12 +169,20 @@ class RefreshSession(UUIDTimestampModel):
             models.CheckConstraint(
                 condition=(
                     models.Q(
+                        principal_type="PLATFORM",
+                        selected_gym__isnull=True,
+                        gym_membership__isnull=True,
+                        member_id__isnull=True,
+                    )
+                    | models.Q(
                         principal_type="STAFF",
+                        selected_gym__isnull=False,
                         gym_membership__isnull=False,
                         member_id__isnull=True,
                     )
                     | models.Q(
                         principal_type="MEMBER",
+                        selected_gym__isnull=False,
                         gym_membership__isnull=True,
                         member_id__isnull=False,
                     )

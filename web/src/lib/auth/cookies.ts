@@ -6,6 +6,7 @@ export const AUTH_COOKIES = {
   csrf: "gms_csrf",
   selectionTicket: "gms_selection_ticket",
   selectionChoices: "gms_selection_choices",
+  mfaChallenge: "gms_mfa_challenge",
 } as const;
 
 const COOKIE_PATH = "/";

@@ -381,7 +381,7 @@ JWT အမည်သတ်မှတ်ချက်တွေက Secret မဟု�
 
 VPS တစ်လုံးပျက်ရင် System ခဏရပ်နိုင်ပါတယ်။ ဒါကြောင့် Backup နဲ့ ပြန်တင်နည်းကို ကြိုတင်ပြင်ဆင်ထားရပါမယ်။ Gym နဲ့ အသုံးပြုသူများလာရင် Database ကို သီးခြား Server သို့ ရွှေ့ပြီး System ကို တိုးချဲ့နိုင်ပါတယ်။
 
-တည်ဆောက်ချိန် Version တွေကို Python 3.14.7, Django 5.2.17 LTS, DRF 3.18.0, Node.js 24.20.0 LTS, Next.js 16.3.3 Active LTS, PostgreSQL 18.6 နဲ့ TypeScript 7.0.2 အဖြစ် တိတိကျကျ Pin လုပ်မယ်။ Django/DRF ကို Python နဲ့၊ Next.js/TypeScript ကို Node နဲ့၊ Database Migration/RLS ကို PostgreSQL အစစ်နဲ့ စမ်းသပ်ပြီး ကိုက်ညီမှုကို အတည်ပြုမယ်။
+တည်ဆောက်ချိန် Version တွေကို Python 3.14.7, Django 5.2.17 LTS, DRF 3.18.0, Node.js 24.20.0 LTS, Next.js 16.4.1 Active LTS, PostgreSQL 18.6 နဲ့ TypeScript 7.0.2 အဖြစ် တိတိကျကျ Pin လုပ်မယ်။ Next.js 16.4.1 သည် အတည်ပြုထားသော လုံခြုံရေးကိုက်ညီမှုပြင်ဆင်ချက်ဖြစ်သည်။ `docs/DEVELOPMENT_PLAN.md` သည် မပြောင်းလဲရသော သမိုင်း baseline အဖြစ် Next.js 16.3.3 ကို ဆက်လက်မှတ်တမ်းတင်ထားသည်။ Django/DRF ကို Python နဲ့၊ Next.js/TypeScript ကို Node နဲ့၊ Database Migration/RLS ကို PostgreSQL အစစ်နဲ့ စမ်းသပ်ပြီး ကိုက်ညီမှုကို အတည်ပြုမယ်။
 
 ---
 
@@ -401,4 +401,4 @@ Member ရှာ/အသစ်ဖွင့်
 
 Reception က အချက်အလက်ထည့်ပေးပါတယ်။ ငွေပမာဏ၊ သက်တမ်း၊ ဝင်ခွင့်နဲ့ အမြတ်ကို System ကတွက်ပေးပြီး Manager/Owner က ငွေစာရင်းကို သီးခြားစစ်ဆေးအတည်ပြုပါတယ်။
 
-Browser Login ဆုံးဖြတ်ချက်ကို [ADR 0002](./adr/0002-nextjs-bff-browser-authentication.md)၊ Reception Cash Session အခွင့်အာဏာကို [ADR 0003](./adr/0003-reception-cash-session-authority.md) မှာ မှတ်တမ်းတင်ထားပါတယ်။ Provider/MFA မူဝါဒကို Phase 1B၊ Jurisdiction ကို Production မတိုင်မီ၊ Device ပုံစံကို Phase 3၊ Expo/Bare React Native ရွေးချယ်မှုကို Phase 7 မှာ ဆုံးဖြတ်မယ်; အခုဖြေရှင်းပြီးသားလို့ မဆိုပါ။
+Browser Login ဆုံးဖြတ်ချက်ကို [ADR 0002](./adr/0002-nextjs-bff-browser-authentication.md)၊ Reception Cash Session အခွင့်အာဏာကို [ADR 0003](./adr/0003-reception-cash-session-authority.md) မှာ မှတ်တမ်းတင်ထားပါတယ်။ MFA သည် TOTP ဖြစ်ပြီး Platform Admin နှင့် Owner အတွက် မဖြစ်မနေ လိုအပ်သည်။ ကာကွယ်ထားသော Owner လုပ်ဆောင်ချက်များအတွက် မကြာသေးမီက MFA အတည်ပြုချက် လိုအပ်သည်။ လျှို့ဝှက်ချက်များကို ကုဒ်ဝှက်သိမ်းပြီး code ပြန်သုံးခြင်းကို ကာကွယ်သည်။ ပိုကျယ်သော role-based MFA ကို နောက်မှ ဆုံးဖြတ်နိုင်သည်။ Email ပို့ခြင်းသည် Django ၏ configurable email backend ဖြစ်သည်။ Test နှင့် E2E တွင် မပို့သော backend ကို သုံးသည်။ ဖိတ်ကြားချက်၊ စကားဝှက် ပြန်လည်ရယူခြင်း၊ သို့မဟုတ် Phase 2 သက်တမ်းကုန် email ကို production-ready ဟု မသတ်မှတ်မီ အတည်ပြုထားသော transactional provider ကို ပြင်ဆင်ရမည်။ Vendor ရွေးချယ်မှုနှင့် deployment ပြင်ဆင်ချက်ကို ရွှေ့ဆိုင်းထားသည်။ Jurisdiction ကို Production မတိုင်မီ၊ Device ပုံစံကို Phase 3၊ Expo/Bare React Native ရွေးချယ်မှုကို Phase 7 မှာ ဆုံးဖြတ်ရမည်။
