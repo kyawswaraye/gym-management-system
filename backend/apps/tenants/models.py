@@ -1,16 +1,36 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from django.conf import settings
 from django.db import models
+from django.db.models.lookups import LessThanOrEqual
 
 from apps.common.db.models import TenantModel, UUIDTimestampModel
 
 
 def default_expiry_warning_days() -> list[int]:
     return [0, 3, 7, 30]
+
+
+# Fernet token for a 65,536-byte plaintext. PKCS7 adds a full block when the
+# plaintext is already a multiple of 16, so the ciphertext is 65,552 bytes.
+# The token is version + timestamp + IV + ciphertext + HMAC = 65,609 bytes.
+# URL-safe base64 length is 4 * ceil(65609 / 3) = 87,480.
+IDEMPOTENCY_CIPHERTEXT_MAX_OCTETS = 87480
+_IDEMPOTENCY_CIPHERTEXT_LENGTH: models.Q = cast(
+    models.Q,
+    models.Q(response_body_ciphertext__isnull=True)
+    | LessThanOrEqual(
+        models.Func(
+            "response_body_ciphertext",
+            function="octet_length",
+            output_field=models.IntegerField(),
+        ),
+        IDEMPOTENCY_CIPHERTEXT_MAX_OCTETS,
+    ),
+)
 
 
 def normalize_role_name(name: str) -> str:
@@ -528,6 +548,136 @@ class TenantSequence(TenantModel):
             models.CheckConstraint(
                 condition=models.Q(prefix__regex=r"^[A-Z0-9-]+$"),
                 name="tenantseq_prefix_format_ck",
+            ),
+        ]
+
+
+class IdempotencyRecord(TenantModel):
+    """One finance command attempt, scoped to a gym, actor, route, and key.
+
+    A null actor is the system identity. ``UNIQUE NULLS NOT DISTINCT`` makes
+    that null collide with another null, so a system key cannot be reused for
+    a different attempt. Terminal rows store ciphertext only.
+    """
+
+    class State(models.TextChoices):
+        IN_PROGRESS = "IN_PROGRESS"
+        COMPLETED = "COMPLETED"
+        FAILED = "FAILED"
+
+    actor_membership_id = models.UUIDField(null=True, blank=True)
+    http_method = models.CharField(max_length=8)
+    route = models.CharField(max_length=200)
+    idempotency_key = models.CharField(max_length=128)
+    request_hash = models.CharField(max_length=64)
+    state = models.CharField(max_length=12, choices=State, default=State.IN_PROGRESS)
+    response_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    response_body_ciphertext = models.TextField(null=True, blank=True)
+    response_body_bytes = models.PositiveIntegerField(null=True, blank=True)
+    resource_type = models.CharField(max_length=64, null=True, blank=True)
+    resource_id = models.UUIDField(null=True, blank=True)
+    locked_until = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+    created_by_membership_id = models.UUIDField(null=True, blank=True)
+
+    class Meta:
+        db_table = "tenants_idempotency_record"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="idem_gym_id_uniq"),
+            models.UniqueConstraint(
+                fields=[
+                    "gym",
+                    "actor_membership_id",
+                    "http_method",
+                    "route",
+                    "idempotency_key",
+                ],
+                name="idem_scope_key_uniq",
+                nulls_distinct=False,
+            ),
+            models.CheckConstraint(
+                condition=models.Q(idempotency_key__regex=r"^[A-Za-z0-9._:-]{16,128}$"),
+                name="idem_key_format_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(request_hash__regex=r"^[0-9a-f]{64}$"),
+                name="idem_hash_format_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(http_method__regex=r"^[A-Z]{3,8}$"),
+                name="idem_method_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(route__regex=r"^/[A-Za-z0-9_./{}-]{1,199}$"),
+                name="idem_route_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(state__in=["IN_PROGRESS", "COMPLETED", "FAILED"]),
+                name="idem_state_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        state="IN_PROGRESS",
+                        response_status__isnull=True,
+                        response_body_ciphertext__isnull=True,
+                        response_body_bytes__isnull=True,
+                        resource_type__isnull=True,
+                        resource_id__isnull=True,
+                        locked_until__isnull=False,
+                    )
+                    | (
+                        models.Q(
+                            state__in=["COMPLETED", "FAILED"],
+                            response_status__isnull=False,
+                            response_body_ciphertext__isnull=False,
+                            response_body_bytes__isnull=False,
+                            locked_until__isnull=True,
+                        )
+                        & (
+                            models.Q(resource_type__isnull=True, resource_id__isnull=True)
+                            | models.Q(resource_type__isnull=False, resource_id__isnull=False)
+                        )
+                    )
+                ),
+                name="idem_evidence_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(expires_at__gt=models.F("created_at")),
+                name="idem_expiry_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(response_status__isnull=True)
+                | models.Q(state="COMPLETED", response_status__gte=200, response_status__lte=299)
+                | models.Q(state="FAILED", response_status__gte=400, response_status__lte=499),
+                name="idem_status_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(response_body_bytes__isnull=True)
+                | (models.Q(response_body_bytes__gte=1) & models.Q(response_body_bytes__lte=65536)),
+                name="idem_bytes_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(resource_type__isnull=True)
+                | models.Q(resource_type__regex=r"^[A-Za-z0-9_]{1,64}$"),
+                name="idem_resource_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(response_body_ciphertext__isnull=True)
+                | models.Q(response_body_ciphertext__regex=r"^gAAAAA[A-Za-z0-9_=-]+$"),
+                name="idem_ciphertext_ck",
+            ),
+            models.CheckConstraint(
+                condition=_IDEMPOTENCY_CIPHERTEXT_LENGTH,
+                name="idem_ciphertext_len_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["gym", "expires_at"], name="idem_gym_expires_idx"),
+            models.Index(
+                fields=["gym", "locked_until"],
+                name="idem_gym_active_lock_idx",
+                condition=models.Q(state="IN_PROGRESS"),
             ),
         ]
 

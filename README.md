@@ -28,17 +28,27 @@ React Native app, and the broader Phase 7 mobile APIs remain deferred and are
 not prerequisites for the already-linked member QR path.
 
 Phase 3 implementation is complete as of 2026-10-18 under ADRs 0004–0008.
-`docs/DEVELOPMENT_PLAN.md` was not edited for this closure. Closure evidence:
-backend checks passed; 225 non-PostgreSQL unit tests passed; the full
-PostgreSQL security and integration suite passed 171 tests before the new
-check-in plan test, and that focused plan test passed separately; web format,
-lint, typecheck, build, and 263 component and unit tests passed earlier, and
-focused static checks passed after the end-to-end spec change; a clean
-end-to-end reset passed 4 Playwright specs, including member authentication,
-a rotating onsite challenge, member QR scan, staff front desk, history, and
-summary, then member logout and refresh replay denial. The peak query-plan
-baseline passed and is documented in `docs/DATABASE.md`. It is not a
-production load test.
+Phase 3 closure evidence: backend checks passed; 225 non-PostgreSQL unit
+tests passed; the full PostgreSQL security and integration suite passed 171
+tests before the new check-in plan test, and that focused plan test passed
+separately; web format, lint, typecheck, build, and 263 component and unit
+tests passed earlier, and focused static checks passed after the end-to-end
+spec change; a clean end-to-end reset passed 4 Playwright specs, including
+member authentication, a rotating onsite challenge, member QR scan, staff
+front desk, history, and summary, then member logout and refresh replay
+denial. The peak query-plan baseline passed and is documented in
+`docs/DATABASE.md`. It is not a production load test.
+
+Phase 4 increment 1, the finance foundation under ADR 0009, is implemented.
+`docs/DEVELOPMENT_PLAN.md` section 15 item 15 is resolved there. The increment
+adds exact decimal money, encrypted idempotency claims, transactional receipt
+sequences, and the `expense_categories.manage` permission. No payment,
+receipt, expense, inventory, retail, or cash HTTP route is published.
+Increment 1 gate evidence: backend ruff, format, and mypy passed and
+migrations are in sync; 252 non-PostgreSQL backend tests passed; the
+PostgreSQL suite passed 189 tests; web format, lint, typecheck, and build
+passed, with 263 web tests. OpenAPI regeneration did not change the published
+contract.
 Notification HTTP routes and general payment and receipt endpoints stay
 unpublished for later phases.
 `is_pt_client` stays false until Phase 5 derives it from an active trainer

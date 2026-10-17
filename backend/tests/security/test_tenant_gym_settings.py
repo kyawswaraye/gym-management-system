@@ -76,9 +76,10 @@ def ensure_authorization_catalog() -> SubscriptionPlan:
     the historical catalog. ``retail.approve`` is applied only by the 0016
     backfill. ``platform.settings.manage`` is then marked inactive by the 0020
     retirement. ``checkins.challenge.issue`` is applied only by the 0022
-    backfill, for OWNER and MANAGER templates and copied roles. A clean install
-    runs those operations after the historical seed, and provisioning copies the
-    restored template permissions.
+    backfill, for OWNER and MANAGER templates and copied roles. Phase 4
+    inventory, retail, and ``expense_categories.manage`` grants are applied
+    only by the 0025 backfill. A clean install runs those operations after the
+    historical seed, and provisioning copies the restored template permissions.
     """
 
     seed = importlib.import_module("apps.tenants.migrations.0003_seed_authorization")
@@ -119,6 +120,8 @@ def ensure_authorization_catalog() -> SubscriptionPlan:
         "apps.tenants.migrations.0022_check_in_challenge_permission"
     )
     challenge.grant_check_in_challenge_issue(django_apps, None)
+    finance = importlib.import_module("apps.tenants.migrations.0025_finance_permission_catalog")
+    finance.grant_finance_foundation_permissions(django_apps, None)
     feature, _ = Feature.objects.get_or_create(
         code="members",
         defaults={"name": "Members", "description": "Members module"},

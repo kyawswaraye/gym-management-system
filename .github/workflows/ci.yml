@@ -166,6 +166,7 @@ jobs:
       E2E_DJANGO_SECRET_KEY: e2e-django-secret-key-placeholder-not-for-production-use
       E2E_BFF_SHARED_SECRET: e2e-bff-shared-secret-placeholder-32
       E2E_MFA_ENCRYPTION_KEY: e2e-mfa-encryption-key-placeholder
+      E2E_FINANCE_IDEMPOTENCY_ENCRYPTION_KEY: e2e-finance-idempotency-key-placeholder
       E2E_MFA_TOKEN_PEPPER: e2e-mfa-token-pepper-placeholder
       E2E_REFRESH_TOKEN_PEPPER: e2e-refresh-pepper-placeholder-value
       E2E_INVITATION_TOKEN_PEPPER: e2e-invitation-pepper-placeholder

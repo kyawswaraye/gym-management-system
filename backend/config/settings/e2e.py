@@ -28,11 +28,14 @@ required: dict[str, tuple[object, int]] = {
     "REFRESH_TOKEN_PEPPER": (REFRESH_TOKEN_PEPPER, 16),  # noqa: F405
     "MFA_TOKEN_PEPPER": (MFA_TOKEN_PEPPER, 16),  # noqa: F405
     "MFA_ENCRYPTION_KEY": (MFA_ENCRYPTION_KEY, 16),  # noqa: F405
+    "FINANCE_IDEMPOTENCY_ENCRYPTION_KEY": (FINANCE_IDEMPOTENCY_ENCRYPTION_KEY, 16),  # noqa: F405
     "INVITATION_TOKEN_PEPPER": (INVITATION_TOKEN_PEPPER, 16),  # noqa: F405
     "BFF_SHARED_SECRET": (BFF_SHARED_SECRET, 32),  # noqa: F405
 }
 missing = [name for name, (value, minimum) in required.items() if not _present(value, minimum)]
 if missing:
     raise ImproperlyConfigured("Missing E2E configuration: " + ", ".join(missing))
+if MFA_ENCRYPTION_KEY == FINANCE_IDEMPOTENCY_ENCRYPTION_KEY:  # noqa: F405
+    raise ImproperlyConfigured("Finance idempotency encryption must not reuse the MFA key")
 if DJANGO_LISTEN_HOST not in {"127.0.0.1", "localhost"}:  # noqa: F405
     raise ImproperlyConfigured("Django must listen only on a loopback address")

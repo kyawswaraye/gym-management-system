@@ -46,6 +46,7 @@ e2e_apply_app_env() {
   export BFF_SHARED_SECRET="${E2E_BFF_SHARED_SECRET:-e2e-bff-shared-secret-placeholder-32}"
   export E2E_BFF_SHARED_SECRET="${BFF_SHARED_SECRET}"
   export MFA_ENCRYPTION_KEY="${E2E_MFA_ENCRYPTION_KEY:-e2e-mfa-encryption-key-placeholder}"
+  export FINANCE_IDEMPOTENCY_ENCRYPTION_KEY="${E2E_FINANCE_IDEMPOTENCY_ENCRYPTION_KEY:-e2e-finance-idempotency-key-placeholder}"
   export MFA_TOKEN_PEPPER="${E2E_MFA_TOKEN_PEPPER:-e2e-mfa-token-pepper-placeholder}"
   export REFRESH_TOKEN_PEPPER="${E2E_REFRESH_TOKEN_PEPPER:-e2e-refresh-pepper-placeholder-value}"
   export INVITATION_TOKEN_PEPPER="${E2E_INVITATION_TOKEN_PEPPER:-e2e-invitation-pepper-placeholder}"

@@ -40,6 +40,23 @@ def test_platform_permissions_are_not_tenant_owner_permissions() -> None:
     assert not {code for code in seed.OWNER if code.startswith("platform.")}
 
 
+def test_historical_catalog_omits_phase4_finance_codes() -> None:
+    finance = importlib.import_module("apps.tenants.migrations.0025_finance_permission_catalog")
+    assert "retail.approve" not in finance.TEMPLATE_GRANTS["OWNER"]
+    assert "expense_categories.manage" in finance.TEMPLATE_GRANTS["OWNER"]
+    assert "expense_categories.manage" in finance.TEMPLATE_GRANTS["MANAGER"]
+    assert "expense_categories.manage" in finance.TEMPLATE_GRANTS["ACCOUNTANT"]
+    assert "expense_categories.manage" not in finance.TEMPLATE_GRANTS["RECEPTIONIST"]
+    assert "TRAINER" not in finance.TEMPLATE_GRANTS
+    assert "inventory.adjust" not in finance.TEMPLATE_GRANTS["RECEPTIONIST"]
+    assert "inventory.manage" not in finance.TEMPLATE_GRANTS["ACCOUNTANT"]
+    assert "retail.void" in finance.TEMPLATE_GRANTS["ACCOUNTANT"]
+    for code, *_rest in finance.NEW_PERMISSIONS:
+        assert code not in seed.PERMISSION_CODES
+        assert not code.startswith("expenses.")
+        assert code != "retail.approve"
+
+
 def test_historical_catalog_retains_retired_platform_settings_code() -> None:
     assert "platform.settings.manage" in seed.PERMISSION_CODES
     assert "platform.settings.manage" not in seed.OWNER

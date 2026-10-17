@@ -52,6 +52,13 @@ from apps.tenants.models import (
     SystemRoleTemplate,
     TenantSequence,
 )
+from apps.tenants.sequence_services import (
+    EXPENSE_CATEGORY_CATALOG as EXPENSE_CATEGORY_CATALOG,
+)
+from apps.tenants.sequence_services import (
+    ensure_protected_expense_categories,
+    ensure_receipt_sequence,
+)
 from apps.tenants.validation import (
     GYM_PROFILE_FIELDS,
     prepare_profile_changes,
@@ -77,18 +84,6 @@ class AdminProvisioningResult:
     replayed: bool
 
 
-EXPENSE_CATEGORY_CATALOG = (
-    ("RENT", "Rent"),
-    ("UTILITIES", "Electricity / water"),
-    ("INTERNET", "Internet"),
-    ("STAFF_SALARY", "Staff salary"),
-    ("PT_COMMISSION", "PT commission"),
-    ("CLEANING_SUPPLIES", "Cleaning supplies"),
-    ("MAINTENANCE", "Maintenance / equipment repair"),
-    ("MARKETING", "Marketing"),
-    ("WATER_DRINKS", "Water / drinks"),
-    ("OTHER", "Other expenses"),
-)
 PROVISIONING_ROUTE = "/api/v1/admin/gyms/"
 
 
@@ -581,39 +576,20 @@ def _copy_roles(*, gym: Gym, owner_membership: GymMembership) -> list[Role]:
 
 
 def _seed_categories(*, gym: Gym, actor_membership: GymMembership) -> list[ExpenseCategory]:
-    categories = []
-    for display_order, (code, name) in enumerate(EXPENSE_CATEGORY_CATALOG, start=1):
-        category, _ = ExpenseCategory.objects.get_or_create(
-            gym=gym,
-            system_key=code,
-            defaults={
-                "code": code,
-                "name": name,
-                "normalized_name": name.strip().upper(),
-                "display_order": display_order,
-                "is_active": True,
-                "created_by_membership_id": actor_membership.id,
-            },
-        )
-        categories.append(category)
-    return categories
+    return ensure_protected_expense_categories(
+        gym=gym,
+        actor_membership_id=actor_membership.id,
+    )
 
 
 def _seed_receipt_sequence(
     *, gym: Gym, settings: GymSettings, actor_membership: GymMembership
 ) -> TenantSequence:
-    year = datetime.now(ZoneInfo(gym.timezone)).year
-    sequence, _ = TenantSequence.objects.get_or_create(
+    return ensure_receipt_sequence(
         gym=gym,
-        sequence_key=f"RECEIPT:{year}",
-        defaults={
-            "prefix": settings.receipt_number_prefix,
-            "next_value": 1,
-            "padding": 6,
-            "created_by_membership_id": actor_membership.id,
-        },
+        prefix=settings.receipt_number_prefix,
+        actor_membership_id=actor_membership.id,
     )
-    return sequence
 
 
 def _claim_provisioning_request(

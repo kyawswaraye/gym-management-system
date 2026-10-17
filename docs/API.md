@@ -642,7 +642,7 @@ POST /api/v1/expenses/{id}/void/
 
 Only drafts are editable. A receipt uses the file upload flow and a tenant-scoped file asset ID. Reception may create and submit drafts but cannot approve them.
 
-Expense-category and expense list/detail reads require `expenses.view`. Protected `system_key` categories can never be created, renamed, or deleted through these routes. The stable permission code governing custom expense-category create/update is not yet assigned in the Phase 0 catalog; it is an open decision that must be resolved before Phase 4 implementation, and until then no route may fall back to a broader finance permission.
+Expense-category and expense list/detail reads require `expenses.view`. Protected `system_key` categories can never be created, renamed, or deleted through these routes. Custom expense-category create and update require `expense_categories.manage` ([ADR 0009](./adr/0009-finance-foundation-defaults.md)). That code is not satisfied by `expenses.view`, `expenses.create`, `expenses.update`, `expenses.submit`, `expenses.approve`, or `expenses.void`. These expense routes remain unpublished. Expense evidence will reuse the private file pipeline with purpose `EXPENSE_RECEIPT`, image-only, at most 5 MiB.
 
 Expense draft create/update fields: `category_id`, `business_date`, `description`, positive decimal-string `amount`, `currency`, `payment_method`, optional `receipt_file_asset_id`, and optional policy note. Read-only/rejected: `gym_id`, `status`, posting/void/cancel/reversal fields, actors, cash effects, and calculated totals. Only `DRAFT` is mutable.
 
@@ -680,7 +680,7 @@ GET  /api/v1/cash-transactions/
 
 The reconcile request supplies actual closing cash and an optional reason. Expected closing and difference are server-calculated. A non-zero difference without a reason is rejected.
 
-Open request fields: `register_code`, `business_date`, and nonnegative decimal-string `opening_cash`. Reconcile fields: decimal-string `actual_closing` and optional `difference_reason`. Manual adjustment fields: `direction`, positive decimal-string `amount`, `currency`, `business_date`, `description`, and required `reason`. Read-only/rejected everywhere: `gym_id`, all status/actor fields, `cash_sales`, `cash_expenses`, `manual_net`, `expected_closing`, `difference`, closing timestamps, source type/link, and reversal IDs.
+Open request fields: `register_code`, `business_date`, and nonnegative decimal-string `opening_cash`. `register_code` is an uppercase token of 1 to 32 characters matching `[A-Z0-9_-]+`. There is no separate register catalog ([ADR 0009](./adr/0009-finance-foundation-defaults.md)). Reconcile fields: decimal-string `actual_closing` and optional `difference_reason`. Manual adjustment fields: `direction`, positive decimal-string `amount`, `currency`, `business_date`, `description`, and required `reason`. Read-only/rejected everywhere: `gym_id`, all status/actor fields, `cash_sales`, `cash_expenses`, `manual_net`, `expected_closing`, `difference`, closing timestamps, source type/link, and reversal IDs.
 
 Open, reconcile, and adjustment responses return the explicit cash session plus created immutable cash transaction(s). They require `cashbook.open`, `cashbook.reconcile`, or elevated `cashbook.adjust`, the cashbook entitlement, same-gym register/session, correct currency/business day, open-session state, and `Idempotency-Key`. Reconcile locks the session and recomputes every total; a nonzero server-calculated difference requires a reason.
 
@@ -1009,7 +1009,7 @@ Bulk endpoints are not created until their atomicity, per-item authorization, li
 
 `Idempotency-Key` is required for every financial command, including payment submit/approve/reject/cancel/void/refund, expense submit/approve/reject/cancel/void, salary submit/approve/reject/cancel/void, cash open/adjust/reconcile, PT sale submit/approve/reject/cancel/void, commission payment/reversal, and every receipt-affecting command. It is also required for gym provisioning.
 
-The server keys records by gym, actor, method, route, and key. Repeating the same request returns the original result. Reusing a key with a different request hash returns `409 IDEMPOTENCY_KEY_REUSED`.
+The server keys records by gym, actor, method, route, and key. Repeating the same request returns the original result while the stored response is unexpired. Reusing a key with a different request hash returns `409 IDEMPOTENCY_KEY_REUSED`. An expired key returns `409 IDEMPOTENCY_KEY_EXPIRED` and is not decrypted. A deterministic client or domain failure is replayed from the API error envelope. A deadlock or other unexpected failure leaves the key retryable. `mutate()` is database-only. Idempotent command views opt out of `ATOMIC_REQUESTS` with `non_atomic_requests`; the runner owns the business transaction.
 
 Profile-photo intent, complete, download-url, and delete do not use `Idempotency-Key`. Intent always creates a new asset. Complete and delete use the state transitions in the Signed files section.
 

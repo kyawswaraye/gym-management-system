@@ -12,6 +12,7 @@ PASSWORD_HASHERS = [
 BFF_SHARED_SECRET = os.environ.get("BFF_SHARED_SECRET", "test-bff-shared-secret-32-chars-min")
 MFA_TOKEN_PEPPER = "test-mfa-token-pepper"
 MFA_ENCRYPTION_KEY = "test-mfa-encryption-key"
+FINANCE_IDEMPOTENCY_ENCRYPTION_KEY = "test-finance-idempotency-key"
 INVITATION_TOKEN_PEPPER = "test-invitation-token-pepper"
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 

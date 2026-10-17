@@ -26,6 +26,7 @@ from apps.common.db.tenant_context import set_gym_context
 from apps.members.models import CheckIn, CheckInChallenge, CheckInDevice, Member
 from apps.members.normalization import canonical_address, normalize_full_name
 from apps.tenants.models import Gym, GymMembership
+from tests.security.test_memberships import _enable_memberships
 from tests.security.test_tenant_gym_settings import (
     BFF_SECRET,
     auth_headers,
@@ -307,6 +308,10 @@ def test_check_in_reads_keep_a_bounded_plan_at_peak_volume() -> None:
     open_params = {"open": "true", "limit": PAGE_LIMIT}
     history_params = {"limit": PAGE_LIMIT}
 
+    # A prior transactional test flushes migration-seeded plan features.
+    # Check-in reads require both the members and memberships entitlements.
+    _enable_memberships(gym)
+    _enable_memberships(other_gym)
     open_first = api.get("/api/v1/check-ins/", data=open_params, **headers)
     assert open_first.status_code == 200, open_first.content
     assert open_first.json()["meta"]["has_more"] is True

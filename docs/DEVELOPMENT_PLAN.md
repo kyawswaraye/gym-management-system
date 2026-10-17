@@ -601,6 +601,6 @@ Track each decision with owner, due phase, options, security/data/migration/cost
 12. **Resolved for Phase 0:** Under [ADR 0003](./adr/0003-reception-cash-session-authority.md), Reception has conditional `cashbook.view/open/reconcile` only for a session opened by the current Reception `GymMembership`; `cashbook.adjust` and all finance approval/posting remain denied.
 13. **Deferred, nonblocking until Phase 3:** Exact integration credential/device model and vendor policy.
 14. **Resolved for Phase 1B:** `platform.settings.manage` has no HTTP routes. The Phase 1B retirement marks the catalog row inactive, omits it from platform sessions, and does not authorize tenant `settings.manage`. Reactivation requires a new approved decision.
-15. **Deferred but blocking before Phase 4:** The stable permission code governing custom `ExpenseCategory` create/update. The protected `system_key` catalog is fixed and immutable, but tenant-defined category mutation currently maps to no code in the catalog. It must not fall back to a broader finance permission.
+15. **Resolved for Phase 4:** Custom `ExpenseCategory` create/update uses `expense_categories.manage`, recorded in [ADR 0009](./adr/0009-finance-foundation-defaults.md). OWNER is allowed, MANAGER and ACCOUNTANT are conditional, and RECEPTIONIST and TRAINER are denied. The protected `system_key` catalog stays immutable. This code is never satisfied by a broader finance permission.
 
 A blocker remains a blocker until explicitly resolved. Major architecture changes and progression to every next phase require approval.

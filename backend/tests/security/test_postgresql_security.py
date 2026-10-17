@@ -56,6 +56,7 @@ TENANT_TABLES = {
     "tenants_gym_settings",
     "tenants_expense_category",
     "tenants_tenant_sequence",
+    "tenants_idempotency_record",
     "members_member",
     "members_membership_plan",
     "members_membership",
@@ -242,18 +243,48 @@ def test_runtime_has_only_required_provisioning_table_privileges() -> None:
                 'gym_runtime', 'tenants_tenant_sequence', 'INSERT'
               ),
               has_table_privilege(
-                'gym_runtime', 'tenants_tenant_sequence', 'UPDATE'
+                'gym_runtime', 'tenants_tenant_sequence', 'DELETE'
+              ),
+              has_column_privilege(
+                'gym_runtime', 'tenants_tenant_sequence', 'next_value', 'UPDATE'
+              ) AND has_column_privilege(
+                'gym_runtime', 'tenants_tenant_sequence', 'updated_at', 'UPDATE'
+              ),
+              has_column_privilege(
+                'gym_runtime', 'tenants_tenant_sequence', 'prefix', 'UPDATE'
+              ),
+              has_table_privilege(
+                'gym_runtime', 'tenants_idempotency_record', 'SELECT'
+              ) AND has_table_privilege(
+                'gym_runtime', 'tenants_idempotency_record', 'INSERT'
+              ) AND has_table_privilege(
+                'gym_runtime', 'tenants_idempotency_record', 'UPDATE'
+              ),
+              has_table_privilege(
+                'gym_runtime', 'tenants_idempotency_record', 'DELETE'
               )
             """
         )
-        gym_insert, user_insert, idempotency_access, sequence_access, sequence_update = (
-            cursor.fetchone()
-        )
+        (
+            gym_insert,
+            user_insert,
+            idempotency_access,
+            sequence_access,
+            sequence_delete,
+            sequence_value_update,
+            sequence_prefix_update,
+            finance_idempotency_access,
+            finance_idempotency_delete,
+        ) = cursor.fetchone()
     assert gym_insert is True
     assert user_insert is False
     assert idempotency_access is True
     assert sequence_access is True
-    assert sequence_update is False
+    assert sequence_delete is False
+    assert sequence_value_update is True
+    assert sequence_prefix_update is False
+    assert finance_idempotency_access is True
+    assert finance_idempotency_delete is False
 
 
 def test_runtime_role_is_unprivileged() -> None:
@@ -753,8 +784,9 @@ def test_existing_gym_backfill_is_idempotent_and_tenant_scoped() -> None:
     assert ExpenseCategory.objects.filter(gym=partial).count() == len(PROTECTED_EXPENSE_CATEGORIES)
     partial_sequence = TenantSequence.objects.get(gym=partial, sequence_key=f"RECEIPT:{year}")
     assert partial_sequence.prefix == "PARTIAL-02"
-    partial_sequence.next_value = 8
-    partial_sequence.save(update_fields=["next_value", "updated_at"])
+    for _ in range(7):
+        partial_sequence.next_value += 1
+        partial_sequence.save(update_fields=["next_value", "updated_at"])
 
     backfill_gym_prerequisites(django_apps, SimpleNamespace(connection=connection))
 

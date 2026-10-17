@@ -147,6 +147,9 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   2026-10-18 under ADRs 0004–0008. The closure evidence is in the repository
   README. The generic staff scan path, notification, and general payment and
   receipt routes stay out of the published OpenAPI contract.
+  Phase 4 increment 1 is the finance foundation under ADR 0009: exact money,
+  encrypted idempotency, receipt sequences, and `expense_categories.manage`.
+  Those finance HTTP routes remain unpublished.
 - Platform gym provisioning, lifecycle, owner invitation, platform audit reads,
   tenant audit reads, staff invitation/acceptance, staff profiles, staff
   activate/suspend, and tenant role/permission management are in place.

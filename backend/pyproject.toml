@@ -36,6 +36,7 @@ disable_error_code = ["misc", "var-annotated"]
 [[tool.mypy.overrides]]
 module = [
   "apps.common.api.exceptions",
+  "apps.common.finance.exceptions",
   "apps.files.exceptions",
   "apps.members.exceptions",
   "apps.tenants.exceptions",
