@@ -1,38 +1,41 @@
-"""Payment drafts and the single posting path.
+"""Payment drafts, posting, and published corrections.
 
 Lock order inside approval: payment, membership, cash session, cash
 transaction, receipt sequence, then the receipt. The receipt guard reads the
 payment status, so the posted update is written immediately before the receipt
-insert and still after the sequence allocation. A failure rolls all of it back.
+insert and still after the sequence allocation.
 
-Public void and refund stay unpublished. Until the reversal increment, only
-the migration role or a superuser may move a posted charge to void and store
-``reversal_payment``. ``gym_runtime`` cannot make that transition, and a
-session setting is not an authorization boundary.
+Void and refund lock the original charge, its corrections, receipts, and the
+membership when one exists, then the destination cash session. A failure rolls
+all of it back. Runtime may mark a posted charge void only in the same
+transaction as its posted reversal, void evidence, and cash link when the
+original movement exists.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from django.db import connection
 from django.db.models import Q, Sum
 from django.http import Http404
 from django.utils import timezone
+from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.audit.services import write_tenant_audit
 from apps.cashbook.models import CashSession, CashTransaction
 from apps.cashbook.selectors import holds_protected_role, membership_has_permission
 from apps.cashbook.services import record_cash_movement, revalidate_cash_actor
-from apps.common.finance.exceptions import FinanceStateConflict
+from apps.common.finance.exceptions import CacheableIdempotentFailure, FinanceStateConflict
 from apps.members.models import Member, Membership, Payment, Receipt
 from apps.members.payment_serializers import money_text
-from apps.members.services import refresh_membership_payment_status
+from apps.members.services import gym_today, refresh_membership_payment_status
+from apps.sales.models import RetailSale
 from apps.tenants.models import Gym, GymMembership, GymSettings, StaffProfile
 from apps.tenants.sequence_services import allocate_formatted_number, ensure_receipt_sequence
 
@@ -40,7 +43,21 @@ _ZERO = Decimal("0.00")
 
 
 class PaymentPostingConflict(FinanceStateConflict):
-    """The locked payment or its source can no longer be posted."""
+    """The locked payment or its source can no longer accept this command."""
+
+
+class RefundExceedsBalance(FinanceStateConflict):
+    default_code = "REFUND_EXCEEDS_BALANCE"
+    default_detail = "The refund exceeds the refundable balance."
+
+
+class RetailCorrectionUnavailable(CacheableIdempotentFailure):
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY  # type: ignore[assignment]
+    default_code = "RETAIL_CORRECTION_UNAVAILABLE"
+    default_detail = (
+        "Retail product charges stay posted until retail void and returns publish "
+        "a stock and destination-session contract."
+    )
 
 
 def create_payment_draft(
@@ -768,3 +785,533 @@ def command_route(*, payment_id: UUID | None, action: str) -> str:
     if not action:
         return f"/api/v1/payments/{payment_id}/"
     return f"/api/v1/payments/{payment_id}/{action}/"
+
+
+def void_payment(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    payment_id: UUID,
+    reason: str,
+    business_date: date | None,
+    cash_session_id: UUID | None,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> dict[str, Any]:
+    """Void one posted charge and post an equal reversal in the same transaction."""
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Payment void requires an active transaction.")
+    gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="payments.void")
+    original = _lock_payment(gym_id=gym.id, payment_id=payment_id)
+    gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="payments.void")
+    _reject_retail_charge(original)
+    if original.entry_type != Payment.EntryType.CHARGE or original.status != Payment.Status.POSTED:
+        raise PaymentPostingConflict()
+    related = _lock_related_payments(original)
+    receipts = _lock_payment_receipts(original, related)
+    if _refundable_amount(original, related) != Decimal(original.amount):
+        raise PaymentPostingConflict()
+    membership = _lock_existing_membership(original)
+    chosen_date = _correction_business_date(
+        gym=gym, original_date=original.business_date, requested=business_date
+    )
+    reversal_id = uuid4()
+    legacy = bool(original.legacy_unlinked_cash)
+    movement = _correction_cash(
+        gym=gym,
+        actor=actor,
+        original=original,
+        source_id=reversal_id,
+        amount=Decimal(original.amount),
+        business_date=chosen_date,
+        reason=reason,
+        cash_session_id=cash_session_id,
+        legacy=legacy,
+        link_original_movement=not legacy and original.method == Payment.Method.CASH,
+    )
+    now = timezone.now()
+    reversal = _insert_posted_correction(
+        gym=gym,
+        actor=actor,
+        original=original,
+        correction_id=reversal_id,
+        entry_type=Payment.EntryType.REVERSAL,
+        amount=Decimal(original.amount),
+        method=original.method,
+        business_date=chosen_date,
+        description=f"Reversal: {original.description}"[:255],
+        reference_number=original.reference_number,
+        movement=movement,
+        legacy=legacy,
+        posted_at=now,
+    )
+    number, sequence_value, sequence_year = _allocate_receipt_number(
+        gym=gym, payment=reversal, actor=actor
+    )
+    correction_receipt = _issue_receipt(
+        gym=gym,
+        actor=actor,
+        payment=reversal,
+        number=number,
+        sequence_value=sequence_value,
+        sequence_year=sequence_year,
+        issued_at=now,
+    )
+    original_receipt = _void_locked_receipt(
+        receipts=receipts, payment_id=original.id, actor=actor, reason=reason, voided_at=now
+    )
+    original.status = Payment.Status.VOID
+    original.voided_at = now
+    original.voided_by_membership_id = actor.id
+    original.void_reason = reason
+    original.reversal_payment = reversal
+    original.updated_by_membership_id = actor.id
+    original.save()
+    settlement = _settlement_after(membership)
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="PAYMENT_VOIDED",
+        payment=original,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={"reversal_payment_id": str(reversal.id)},
+    )
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="PAYMENT_REVERSAL_POSTED",
+        payment=reversal,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={"original_payment_id": str(original.id)},
+    )
+    return {
+        "original": original,
+        "correction": reversal,
+        "original_receipt": original_receipt,
+        "correction_receipt": correction_receipt,
+        "cash_transactions": [] if movement is None else [movement],
+        "refundable_amount": Decimal("0.00"),
+        "settlement": settlement,
+    }
+
+
+def refund_payment(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    payment_id: UUID,
+    amount: Decimal,
+    reason: str,
+    method: str,
+    business_date: date,
+    reference_number: str,
+    cash_session_id: UUID | None,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> dict[str, Any]:
+    """Post one immutable refund without changing the original charge."""
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Payment refund requires an active transaction.")
+    gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="payments.refund")
+    original = _lock_payment(gym_id=gym.id, payment_id=payment_id)
+    gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="payments.refund")
+    _reject_retail_charge(original)
+    if original.entry_type != Payment.EntryType.CHARGE or original.status != Payment.Status.POSTED:
+        raise PaymentPostingConflict()
+    if original.currency != gym.currency:
+        raise ValidationError({"currency": ["Currency must match the selected gym."]})
+    related = _lock_related_payments(original)
+    receipts = _lock_payment_receipts(original, related)
+    refundable = _refundable_amount(original, related)
+    refund_amount = Decimal(amount).quantize(Decimal("0.01"))
+    if refund_amount <= 0 or refund_amount > refundable:
+        raise RefundExceedsBalance()
+    membership = _lock_existing_membership(original)
+    chosen_date = _correction_business_date(
+        gym=gym, original_date=original.business_date, requested=business_date
+    )
+    refund_id = uuid4()
+    movement = _refund_cash(
+        gym=gym,
+        actor=actor,
+        source_id=refund_id,
+        amount=refund_amount,
+        currency=original.currency,
+        method=method,
+        business_date=chosen_date,
+        description=f"Refund: {original.description}"[:255],
+        reason=reason,
+        cash_session_id=cash_session_id,
+    )
+    now = timezone.now()
+    refund = _insert_posted_correction(
+        gym=gym,
+        actor=actor,
+        original=original,
+        correction_id=refund_id,
+        entry_type=Payment.EntryType.REFUND,
+        amount=refund_amount,
+        method=method,
+        business_date=chosen_date,
+        description=f"Refund: {original.description}"[:255],
+        reference_number=reference_number,
+        movement=movement,
+        legacy=False,
+        posted_at=now,
+    )
+    number, sequence_value, sequence_year = _allocate_receipt_number(
+        gym=gym, payment=refund, actor=actor
+    )
+    correction_receipt = _issue_receipt(
+        gym=gym,
+        actor=actor,
+        payment=refund,
+        number=number,
+        sequence_value=sequence_value,
+        sequence_year=sequence_year,
+        issued_at=now,
+    )
+    original_receipt = next(
+        (
+            row
+            for row in receipts
+            if row.payment_id == original.id and row.status == Receipt.Status.ISSUED
+        ),
+        None,
+    )
+    settlement = _settlement_after(membership)
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="PAYMENT_REFUND_POSTED",
+        payment=refund,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={"original_payment_id": str(original.id)},
+    )
+    return {
+        "original": original,
+        "correction": refund,
+        "original_receipt": original_receipt,
+        "correction_receipt": correction_receipt,
+        "cash_transactions": [] if movement is None else [movement],
+        "refundable_amount": (refundable - refund_amount).quantize(Decimal("0.01")),
+        "settlement": settlement,
+    }
+
+
+def void_receipt(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    receipt_id: UUID,
+    reason: str,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> Receipt:
+    """Void one issued receipt document. Payment and cash rows stay unchanged."""
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Receipt void requires an active transaction.")
+    gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="receipts.void")
+    receipt = (
+        Receipt.objects.select_for_update()
+        .filter(gym_id=gym.id, id=receipt_id)
+        .order_by("id")
+        .first()
+    )
+    if receipt is None:
+        raise Http404
+    gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="receipts.void")
+    if receipt.status != Receipt.Status.ISSUED:
+        raise PaymentPostingConflict()
+    payment = Payment.objects.filter(gym_id=gym.id, id=receipt.payment_id).first()
+    if payment is None:
+        raise PaymentPostingConflict()
+    if payment.purpose == Payment.Purpose.PRODUCT or payment.retail_sale_id is not None:
+        raise RetailCorrectionUnavailable()
+    if RetailSale.objects.filter(
+        gym_id=gym.id, receipt_id=receipt.id, status=RetailSale.Status.POSTED
+    ).exists():
+        raise RetailCorrectionUnavailable()
+    now = timezone.now()
+    receipt.status = Receipt.Status.VOID
+    receipt.voided_at = now
+    receipt.voided_by_membership_id = actor.id
+    receipt.void_reason = reason
+    receipt.save(
+        update_fields=[
+            "status",
+            "voided_at",
+            "voided_by_membership_id",
+            "void_reason",
+            "updated_at",
+        ]
+    )
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="RECEIPT_VOIDED",
+        payment=payment,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        module="receipts",
+        target_type="Receipt",
+        target_id=receipt.id,
+        extra={"receipt_number": receipt.receipt_number},
+    )
+    return receipt
+
+
+def _reject_retail_charge(payment: Payment) -> None:
+    if payment.purpose == Payment.Purpose.PRODUCT or payment.retail_sale_id is not None:
+        raise RetailCorrectionUnavailable()
+
+
+def _lock_related_payments(original: Payment) -> list[Payment]:
+    return list(
+        Payment.objects.select_for_update()
+        .filter(gym_id=original.gym_id, original_payment_id=original.id)
+        .order_by("id")
+    )
+
+
+def _lock_payment_receipts(original: Payment, related: list[Payment]) -> list[Receipt]:
+    payment_ids = [original.id, *[row.id for row in related]]
+    return list(
+        Receipt.objects.select_for_update()
+        .filter(gym_id=original.gym_id, payment_id__in=payment_ids)
+        .order_by("id")
+    )
+
+
+def _refundable_amount(original: Payment, related: list[Payment]) -> Decimal:
+    used = sum(
+        (
+            Decimal(row.amount)
+            for row in related
+            if row.status == Payment.Status.POSTED
+            and row.entry_type in {Payment.EntryType.REFUND, Payment.EntryType.REVERSAL}
+        ),
+        _ZERO,
+    )
+    return (Decimal(original.amount) - used).quantize(Decimal("0.01"))
+
+
+def _lock_existing_membership(payment: Payment) -> Membership | None:
+    if payment.membership_id is None:
+        return None
+    member_id = payment.member_id
+    if member_id is None:
+        raise ValidationError({"membership_id": ["The membership does not belong to this gym."]})
+    membership = (
+        Membership.objects.select_for_update()
+        .filter(gym_id=payment.gym_id, id=payment.membership_id, member_id=member_id)
+        .first()
+    )
+    if membership is None:
+        raise ValidationError({"membership_id": ["The membership does not belong to this gym."]})
+    return membership
+
+
+def _correction_business_date(*, gym: Gym, original_date: date, requested: date | None) -> date:
+    chosen = gym_today(gym) if requested is None else requested
+    if chosen > gym_today(gym):
+        raise ValidationError({"business_date": ["The business date cannot be after today."]})
+    if chosen < original_date:
+        raise ValidationError(
+            {"business_date": ["The business date cannot be before the original business date."]}
+        )
+    return chosen
+
+
+def _correction_cash(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    original: Payment,
+    source_id: UUID,
+    amount: Decimal,
+    business_date: date,
+    reason: str,
+    cash_session_id: UUID | None,
+    legacy: bool,
+    link_original_movement: bool,
+) -> CashTransaction | None:
+    if legacy:
+        if cash_session_id is not None:
+            raise ValidationError(
+                {
+                    "cash_session_id": [
+                        "A legacy unlinked cash charge has no original movement to correct."
+                    ]
+                }
+            )
+        return None
+    if original.method != Payment.Method.CASH:
+        if cash_session_id is not None:
+            raise ValidationError(
+                {"cash_session_id": ["Only a cash correction can use a cash session."]}
+            )
+        return None
+    if cash_session_id is None:
+        raise ValidationError({"cash_session_id": ["A cash correction requires an open session."]})
+    return record_cash_movement(
+        gym=gym,
+        actor=actor,
+        session_id=cash_session_id,
+        direction=CashTransaction.Direction.OUT,
+        source_type=CashTransaction.SourceType.PAYMENT,
+        source_id=source_id,
+        amount=amount,
+        currency=original.currency,
+        business_date=business_date,
+        description=f"Reversal: {original.description}"[:255],
+        reason=reason[:255],
+        reversal_of_id=original.cash_transaction_id if link_original_movement else None,
+    )
+
+
+def _refund_cash(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    source_id: UUID,
+    amount: Decimal,
+    currency: str,
+    method: str,
+    business_date: date,
+    description: str,
+    reason: str,
+    cash_session_id: UUID | None,
+) -> CashTransaction | None:
+    if method != Payment.Method.CASH:
+        if cash_session_id is not None:
+            raise ValidationError(
+                {"cash_session_id": ["Only a cash refund can use a cash session."]}
+            )
+        return None
+    if cash_session_id is None:
+        raise ValidationError({"cash_session_id": ["A cash refund requires an open session."]})
+    return record_cash_movement(
+        gym=gym,
+        actor=actor,
+        session_id=cash_session_id,
+        direction=CashTransaction.Direction.OUT,
+        source_type=CashTransaction.SourceType.PAYMENT,
+        source_id=source_id,
+        amount=amount,
+        currency=currency,
+        business_date=business_date,
+        description=description[:255],
+        reason=reason[:255],
+        reversal_of_id=None,
+    )
+
+
+def _insert_posted_correction(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    original: Payment,
+    correction_id: UUID,
+    entry_type: str,
+    amount: Decimal,
+    method: str,
+    business_date: date,
+    description: str,
+    reference_number: str,
+    movement: CashTransaction | None,
+    legacy: bool,
+    posted_at: datetime,
+) -> Payment:
+    reception = _holds_reception(gym_id=gym.id, membership_id=actor.id)
+    return Payment.objects.create(
+        id=correction_id,
+        gym=gym,
+        member_id=original.member_id,
+        membership_id=original.membership_id,
+        original_payment=original,
+        entry_type=entry_type,
+        purpose=original.purpose,
+        description=description,
+        amount=amount,
+        currency=original.currency,
+        method=method,
+        business_date=business_date,
+        received_at=posted_at,
+        reference_number=reference_number,
+        status=Payment.Status.POSTED,
+        submitted_at=posted_at,
+        submitted_by_membership_id=actor.id,
+        approved_at=posted_at,
+        approved_by_membership_id=actor.id,
+        posted_at=posted_at,
+        posted_by_membership_id=actor.id,
+        cash_session=None if movement is None else movement.cash_session,
+        cash_transaction=movement,
+        legacy_unlinked_cash=legacy,
+        created_with_reception_scope=reception,
+        submitted_with_reception_scope=reception,
+        created_by_membership_id=actor.id,
+        updated_by_membership_id=actor.id,
+    )
+
+
+def _void_locked_receipt(
+    *,
+    receipts: list[Receipt],
+    payment_id: UUID,
+    actor: GymMembership,
+    reason: str,
+    voided_at: datetime,
+) -> Receipt | None:
+    issued = next(
+        (
+            row
+            for row in receipts
+            if row.payment_id == payment_id and row.status == Receipt.Status.ISSUED
+        ),
+        None,
+    )
+    if issued is None:
+        return None
+    issued.status = Receipt.Status.VOID
+    issued.voided_at = voided_at
+    issued.voided_by_membership_id = actor.id
+    issued.void_reason = reason
+    issued.save(
+        update_fields=[
+            "status",
+            "voided_at",
+            "voided_by_membership_id",
+            "void_reason",
+            "updated_at",
+        ]
+    )
+    return issued
+
+
+def _settlement_after(membership: Membership | None) -> dict[str, object] | None:
+    if membership is None:
+        return None
+    refresh_membership_payment_status(membership)
+    membership.refresh_from_db()
+    paid = _posted_total(membership)
+    return {
+        "membership_id": membership.id,
+        "payment_status": membership.payment_status,
+        "paid_amount": paid,
+        "balance_amount": Decimal(membership.final_amount) - paid,
+    }

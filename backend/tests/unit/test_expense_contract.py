@@ -4,6 +4,7 @@ from apps.expenses.serializers import (
     ExpenseCategoryListQuerySerializer,
     ExpenseCategoryWriteSerializer,
     ExpenseWriteSerializer,
+    VoidExpenseSerializer,
 )
 from apps.files.serializers import UploadIntentSerializer
 
@@ -49,6 +50,14 @@ def test_expense_write_rejects_mass_assignment_and_inexact_money() -> None:
     )
     assert exact.is_valid(), exact.errors
     assert exact.validated_data["amount"] == Decimal("10.00")
+
+
+def test_expense_void_rejects_mass_assignment_and_blank_reason() -> None:
+    rejected = VoidExpenseSerializer(data={"reason": " ", "status": "VOID", "amount": "1.00"})
+    assert not rejected.is_valid()
+    assert "reason" in rejected.errors or "status" in rejected.errors
+    accepted = VoidExpenseSerializer(data={"reason": "Entered twice"})
+    assert accepted.is_valid(), accepted.errors
 
 
 def test_upload_intent_accepts_expense_receipt_gym_owner() -> None:

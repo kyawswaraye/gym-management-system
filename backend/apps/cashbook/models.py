@@ -40,6 +40,12 @@ _AUTOMATIC_TXN = models.Q(
     reversal_of__isnull=True,
     source_id__isnull=False,
 )
+_LINKED_CORRECTION_TXN = models.Q(
+    source_type__in=["PAYMENT", "EXPENSE"],
+    reversal_of__isnull=False,
+    source_id__isnull=False,
+    reason__regex=r"\S",
+)
 
 
 class CashSession(TenantModel):
@@ -104,14 +110,6 @@ class CashSession(TenantModel):
             models.CheckConstraint(
                 condition=models.Q(opening_cash__gte=0),
                 name="cashsession_opening_ck",
-            ),
-            models.CheckConstraint(
-                condition=models.Q(cash_sales__gte=0),
-                name="cashsession_sales_ck",
-            ),
-            models.CheckConstraint(
-                condition=models.Q(cash_expenses__gte=0),
-                name="cashsession_expenses_ck",
             ),
             models.CheckConstraint(
                 condition=models.Q(actual_closing__isnull=True) | models.Q(actual_closing__gte=0),
@@ -204,7 +202,7 @@ class CashTransaction(TenantModel):
                 name="cashtxn_currency_ck",
             ),
             models.CheckConstraint(
-                condition=_MANUAL_TXN | _REVERSAL_TXN | _AUTOMATIC_TXN,
+                condition=_MANUAL_TXN | _REVERSAL_TXN | _AUTOMATIC_TXN | _LINKED_CORRECTION_TXN,
                 name="cashtxn_shape_ck",
             ),
         ]

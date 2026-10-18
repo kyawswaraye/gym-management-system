@@ -41,6 +41,13 @@ class Expense(TenantModel):
         blank=True,
         related_name="reversed_by",
     )
+    original_expense = models.ForeignKey(
+        "self",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="corrections",
+    )
     submitted_at = models.DateTimeField(null=True, blank=True)
     submitted_by_membership_id = models.UUIDField(null=True, blank=True)
     approved_at = models.DateTimeField(null=True, blank=True)
@@ -51,6 +58,7 @@ class Expense(TenantModel):
     posted_at = models.DateTimeField(null=True, blank=True)
     posted_by_membership_id = models.UUIDField(null=True, blank=True)
     voided_at = models.DateTimeField(null=True, blank=True)
+    voided_by_membership_id = models.UUIDField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
     cancelled_by_membership_id = models.UUIDField(null=True, blank=True)
     reason = models.TextField(blank=True, default="")

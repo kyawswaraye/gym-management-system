@@ -25,7 +25,9 @@ def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     loader = MigrationLoader(None, ignore_no_migrations=True)
     loader.graph.ensure_not_cyclic()
     assert loader.graph.leaf_nodes("sales") == [SALES_LEAF]
-    assert loader.graph.leaf_nodes("members") == [("members", "0018_retail_sale_foundation")]
+    assert loader.graph.leaf_nodes("members") == [
+        ("members", "0019_payment_receipt_runtime_reversal")
+    ]
     inventory_leaf = ("inventory", "0003_retail_sale_foundation")
     members_leaf = ("members", "0018_retail_sale_foundation")
     assert loader.graph.leaf_nodes("inventory") == [inventory_leaf]

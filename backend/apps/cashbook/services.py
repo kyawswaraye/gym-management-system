@@ -399,8 +399,6 @@ def recompute_cash_totals(session: CashSession) -> tuple[Decimal, Decimal, Decim
             expenses -= signed
         else:
             raise CashMovementRejected()
-    if sales < 0 or expenses < 0:
-        raise CashMovementRejected()
     return parse_money(sales), parse_money(expenses), parse_money(manual)
 
 

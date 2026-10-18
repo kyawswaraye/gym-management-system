@@ -609,12 +609,12 @@ def test_member_summary_dates_history_balances_and_query_budget() -> None:
         (overpaid, Payment.EntryType.CHARGE, Payment.Status.POSTED, "80.00"),
         (cancelled, Payment.EntryType.CHARGE, Payment.Status.POSTED, "200.00"),
         (refund_heavy, Payment.EntryType.CHARGE, Payment.Status.POSTED, "10.00"),
-        (refund_heavy, Payment.EntryType.REFUND, Payment.Status.POSTED, "12.00"),
+        (refund_heavy, Payment.EntryType.REFUND, Payment.Status.POSTED, "10.00"),
         (None, Payment.EntryType.CHARGE, Payment.Status.POSTED, "25.00"),
         (None, Payment.EntryType.CHARGE, Payment.Status.VOID, "7.00"),
         (None, Payment.EntryType.REFUND, Payment.Status.POSTED, "3.00"),
         (None, Payment.EntryType.REFUND, Payment.Status.VOID, "2.00"),
-        (None, Payment.EntryType.REFUND, Payment.Status.POSTED, "400.00"),
+        (None, Payment.EntryType.REFUND, Payment.Status.POSTED, "4.00"),
     )
     posted_charge = None
     originals: dict[object, Payment] = {}
@@ -692,9 +692,9 @@ def test_member_summary_dates_history_balances_and_query_budget() -> None:
         "available": True,
         "currency": gym.currency,
         "total_charged": "367.00",
-        "total_refunded": "432.00",
-        "net_paid": "0.00",
-        "outstanding_membership_balance": "97.00",
+        "total_refunded": "34.00",
+        "net_paid": "333.00",
+        "outstanding_membership_balance": "95.00",
     }
     for secret in ("do-not-leak-description", "REF-SECRET", "RCPT-SECRET", "Actor Secret"):
         assert secret not in rendered

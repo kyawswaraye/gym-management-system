@@ -9,6 +9,7 @@ from apps.expenses.views import (
     ExpenseListCreateView,
     ExpenseRejectView,
     ExpenseSubmitView,
+    ExpenseVoidView,
 )
 
 urlpatterns = [
@@ -39,5 +40,10 @@ urlpatterns = [
         "expenses/<uuid:expense_id>/cancel/",
         ExpenseCancelView.as_view(),
         name="expense-cancel",
+    ),
+    path(
+        "expenses/<uuid:expense_id>/void/",
+        ExpenseVoidView.as_view(),
+        name="expense-void",
     ),
 ]

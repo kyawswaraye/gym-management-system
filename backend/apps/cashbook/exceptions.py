@@ -11,4 +11,4 @@ class CashSessionUnavailable(FinanceStateConflict):
 
 
 class CashMovementRejected(FinanceStateConflict):
-    """A movement would break the session's non-negative sales or expenses."""
+    """A movement does not match an append-only cash source."""

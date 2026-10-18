@@ -855,7 +855,7 @@ def test_reversal_linkage_is_reciprocal_and_reserved() -> None:
                 gym=gym,
                 original=original,
                 entry_type=Payment.EntryType.REVERSAL,
-                amount=Decimal("1.00"),
+                amount=original.amount,
                 business_date=today,
                 owner_id=owner.id,
                 submitter_id=receptionist.id,
@@ -890,29 +890,10 @@ def test_reversal_linkage_is_reciprocal_and_reserved() -> None:
                 ]
             )
 
-    def runtime_void(sequence_value: int, *, session_setting: bool) -> None:
-        with pytest.raises(DatabaseError, match="void is reserved to the migration role"):
+    def runtime_void_without_reversal(*, session_setting: bool) -> None:
+        with pytest.raises(DatabaseError, match="void requires a reversal"):
             with transaction.atomic():
                 set_gym_context(gym_id=gym.id)
-                other = Payment.objects.get(id=second)
-                reserved = _posted_correction(
-                    gym=gym,
-                    original=other,
-                    entry_type=Payment.EntryType.REVERSAL,
-                    amount=other.amount,
-                    business_date=today,
-                    owner_id=owner.id,
-                    submitter_id=receptionist.id,
-                    approver_id=manager.id,
-                    sequence_value=sequence_value,
-                )
-                moment = timezone.now()
-                Receipt.objects.filter(payment=other, status=Receipt.Status.ISSUED).update(
-                    status=Receipt.Status.VOID,
-                    voided_at=moment,
-                    voided_by_membership_id=manager.id,
-                    void_reason="reserved",
-                )
                 with connection.cursor() as cursor:
                     cursor.execute("SET LOCAL ROLE gym_runtime")
                     if session_setting:
@@ -923,21 +904,61 @@ def test_reversal_linkage_is_reciprocal_and_reserved() -> None:
                         """
                         UPDATE members_payment
                         SET status = 'VOID',
-                            reversal_payment_id = %s,
                             voided_at = now(),
                             voided_by_membership_id = %s,
                             void_reason = 'reserved',
                             updated_at = now()
                         WHERE id = %s
                         """,
-                        [reserved.id, manager.id, other.id],
+                        [manager.id, second],
                     )
 
-    runtime_void(4, session_setting=False)
-    runtime_void(5, session_setting=True)
-    other = Payment.objects.get(id=second)
-    assert other.status == "POSTED"
-    assert other.reversal_payment_id is None
+    runtime_void_without_reversal(session_setting=False)
+    runtime_void_without_reversal(session_setting=True)
+    untouched = Payment.objects.get(id=second)
+    assert untouched.status == "POSTED"
+    assert untouched.reversal_payment_id is None
+
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        other = Payment.objects.get(id=second)
+        reserved = _posted_correction(
+            gym=gym,
+            original=other,
+            entry_type=Payment.EntryType.REVERSAL,
+            amount=other.amount,
+            business_date=today,
+            owner_id=owner.id,
+            submitter_id=receptionist.id,
+            approver_id=manager.id,
+            sequence_value=4,
+        )
+        moment = timezone.now()
+        Receipt.objects.filter(payment=other, status=Receipt.Status.ISSUED).update(
+            status=Receipt.Status.VOID,
+            voided_at=moment,
+            voided_by_membership_id=manager.id,
+            void_reason="reserved",
+        )
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL ROLE gym_runtime")
+            cursor.execute("SELECT set_config('app.payment_internal_correction', 'on', true)")
+            cursor.execute(
+                """
+                UPDATE members_payment
+                SET status = 'VOID',
+                    reversal_payment_id = %s,
+                    voided_at = now(),
+                    voided_by_membership_id = %s,
+                    void_reason = 'reserved',
+                    updated_at = now()
+                WHERE id = %s
+                """,
+                [reserved.id, manager.id, other.id],
+            )
+    completed = Payment.objects.get(id=second)
+    assert completed.status == "VOID"
+    assert completed.reversal_payment_id == reserved.id
 
 
 def _void_linked(
@@ -1115,6 +1136,13 @@ def test_cash_reversal_requires_an_out_movement() -> None:
                 currency=gym.currency,
                 business_date=original.business_date,
                 occurred_at=moment,
+                description="Cash reversal",
+                reason="reversal" if direction == CashTransaction.Direction.OUT else "",
+                reversal_of_id=(
+                    original.cash_transaction_id
+                    if direction == CashTransaction.Direction.OUT
+                    else None
+                ),
                 created_by_membership_id=manager.id,
             )
             session = CashSession.objects.select_for_update().get(id=session_id)

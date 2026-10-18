@@ -16,11 +16,14 @@ from apps.members.payment_views import (
     PaymentCancelView,
     PaymentDetailView,
     PaymentListCreateView,
+    PaymentRefundView,
     PaymentRejectView,
     PaymentSubmitView,
+    PaymentVoidView,
     ReceiptDetailView,
     ReceiptDownloadView,
     ReceiptListView,
+    ReceiptVoidView,
 )
 from apps.members.scan_views import MemberCheckInScanView
 from apps.members.views import (
@@ -169,8 +172,23 @@ urlpatterns = [
         PaymentCancelView.as_view(),
         name="payment-cancel",
     ),
+    path(
+        "payments/<uuid:payment_id>/void/",
+        PaymentVoidView.as_view(),
+        name="payment-void",
+    ),
+    path(
+        "payments/<uuid:payment_id>/refund/",
+        PaymentRefundView.as_view(),
+        name="payment-refund",
+    ),
     path("receipts/", ReceiptListView.as_view(), name="receipt-list"),
     path("receipts/<uuid:receipt_id>/", ReceiptDetailView.as_view(), name="receipt-detail"),
+    path(
+        "receipts/<uuid:receipt_id>/void/",
+        ReceiptVoidView.as_view(),
+        name="receipt-void",
+    ),
     path(
         "receipts/<uuid:receipt_id>/download/",
         ReceiptDownloadView.as_view(),

@@ -100,8 +100,8 @@ class CashSessionSerializer(serializers.Serializer):
     register_code = serializers.CharField()
     currency = serializers.CharField()
     opening_cash = ExactMoneyField(minimum=Decimal("0"), read_only=True)
-    cash_sales = ExactMoneyField(minimum=Decimal("0"), read_only=True)
-    cash_expenses = ExactMoneyField(minimum=Decimal("0"), read_only=True)
+    cash_sales = ExactMoneyField(minimum=Decimal("-9999999999999999.99"), read_only=True)
+    cash_expenses = ExactMoneyField(minimum=Decimal("-9999999999999999.99"), read_only=True)
     manual_net = ExactMoneyField(minimum=Decimal("-9999999999999999.99"), read_only=True)
     expected_closing = ExactMoneyField(minimum=Decimal("-9999999999999999.99"), read_only=True)
     actual_closing = ExactMoneyField(

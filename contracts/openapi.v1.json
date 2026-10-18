@@ -5173,6 +5173,141 @@
                 }
             }
         },
+        "/api/v1/expenses/{expense_id}/void/": {
+            "post": {
+                "operationId": "expenses_void",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "High-entropy key reused only for retries of this expense command.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "expense_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "expenses"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidExpenseRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidExpenseRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidExpenseRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ExpenseVoidEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/files/{id}/": {
             "delete": {
                 "operationId": "files_delete_upload",
@@ -9091,6 +9226,141 @@
                 }
             }
         },
+        "/api/v1/payments/{payment_id}/refund/": {
+            "post": {
+                "operationId": "payments_refund",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "High-entropy key reused only for retries of this payment command.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "payment_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RefundPaymentRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RefundPaymentRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RefundPaymentRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaymentCorrectionEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/payments/{payment_id}/reject/": {
             "post": {
                 "operationId": "payments_reject",
@@ -9299,6 +9569,141 @@
                         "description": ""
                     },
                     "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/payments/{payment_id}/void/": {
+            "post": {
+                "operationId": "payments_void",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "High-entropy key reused only for retries of this payment command.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "payment_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidPaymentRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidPaymentRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidPaymentRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaymentCorrectionEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "422": {
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10377,6 +10782,141 @@
                         "description": ""
                     },
                     "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/receipts/{receipt_id}/void/": {
+            "post": {
+                "operationId": "receipts_void",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "High-entropy key reused only for retries of this payment command.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "receipt_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "receipts"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidReceiptRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidReceiptRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidReceiptRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReceiptEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -16411,6 +16951,11 @@
                         "format": "uuid",
                         "nullable": true
                     },
+                    "original_expense_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
                     "submitted_at": {
                         "type": "string",
                         "format": "date-time",
@@ -16457,6 +17002,11 @@
                     "voided_at": {
                         "type": "string",
                         "format": "date-time",
+                        "nullable": true
+                    },
+                    "voided_by_membership_id": {
+                        "type": "string",
+                        "format": "uuid",
                         "nullable": true
                     },
                     "cancelled_at": {
@@ -16514,6 +17064,7 @@
                     "currency",
                     "description",
                     "id",
+                    "original_expense_id",
                     "payment_method",
                     "policy_note",
                     "posted_at",
@@ -16529,7 +17080,8 @@
                     "submitted_by_membership_id",
                     "updated_at",
                     "updated_by_membership_id",
-                    "voided_at"
+                    "voided_at",
+                    "voided_by_membership_id"
                 ]
             },
             "ExpenseApproval": {
@@ -16769,6 +17321,58 @@
                 "required": [
                     "has_more",
                     "next_after"
+                ]
+            },
+            "ExpenseVoid": {
+                "type": "object",
+                "properties": {
+                    "original_expense": {
+                        "$ref": "#/components/schemas/Expense"
+                    },
+                    "reversal_expense": {
+                        "$ref": "#/components/schemas/Expense"
+                    },
+                    "cash_session": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/CashSession"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "cash_transaction": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/CashTransaction"
+                            }
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "cash_session",
+                    "cash_transaction",
+                    "original_expense",
+                    "reversal_expense"
+                ]
+            },
+            "ExpenseVoidEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/ExpenseVoid"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
                 ]
             },
             "ExpenseWriteRequest": {
@@ -19832,6 +20436,73 @@
                     "success"
                 ]
             },
+            "PaymentCorrection": {
+                "type": "object",
+                "properties": {
+                    "original_payment": {
+                        "$ref": "#/components/schemas/Payment"
+                    },
+                    "correction_payment": {
+                        "$ref": "#/components/schemas/Payment"
+                    },
+                    "original_receipt": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Receipt"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "correction_receipt": {
+                        "$ref": "#/components/schemas/Receipt"
+                    },
+                    "cash_transactions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CashTransaction"
+                        }
+                    },
+                    "refundable_amount": {
+                        "type": "string"
+                    },
+                    "membership_settlement": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/MembershipSettlement"
+                            }
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "cash_transactions",
+                    "correction_payment",
+                    "correction_receipt",
+                    "membership_settlement",
+                    "original_payment",
+                    "original_receipt",
+                    "refundable_amount"
+                ]
+            },
+            "PaymentCorrectionEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/PaymentCorrection"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
+                ]
+            },
             "PaymentEnvelope": {
                 "type": "object",
                 "properties": {
@@ -20723,6 +21394,43 @@
                 },
                 "required": [
                     "refresh_token"
+                ]
+            },
+            "RefundPaymentRequest": {
+                "type": "object",
+                "properties": {
+                    "amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                    },
+                    "method": {
+                        "$ref": "#/components/schemas/PaymentMethodEnum"
+                    },
+                    "business_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "reference_number": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "cash_session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "amount",
+                    "business_date",
+                    "method",
+                    "reason"
                 ]
             },
             "RejectExpenseRequest": {
@@ -22764,6 +23472,63 @@
                     "file_field",
                     "method",
                     "url"
+                ]
+            },
+            "VoidExpenseRequest": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                    },
+                    "business_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "cash_session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "reason"
+                ]
+            },
+            "VoidPaymentRequest": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                    },
+                    "business_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "cash_session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "reason"
+                ]
+            },
+            "VoidReceiptRequest": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                    }
+                },
+                "required": [
+                    "reason"
                 ]
             }
         },

@@ -115,6 +115,17 @@ stay unpublished. Approval posts one sale movement per line, one product
 payment, one receipt, and one cash-in movement when the method is cash.
 Quantity times money rounds half up to minor units. Daily product metrics
 come from posted retail lines. Phase 4 remains open.
+Phase 4 increment 8A publishes payment void, payment refund, receipt void, and
+manual expense void. Salary void and retail void/returns stay unpublished:
+their public contract only says `reason`, and a cash-origin record may need an
+open destination session after the original till is closed. Product payment
+corrections are rejected so posted retail stock and receipts stay aligned.
+A legacy unlinked cash void does not invent a movement. Closed sessions are
+not reopened. A correction requires the exact live permission, the finance
+entitlement, and an active same-gym membership. The creator, submitter, or
+receipt issuer may correct, including through a custom role that holds that
+permission. Approval and rejection still require a different protected Manager
+or Owner. Increment 9 UI claims are unchanged. Phase 4 remains open.
 Increment 6 gate evidence: backend ruff, format, and mypy passed and
 migrations stayed in sync; 273 non-PostgreSQL backend tests passed; the
 PostgreSQL suite passed 234 tests; web format, lint, typecheck, and build
@@ -130,6 +141,16 @@ retail-sale routes and omit retail void. A second schema export matched the
 working tree. End-to-end browser tests were not run. The local `make check`
 contract step still reports the schema files because this increment is not
 committed. Phase 4 remains open.
+Increment 8A gate evidence: backend ruff, format, and mypy passed and
+migrations stayed in sync; 282 non-PostgreSQL backend tests passed and 244
+were deselected; the PostgreSQL suite passed 244 tests and 282 were
+deselected. Those suite results are after the correction-authorization
+alignment. Web format, lint, typecheck, and build passed, with 263 web tests.
+OpenAPI and the generated web types include payment void, payment refund,
+receipt void, and manual expense void, and omit salary void and retail
+void/returns. A second schema export matched the working tree. End-to-end
+browser tests were not run. The local `make check` contract step still reports
+the schema files because this increment is not committed. Phase 4 remains open.
 
 `is_pt_client` stays false until Phase 5 derives it from an active trainer
 assignment.

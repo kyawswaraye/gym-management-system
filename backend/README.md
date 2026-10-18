@@ -22,10 +22,10 @@ Member-self QR redemption is published at `POST /api/v1/member/check-ins/scan/`.
 Display-device list, enroll, rotate, and revoke are published, as is
 `POST /api/v1/device/check-in-challenges/`. NFC and biometric ingestion is published at `POST /api/v1/device/check-ins/`.
 The generic staff scan path, trainer scan, notification HTTP routes, and
-Payment draft, submit, approve, reject, cancel, receipt list, detail, download, and daily sales are published. Void, refund, and receipt void remain unpublished. Cash-session
+Payment draft, submit, approve, reject, cancel, void, refund, receipt list, detail, download, receipt void, and daily sales are published. Salary void and retail void/returns remain unpublished. Cash-session
 list, detail, open, adjustment, and reconcile, plus the cash-transaction
 list, are published. The cash-book staff UI is deferred to increment 9. Expense-category and expense
-approval routes are published; expense void remains unpublished. Salary-period
+approval routes are published. Manual expense void is published in Increment 8A. Salary-period
 list, detail, create, update, line replacement, submit, approve, reject, and
 cancel are published; salary void remains unpublished. Product-category
 list and create, product list, detail, create, and update, low-stock, and
@@ -158,13 +158,16 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   Phase 4 increment 1 is the finance foundation under ADR 0009: exact money,
   encrypted idempotency, receipt sequences, and `expense_categories.manage`.
   Increment 3 publishes payment, receipt, and daily-sales routes on that foundation.
-  Increment 4 publishes expense-category and expense approval routes. Void, refund,
-  receipt void, and expense void remain unpublished.
+  Increment 4 publishes expense-category and expense approval routes.
+  Increment 8A publishes payment void, payment refund, receipt void, and
+  manual expense void. Salary void and retail void/returns remain unpublished
+  until their destination open-session contract is specified.
   Increment 5 publishes salary-period and salary-line routes. Salary void
   remains unpublished.
   Increment 6 publishes product-category list/create, product
   list/create/detail/update, low-stock, stock-movement list, and manual
-  adjustment. Category update and void/refund routes remain unpublished.
+  adjustment. Category update remains unpublished. Payment and manual expense
+  corrections are Increment 8A.
   Catalog and stock commands use the finance entitlement.
   Increment 7 publishes retail-sale list/create/detail/update and
   submit/approve/reject/cancel. Retail void, returns, and the retail UI

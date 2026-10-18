@@ -375,7 +375,7 @@ def test_database_guards_and_runtime_cannot_void() -> None:
                     "UPDATE expenses_expense SET amount = %s WHERE id = %s",
                     [Decimal("99.00"), expense_id],
                 )
-    with pytest.raises(DatabaseError, match="void is reserved"):
+    with pytest.raises(DatabaseError, match="void evidence does not match"):
         with transaction.atomic():
             with connection.cursor() as cursor:
                 _as_runtime(cursor)

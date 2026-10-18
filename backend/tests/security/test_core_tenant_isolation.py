@@ -310,6 +310,7 @@ def test_tenant_a_api_cannot_access_tenant_b_core_operations() -> None:
             {"reason": "cross-tenant attempt"},
             format="json",
             HTTP_AUTHORIZATION=f"Bearer {token_a}",
+            HTTP_IDEMPOTENCY_KEY="iso-pay-void0000000001",
         ).status_code
         == 404
     )

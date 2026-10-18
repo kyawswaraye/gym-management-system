@@ -100,6 +100,40 @@ class RejectPaymentSerializer(StrictSerializer):
         return value.strip()
 
 
+class VoidPaymentSerializer(StrictSerializer):
+    reason = serializers.CharField(max_length=2000, trim_whitespace=True)
+    business_date = serializers.DateField(required=False)
+    cash_session_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_reason(self, value: str) -> str:
+        if not value.strip():
+            raise serializers.ValidationError("Enter a reason.")
+        return value.strip()
+
+
+class RefundPaymentSerializer(StrictSerializer):
+    amount = ExactMoneyField(minimum=Decimal("0.01"), positive=True)
+    reason = serializers.CharField(max_length=2000, trim_whitespace=True)
+    method = serializers.ChoiceField(choices=Payment.Method.choices)
+    business_date = serializers.DateField()
+    reference_number = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    cash_session_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_reason(self, value: str) -> str:
+        if not value.strip():
+            raise serializers.ValidationError("Enter a reason.")
+        return value.strip()
+
+
+class VoidReceiptSerializer(StrictSerializer):
+    reason = serializers.CharField(max_length=2000, trim_whitespace=True)
+
+    def validate_reason(self, value: str) -> str:
+        if not value.strip():
+            raise serializers.ValidationError("Enter a reason.")
+        return value.strip()
+
+
 class CancelPaymentSerializer(StrictSerializer):
     reason = serializers.CharField(max_length=2000, trim_whitespace=True)
 
@@ -237,6 +271,22 @@ class PaymentApprovalSerializer(serializers.Serializer):
     cash_session = CashSessionSerializer(allow_null=True)
     cash_transaction = CashTransactionSerializer(allow_null=True)
     membership_settlement = MembershipSettlementSerializer(allow_null=True)
+
+
+class PaymentCorrectionSerializer(serializers.Serializer):
+    original_payment = PaymentSerializer()
+    correction_payment = PaymentSerializer()
+    original_receipt = ReceiptSerializer(allow_null=True)
+    correction_receipt = ReceiptSerializer()
+    cash_transactions = CashTransactionSerializer(many=True)
+    refundable_amount = serializers.CharField()
+    membership_settlement = MembershipSettlementSerializer(allow_null=True)
+
+
+class PaymentCorrectionEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    data = PaymentCorrectionSerializer()
+    message = serializers.CharField()
 
 
 class PaymentApprovalEnvelopeSerializer(serializers.Serializer):

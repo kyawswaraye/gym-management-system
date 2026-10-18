@@ -39,8 +39,10 @@ from apps.expenses.serializers import (
     ExpenseListEnvelopeSerializer,
     ExpenseListQuerySerializer,
     ExpenseUpdateSerializer,
+    ExpenseVoidEnvelopeSerializer,
     ExpenseWriteSerializer,
     RejectExpenseSerializer,
+    VoidExpenseSerializer,
     category_payload,
     expense_payload,
 )
@@ -55,6 +57,7 @@ from apps.expenses.services import (
     submit_expense,
     update_category,
     update_expense_draft,
+    void_expense,
 )
 from apps.files.throttling import MembershipWindowThrottle
 from apps.users.permissions import RequiresEntitlement, RequiresPermission
@@ -605,6 +608,76 @@ class ExpenseCancelView(ExpenseCommandView):
             command=cancel_expense,
             fields={"reason": serializer.validated_data["reason"]},
         )
+
+
+class ExpenseVoidView(ExpenseCommandView):
+    required_permission = "expenses.void"
+
+    @extend_schema(
+        operation_id="expenses_void",
+        parameters=[IDEMPOTENCY_HEADER],
+        request=VoidExpenseSerializer,
+        responses={
+            200: ExpenseVoidEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+            422: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, expense_id: UUID) -> HttpResponse:
+        serializer = VoidExpenseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+        key = require_idempotency_key(request.headers.get("Idempotency-Key"))
+        context = _audit_context(request)
+        fields = {
+            "reason": payload["reason"],
+            "business_date": payload.get("business_date"),
+            "cash_session_id": payload.get("cash_session_id"),
+        }
+        body = {"expense_id": str(expense_id), **fields}
+
+        def mutate() -> IdempotentResponse:
+            original, reversal, movement = void_expense(
+                gym=request.gym,
+                actor=request.gym_membership,
+                expense_id=expense_id,
+                **fields,
+                **context,
+            )
+            session = None if movement is None else movement.cash_session
+            rendered = {
+                "success": True,
+                "data": {
+                    "original_expense": expense_payload(original),
+                    "reversal_expense": expense_payload(reversal),
+                    "cash_session": None if session is None else session_payload(session),
+                    "cash_transaction": None if movement is None else transaction_payload(movement),
+                },
+                "message": "Expense voided",
+            }
+            return IdempotentResponse(
+                status=200,
+                body=JSONRenderer().render(rendered),
+                resource_type="Expense",
+                resource_id=reversal.id,
+            )
+
+        result = run_idempotent(
+            gym_id=request.gym.id,
+            actor_membership_id=request.gym_membership.id,
+            http_method="POST",
+            route=command_route(expense_id=expense_id, action="void"),
+            idempotency_key=key,
+            body=body,
+            mutate=mutate,
+            request=request,
+        )
+        return _stored_response(result)
 
 
 def _expense_command(

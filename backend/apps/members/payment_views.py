@@ -39,6 +39,7 @@ from apps.members.payment_serializers import (
     DailySalesQuerySerializer,
     EmptyCommandSerializer,
     PaymentApprovalEnvelopeSerializer,
+    PaymentCorrectionEnvelopeSerializer,
     PaymentEnvelopeSerializer,
     PaymentListEnvelopeSerializer,
     PaymentListQuerySerializer,
@@ -47,7 +48,11 @@ from apps.members.payment_serializers import (
     ReceiptEnvelopeSerializer,
     ReceiptListEnvelopeSerializer,
     ReceiptListQuerySerializer,
+    RefundPaymentSerializer,
     RejectPaymentSerializer,
+    VoidPaymentSerializer,
+    VoidReceiptSerializer,
+    money_text,
     payment_payload,
     receipt_payload,
     settlement_payload,
@@ -57,9 +62,12 @@ from apps.members.payment_services import (
     cancel_payment,
     command_route,
     create_payment_draft,
+    refund_payment,
     reject_payment,
     submit_payment,
     update_payment_draft,
+    void_payment,
+    void_receipt,
 )
 from apps.members.receipt_rendering import receipt_download_response
 from apps.users.permissions import RequiresEntitlement, RequiresEntitlements, RequiresPermission
@@ -470,6 +478,81 @@ class PaymentCancelView(PaymentCommandView):
         )
 
 
+class PaymentVoidView(PaymentCommandView):
+    required_permission = "payments.void"
+
+    @extend_schema(
+        operation_id="payments_void",
+        parameters=[IDEMPOTENCY_HEADER],
+        request=VoidPaymentSerializer,
+        responses={
+            200: PaymentCorrectionEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+            422: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, payment_id: UUID) -> HttpResponse:
+        serializer = VoidPaymentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+        return _correction_command(
+            request,
+            payment_id=payment_id,
+            action="void",
+            message="Payment voided",
+            command=void_payment,
+            fields={
+                "reason": payload["reason"],
+                "business_date": payload.get("business_date"),
+                "cash_session_id": payload.get("cash_session_id"),
+            },
+        )
+
+
+class PaymentRefundView(PaymentCommandView):
+    required_permission = "payments.refund"
+
+    @extend_schema(
+        operation_id="payments_refund",
+        parameters=[IDEMPOTENCY_HEADER],
+        request=RefundPaymentSerializer,
+        responses={
+            200: PaymentCorrectionEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+            422: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, payment_id: UUID) -> HttpResponse:
+        serializer = RefundPaymentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+        return _correction_command(
+            request,
+            payment_id=payment_id,
+            action="refund",
+            message="Payment refunded",
+            command=refund_payment,
+            fields={
+                "amount": payload["amount"],
+                "reason": payload["reason"],
+                "method": payload["method"],
+                "business_date": payload["business_date"],
+                "reference_number": str(payload.get("reference_number") or ""),
+                "cash_session_id": payload.get("cash_session_id"),
+            },
+        )
+
+
 class ReceiptListView(PaymentAPIView):
     required_permission = "receipts.view"
 
@@ -517,6 +600,65 @@ class ReceiptDetailView(PaymentAPIView):
         return success_response(receipt_payload(receipt))
 
 
+class ReceiptVoidView(PaymentCommandView):
+    required_permission = "receipts.void"
+
+    @extend_schema(
+        operation_id="receipts_void",
+        parameters=[IDEMPOTENCY_HEADER],
+        request=VoidReceiptSerializer,
+        responses={
+            200: ReceiptEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+            422: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, receipt_id: UUID) -> HttpResponse:
+        serializer = VoidReceiptSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        key = require_idempotency_key(request.headers.get("Idempotency-Key"))
+        context = _audit_context(request)
+        reason = serializer.validated_data["reason"]
+        body = {"receipt_id": str(receipt_id), "reason": reason}
+
+        def mutate() -> IdempotentResponse:
+            receipt = void_receipt(
+                gym=request.gym,
+                actor=request.gym_membership,
+                receipt_id=receipt_id,
+                reason=reason,
+                **context,
+            )
+            rendered = {
+                "success": True,
+                "data": receipt_payload(receipt),
+                "message": "Receipt voided",
+            }
+            return IdempotentResponse(
+                status=200,
+                body=JSONRenderer().render(rendered),
+                resource_type="Receipt",
+                resource_id=receipt.id,
+            )
+
+        result = run_idempotent(
+            gym_id=request.gym.id,
+            actor_membership_id=request.gym_membership.id,
+            http_method="POST",
+            route=f"/api/v1/receipts/{receipt_id}/void/",
+            idempotency_key=key,
+            body=body,
+            mutate=mutate,
+            request=request,
+        )
+        return _stored_response(result)
+
+
 class ReceiptDownloadView(PaymentAPIView):
     required_permission = "receipts.view"
 
@@ -558,6 +700,76 @@ class DailySalesView(APIView):
             currency=request.gym.currency,
         )
         return success_response(payload)
+
+
+def _correction_command(
+    request: Request,
+    *,
+    payment_id: UUID,
+    action: str,
+    message: str,
+    command: Any,
+    fields: dict[str, Any],
+) -> HttpResponse:
+    key = require_idempotency_key(request.headers.get("Idempotency-Key"))
+    context = _audit_context(request)
+    body = {"payment_id": str(payment_id), **fields}
+
+    def mutate() -> IdempotentResponse:
+        result = command(
+            gym=request.gym,
+            actor=request.gym_membership,
+            payment_id=payment_id,
+            **fields,
+            **context,
+        )
+        settlement = result["settlement"]
+        rendered = {
+            "success": True,
+            "data": {
+                "original_payment": payment_payload(result["original"]),
+                "correction_payment": payment_payload(result["correction"]),
+                "original_receipt": (
+                    None
+                    if result["original_receipt"] is None
+                    else receipt_payload(result["original_receipt"])
+                ),
+                "correction_receipt": receipt_payload(result["correction_receipt"]),
+                "cash_transactions": [
+                    transaction_payload(movement) for movement in result["cash_transactions"]
+                ],
+                "refundable_amount": money_text(result["refundable_amount"]),
+                "membership_settlement": (
+                    None
+                    if settlement is None
+                    else settlement_payload(
+                        membership_id=settlement["membership_id"],
+                        payment_status=str(settlement["payment_status"]),
+                        paid_amount=settlement["paid_amount"],
+                        balance_amount=settlement["balance_amount"],
+                    )
+                ),
+            },
+            "message": message,
+        }
+        return IdempotentResponse(
+            status=200,
+            body=JSONRenderer().render(rendered),
+            resource_type="Payment",
+            resource_id=result["correction"].id,
+        )
+
+    stored = run_idempotent(
+        gym_id=request.gym.id,
+        actor_membership_id=request.gym_membership.id,
+        http_method="POST",
+        route=command_route(payment_id=payment_id, action=action),
+        idempotency_key=key,
+        body=body,
+        mutate=mutate,
+        request=request,
+    )
+    return _stored_response(stored)
 
 
 def _payment_command(

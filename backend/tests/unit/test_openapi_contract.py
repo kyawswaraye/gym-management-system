@@ -97,8 +97,11 @@ PUBLISHED_PATHS = {
     "/api/v1/payments/{payment_id}/approve/",
     "/api/v1/payments/{payment_id}/reject/",
     "/api/v1/payments/{payment_id}/cancel/",
+    "/api/v1/payments/{payment_id}/void/",
+    "/api/v1/payments/{payment_id}/refund/",
     "/api/v1/receipts/",
     "/api/v1/receipts/{receipt_id}/",
+    "/api/v1/receipts/{receipt_id}/void/",
     "/api/v1/receipts/{receipt_id}/download/",
     "/api/v1/sales/daily/",
     "/api/v1/expense-categories/",
@@ -109,6 +112,7 @@ PUBLISHED_PATHS = {
     "/api/v1/expenses/{expense_id}/approve/",
     "/api/v1/expenses/{expense_id}/reject/",
     "/api/v1/expenses/{expense_id}/cancel/",
+    "/api/v1/expenses/{expense_id}/void/",
     "/api/v1/salary-periods/",
     "/api/v1/salary-periods/{period_id}/",
     "/api/v1/salary-periods/{period_id}/lines/",
@@ -164,10 +168,6 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
         "/api/v1/check-ins/scan/",
         "/api/v1/member/me/",
         "/api/v1/notifications/",
-        "/api/v1/payments/{payment_id}/void/",
-        "/api/v1/payments/{payment_id}/refund/",
-        "/api/v1/receipts/{receipt_id}/void/",
-        "/api/v1/expenses/{expense_id}/void/",
         "/api/v1/salary-periods/{period_id}/void/",
         "/api/v1/retail-sales/{sale_id}/void/",
         "/api/v1/product-categories/{id}/",
@@ -1109,12 +1109,6 @@ def test_openapi_documents_complete_retry_after() -> None:
 def test_openapi_documents_payment_commands_and_generated_types() -> None:
     document = generated_schema()
     paths = document["paths"]
-    for deferred in (
-        "/api/v1/payments/{payment_id}/void/",
-        "/api/v1/payments/{payment_id}/refund/",
-        "/api/v1/receipts/{receipt_id}/void/",
-    ):
-        assert deferred not in paths
     writes = (
         (paths["/api/v1/payments/"]["post"], "201"),
         (paths["/api/v1/payments/{payment_id}/"]["patch"], "200"),
@@ -1122,6 +1116,9 @@ def test_openapi_documents_payment_commands_and_generated_types() -> None:
         (paths["/api/v1/payments/{payment_id}/approve/"]["post"], "200"),
         (paths["/api/v1/payments/{payment_id}/reject/"]["post"], "200"),
         (paths["/api/v1/payments/{payment_id}/cancel/"]["post"], "200"),
+        (paths["/api/v1/payments/{payment_id}/void/"]["post"], "200"),
+        (paths["/api/v1/payments/{payment_id}/refund/"]["post"], "200"),
+        (paths["/api/v1/receipts/{receipt_id}/void/"]["post"], "200"),
     )
     for operation, success in writes:
         header = next(
@@ -1142,13 +1139,14 @@ def test_openapi_documents_payment_commands_and_generated_types() -> None:
     assert "200" in sales["responses"]
     generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
     assert '"/api/v1/payments/{payment_id}/approve/"' in generated
+    assert '"/api/v1/payments/{payment_id}/void/"' in generated
+    assert '"/api/v1/receipts/{receipt_id}/void/"' in generated
     assert '"/api/v1/sales/daily/"' in generated
 
 
 def test_openapi_documents_expense_commands() -> None:
     document = generated_schema()
     paths = document["paths"]
-    assert "/api/v1/expenses/{expense_id}/void/" not in paths
     writes = (
         (paths["/api/v1/expense-categories/"]["post"], "201"),
         (paths["/api/v1/expense-categories/{category_id}/"]["patch"], "200"),
@@ -1158,6 +1156,7 @@ def test_openapi_documents_expense_commands() -> None:
         (paths["/api/v1/expenses/{expense_id}/approve/"]["post"], "200"),
         (paths["/api/v1/expenses/{expense_id}/reject/"]["post"], "200"),
         (paths["/api/v1/expenses/{expense_id}/cancel/"]["post"], "200"),
+        (paths["/api/v1/expenses/{expense_id}/void/"]["post"], "200"),
     )
     for operation, success in writes:
         header = next(
@@ -1173,6 +1172,7 @@ def test_openapi_documents_expense_commands() -> None:
     }
     generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
     assert '"/api/v1/expenses/{expense_id}/approve/"' in generated
+    assert '"/api/v1/expenses/{expense_id}/void/"' in generated
     assert '"/api/v1/expense-categories/"' in generated
 
 

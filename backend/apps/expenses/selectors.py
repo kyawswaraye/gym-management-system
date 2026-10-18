@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from django.core import signing
-from django.db.models import Q, QuerySet
+from django.db.models import DecimalField, Q, QuerySet, Sum
+from django.db.models.functions import Coalesce
 from django.http import Http404
 from rest_framework.exceptions import ValidationError
 
@@ -19,6 +21,58 @@ from apps.tenants.models import ExpenseCategory
 _CATEGORY_SALT = "expense-category-list"
 _EXPENSE_SALT = "expense-list"
 _CURSOR_MAX_AGE = 24 * 60 * 60
+
+
+def expense_net_totals(
+    *,
+    gym_id: UUID,
+    business_date: date | None = None,
+    category_id: UUID | None = None,
+) -> dict[str, Any]:
+    """Posted and void originals minus linked posted reversals, once each.
+
+    Originals count on their own business date. Reversals subtract on the
+    correction business date. Draft, rejected, and cancelled rows are absent.
+    """
+
+    originals = Expense.objects.filter(
+        gym_id=gym_id,
+        status__in=[Expense.Status.POSTED, Expense.Status.VOID],
+        original_expense_id__isnull=True,
+    )
+    reversals = Expense.objects.filter(
+        gym_id=gym_id,
+        status=Expense.Status.POSTED,
+        original_expense_id__isnull=False,
+    )
+    if business_date is not None:
+        originals = originals.filter(business_date=business_date)
+        reversals = reversals.filter(business_date=business_date)
+    if category_id is not None:
+        originals = originals.filter(category_id=category_id)
+        reversals = reversals.filter(category_id=category_id)
+    zero = Decimal("0.00")
+    gross = originals.aggregate(
+        total=Coalesce(
+            Sum("amount"),
+            zero,
+            output_field=DecimalField(max_digits=18, decimal_places=2),
+        )
+    )["total"]
+    reversed_amount = reversals.aggregate(
+        total=Coalesce(
+            Sum("amount"),
+            zero,
+            output_field=DecimalField(max_digits=18, decimal_places=2),
+        )
+    )["total"]
+    gross_amount = gross if isinstance(gross, Decimal) else zero
+    reversal_amount = reversed_amount if isinstance(reversed_amount, Decimal) else zero
+    return {
+        "gross_amount": gross_amount.quantize(Decimal("0.01")),
+        "reversal_amount": reversal_amount.quantize(Decimal("0.01")),
+        "net_amount": (gross_amount - reversal_amount).quantize(Decimal("0.01")),
+    }
 
 
 def get_category(*, gym_id: UUID, category_id: UUID) -> ExpenseCategory:

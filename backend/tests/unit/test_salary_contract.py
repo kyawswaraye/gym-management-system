@@ -32,7 +32,7 @@ def test_salary_leaf_requires_expense_posting_commit_migration() -> None:
     assert tuple(salary_dependencies) == SALARY_APP_PLAN
     assert EXPENSE_POSTING_COMMIT in loader.disk_migrations[SALARY_INITIAL].dependencies
     assert loader.graph.leaf_nodes("salaries") == [SALARY_LEAF]
-    assert loader.graph.leaf_nodes("expenses") == [EXPENSE_POSTING_COMMIT]
+    assert loader.graph.leaf_nodes("expenses") == [("expenses", "0004_correction_runtime_reversal")]
     assert SALARY_INITIAL in loader.graph.node_map[EXPENSE_POSTING_COMMIT].children
     loader.graph.ensure_not_cyclic()
 

@@ -95,6 +95,17 @@ class RejectExpenseSerializer(StrictSerializer):
         return value.strip()
 
 
+class VoidExpenseSerializer(StrictSerializer):
+    reason = serializers.CharField(max_length=2000, trim_whitespace=True)
+    business_date = serializers.DateField(required=False)
+    cash_session_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_reason(self, value: str) -> str:
+        if not value.strip():
+            raise serializers.ValidationError("Enter a reason.")
+        return value.strip()
+
+
 class CancelExpenseSerializer(StrictSerializer):
     reason = serializers.CharField(max_length=2000, trim_whitespace=True)
 
@@ -148,6 +159,7 @@ class ExpenseSerializer(serializers.Serializer):
     policy_note = serializers.CharField()
     status = serializers.CharField()
     reversal_expense_id = serializers.UUIDField(allow_null=True)
+    original_expense_id = serializers.UUIDField(allow_null=True)
     submitted_at = serializers.DateTimeField(allow_null=True)
     submitted_by_membership_id = serializers.UUIDField(allow_null=True)
     approved_at = serializers.DateTimeField(allow_null=True)
@@ -158,6 +170,7 @@ class ExpenseSerializer(serializers.Serializer):
     posted_at = serializers.DateTimeField(allow_null=True)
     posted_by_membership_id = serializers.UUIDField(allow_null=True)
     voided_at = serializers.DateTimeField(allow_null=True)
+    voided_by_membership_id = serializers.UUIDField(allow_null=True)
     cancelled_at = serializers.DateTimeField(allow_null=True)
     cancelled_by_membership_id = serializers.UUIDField(allow_null=True)
     reason = serializers.CharField()
@@ -204,6 +217,19 @@ class ExpenseApprovalSerializer(serializers.Serializer):
     expense = ExpenseSerializer()
     cash_session = CashSessionSerializer(allow_null=True)
     cash_transaction = CashTransactionSerializer(allow_null=True)
+
+
+class ExpenseVoidSerializer(serializers.Serializer):
+    original_expense = ExpenseSerializer()
+    reversal_expense = ExpenseSerializer()
+    cash_session = CashSessionSerializer(allow_null=True)
+    cash_transaction = CashTransactionSerializer(allow_null=True)
+
+
+class ExpenseVoidEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    data = ExpenseVoidSerializer()
+    message = serializers.CharField()
 
 
 class ExpenseApprovalEnvelopeSerializer(serializers.Serializer):
