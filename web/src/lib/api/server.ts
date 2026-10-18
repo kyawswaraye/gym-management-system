@@ -5,6 +5,10 @@ import { NextResponse } from "next/server";
 
 import { redactTenantAuditValue } from "@/features/operations/audit-policy";
 import {
+  allowsFinanceRoute,
+  FINANCE_PATH_PATTERNS,
+} from "@/lib/api/finance-routes";
+import {
   AUTH_COOKIES,
   SELECTION_COOKIE_MAX_AGE,
   authCookieOptions,
@@ -76,7 +80,7 @@ const ALLOWED_TENANT_PATHS = [
   CHECK_IN_CHALLENGE_PATTERN,
   /^\/api\/v1\/membership-plans\/(?:[0-9a-f-]+\/(?:archive\/)?)?$/,
   /^\/api\/v1\/memberships\/(?:expiry\/|[0-9a-f-]+\/(?:cancel\/|suspend\/|resume\/)?)?$/,
-  /^\/api\/v1\/payments\/(?:[0-9a-f-]+\/(?:submit|approve|reject|cancel|void|refund)\/)?$/,
+  ...FINANCE_PATH_PATTERNS,
   /^\/api\/v1\/dashboard\/$/,
   /^\/api\/v1\/audit-logs\/$/,
   FILE_UPLOAD_INTENT_PATTERN,
@@ -515,6 +519,8 @@ function allowsForwardedQuery(
   search: string,
   method: string | undefined,
 ): boolean {
+  const finance = allowsFinanceRoute(pathname, search, method);
+  if (finance !== null) return finance;
   if (pathname === TENANT_AUDIT_LIST_PATH) {
     return method === "GET" && allowsTenantAuditListQuery(search);
   }
@@ -952,6 +958,141 @@ export async function authenticatedGet(
   }
 }
 
+const RECEIPT_DOCUMENT_CSP =
+  "default-src 'none'; sandbox; base-uri 'none'; form-action 'none'";
+
+function receiptFileName(header: string | null): string {
+  const match = /^attachment;\s*filename="([A-Za-z0-9_-]{1,80}\.html)"$/.exec(
+    header ?? "",
+  );
+  return match?.[1] ?? "receipt.html";
+}
+
+function receiptHtmlResponse(
+  status: number,
+  html: string,
+  disposition: string | null,
+): NextResponse {
+  if (/<script|javascript:/i.test(html)) {
+    return responseFromUpstream(502, {
+      success: false,
+      error: {
+        code: "INVALID_UPSTREAM_RESPONSE",
+        message: "The receipt could not be downloaded.",
+      },
+    });
+  }
+  return new NextResponse(html, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, private",
+      "Content-Disposition": `attachment; filename="${receiptFileName(disposition)}"`,
+      "Content-Security-Policy": RECEIPT_DOCUMENT_CSP,
+      "Content-Type": "text/html; charset=utf-8",
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
+async function responseForDocument(upstream: Response): Promise<NextResponse> {
+  const type = upstream.headers.get("content-type") ?? "";
+  if (upstream.ok && type.includes("text/html")) {
+    return receiptHtmlResponse(
+      upstream.status,
+      await upstream.text(),
+      upstream.headers.get("content-disposition"),
+    );
+  }
+  return responseFromUpstream(upstream.status, await parseJson(upstream));
+}
+
+export async function authenticatedDocumentGet(
+  request: NextRequest,
+  path: string,
+): Promise<NextResponse> {
+  const access = request.cookies.get(AUTH_COOKIES.access)?.value;
+  if (!access) {
+    return responseFromUpstream(401, {
+      success: false,
+      error: { code: "AUTHENTICATION_REQUIRED", message: "Please sign in." },
+    });
+  }
+  const perform = (accessToken: string) =>
+    callDjango(path, {
+      method: "GET",
+      headers: {
+        Accept: "text/html, application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  try {
+    const upstream = await perform(access);
+    const type = upstream.headers.get("content-type") ?? "";
+    if (upstream.status === 401 && type.includes("application/json")) {
+      const body = await parseJson(upstream);
+      const env = getServerEnv();
+      if (errorCode(body) === env.accessExpiredCode) {
+        const envCheck = getServerEnv();
+        const verified = verifyMutationRequest(
+          request,
+          envCheck.allowedOrigins,
+        );
+        const refresh = request.cookies.get(AUTH_COOKIES.refresh)?.value;
+        if (!verified.ok || !refresh) return responseFromUpstream(401, body);
+        const refreshed = await callDjango("/api/v1/auth/refresh/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refresh }),
+        });
+        const refreshedBody = await parseJson(refreshed);
+        if (!refreshed.ok) {
+          const failed = responseFromUpstream(refreshed.status, refreshedBody);
+          clearAuthCookies(failed);
+          return failed;
+        }
+        const newAccess = findString(refreshedBody, "access_token");
+        if (!newAccess) {
+          const invalid = responseFromUpstream(502, null);
+          clearAuthCookies(invalid);
+          return invalid;
+        }
+        const retried = await perform(newAccess);
+        const response = await responseForDocument(retried);
+        if (retried.status === 401) clearAuthCookies(response);
+        else setTokenCookies(response, refreshedBody);
+        return response;
+      }
+      return responseFromUpstream(401, body);
+    }
+    return responseForDocument(upstream);
+  } catch {
+    return responseFromUpstream(503, {
+      success: false,
+      error: {
+        code: "UPSTREAM_UNAVAILABLE",
+        message: "The service is temporarily unavailable. Please try again.",
+      },
+    } satisfies ApiErrorBody);
+  }
+}
+
+function idempotencyKeyForMutation(
+  path: string,
+  method: "POST" | "PATCH" | "PUT" | "DELETE",
+  suppliedKey: string | null,
+): string | null {
+  if (suppliedKey) return suppliedKey;
+  if (method === "DELETE") return null;
+  const queryIndex = path.indexOf("?");
+  const pathname = queryIndex === -1 ? path : path.slice(0, queryIndex);
+  const search = queryIndex === -1 ? "" : path.slice(queryIndex);
+  // Finance commands require a key. Other published commands, including
+  // check-in challenges, reject a key the caller did not send.
+  if (allowsFinanceRoute(pathname, search, method) !== true) return null;
+  return crypto.randomUUID();
+}
+
 export async function authenticatedMutation(
   request: NextRequest,
   path: string,
@@ -988,7 +1129,8 @@ export async function authenticatedMutation(
       error: { code: "AUTHENTICATION_REQUIRED", message: "Please sign in." },
     });
   }
-  const idempotencyKey = request.headers.get("Idempotency-Key");
+  const suppliedKey = request.headers.get("Idempotency-Key");
+  const idempotencyKey = idempotencyKeyForMutation(path, method, suppliedKey);
   if (idempotencyKey && !IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
     return responseFromUpstream(400, {
       success: false,

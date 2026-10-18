@@ -142,8 +142,26 @@ export function tenantHomePath(session: CurrentUser): string {
   if (hasTenantCapability(session, "memberships.view", "memberships")) {
     return "/memberships";
   }
-  if (hasTenantCapability(session, "payments.view", "finance")) {
+  if (
+    hasTenantCapability(session, "payments.view", "finance") ||
+    hasTenantCapability(session, "receipts.view", "finance")
+  ) {
     return "/payments";
+  }
+  if (hasTenantCapability(session, "cashbook.view", "finance")) {
+    return "/cash-book";
+  }
+  if (hasTenantCapability(session, "expenses.view", "finance")) {
+    return "/expenses";
+  }
+  if (hasTenantCapability(session, "salaries.view", "finance")) {
+    return "/salaries";
+  }
+  if (hasTenantCapability(session, "inventory.view", "finance")) {
+    return "/inventory";
+  }
+  if (hasTenantCapability(session, "retail.view", "finance")) {
+    return "/retail-sales";
   }
   if (hasPermission(session, "staff.view")) return "/staff";
   if (hasPermission(session, "roles.view")) return "/roles";

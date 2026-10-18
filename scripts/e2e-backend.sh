@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Create the disposable E2E database, migrate as gym_migration, seed, then
-# serve the API as gym_runtime on loopback. Playwright starts this script.
+# Drop and recreate the disposable gym_platform_e2e database, migrate as
+# gym_migration, seed, then serve the API as gym_runtime on loopback.
+# Playwright starts this script. No other database is dropped.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -64,7 +65,19 @@ if [[ "${role_exists//[[:space:]]/}" != "1" ]]; then
   exit 1
 fi
 
-if [[ "${E2E_RESET:-0}" == "1" ]]; then
+# Finance, cash, receipt, salary, inventory, and idempotency rows are immutable
+# or restricted. seed_e2e does not disable those protections, so deleting them
+# is not the reset. Recreate this disposable database on every run. The name
+# below is a literal: this script already refused every other DB_NAME.
+# E2E_RESET=0 keeps the current gym_platform_e2e database for debugging and is
+# not repeatable after those protected rows exist.
+e2e_reset="${E2E_RESET:-1}"
+if [[ "${e2e_reset}" != "0" && "${e2e_reset}" != "1" ]]; then
+  echo "E2E_RESET must be 0 or 1." >&2
+  exit 1
+fi
+if [[ "${e2e_reset}" == "1" ]]; then
+  echo "Dropping disposable database gym_platform_e2e before migrate."
   psql_admin -d postgres <<'SQL'
 SELECT pg_terminate_backend(pid)
 FROM pg_stat_activity

@@ -286,6 +286,9 @@ describe("browser credential boundary", () => {
     expect((await authenticatedGet(request, "/api/v1/payments/")).status).toBe(
       200,
     );
+    expect((await authenticatedGet(request, "/api/v1/receipts/")).status).toBe(
+      200,
+    );
 
     const rejected = [
       `/api/v1/members/${memberId}/payments/?gym_id=${memberId}`,
@@ -296,7 +299,8 @@ describe("browser credential boundary", () => {
       `/api/v1/members/${memberId}/payments/?after=`,
       `/api/v1/members/${memberId}/payments/extra/`,
       `/api/v1/members/${memberId.toUpperCase()}/payments/`,
-      "/api/v1/receipts/",
+      "/api/v1/receipts/?status=POSTED",
+      "/api/v1/retail-sales/return/",
     ];
     for (const path of rejected) {
       expect((await authenticatedGet(request, path)).status).toBe(503);
@@ -324,7 +328,7 @@ describe("browser credential boundary", () => {
         )
       ).status,
     ).toBe(503);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       `https://api.example.com/api/v1/members/${memberId}/payments/`,
     );

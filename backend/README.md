@@ -24,7 +24,7 @@ Display-device list, enroll, rotate, and revoke are published, as is
 The generic staff scan path, trainer scan, notification HTTP routes, and
 Payment draft, submit, approve, reject, cancel, void, refund, receipt list, detail, download, receipt void, and daily sales are published. Salary-period void and full retail-sale void are published in Increment 8B. Partial retail returns remain unpublished. Cash-session
 list, detail, open, adjustment, and reconcile, plus the cash-transaction
-list, are published. The cash-book staff UI is deferred to increment 9. Expense-category and expense
+list, are published. The cash-book, payment, expense, salary, inventory, and retail staff pages are delivered in increment 9. Partial retail returns remain unpublished. Expense-category and expense
 approval routes are published. Manual expense void is published in Increment 8A. Salary-period
 list, detail, create, update, line replacement, submit, approve, reject, and
 cancel, and void are published. Partial retail returns remain unpublished. Product-category
@@ -91,12 +91,16 @@ That command also starts loopback MinIO, ClamAV, and the object proxy for the
 Phase 2 member-lifecycle journey.
 `python manage.py seed_e2e` runs only when `E2E_SEED=1`,
 `DJANGO_SETTINGS_MODULE=config.settings.e2e`, and the connected database is
-exactly `gym_platform_e2e`. It deletes prior `E2E*` gyms and `e2e-*@example.test`
-users in that database, then creates one MFA-enabled platform admin, one
-MFA-enabled owner gym, and one already-linked member with an eligible
-membership. The member password is `E2E_MEMBER_PASSWORD`. Member MFA stays
-off because member login has no challenge contract. The command does not
-change production authentication.
+exactly `gym_platform_e2e`. The same guard wraps the temporary disable of the
+append-only audit and owner-role cleanup triggers. Finance, cash, receipt,
+salary, inventory, and idempotency protections stay enabled. The repeatable
+browser reset drops and recreates `gym_platform_e2e` before migrate; prefix
+deletion is not a substitute once those protected rows exist. If a protected
+row blocks deletion, the original database error is raised. The command then
+creates one MFA-enabled platform admin, one MFA-enabled owner gym, and one
+already-linked member with an eligible membership. The member password is
+`E2E_MEMBER_PASSWORD`. Member MFA stays off because member login has no
+challenge contract. The command does not change production authentication.
 
 ## Checks
 

@@ -147,7 +147,7 @@ Complex financial calculations do not live in signals. Signals are limited to no
 
 ## 3. Next.js web
 
-The web workspace uses Next.js 16.4.1 with the App Router, TypeScript 7.0.2 in strict mode, and Tailwind CSS. React Server Components (RSC) are the default; Client Components are explicit boundaries used only where browser interaction or local transient state requires them.
+The web workspace uses Next.js 16.4.1 with the App Router, TypeScript 7.0.2 in strict mode, and Tailwind CSS. React Server Components (RSC) are the default; Client Components are explicit boundaries used only where browser interaction or local transient state requires them. Increment 9 implements `/payments`, `/cash-book`, `/expenses`, `/salaries`, `/inventory`, and `/retail-sales` as permission-gated tenant pages. The nested inventory paths in the target tree below are not separate routes.
 
 ```text
 web/

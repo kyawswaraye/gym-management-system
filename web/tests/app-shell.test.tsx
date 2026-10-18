@@ -8,11 +8,15 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
 }));
 
-function session(permissions: string[], platform = false): CurrentUser {
+function session(
+  permissions: string[],
+  platform = false,
+  features: Array<{ feature__code: string }> = [],
+): CurrentUser {
   return {
     principal_type: platform ? "PLATFORM" : "STAFF",
     permissions,
-    features: [],
+    features,
     mfa_enabled: true,
     user: { first_name: "Ada", email: "ada@example.test" },
     gym: { name: "Yangon Fitness" },
@@ -255,5 +259,59 @@ describe("tenant settings navigation", () => {
       "href",
       "/super-admin/audit-logs",
     );
+  });
+
+  it("shows finance pages only with the view permission and entitlement", () => {
+    const permissions = [
+      "payments.view",
+      "cashbook.view",
+      "expenses.view",
+      "salaries.view",
+      "inventory.view",
+      "retail.view",
+    ];
+    const { rerender } = render(
+      <AppShell
+        session={session(permissions, false, [{ feature__code: "finance" }])}
+      >
+        <p>Workspace</p>
+      </AppShell>,
+    );
+    expect(screen.getByRole("link", { name: "Payments" })).toHaveAttribute(
+      "href",
+      "/payments",
+    );
+    expect(screen.getByRole("link", { name: "Cash book" })).toHaveAttribute(
+      "href",
+      "/cash-book",
+    );
+    expect(screen.getByRole("link", { name: "Expenses" })).toHaveAttribute(
+      "href",
+      "/expenses",
+    );
+    expect(screen.getByRole("link", { name: "Salaries" })).toHaveAttribute(
+      "href",
+      "/salaries",
+    );
+    expect(screen.getByRole("link", { name: "Inventory" })).toHaveAttribute(
+      "href",
+      "/inventory",
+    );
+    expect(screen.getByRole("link", { name: "Retail sales" })).toHaveAttribute(
+      "href",
+      "/retail-sales",
+    );
+
+    rerender(
+      <AppShell session={session(permissions)}>
+        <p>Workspace</p>
+      </AppShell>,
+    );
+    expect(
+      screen.queryByRole("link", { name: "Cash book" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Retail sales" }),
+    ).not.toBeInTheDocument();
   });
 });

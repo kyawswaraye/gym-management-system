@@ -71,6 +71,22 @@ describe("tenant authorization helpers", () => {
     expect(tenantHomePath(session(["payments.view"], ["finance"]))).toBe(
       "/payments",
     );
+    expect(tenantHomePath(session(["cashbook.view"], ["finance"]))).toBe(
+      "/cash-book",
+    );
+    expect(tenantHomePath(session(["expenses.view"], ["finance"]))).toBe(
+      "/expenses",
+    );
+    expect(tenantHomePath(session(["salaries.view"], ["finance"]))).toBe(
+      "/salaries",
+    );
+    expect(tenantHomePath(session(["inventory.view"], ["finance"]))).toBe(
+      "/inventory",
+    );
+    expect(tenantHomePath(session(["retail.view"], ["finance"]))).toBe(
+      "/retail-sales",
+    );
+    expect(tenantHomePath(session(["cashbook.view"], []))).toBe("/dashboard");
     expect(tenantHomePath(session(["staff.view"], []))).toBe("/staff");
     expect(tenantHomePath(session(["staff.view", "roles.view"], []))).toBe(
       "/staff",

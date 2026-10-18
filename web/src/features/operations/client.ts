@@ -50,11 +50,13 @@ import type {
 
 export class OperationError extends Error {
   readonly fields: Record<string, string>;
+  readonly code: string;
 
-  constructor(message: string, fields: Record<string, string> = {}) {
+  constructor(message: string, fields: Record<string, string> = {}, code = "") {
     super(message);
     this.name = "OperationError";
     this.fields = fields;
+    this.code = code;
   }
 }
 
@@ -116,16 +118,32 @@ export async function operationGet<T>(path: string): Promise<T> {
   return (body as ApiEnvelope<T>).data;
 }
 
+export async function operationList<T>(
+  path: string,
+): Promise<CollectionPage<T>> {
+  const response = await fetch(`/api/operations/${path}`, {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) throw readOperationError(body);
+  return readCollection<T>(body);
+}
+
 export async function operationMutation<T>(
   path: string,
   body: object,
   method: "POST" | "PATCH" | "PUT" = "POST",
+  idempotencyKey?: string,
 ): Promise<T> {
   const csrf = await getCsrfToken();
   const response = await fetch(`/api/operations/${path}`, {
     method,
     credentials: "same-origin",
-    headers: mutationHeaders(csrf),
+    headers: {
+      ...mutationHeaders(csrf),
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+    },
     body: JSON.stringify(body),
   });
   const responseBody: unknown = await response.json();
@@ -1219,8 +1237,9 @@ function readOperationError(body: unknown): OperationError {
   if (typeof body !== "object" || body === null || !("error" in body)) {
     return new OperationError(fallback);
   }
-  const error = (body as { error?: { message?: unknown; fields?: unknown } })
-    .error;
+  const error = (
+    body as { error?: { code?: unknown; message?: unknown; fields?: unknown } }
+  ).error;
   const fields: Record<string, string> = {};
   if (error?.fields && typeof error.fields === "object") {
     for (const [key, value] of Object.entries(error.fields)) {
@@ -1234,5 +1253,6 @@ function readOperationError(body: unknown): OperationError {
     (typeof error?.message === "string" && error.message
       ? error.message
       : fallback);
-  return new OperationError(message, fields);
+  const code = typeof error?.code === "string" ? error.code : "";
+  return new OperationError(message, fields, code);
 }

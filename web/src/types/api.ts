@@ -127,21 +127,88 @@ export type MembershipListPage = {
 export type MembershipExpiryQuery =
   operations["memberships_expiry"]["parameters"]["query"];
 
-export type Payment = {
-  id: string;
-  member: string;
-  member_name: string;
-  membership: string | null;
-  purpose: string;
-  description: string;
-  amount: string;
-  currency: string;
-  method: string;
-  business_date: string;
-  received_at: string;
-  status: string;
-  receipt_number?: string;
-};
+export type Payment = components["schemas"]["Payment"];
+export type PaymentWriteRequest = components["schemas"]["PaymentWriteRequest"];
+export type PaymentUpdateRequest =
+  components["schemas"]["PatchedPaymentUpdateRequest"];
+export type PaymentApproval = components["schemas"]["PaymentApproval"];
+export type PaymentCorrection = components["schemas"]["PaymentCorrection"];
+export type ApprovePaymentRequest =
+  components["schemas"]["ApprovePaymentRequest"];
+export type RefundPaymentRequest =
+  components["schemas"]["RefundPaymentRequest"];
+export type VoidPaymentRequest = components["schemas"]["VoidPaymentRequest"];
+export type VoidReceiptRequest = components["schemas"]["VoidReceiptRequest"];
+export type RejectPaymentRequest =
+  components["schemas"]["RejectPaymentRequest"];
+export type CancelPaymentRequest =
+  components["schemas"]["CancelPaymentRequest"];
+export type PaymentMethod = components["schemas"]["PaymentMethodEnum"];
+export type PaymentPurpose = components["schemas"]["PurposeEnum"];
+export type Receipt = components["schemas"]["Receipt"];
+export type CashSession = components["schemas"]["CashSession"];
+export type CashTransaction = components["schemas"]["CashTransaction"];
+export type CashCommandData = components["schemas"]["CashCommandData"];
+export type OpenCashSessionRequest =
+  components["schemas"]["OpenCashSessionRequest"];
+export type AdjustCashSessionRequest =
+  components["schemas"]["AdjustCashSessionRequest"];
+export type ReconcileCashSessionRequest =
+  components["schemas"]["ReconcileCashSessionRequest"];
+export type Expense = components["schemas"]["Expense"];
+export type ExpenseCategory = components["schemas"]["ExpenseCategory"];
+export type ExpenseWriteRequest = components["schemas"]["ExpenseWriteRequest"];
+export type ExpenseUpdateRequest =
+  components["schemas"]["PatchedExpenseUpdateRequest"];
+export type ExpenseCategoryWriteRequest =
+  components["schemas"]["ExpenseCategoryWriteRequest"];
+export type ExpenseCategoryUpdateRequest =
+  components["schemas"]["PatchedExpenseCategoryUpdateRequest"];
+export type ExpenseApproval = components["schemas"]["ExpenseApproval"];
+export type ExpenseVoid = components["schemas"]["ExpenseVoid"];
+export type ApproveExpenseRequest =
+  components["schemas"]["ApproveExpenseRequest"];
+export type VoidExpenseRequest = components["schemas"]["VoidExpenseRequest"];
+export type SalaryPeriod = components["schemas"]["SalaryPeriod"];
+export type SalaryPeriodWriteRequest =
+  components["schemas"]["SalaryPeriodWriteRequest"];
+export type SalaryPeriodUpdateRequest =
+  components["schemas"]["PatchedSalaryPeriodUpdateRequest"];
+export type SalaryLineWriteRequest =
+  components["schemas"]["SalaryLineWriteRequest"];
+export type SalaryLinesReplaceRequest =
+  components["schemas"]["SalaryLinesReplaceRequest"];
+export type SalaryApproval = components["schemas"]["SalaryApproval"];
+export type SalaryVoid = components["schemas"]["SalaryVoid"];
+export type ApproveSalaryRequest =
+  components["schemas"]["ApproveSalaryRequest"];
+export type VoidSalaryRequest = components["schemas"]["VoidSalaryRequest"];
+export type StaffSalaryLine = components["schemas"]["StaffSalaryLine"];
+export type Product = components["schemas"]["Product"];
+export type ProductCategory = components["schemas"]["ProductCategory"];
+export type ProductWriteRequest = components["schemas"]["ProductWriteRequest"];
+export type ProductUpdateRequest =
+  components["schemas"]["PatchedProductUpdateRequest"];
+export type ProductCategoryWriteRequest =
+  components["schemas"]["ProductCategoryWriteRequest"];
+export type StockMovement = components["schemas"]["StockMovement"];
+export type StockAdjustRequest = components["schemas"]["StockAdjustRequest"];
+export type StockAdjustment = components["schemas"]["StockAdjustment"];
+export type MovementType = components["schemas"]["MovementTypeEnum"];
+export type RetailSale = components["schemas"]["RetailSale"];
+export type RetailSaleWriteRequest =
+  components["schemas"]["RetailSaleWriteRequest"];
+export type RetailSaleUpdateRequest =
+  components["schemas"]["PatchedRetailSaleUpdateRequest"];
+export type RetailSaleLineWriteRequest =
+  components["schemas"]["RetailSaleLineWriteRequest"];
+export type RetailSaleApproval = components["schemas"]["RetailSaleApproval"];
+export type RetailSaleVoid = components["schemas"]["RetailSaleVoid"];
+export type ApproveRetailSaleRequest =
+  components["schemas"]["ApproveRetailSaleRequest"];
+export type VoidRetailSaleRequest =
+  components["schemas"]["VoidRetailSaleRequest"];
+export type Direction = components["schemas"]["DirectionEnum"];
 
 export type DashboardData = {
   range: "today" | "month";

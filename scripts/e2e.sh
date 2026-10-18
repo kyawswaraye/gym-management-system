@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Run the browser smoke tests, including the Phase 2 member lifecycle.
+# scripts/e2e-backend.sh recreates gym_platform_e2e before each API start.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

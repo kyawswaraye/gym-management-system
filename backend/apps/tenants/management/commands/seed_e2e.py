@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable
 from decimal import Decimal
 from typing import Any
 
@@ -142,34 +143,70 @@ def _delete_gym_tree(gym: Gym) -> None:
     gym.delete()
 
 
-def _purge_e2e_rows() -> int:
-    """Remove previous E2E-prefixed rows without touching any other tenant."""
+def _execute_statements(statements: tuple[str, ...]) -> None:
+    with connection.cursor() as cursor:
+        for statement in statements:
+            cursor.execute(statement)
 
+
+def _assert_e2e_cleanup_allowed() -> None:
+    assert_e2e_seed_allowed(
+        database_name=str(connection.settings_dict["NAME"]),
+        settings_module=os.environ.get("DJANGO_SETTINGS_MODULE", ""),
+        seed_flag=os.environ.get("E2E_SEED", ""),
+    )
+
+
+def _with_e2e_cleanup_triggers(operation: Callable[[], None]) -> None:
+    """Disable append-only cleanup triggers only for a successful E2E transaction.
+
+    The first database error aborts the PostgreSQL transaction. Running the
+    ENABLE statements afterward raises TransactionManagementError and hides
+    that error. Rollback restores the disabled triggers. Finance, cash,
+    receipt, salary, inventory, and idempotency protections are not disabled.
+    """
+
+    _assert_e2e_cleanup_allowed()
+    with transaction.atomic():
+        _execute_statements(_DISABLE_AUDIT_TRIGGERS)
+        operation()
+        _execute_statements(_ENABLE_AUDIT_TRIGGERS)
+
+
+def _delete_e2e_prefix(gyms: list[Gym], users: list[User]) -> None:
+    for gym in gyms:
+        _delete_gym_tree(gym)
+    user_ids = [user.id for user in users]
+    if not user_ids:
+        return
+    RefreshSession.objects.filter(user_id__in=user_ids).update(replaced_by_session=None)
+    RefreshSession.objects.filter(user_id__in=user_ids).delete()
+    GymSelectionTicket.objects.filter(user_id__in=user_ids).delete()
+    MFAChallenge.objects.filter(user_id__in=user_ids).delete()
+    MFAEnrollment.objects.filter(user_id__in=user_ids).delete()
+    PlatformAuditLog.objects.filter(
+        Q(actor_user_id__in=user_ids) | Q(effective_user_id__in=user_ids)
+    ).delete()
+    GymProvisioningRequest.objects.filter(actor_user_id__in=user_ids).delete()
+    User.objects.filter(id__in=user_ids).delete()
+
+
+def _purge_e2e_rows() -> int:
+    """Remove previous E2E-prefixed rows without touching any other tenant.
+
+    Immutable and restricted finance rows are left to the database. The
+    repeatable browser reset drops and recreates gym_platform_e2e before
+    migrate; this prefix delete is not that reset.
+    """
+
+    _assert_e2e_cleanup_allowed()
     gyms = list(Gym.objects.filter(code__startswith=GYM_CODE_PREFIX))
     users = list(_e2e_users())
-    with transaction.atomic():
-        with connection.cursor() as cursor:
-            for statement in _DISABLE_AUDIT_TRIGGERS:
-                cursor.execute(statement)
-        try:
-            for gym in gyms:
-                _delete_gym_tree(gym)
-            user_ids = [user.id for user in users]
-            if user_ids:
-                RefreshSession.objects.filter(user_id__in=user_ids).update(replaced_by_session=None)
-                RefreshSession.objects.filter(user_id__in=user_ids).delete()
-                GymSelectionTicket.objects.filter(user_id__in=user_ids).delete()
-                MFAChallenge.objects.filter(user_id__in=user_ids).delete()
-                MFAEnrollment.objects.filter(user_id__in=user_ids).delete()
-                PlatformAuditLog.objects.filter(
-                    Q(actor_user_id__in=user_ids) | Q(effective_user_id__in=user_ids)
-                ).delete()
-                GymProvisioningRequest.objects.filter(actor_user_id__in=user_ids).delete()
-                User.objects.filter(id__in=user_ids).delete()
-        finally:
-            with connection.cursor() as cursor:
-                for statement in _ENABLE_AUDIT_TRIGGERS:
-                    cursor.execute(statement)
+
+    def remove() -> None:
+        _delete_e2e_prefix(gyms, users)
+
+    _with_e2e_cleanup_triggers(remove)
     return len(gyms)
 
 

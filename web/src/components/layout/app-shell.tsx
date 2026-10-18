@@ -53,11 +53,30 @@ export function AppShell({
     "memberships.view",
     "memberships",
   );
-  const canViewPayments = hasTenantCapability(
+  const canViewPayments =
+    hasTenantCapability(session, "payments.view", "finance") ||
+    hasTenantCapability(session, "receipts.view", "finance");
+  const canViewCashBook = hasTenantCapability(
     session,
-    "payments.view",
+    "cashbook.view",
     "finance",
   );
+  const canViewExpenses = hasTenantCapability(
+    session,
+    "expenses.view",
+    "finance",
+  );
+  const canViewSalaries = hasTenantCapability(
+    session,
+    "salaries.view",
+    "finance",
+  );
+  const canViewInventory = hasTenantCapability(
+    session,
+    "inventory.view",
+    "finance",
+  );
+  const canViewRetail = hasTenantCapability(session, "retail.view", "finance");
   const canViewCheckIns = canOpenCheckIns(session);
   const canIssueChallenge = canIssueCheckInChallenge(session);
   const canViewStaff = hasPermission(session, "staff.view");
@@ -151,7 +170,49 @@ export function AppShell({
               className="rounded-md px-3 py-2 hover:bg-slate-800"
               href="/payments"
             >
-              Payments
+              {hasTenantCapability(session, "payments.view", "finance")
+                ? "Payments"
+                : "Receipts"}
+            </Link>
+          )}
+          {!platform && canViewCashBook && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/cash-book"
+            >
+              Cash book
+            </Link>
+          )}
+          {!platform && canViewExpenses && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/expenses"
+            >
+              Expenses
+            </Link>
+          )}
+          {!platform && canViewSalaries && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/salaries"
+            >
+              Salaries
+            </Link>
+          )}
+          {!platform && canViewInventory && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/inventory"
+            >
+              Inventory
+            </Link>
+          )}
+          {!platform && canViewRetail && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/retail-sales"
+            >
+              Retail sales
             </Link>
           )}
           {!platform && canViewStaff && (

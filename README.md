@@ -54,7 +54,7 @@ reconcile/close, and the session and transaction lists. A membership that
 holds Reception can view, use, and close only a session it opened, even when
 it also holds another role, and it cannot adjust. Until an Owner-configurable
 policy exists, only the protected Owner role may adjust. Movements are
-append-only. The cash-book staff UI is deferred to increment 9. Notification HTTP routes stay
+append-only. The cash-book staff page is delivered in increment 9. Notification HTTP routes stay
 unpublished for later phases.
 Increment 2 gate evidence: backend ruff, format, and mypy passed and
 migrations stayed in sync; 255 non-PostgreSQL backend tests passed; the
@@ -68,7 +68,7 @@ receipt list, detail, and download, and daily sales. Void, refund, and receipt
 void stay unpublished. Approval requires a different active protected Manager
 or Owner, and a cash approval must use an open session. Legacy posted cash
 rows are marked `legacy_unlinked_cash` instead of receiving an invented cash
-movement. The payment staff UI is deferred to increment 9.
+movement. The payment and receipt staff page is delivered in increment 9.
 Increment 3 gate evidence: backend ruff, format, and mypy passed and
 migrations stayed in sync; 258 non-PostgreSQL backend tests passed; the
 PostgreSQL suite passed 216 tests; web format, lint, typecheck, and build
@@ -80,8 +80,7 @@ Phase 4 increment 4 publishes expense-category list/create/update and expense
 list/create/detail/update/submit/approve/reject/cancel. Expense void stays
 unpublished. Protected system categories stay immutable. Custom category
 changes require `expense_categories.manage`. Cash approval posts one `OUT`
-expense movement on an open same-gym session. The expense staff UI is deferred
-to increment 9.
+expense movement on an open same-gym session. The expense staff page is delivered in increment 9.
 Increment 4 gate evidence: backend ruff, format, and mypy passed and
 migrations stayed in sync; 263 non-PostgreSQL backend tests passed; the
 PostgreSQL suite passed 224 tests; web format, lint, typecheck, and build
@@ -94,7 +93,7 @@ line replacement, and submit/approve/reject/cancel. Salary void, inventory,
 retail, and payment/receipt/expense void/refund stay unpublished. Approval
 posts one protected staff-salary expense per line and one cash-out movement
 per cash line, or rolls the whole period back. Reception sees only its own
-non-posted periods. The salary staff UI is deferred to increment 9.
+non-posted periods. The salary staff page is delivered in increment 9.
 Increment 5 gate evidence: backend ruff, format, and mypy passed and
 migrations stayed in sync; 267 non-PostgreSQL backend tests passed; the
 PostgreSQL suite passed 229 tests; web format, lint, typecheck, and build
@@ -108,10 +107,9 @@ adjustment. Category update, returns, inventory UI, and every void/refund
 route stay unpublished. Quantity on hand is the sum of append-only movements.
 Adjustment snapshots current unit cost and does not compute a weighted
 average. Catalog and stock commands use the finance entitlement.
-The inventory staff UI is deferred.
+The inventory staff page is delivered in increment 9.
 Phase 4 increment 7 publishes retail-sale list, create, detail, update,
-submit, approve, reject, and cancel. Retail void, returns, and the retail UI
-stay unpublished. Approval posts one sale movement per line, one product
+submit, approve, reject, and cancel. Partial returns stay unpublished. The retail staff page, including full void, is delivered in increment 9. Approval posts one sale movement per line, one product
 payment, one receipt, and one cash-in movement when the method is cash.
 Quantity times money rounds half up to minor units. Daily product metrics
 come from posted retail lines. Phase 4 remains open.
@@ -124,7 +122,7 @@ not reopened. A correction requires the exact live permission, the finance
 entitlement, and an active same-gym membership. The creator, submitter, or
 receipt issuer may correct, including through a custom role that holds that
 permission. Approval and rejection still require a different protected Manager
-or Owner. Increment 9 UI claims are unchanged. Phase 4 remains open.
+or Owner. Phase 4 increment 9 delivers the tenant staff pages for the published cash-book, payment, receipt, expense, salary, inventory, and full retail-void workflows. Navigation requires the matching view permission and the finance entitlement. Cash approval and cash correction select an open session the server returns for that caller. Product payment corrections stay on the retail full void. Partial retail returns are not in the UI. Phase 4 remains open. Production email and object-storage gates remain. Increment 9 web checks: format, lint, strict typecheck, and the production build passed. Vitest passed 51 files and 286 tests. Playwright finance smoke passed twice in a row with `E2E_RESET` unset (1 spec each: navigation plus an OTHER payment draft submit). `make e2e` then passed 5 specs. Each API start drops and recreates only `gym_platform_e2e`. Generated types were not regenerated. Backend business APIs were not changed.
 Increment 6 gate evidence: backend ruff, format, and mypy passed and
 migrations stayed in sync; 273 non-PostgreSQL backend tests passed; the
 PostgreSQL suite passed 234 tests; web format, lint, typecheck, and build
@@ -241,8 +239,12 @@ the same-origin BFF, and the Django API on PostgreSQL. The member journey also
 uploads a profile photo through live MinIO, ClamAV, and the Caddy object proxy,
 then checks that member in and out and shows the rotating desk QR. It does not
 redeem a scan.
-It uses only the disposable `gym_platform_e2e` database. Unit tests do not
-install or launch a browser.
+It uses only the disposable `gym_platform_e2e` database. Each API start drops
+and recreates that database as the PostgreSQL admin, then migrates and seeds
+it. The application database is not dropped. `E2E_RESET=0` skips the drop for
+debugging; after finance rows exist, `seed_e2e` still cannot delete those
+immutable or restricted rows, and the original database error is reported.
+Unit tests do not install or launch a browser.
 
 Prerequisites are the local PostgreSQL roles from `make db-up`, Docker with
 Compose v2, Python 3.14.7, Node.js 24.20.0, and `npm --prefix web ci`. The
@@ -265,8 +267,9 @@ Application table and function privileges come from the migrations.
 make e2e
 ```
 
-Set `E2E_RESET=1` to drop and recreate `gym_platform_e2e` before migrating.
-Screenshots, traces, and video are off. A failure log can include the obvious
+`make e2e` and Playwright both use that drop. Set `E2E_RESET=0` only to keep
+the current disposable database. Screenshots, traces, and video are off. A
+failure log can include the obvious
 E2E placeholder password or a one-time authenticator code when the failure is
 on the sign-in form.
 
