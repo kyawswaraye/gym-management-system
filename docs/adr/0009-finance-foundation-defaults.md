@@ -52,7 +52,7 @@ A stolen idempotency key still cannot be replayed across a gym, actor, method, o
 
 ## Compatibility consequences
 
-`docs/DEVELOPMENT_PLAN.md` section 15 item 15 is resolved by this record. The rest of that file stays the historical phase baseline. Cash, payment/receipt, and expense HTTP workflows are published in later Phase 4 increments. Expense-file upload acceptance for `EXPENSE_RECEIPT` is published with Increment 4. Jurisdiction remains open. Salary, inventory, retail, and finance void/refund routes remain later work.
+`docs/DEVELOPMENT_PLAN.md` section 15 item 15 is resolved by this record. The rest of that file stays the historical phase baseline. Cash, payment/receipt, expense, and salary-period HTTP workflows are published in later Phase 4 increments. Expense-file upload acceptance for `EXPENSE_RECEIPT` is published with Increment 4. Salary void, inventory, retail, and finance void/refund routes remain later work. Jurisdiction remains open.
 
 ## Alternatives considered
 

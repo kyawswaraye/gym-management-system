@@ -36,6 +36,9 @@ def get_expense(*, gym_id: UUID, expense_id: UUID, actor_membership_id: UUID) ->
     return expense
 
 
+_SERVICE_ONLY_CATEGORIES = ("STAFF_SALARY", "PT_COMMISSION")
+
+
 def visible_expenses(*, gym_id: UUID, actor_membership_id: UUID) -> QuerySet[Expense]:
     queryset = Expense.objects.filter(gym_id=gym_id)
     if holds_protected_role(
@@ -44,7 +47,7 @@ def visible_expenses(*, gym_id: UUID, actor_membership_id: UUID) -> QuerySet[Exp
         queryset = queryset.filter(
             Q(created_by_membership_id=actor_membership_id)
             | Q(submitted_by_membership_id=actor_membership_id)
-        )
+        ).exclude(category__system_key__in=_SERVICE_ONLY_CATEGORIES)
     return queryset
 
 

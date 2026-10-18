@@ -19,7 +19,7 @@ Work proceeds one approved phase at a time. Phase 1 has two ordered subphases, 1
 
 ### Current phase status
 
-Phase 0, Phase 1A, and Phase 1B are complete. The Phase 1B gate closed on 2026-10-17. Phase 2 and Phase 3 implementation is complete. Phase 4 Increments 1–4 are published (finance foundation, cash book, payments/receipts/daily sales, and expense categories/approval). Expense void, salaries, inventory, retail, and payment/receipt void/refund remain unpublished. The Phase 4 gate is not closed. Increment evidence lives in the repository README. Production expiry delivery remains gated on an approved transactional email provider that honors `X-Idempotency-Key`.
+Phase 0, Phase 1A, and Phase 1B are complete. The Phase 1B gate closed on 2026-10-17. Phase 2 and Phase 3 implementation is complete. Phase 4 Increments 1–5 are published (finance foundation, cash book, payments/receipts/daily sales, expense categories/approval, and salary periods/lines). Expense void, salary void, inventory, retail, and payment/receipt void/refund remain unpublished. The Phase 4 gate is not closed. Increment evidence lives in the repository README. Production expiry delivery remains gated on an approved transactional email provider that honors `X-Idempotency-Key`.
 
 The 2026-10-17 closure is local CI-equivalent gate evidence. CI still enforces these check classes on push and pull request.
 

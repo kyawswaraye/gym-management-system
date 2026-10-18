@@ -1500,6 +1500,118 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/salary-periods/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["salary_periods_list"];
+    put?: never;
+    post: operations["salary_periods_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/salary-periods/{period_id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["salary_periods_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["salary_periods_update"];
+    trace?: never;
+  };
+  "/api/v1/salary-periods/{period_id}/approve/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["salary_periods_approve"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/salary-periods/{period_id}/cancel/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["salary_periods_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/salary-periods/{period_id}/lines/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["salary_periods_replace_lines"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/salary-periods/{period_id}/reject/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["salary_periods_reject"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/salary-periods/{period_id}/submit/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["salary_periods_submit"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/sales/daily/": {
     parameters: {
       query?: never;
@@ -1892,10 +2004,16 @@ export interface components {
       /** Format: uuid */
       cash_session_id?: string | null;
     };
+    ApproveSalaryRequest: {
+      cash_sessions?: components["schemas"]["SalaryCashMappingRequest"][];
+    };
     CancelExpenseRequest: {
       reason: string;
     };
     CancelPaymentRequest: {
+      reason: string;
+    };
+    CancelSalaryRequest: {
       reason: string;
     };
     CashCollectionMeta: {
@@ -3235,6 +3353,15 @@ export interface components {
       description?: string;
       is_active?: boolean;
     };
+    PatchedSalaryPeriodUpdateRequest: {
+      /** Format: date */
+      period_start?: string;
+      /** Format: date */
+      period_end?: string;
+      /** Format: date */
+      business_date?: string;
+      description?: string;
+    };
     PatchedStaffUpdateRequest: {
       staff_code?: string;
       display_name?: string;
@@ -3512,6 +3639,9 @@ export interface components {
     RejectPaymentRequest: {
       rejection_reason: string;
     };
+    RejectSalaryRequest: {
+      rejection_reason: string;
+    };
     Role: {
       /** Format: uuid */
       id: string;
@@ -3555,6 +3685,104 @@ export interface components {
     };
     RolePermissionReplaceRequest: {
       permission_codes: string[];
+    };
+    SalaryApproval: {
+      salary_period: components["schemas"]["SalaryPeriod"];
+      expenses: components["schemas"]["Expense"][];
+      cash_transactions: components["schemas"]["CashTransaction"][];
+    };
+    SalaryApprovalEnvelope: {
+      success: boolean;
+      data: components["schemas"]["SalaryApproval"];
+      message: string;
+    };
+    SalaryCashMappingRequest: {
+      /** Format: uuid */
+      line_id: string;
+      /** Format: uuid */
+      cash_session_id: string;
+    };
+    SalaryLineWriteRequest: {
+      /** Format: uuid */
+      staff_profile_id: string;
+      /** Format: decimal */
+      amount: string;
+      currency: string;
+      payment_method: components["schemas"]["PaymentMethodEnum"];
+      external_reference?: string;
+      description: string;
+    };
+    SalaryLinesReplaceRequest: {
+      lines: components["schemas"]["SalaryLineWriteRequest"][];
+    };
+    SalaryListMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    SalaryPeriod: {
+      /** Format: uuid */
+      id: string;
+      /** Format: date */
+      period_start: string;
+      /** Format: date */
+      period_end: string;
+      /** Format: date */
+      business_date: string;
+      description: string;
+      status: string;
+      /** Format: date-time */
+      submitted_at: string | null;
+      /** Format: uuid */
+      submitted_by_membership_id: string | null;
+      /** Format: date-time */
+      approved_at: string | null;
+      /** Format: uuid */
+      approved_by_membership_id: string | null;
+      /** Format: date-time */
+      rejected_at: string | null;
+      /** Format: uuid */
+      rejected_by_membership_id: string | null;
+      rejection_reason: string;
+      /** Format: date-time */
+      posted_at: string | null;
+      /** Format: uuid */
+      posted_by_membership_id: string | null;
+      /** Format: date-time */
+      cancelled_at: string | null;
+      /** Format: uuid */
+      cancelled_by_membership_id: string | null;
+      /** Format: date-time */
+      voided_at: string | null;
+      reason: string;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: uuid */
+      updated_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+      lines: components["schemas"]["StaffSalaryLine"][];
+    };
+    SalaryPeriodEnvelope: {
+      success: boolean;
+      data: components["schemas"]["SalaryPeriod"];
+      message: string;
+    };
+    SalaryPeriodListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["SalaryPeriod"][];
+      meta: components["schemas"]["SalaryListMeta"];
+      message: string;
+    };
+    SalaryPeriodWriteRequest: {
+      /** Format: date */
+      period_start: string;
+      /** Format: date */
+      period_end: string;
+      /** Format: date */
+      business_date: string;
+      description: string;
     };
     /**
      * @description * `GYM` - GYM
@@ -3694,6 +3922,37 @@ export interface components {
       invited_at: string | null;
       /** Format: date-time */
       activated_at: string | null;
+    };
+    StaffPayee: {
+      /** Format: uuid */
+      id: string;
+      staff_code: string;
+      display_name: string;
+    };
+    StaffSalaryLine: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      staff_profile_id: string;
+      staff: components["schemas"]["StaffPayee"];
+      /** Format: decimal */
+      readonly amount: string;
+      currency: string;
+      payment_method: string;
+      external_reference: string;
+      /** Format: uuid */
+      cash_session_id: string | null;
+      /** Format: uuid */
+      expense_id: string | null;
+      description: string;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: uuid */
+      updated_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
     };
     StaffSession: {
       access_token: string;
@@ -10389,6 +10648,651 @@ export interface operations {
         };
       };
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  salary_periods_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        business_date?: string;
+        limit?: number;
+        /**
+         * @description * `DRAFT` - Draft
+         *     * `PENDING_APPROVAL` - Pending Approval
+         *     * `POSTED` - Posted
+         *     * `REJECTED` - Rejected
+         *     * `CANCELLED` - Cancelled
+         *     * `VOID` - Void
+         */
+        status?:
+          | "DRAFT"
+          | "PENDING_APPROVAL"
+          | "POSTED"
+          | "REJECTED"
+          | "CANCELLED"
+          | "VOID";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SalaryPeriodListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  salary_periods_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this salary command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SalaryPeriodWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["SalaryPeriodWriteRequest"];
+        "multipart/form-data": components["schemas"]["SalaryPeriodWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SalaryPeriodEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  salary_periods_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        period_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SalaryPeriodEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  salary_periods_update: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this salary command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        period_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedSalaryPeriodUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedSalaryPeriodUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedSalaryPeriodUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SalaryPeriodEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  salary_periods_approve: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this salary command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        period_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ApproveSalaryRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ApproveSalaryRequest"];
+        "multipart/form-data": components["schemas"]["ApproveSalaryRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SalaryApprovalEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  salary_periods_cancel: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this salary command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        period_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CancelSalaryRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CancelSalaryRequest"];
+        "multipart/form-data": components["schemas"]["CancelSalaryRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SalaryPeriodEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  salary_periods_replace_lines: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this salary command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        period_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SalaryLinesReplaceRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["SalaryLinesReplaceRequest"];
+        "multipart/form-data": components["schemas"]["SalaryLinesReplaceRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SalaryPeriodEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  salary_periods_reject: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this salary command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        period_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RejectSalaryRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["RejectSalaryRequest"];
+        "multipart/form-data": components["schemas"]["RejectSalaryRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SalaryPeriodEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  salary_periods_submit: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this salary command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        period_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SalaryPeriodEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
         headers: {
           [name: string]: unknown;
         };

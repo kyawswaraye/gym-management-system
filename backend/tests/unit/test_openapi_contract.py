@@ -109,6 +109,13 @@ PUBLISHED_PATHS = {
     "/api/v1/expenses/{expense_id}/approve/",
     "/api/v1/expenses/{expense_id}/reject/",
     "/api/v1/expenses/{expense_id}/cancel/",
+    "/api/v1/salary-periods/",
+    "/api/v1/salary-periods/{period_id}/",
+    "/api/v1/salary-periods/{period_id}/lines/",
+    "/api/v1/salary-periods/{period_id}/submit/",
+    "/api/v1/salary-periods/{period_id}/approve/",
+    "/api/v1/salary-periods/{period_id}/reject/",
+    "/api/v1/salary-periods/{period_id}/cancel/",
 }
 CONTRACT_PATH = Path(__file__).resolve().parents[3] / "contracts" / "openapi.v1.json"
 
@@ -149,6 +156,7 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
         "/api/v1/payments/{payment_id}/refund/",
         "/api/v1/receipts/{receipt_id}/void/",
         "/api/v1/expenses/{expense_id}/void/",
+        "/api/v1/salary-periods/{period_id}/void/",
     )
     assert "/api/v1/members/{id}/summary/" in schema["paths"]
     assert "/api/v1/members/{id}/payments/" in schema["paths"]
@@ -1151,3 +1159,36 @@ def test_openapi_documents_expense_commands() -> None:
     generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
     assert '"/api/v1/expenses/{expense_id}/approve/"' in generated
     assert '"/api/v1/expense-categories/"' in generated
+
+
+def test_openapi_documents_salary_commands() -> None:
+    document = generated_schema()
+    paths = document["paths"]
+    assert "/api/v1/salary-periods/{period_id}/void/" not in paths
+    writes = (
+        (paths["/api/v1/salary-periods/"]["post"], "201"),
+        (paths["/api/v1/salary-periods/{period_id}/"]["patch"], "200"),
+        (paths["/api/v1/salary-periods/{period_id}/lines/"]["put"], "200"),
+        (paths["/api/v1/salary-periods/{period_id}/submit/"]["post"], "200"),
+        (paths["/api/v1/salary-periods/{period_id}/approve/"]["post"], "200"),
+        (paths["/api/v1/salary-periods/{period_id}/reject/"]["post"], "200"),
+        (paths["/api/v1/salary-periods/{period_id}/cancel/"]["post"], "200"),
+    )
+    for operation, success in writes:
+        header = next(
+            parameter
+            for parameter in operation["parameters"]
+            if parameter["name"] == "Idempotency-Key"
+        )
+        assert header["required"] is True
+        assert success in operation["responses"]
+        assert "409" in operation["responses"]
+    assert "Idempotency-Key" not in {
+        parameter["name"]
+        for parameter in paths["/api/v1/salary-periods/"]["get"].get("parameters", [])
+    }
+    approve = paths["/api/v1/salary-periods/{period_id}/approve/"]["post"]
+    assert "422" in approve["responses"]
+    generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
+    assert '"/api/v1/salary-periods/{period_id}/approve/"' in generated
+    assert '"/api/v1/salary-periods/{period_id}/lines/"' in generated

@@ -7,6 +7,8 @@ failure rolls every side effect back. Public void stays unpublished.
 
 from __future__ import annotations
 
+from datetime import date
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -327,6 +329,111 @@ def approve_expense(
     )
     session = movement.cash_session if movement is not None else None
     return expense, session, movement
+
+
+def post_staff_salary_expense(
+    *,
+    gym: Gym,
+    approver: GymMembership,
+    category: ExpenseCategory,
+    created_by_membership_id: UUID,
+    submitted_by_membership_id: UUID,
+    business_date: date,
+    description: str,
+    amount: Decimal,
+    currency: str,
+    payment_method: str,
+    cash_session_id: UUID | None,
+    policy_note: str,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> tuple[Expense, CashTransaction | None]:
+    """Post one protected salary expense inside the caller's transaction.
+
+    Public expense commands still reject ``STAFF_SALARY``. This path is the
+    only application writer for that category. It still inserts a draft, then
+    submits and posts, so the expense guards and cash rules stay in force.
+    """
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Salary expense posting requires an active transaction.")
+    if category.gym_id != gym.id or category.system_key != "STAFF_SALARY" or not category.is_active:
+        raise ProtectedExpenseCategory()
+    if currency != gym.currency:
+        raise ValidationError({"currency": ["Currency must match the selected gym."]})
+    if approver.id in {created_by_membership_id, submitted_by_membership_id}:
+        raise PermissionDenied()
+    if payment_method != Payment.Method.CASH and cash_session_id is not None:
+        raise ValidationError(
+            {"cash_session_id": ["Only a cash salary line can use a cash session."]}
+        )
+    if payment_method == Payment.Method.CASH and cash_session_id is None:
+        raise ValidationError({"cash_session_id": ["A cash salary line requires an open session."]})
+    now = timezone.now()
+    expense = Expense.objects.create(
+        gym=gym,
+        category=category,
+        business_date=business_date,
+        description=description,
+        amount=amount,
+        currency=currency,
+        payment_method=payment_method,
+        policy_note=policy_note,
+        status=Expense.Status.DRAFT,
+        created_with_reception_scope=_holds_reception(
+            gym_id=gym.id, membership_id=created_by_membership_id
+        ),
+        created_by_membership_id=created_by_membership_id,
+        updated_by_membership_id=approver.id,
+    )
+    expense.status = Expense.Status.PENDING_APPROVAL
+    expense.submitted_at = now
+    expense.submitted_by_membership_id = submitted_by_membership_id
+    expense.submitted_with_reception_scope = _holds_reception(
+        gym_id=gym.id, membership_id=submitted_by_membership_id
+    )
+    expense.updated_by_membership_id = approver.id
+    expense.save()
+    movement: CashTransaction | None = None
+    if payment_method == Payment.Method.CASH:
+        assert cash_session_id is not None
+        movement = record_cash_movement(
+            gym=gym,
+            actor=approver,
+            session_id=cash_session_id,
+            direction=CashTransaction.Direction.OUT,
+            source_type=CashTransaction.SourceType.EXPENSE,
+            source_id=expense.id,
+            amount=expense.amount,
+            currency=expense.currency,
+            business_date=expense.business_date,
+            description=expense.description,
+            reason="",
+            reversal_of_id=None,
+        )
+        _assert_reception_till(expense=expense, session=movement.cash_session)
+    posted_at = timezone.now()
+    expense.status = Expense.Status.POSTED
+    expense.approved_at = posted_at
+    expense.approved_by_membership_id = approver.id
+    expense.posted_at = posted_at
+    expense.posted_by_membership_id = approver.id
+    expense.updated_by_membership_id = approver.id
+    if movement is not None:
+        expense.cash_session = movement.cash_session
+        expense.cash_transaction = movement
+    expense.save()
+    _audit(
+        gym=gym,
+        actor=approver,
+        action="EXPENSE_APPROVED_POSTED",
+        expense=expense,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    return expense, movement
 
 
 def reject_expense(

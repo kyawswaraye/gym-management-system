@@ -25,7 +25,9 @@ The generic staff scan path, trainer scan, notification HTTP routes, and
 Payment draft, submit, approve, reject, cancel, receipt list, detail, download, and daily sales are published. Void, refund, and receipt void remain unpublished. Cash-session
 list, detail, open, adjustment, and reconcile, plus the cash-transaction
 list, are published. The cash-book staff UI is deferred to increment 9. Expense-category and expense
-approval routes are published; expense void remains unpublished. Trainer scan
+approval routes are published; expense void remains unpublished. Salary-period
+list, detail, create, update, line replacement, submit, approve, reject, and
+cancel are published; salary void remains unpublished. Trainer scan
 waits for Phase 5 assignments. Profile-photo
 upload, complete, download-url, and delete are published. Phase 2
 implementation is complete. `docs/DEVELOPMENT_PLAN.md` was not edited for that
@@ -154,7 +156,9 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   encrypted idempotency, receipt sequences, and `expense_categories.manage`.
   Increment 3 publishes payment, receipt, and daily-sales routes on that foundation.
   Increment 4 publishes expense-category and expense approval routes. Void, refund,
-  receipt void, expense void, salary, inventory, and retail routes remain unpublished.
+  receipt void, and expense void remain unpublished.
+  Increment 5 publishes salary-period and salary-line routes. Salary void,
+  inventory, and retail routes remain unpublished.
 - Platform gym provisioning, lifecycle, owner invitation, platform audit reads,
   tenant audit reads, staff invitation/acceptance, staff profiles, staff
   activate/suspend, and tenant role/permission management are in place.
@@ -196,10 +200,11 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   staff check-in challenge issuance, member login, refresh, and logout, and
   member QR redemption, and display-device enrollment, rotation, revocation,
   and device challenge issuance, Increment 3 payment, receipt, and daily-sales
-  routes, and Increment 4 expense-category and expense approval routes. It leaves
+  routes, Increment 4 expense-category and expense approval routes, and Increment 5
+  salary-period routes. It leaves
   the generic staff scan
   path, trainer scan, notification, member profile, payment void, refund, receipt
-  void, and expense void routes unpublished.
+  void, expense void, and salary void routes unpublished.
   `profile_photo_asset_id` remains a nullable identifier with no foreign key to
   `FileAsset`. The staff API does not accept or return it. Attaching it later
   requires a same-gym asset whose scan status is CLEAN.

@@ -73,6 +73,9 @@ TENANT_TABLES = {
     "tenants_staff_profile",
     "cashbook_cash_session",
     "cashbook_cash_transaction",
+    "expenses_expense",
+    "salaries_salary_period",
+    "salaries_staff_salary_line",
 }
 POLICY_COMMANDS = {"r", "a", "w", "d"}
 

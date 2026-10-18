@@ -989,7 +989,7 @@ def test_legacy_reconciliation_is_deterministic_and_fails_closed() -> None:
             with connection.cursor() as cursor:
                 cursor.execute("DELETE FROM members_receipt WHERE gym_id = %s", [gym_row.id])
                 cursor.execute("DELETE FROM members_payment WHERE gym_id = %s", [gym_row.id])
-        MigrationExecutor(connection).migrate([("members", "0017_payment_receipt_hardening")])
+        _restore_migration_head()
 
 
 @override_settings(**jwt_settings())
@@ -1097,7 +1097,21 @@ def test_legacy_overpayment_counts_voided_charges() -> None:
             with connection.cursor() as cursor:
                 cursor.execute("DELETE FROM members_receipt WHERE gym_id = %s", [gym_row.id])
                 cursor.execute("DELETE FROM members_payment WHERE gym_id = %s", [gym_row.id])
-        MigrationExecutor(connection).migrate([("members", "0017_payment_receipt_hardening")])
+        _restore_migration_head()
+
+
+def _restore_migration_head() -> None:
+    """Return the shared PostgreSQL test database to the current migration head.
+
+    These tests move ``members`` behind the expense and salary migrations. Stopping
+    at ``0017`` leaves those later tables unapplied for every test that follows.
+    ``salaries.0001`` depends on ``expenses.0003``, so the full leaf set reapplies
+    that expense migration before either salary migration.
+    """
+
+    executor = MigrationExecutor(connection)
+    executor.loader.build_graph()
+    executor.migrate(executor.loader.graph.leaf_nodes())
 
 
 def _other_payment(api: APIClient, headers: dict[str, str], gym: Gym, amount: str) -> str:

@@ -77,11 +77,11 @@ payment, receipt, and daily-sales routes. A second schema export matched the
 working tree. The local `make check` contract step still reports those files
 because this increment is not committed.
 Phase 4 increment 4 publishes expense-category list/create/update and expense
-list/create/detail/update/submit/approve/reject/cancel. Expense void, salaries,
-inventory, retail, and payment/receipt void/refund stay unpublished. Protected
-system categories stay immutable. Custom category changes require
-`expense_categories.manage`. Cash approval posts one `OUT` expense movement on
-an open same-gym session. The expense staff UI is deferred to increment 9.
+list/create/detail/update/submit/approve/reject/cancel. Expense void stays
+unpublished. Protected system categories stay immutable. Custom category
+changes require `expense_categories.manage`. Cash approval posts one `OUT`
+expense movement on an open same-gym session. The expense staff UI is deferred
+to increment 9.
 Increment 4 gate evidence: backend ruff, format, and mypy passed and
 migrations stayed in sync; 263 non-PostgreSQL backend tests passed; the
 PostgreSQL suite passed 224 tests; web format, lint, typecheck, and build
@@ -89,6 +89,20 @@ passed, with 263 web tests. OpenAPI and the generated web types include the
 expense-category and expense command routes. A second schema export matched the
 working tree. The local `make check` contract step still reports those files
 because this increment is not committed.
+Phase 4 increment 5 publishes salary-period list/create/detail/update, draft
+line replacement, and submit/approve/reject/cancel. Salary void, inventory,
+retail, and payment/receipt/expense void/refund stay unpublished. Approval
+posts one protected staff-salary expense per line and one cash-out movement
+per cash line, or rolls the whole period back. Reception sees only its own
+non-posted periods. The salary staff UI is deferred to increment 9.
+Increment 5 gate evidence: backend ruff, format, and mypy passed and
+migrations stayed in sync; 267 non-PostgreSQL backend tests passed; the
+PostgreSQL suite passed 229 tests; web format, lint, typecheck, and build
+passed, with 263 web tests. OpenAPI and the generated web types include the
+salary-period routes. A second schema export matched the working tree. The
+local `make check` contract step still reports those files because this
+increment is not committed.
+
 `is_pt_client` stays false until Phase 5 derives it from an active trainer
 assignment.
 
