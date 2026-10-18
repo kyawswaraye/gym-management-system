@@ -68,6 +68,7 @@ module = [
   "apps.cashbook.serializers",
   "apps.expenses.serializers",
   "apps.salaries.serializers",
+  "apps.inventory.serializers",
 ]
 disable_error_code = ["assignment", "type-arg"]
 
@@ -86,6 +87,7 @@ module = [
   "apps.cashbook.views",
   "apps.expenses.views",
   "apps.salaries.views",
+  "apps.inventory.views",
   "apps.members.payment_views",
   "apps.files.authentication",
 ]

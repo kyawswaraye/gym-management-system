@@ -116,6 +116,12 @@ PUBLISHED_PATHS = {
     "/api/v1/salary-periods/{period_id}/approve/",
     "/api/v1/salary-periods/{period_id}/reject/",
     "/api/v1/salary-periods/{period_id}/cancel/",
+    "/api/v1/product-categories/",
+    "/api/v1/products/",
+    "/api/v1/products/low-stock/",
+    "/api/v1/products/{product_id}/",
+    "/api/v1/stock-movements/",
+    "/api/v1/stock-movements/adjust/",
 }
 CONTRACT_PATH = Path(__file__).resolve().parents[3] / "contracts" / "openapi.v1.json"
 
@@ -157,6 +163,11 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
         "/api/v1/receipts/{receipt_id}/void/",
         "/api/v1/expenses/{expense_id}/void/",
         "/api/v1/salary-periods/{period_id}/void/",
+        "/api/v1/retail-sales/",
+        "/api/v1/retail-sales/{id}/",
+        "/api/v1/retail-sales/{id}/void/",
+        "/api/v1/product-categories/{id}/",
+        "/api/v1/stock-movements/{id}/",
     )
     assert "/api/v1/members/{id}/summary/" in schema["paths"]
     assert "/api/v1/members/{id}/payments/" in schema["paths"]
@@ -1192,3 +1203,38 @@ def test_openapi_documents_salary_commands() -> None:
     generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
     assert '"/api/v1/salary-periods/{period_id}/approve/"' in generated
     assert '"/api/v1/salary-periods/{period_id}/lines/"' in generated
+
+
+def test_openapi_documents_inventory_commands() -> None:
+    document = generated_schema()
+    paths = document["paths"]
+    assert "/api/v1/retail-sales/" not in paths
+    assert "/api/v1/product-categories/{id}/" not in paths
+    writes = (
+        (paths["/api/v1/product-categories/"]["post"], "201"),
+        (paths["/api/v1/products/"]["post"], "201"),
+        (paths["/api/v1/products/{product_id}/"]["patch"], "200"),
+        (paths["/api/v1/stock-movements/adjust/"]["post"], "201"),
+    )
+    for operation, success in writes:
+        header = next(
+            parameter
+            for parameter in operation["parameters"]
+            if parameter["name"] == "Idempotency-Key"
+        )
+        assert header["required"] is True
+        assert success in operation["responses"]
+        assert "409" in operation["responses"]
+    for path in (
+        "/api/v1/product-categories/",
+        "/api/v1/products/",
+        "/api/v1/products/low-stock/",
+        "/api/v1/stock-movements/",
+    ):
+        assert "Idempotency-Key" not in {
+            parameter["name"] for parameter in paths[path]["get"].get("parameters", [])
+        }
+    generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
+    assert '"/api/v1/stock-movements/adjust/"' in generated
+    assert '"/api/v1/products/low-stock/"' in generated
+    assert '"/api/v1/retail-sales/"' not in generated

@@ -102,6 +102,20 @@ passed, with 263 web tests. OpenAPI and the generated web types include the
 salary-period routes. A second schema export matched the working tree. The
 local `make check` contract step still reports those files because this
 increment is not committed.
+Phase 4 increment 6 publishes product-category list and create, product list,
+create, detail, and update, low-stock, stock-movement list, and manual stock
+adjustment. Category update, retail sales, returns, inventory UI, and every
+void/refund route stay unpublished. Quantity on hand is the sum of append-only
+movements. Adjustment snapshots current unit cost and does not compute a
+weighted average. Catalog and stock commands use the finance entitlement.
+The inventory staff UI is deferred.
+Increment 6 gate evidence: backend ruff, format, and mypy passed and
+migrations stayed in sync; 273 non-PostgreSQL backend tests passed; the
+PostgreSQL suite passed 234 tests; web format, lint, typecheck, and build
+passed, with 263 web tests. OpenAPI and the generated web types include the
+product-category, product, low-stock, and stock-movement routes. A second
+schema export matched the working tree. The local `make check` contract step
+still reports those files because this increment is not committed.
 
 `is_pt_client` stays false until Phase 5 derives it from an active trainer
 assignment.

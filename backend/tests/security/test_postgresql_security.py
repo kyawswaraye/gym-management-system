@@ -76,6 +76,9 @@ TENANT_TABLES = {
     "expenses_expense",
     "salaries_salary_period",
     "salaries_staff_salary_line",
+    "inventory_product_category",
+    "inventory_product",
+    "inventory_stock_movement",
 }
 POLICY_COMMANDS = {"r", "a", "w", "d"}
 

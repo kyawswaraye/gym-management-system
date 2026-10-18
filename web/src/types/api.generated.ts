@@ -1372,6 +1372,70 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/product-categories/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["product_categories_list"];
+    put?: never;
+    post: operations["product_categories_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/products/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["products_list"];
+    put?: never;
+    post: operations["products_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/products/{product_id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["products_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["products_update"];
+    trace?: never;
+  };
+  "/api/v1/products/low-stock/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["products_low_stock"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/readiness/": {
     parameters: {
       query?: never;
@@ -1734,6 +1798,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["staff_invitation_accept"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/stock-movements/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["stock_movements_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/stock-movements/adjust/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["stock_movements_adjust"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2718,6 +2814,10 @@ export interface components {
      * @enum {string}
      */
     KindEnum: "NFC" | "BIOMETRIC";
+    ListMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
     LoginEnvelope:
       | components["schemas"]["DirectLoginEnvelope"]
       | components["schemas"]["SelectionLoginEnvelope"]
@@ -3147,6 +3247,17 @@ export interface components {
       method: string;
       total: string;
     };
+    /**
+     * @description * `OPENING` - OPENING
+     *     * `PURCHASE` - PURCHASE
+     *     * `DAMAGE` - DAMAGE
+     *     * `LOSS` - LOSS
+     *     * `ADJUSTMENT` - ADJUSTMENT
+     *     * `CORRECTION` - CORRECTION
+     * @enum {string}
+     */
+    MovementTypeEnum:
+      "OPENING" | "PURCHASE" | "DAMAGE" | "LOSS" | "ADJUSTMENT" | "CORRECTION";
     /** @enum {unknown} */
     NullEnum: null;
     OpenCashSessionRequest: {
@@ -3346,6 +3457,23 @@ export interface components {
       /** Format: date-time */
       received_at?: string;
       reference_number?: string;
+    };
+    PatchedProductUpdateRequest: {
+      sku?: string;
+      barcode?: string | null;
+      name?: string;
+      /** Format: uuid */
+      category_id?: string;
+      unit?: string;
+      /** Format: decimal */
+      sale_price?: string;
+      /** Format: decimal */
+      current_unit_cost?: string;
+      /** Format: decimal */
+      default_unit_cost?: string;
+      /** Format: decimal */
+      low_stock_threshold?: string;
+      is_active?: boolean;
     };
     PatchedRoleUpdateRequest: {
       key?: string;
@@ -3568,6 +3696,99 @@ export interface components {
      * @enum {string}
      */
     PrincipalTypeEnum: "PLATFORM" | "STAFF";
+    Product: {
+      /** Format: uuid */
+      id: string;
+      sku: string;
+      barcode: string | null;
+      name: string;
+      /** Format: uuid */
+      category_id: string;
+      unit: string;
+      sale_price: string;
+      current_unit_cost: string;
+      default_unit_cost: string;
+      low_stock_threshold: string;
+      quantity_on_hand: string;
+      sold_quantity: string;
+      revenue: string;
+      cost_of_goods_sold: string;
+      gross_profit: string;
+      is_active: boolean;
+      /** Format: date-time */
+      archived_at: string | null;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: uuid */
+      updated_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    ProductCategory: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      name: string;
+      is_active: boolean;
+      /** Format: date-time */
+      archived_at: string | null;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: uuid */
+      updated_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    ProductCategoryEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ProductCategory"];
+      message: string;
+    };
+    ProductCategoryListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ProductCategory"][];
+      meta: components["schemas"]["ListMeta"];
+      message: string;
+    };
+    ProductCategoryWriteRequest: {
+      code: string;
+      name: string;
+      /** @default true */
+      is_active: boolean;
+    };
+    ProductEnvelope: {
+      success: boolean;
+      data: components["schemas"]["Product"];
+      message: string;
+    };
+    ProductListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["Product"][];
+      meta: components["schemas"]["ListMeta"];
+      message: string;
+    };
+    ProductWriteRequest: {
+      sku: string;
+      barcode?: string | null;
+      name: string;
+      /** Format: uuid */
+      category_id: string;
+      unit: string;
+      /** Format: decimal */
+      sale_price: string;
+      /** Format: decimal */
+      current_unit_cost: string;
+      /** Format: decimal */
+      default_unit_cost: string;
+      /** Format: decimal */
+      low_stock_threshold: string;
+      /** @default true */
+      is_active: boolean;
+    };
     /**
      * @description * `MEMBERSHIP` - Membership
      *     * `PT` - Pt
@@ -3977,6 +4198,47 @@ export interface components {
      * @enum {string}
      */
     StaffStatusEnum: "ACTIVE" | "ON_LEAVE" | "TERMINATED" | "ARCHIVED";
+    StockAdjustRequest: {
+      /** Format: uuid */
+      product_id: string;
+      /** Format: decimal */
+      quantity: string;
+      movement_type: components["schemas"]["MovementTypeEnum"];
+      /** Format: date */
+      business_date: string;
+      reason: string;
+    };
+    StockAdjustment: {
+      movement: components["schemas"]["StockMovement"];
+      product: components["schemas"]["Product"];
+    };
+    StockAdjustmentEnvelope: {
+      success: boolean;
+      data: components["schemas"]["StockAdjustment"];
+      message: string;
+    };
+    StockMovement: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      product_id: string;
+      quantity: string;
+      movement_type: string;
+      unit_cost_snapshot: string;
+      reason: string;
+      /** Format: date */
+      business_date: string;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+    };
+    StockMovementListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["StockMovement"][];
+      meta: components["schemas"]["ListMeta"];
+      message: string;
+    };
     SubscriptionPlanStatusCounts: {
       ACTIVE: number;
       RETIRED: number;
@@ -10134,6 +10396,441 @@ export interface operations {
       };
     };
   };
+  product_categories_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        /**
+         * @description * `true` - true
+         *     * `false` - false
+         */
+        is_active?: "true" | "false";
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProductCategoryListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  product_categories_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this inventory command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ProductCategoryWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ProductCategoryWriteRequest"];
+        "multipart/form-data": components["schemas"]["ProductCategoryWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProductCategoryEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  products_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        barcode?: string;
+        category_id?: string;
+        /**
+         * @description * `true` - true
+         *     * `false` - false
+         */
+        is_active?: "true" | "false";
+        limit?: number;
+        sku?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProductListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  products_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this inventory command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ProductWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ProductWriteRequest"];
+        "multipart/form-data": components["schemas"]["ProductWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProductEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  products_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        product_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProductEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  products_update: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this inventory command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        product_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedProductUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedProductUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedProductUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProductEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  products_low_stock: {
+    parameters: {
+      query?: {
+        after?: string;
+        category_id?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProductListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   readiness: {
     parameters: {
       query?: never;
@@ -11870,6 +12567,157 @@ export interface operations {
         };
       };
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  stock_movements_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        business_date?: string;
+        limit?: number;
+        /**
+         * @description * `OPENING` - Opening
+         *     * `PURCHASE` - Purchase
+         *     * `SALE` - Sale
+         *     * `SALE_RETURN` - Sale Return
+         *     * `DAMAGE` - Damage
+         *     * `LOSS` - Loss
+         *     * `ADJUSTMENT` - Adjustment
+         *     * `CORRECTION` - Correction
+         */
+        movement_type?:
+          | "OPENING"
+          | "PURCHASE"
+          | "SALE"
+          | "SALE_RETURN"
+          | "DAMAGE"
+          | "LOSS"
+          | "ADJUSTMENT"
+          | "CORRECTION";
+        product_id?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StockMovementListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  stock_movements_adjust: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this inventory command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StockAdjustRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["StockAdjustRequest"];
+        "multipart/form-data": components["schemas"]["StockAdjustRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StockAdjustmentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
         headers: {
           [name: string]: unknown;
         };

@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "apps.cashbook",
     "apps.expenses",
     "apps.salaries",
+    "apps.inventory",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -100,6 +101,7 @@ REST_FRAMEWORK = {
         "payments_command": "120/60",
         "expenses_command": "120/60",
         "salaries_command": "120/60",
+        "inventory_command": "120/60",
     },
 }
 
