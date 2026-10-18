@@ -34,13 +34,10 @@ unpublished. Full retail-sale void is published in Increment 8B. Trainer scan
 waits for Phase 5 assignments. Profile-photo
 upload, complete, download-url, and delete are published. Phase 2
 implementation is complete. `docs/DEVELOPMENT_PLAN.md` was not edited for that
-closure. Production MinIO-compatible storage and ClamAV credentials stay in
-the environment and are not repository secrets. Local and end-to-end Compose
-use digest-pinned `docker.io/pgsty/silo`, a third-party MinIO-compatible fork,
-not official MinIO. Production object-storage image and provider approval
-remains open because official MinIO images are not anonymously distributable.
-Production expiry delivery remains gated on an idempotency-capable
-transactional provider.
+closure. [ADR 0010](../docs/adr/0010-production-provider-readiness.md) selects AWS S3 in `ap-southeast-1` and Resend. Neither client is implemented. AWS and ClamAV credentials stay outside the repository. Local and end-to-end Compose
+use digest-pinned `docker.io/pgsty/silo`, a test-only MinIO-compatible fork,
+not official MinIO and not the production store. Production MinIO is no longer planned.
+Live Resend, AWS, and ClamAV proofs remain open. Legal retention stays draft-only.
 
 ## Runtime
 
@@ -121,17 +118,18 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
 
 ## Deliberate limitations
 
-- Password recovery endpoints return `501 PROVIDER_NOT_CONFIGURED`. Django's
-  configurable `EMAIL_BACKEND` is the delivery abstraction. Tests and E2E use
+- Password recovery is implemented under [ADR 0010](../docs/adr/0010-production-provider-readiness.md): global user scope for platform, staff, and linked-member identities; BFF routes; forgot constant `200`; reset `204`; a 30-minute high-entropy hash-only single-use token under `PASSWORD_RESET_TOKEN_PEPPER`; one live token per user; page `/reset-password?token=`; existing password validators and a different password; revocation of every refresh session, gym-selection ticket, and MFA challenge; an `authz_version` bump on every linked gym membership and member; MFA left enabled; login required afterward. Provider failure stays private. Django's
+  configurable `EMAIL_BACKEND` is still the delivery abstraction. Production uses
+  `apps.common.mail.resend.EmailBackend`. Tests and E2E use
   non-delivery backends. `schedule_membership_expiry_emails` and
   `deliver_membership_expiry_emails` are implemented. The delivery command
   locks one due row at a time with `skip_locked`, commits that outcome after
-  the provider call, and sets `X-Idempotency-Key`. Concurrent runs and ordinary
+  the provider call, and sets `X-Idempotency-Key` as an email header. The
+  Resend backend translates that header to `Idempotency-Key`. Concurrent runs and ordinary
   reruns do not deliver one row twice. A crash after provider acceptance and
-  before commit can still duplicate that send until the backend honors the
-  header. Production must configure an approved transactional provider that
-  does so before invitation, password-recovery, or expiry delivery is
-  production-ready. Vendor selection remains deferred. Notification HTTP routes
+  before commit can still duplicate that send until Resend honors
+  `Idempotency-Key` (1–256 characters, retained 24 hours). The live domain,
+  API key, and idempotency proof are absent. Notification HTTP routes
   stay unpublished.
 - MFA is TOTP and is mandatory for platform administrators and Owners.
   MFA-enabled users do not receive a session at password login. They receive a
@@ -191,8 +189,8 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   production email provider described above.
   Tenant `FileAsset` metadata, checks, and forced RLS are in place. Profile-photo
   upload intent, complete, download URL, and delete routes are published.
-  Pillow 13.0.0 re-encodes those images. MinIO and ClamAV stay private and are
-  configured with environment variables, never repository secrets.
+  Pillow 13.0.0 re-encodes those images. Local and end-to-end storage is the private test fork. Production storage is AWS S3 when the live bucket exists. ClamAV stays on the private network.
+  Credentials are environment variables, never repository secrets, and the production values are not set.
 - `GET /api/v1/audit-logs/` requires a staff access token and active `audit.view`.
   A platform token is rejected. An active owner receives every same-gym tenant
   audit row (`scope=GYM` in the collection metadata). Every other caller

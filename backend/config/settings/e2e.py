@@ -30,6 +30,7 @@ required: dict[str, tuple[object, int]] = {
     "MFA_ENCRYPTION_KEY": (MFA_ENCRYPTION_KEY, 16),  # noqa: F405
     "FINANCE_IDEMPOTENCY_ENCRYPTION_KEY": (FINANCE_IDEMPOTENCY_ENCRYPTION_KEY, 16),  # noqa: F405
     "INVITATION_TOKEN_PEPPER": (INVITATION_TOKEN_PEPPER, 16),  # noqa: F405
+    "PASSWORD_RESET_TOKEN_PEPPER": (PASSWORD_RESET_TOKEN_PEPPER, 16),  # noqa: F405
     "BFF_SHARED_SECRET": (BFF_SHARED_SECRET, 32),  # noqa: F405
 }
 missing = [name for name, (value, minimum) in required.items() if not _present(value, minimum)]

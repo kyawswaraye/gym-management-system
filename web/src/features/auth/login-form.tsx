@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import {
@@ -128,6 +129,11 @@ export function LoginForm({
       <button className="button" type="submit" disabled={pending}>
         {pending ? "Verifying…" : mfaRequired ? "Verify code" : "Sign in"}
       </button>
+      {!mfaRequired ? (
+        <p className="muted">
+          <Link href="/forgot-password">Forgot password</Link>
+        </p>
+      ) : null}
     </form>
   );
 }

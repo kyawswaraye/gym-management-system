@@ -301,7 +301,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["auth_password_forgot_create"];
+    /** @description Accepts an email and always returns the same 200 envelope. The body does not reveal account existence or provider failure. */
+    post: operations["auth_password_forgot"];
     delete?: never;
     options?: never;
     head?: never;
@@ -317,7 +318,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["auth_password_reset_create"];
+    /** @description Consumes a single-use reset token, installs a new password, and revokes every login credential for that user. Issues no session. */
+    post: operations["auth_password_reset"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3561,6 +3563,21 @@ export interface components {
     OwnerRevokeInputRequest: {
       reason: string;
     };
+    PasswordForgotEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: unknown;
+      message: string;
+    };
+    PasswordForgotInputRequest: {
+      /** Format: email */
+      email: string;
+    };
+    PasswordResetInputRequest: {
+      reset_token: string;
+      password: string;
+      password_confirmation: string;
+    };
     PatchedAdminGymPatchRequest: {
       name?: string;
       legal_name?: string;
@@ -5926,7 +5943,7 @@ export interface operations {
       };
     };
   };
-  auth_password_forgot_create: {
+  auth_password_forgot: {
     parameters: {
       query?: never;
       header: {
@@ -5936,20 +5953,30 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
-        "application/json": {
-          [key: string]: unknown;
-        };
-        "application/x-www-form-urlencoded": {
-          [key: string]: unknown;
-        };
-        "multipart/form-data": {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["PasswordForgotInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PasswordForgotInputRequest"];
+        "multipart/form-data": components["schemas"]["PasswordForgotInputRequest"];
       };
     };
     responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PasswordForgotEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
       403: {
         headers: {
           [name: string]: unknown;
@@ -5958,7 +5985,7 @@ export interface operations {
           "application/json": components["schemas"]["ErrorEnvelope"];
         };
       };
-      501: {
+      429: {
         headers: {
           [name: string]: unknown;
         };
@@ -5968,7 +5995,7 @@ export interface operations {
       };
     };
   };
-  auth_password_reset_create: {
+  auth_password_reset: {
     parameters: {
       query?: never;
       header: {
@@ -5978,20 +6005,37 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
-        "application/json": {
-          [key: string]: unknown;
-        };
-        "application/x-www-form-urlencoded": {
-          [key: string]: unknown;
-        };
-        "multipart/form-data": {
-          [key: string]: unknown;
-        };
+        "application/json": components["schemas"]["PasswordResetInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PasswordResetInputRequest"];
+        "multipart/form-data": components["schemas"]["PasswordResetInputRequest"];
       };
     };
     responses: {
+      /** @description Password updated. Sign in again. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
       403: {
         headers: {
           [name: string]: unknown;
@@ -6000,7 +6044,7 @@ export interface operations {
           "application/json": components["schemas"]["ErrorEnvelope"];
         };
       };
-      501: {
+      429: {
         headers: {
           [name: string]: unknown;
         };

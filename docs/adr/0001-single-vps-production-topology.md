@@ -1,8 +1,8 @@
 # ADR 0001: Single-VPS Budget Production Topology
 
-- **Status:** Accepted for Phase 0 baseline
+- **Status:** Accepted for Phase 0 baseline. Production object storage in this record is superseded by [ADR 0010](./0010-production-provider-readiness.md): AWS S3 in `ap-southeast-1` is the selected primary store, and production MinIO is no longer planned. The single-VPS application topology otherwise remains. The approximately $80 estimate is not an approved AWS S3 price.
 - **Decision date:** 2026-08-15
-- **Budget target:** approximately USD 80 per month
+- **Budget target:** approximately USD 80 per month, historical; S3 cost approval remains open
 
 ## Context
 

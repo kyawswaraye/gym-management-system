@@ -34,6 +34,7 @@ pytestmark = [
 
 DIRECT_FUNCTIONS = frozenset(
     {
+        "app_bump_password_reset_authz(uuid)",
         "app_check_in_device(text)",
         "app_linked_members()",
         "app_owner_invitation(text)",
@@ -61,6 +62,10 @@ BOOTSTRAP_TABLES = frozenset(
         "tenants_system_role_template_permission",
     }
 )
+AUTHZ_BUMP_COLUMNS = (
+    "authz_version",
+    "updated_at",
+)
 MFA_UPDATE_COLUMNS = (
     "mfa_enabled",
     "mfa_last_used_step",
@@ -71,6 +76,7 @@ IDENTITY_FUNCTIONS = (
     "public.app_create_invited_identity(text,text,text,text)",
     "public.app_accept_invitation_password(text,text,timestamptz)",
     "public.app_confirm_invited_profile(text,text,text,text,timestamptz)",
+    "public.app_accept_password_reset(text,text,timestamptz)",
 )
 IDENTITY_TRIGGER_FUNCTIONS = (
     "public.app_guard_runtime_user_insert()",
@@ -180,6 +186,15 @@ def _assert_least_privilege(cursor: CatalogCursor) -> None:
                has_column_privilege(
                  'gym_auth_bootstrap', 'members_member', 'email', 'SELECT'
                ),
+               has_column_privilege(
+                 'gym_auth_bootstrap', 'members_member', 'authz_version', 'UPDATE'
+               ),
+               has_column_privilege(
+                 'gym_auth_bootstrap', 'members_member', 'updated_at', 'UPDATE'
+               ),
+               has_column_privilege(
+                 'gym_auth_bootstrap', 'members_member', 'first_name', 'UPDATE'
+               ),
                has_table_privilege('gym_auth_bootstrap', 'members_member', 'SELECT'),
                has_table_privilege('gym_auth_bootstrap', 'members_member', 'INSERT'),
                has_table_privilege('gym_auth_bootstrap', 'members_member', 'UPDATE'),
@@ -194,11 +209,29 @@ def _assert_least_privilege(cursor: CatalogCursor) -> None:
         True,
         False,
         False,
+        True,
+        True,
+        False,
         False,
         False,
         False,
         False,
     )
+    for table, forbidden_column in (
+        ("members_member", "first_name"),
+        ("tenants_gym_membership", "user_id"),
+    ):
+        for column in AUTHZ_BUMP_COLUMNS:
+            cursor.execute(
+                "SELECT has_column_privilege('gym_auth_bootstrap', %s, %s, 'UPDATE')",
+                [table, column],
+            )
+            assert cursor.fetchone() == (True,)
+        cursor.execute(
+            "SELECT has_column_privilege('gym_auth_bootstrap', %s, %s, 'UPDATE')",
+            [table, forbidden_column],
+        )
+        assert cursor.fetchone() == (False,)
 
     cursor.execute(
         """
@@ -272,6 +305,29 @@ def _assert_least_privilege(cursor: CatalogCursor) -> None:
         """
     )
     assert cursor.fetchone() == (["p_token_hash", "p_password_hash", "p_changed_at"],)
+    cursor.execute(
+        """
+        SELECT proargnames
+        FROM pg_proc
+        WHERE oid = 'public.app_accept_password_reset(text,text,timestamptz)'::regprocedure
+        """
+    )
+    assert cursor.fetchone() == (["p_token_hash", "p_password_hash", "p_changed_at"],)
+    cursor.execute(
+        """
+        SELECT pg_get_userbyid(p.proowner), p.prosecdef, p.proconfig,
+               has_function_privilege('public', p.oid, 'EXECUTE'),
+               has_function_privilege('gym_runtime', p.oid, 'EXECUTE')
+        FROM pg_proc p
+        WHERE p.oid = 'public.app_bump_password_reset_authz(uuid)'::regprocedure
+        """
+    )
+    bump_owner, bump_definer, bump_config, public_exec, runtime_exec = cursor.fetchone()
+    assert bump_owner == "gym_auth_bootstrap"
+    assert bump_definer is True
+    assert "row_security=off" in set(bump_config or [])
+    assert public_exec is False
+    assert runtime_exec is True
     for signature in IDENTITY_TRIGGER_FUNCTIONS:
         cursor.execute(
             """

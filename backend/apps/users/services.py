@@ -10,17 +10,23 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from django.conf import settings
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.mail import EmailMessage, get_connection
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 from apps.audit.models import Outcome
-from apps.audit.services import audit_ticket
+from apps.audit.services import audit_ticket, write_platform_audit
 from apps.common.api.exceptions import AuthenticationFailed
 from apps.common.db.tenant_context import set_gym_context, set_identity_context
+from apps.notifications.services import IDEMPOTENCY_HEADER
 from apps.tenants.models import GymMembership
 
-from .models import GymSelectionTicket, RefreshSession, User
+from .identity import InvitedIdentityError, bump_password_reset_authz, set_reset_password
+from .models import GymSelectionTicket, MFAChallenge, PasswordResetToken, RefreshSession, User
 from .tokens import issue_access_token, issue_platform_access_token
 
 
@@ -216,9 +222,9 @@ def revoke_refresh_token(plaintext: str, reason: str = "LOGOUT") -> None:
 
 
 @transaction.atomic
-def revoke_all_user_sessions(user_id: uuid.UUID) -> None:
+def revoke_all_user_sessions(user_id: uuid.UUID, reason: str = "LOGOUT_ALL") -> None:
     RefreshSession.objects.filter(user_id=user_id, revoked_at__isnull=True).update(
-        revoked_at=timezone.now(), revocation_reason="LOGOUT_ALL"
+        revoked_at=timezone.now(), revocation_reason=reason
     )
 
 
@@ -417,3 +423,140 @@ def consume_gym_selection_ticket(
     if pair is None:
         raise AuthenticationFailed()
     return pair
+
+
+def hash_password_reset_token(token: str) -> str:
+    if not settings.PASSWORD_RESET_TOKEN_PEPPER:
+        raise RuntimeError("PASSWORD_RESET_TOKEN_PEPPER is not configured")
+    return hmac.new(
+        settings.PASSWORD_RESET_TOKEN_PEPPER.encode(), token.encode(), hashlib.sha256
+    ).hexdigest()
+
+
+def _new_password_reset_token() -> str:
+    return secrets.token_urlsafe(48)
+
+
+@transaction.atomic
+def request_password_reset(
+    *,
+    email: str,
+    request_id: str,
+    ip_address: str | None = None,
+    user_agent: str = "",
+) -> None:
+    """Issue a live reset token when the address matches an active user.
+
+    The HTTP layer always returns the same 200 envelope. Provider failure,
+    a missing account, and a successful send stay indistinguishable.
+    """
+
+    normalized = email.strip().lower()
+    try:
+        user = User.objects.get(normalized_email=normalized, is_active=True)
+    except User.DoesNotExist:
+        return
+    now = timezone.now()
+    PasswordResetToken.objects.filter(
+        user=user, consumed_at__isnull=True, revoked_at__isnull=True
+    ).update(revoked_at=now)
+    plaintext = _new_password_reset_token()
+    token = PasswordResetToken.objects.create(
+        user=user,
+        token_hash=hash_password_reset_token(plaintext),
+        issued_at=now,
+        expires_at=now + timedelta(seconds=settings.PASSWORD_RESET_TTL_SECONDS),
+        request_id=request_id[:128],
+        ip_address=ip_address,
+        user_agent=user_agent[:512],
+    )
+    reset_url = f"{settings.APP_PUBLIC_URL.rstrip('/')}/reset-password?token={plaintext}"
+    message = EmailMessage(
+        subject="Reset your Gym Management password",
+        body=(
+            "Use this link to choose a new password. It expires in 30 minutes "
+            f"and can be used once.\n\n{reset_url}\n"
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+        headers={IDEMPOTENCY_HEADER: f"password-reset:{token.id}"},
+        connection=get_connection(fail_silently=False),
+    )
+    try:
+        sent = message.send(fail_silently=False)
+    except Exception:
+        sent = 0
+    write_platform_audit(
+        actor=user,
+        action="PASSWORD_RESET_REQUESTED",
+        target_type="PasswordResetToken",
+        target_id=token.id,
+        request_id=request_id,
+        outcome=Outcome.SUCCESS if sent == 1 else Outcome.DENIED,
+        details={"reason": "REQUESTED" if sent == 1 else "PROVIDER_UNAVAILABLE"},
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+
+@transaction.atomic
+def reset_password(
+    *,
+    reset_token: str,
+    password: str,
+    request_id: str,
+    ip_address: str | None = None,
+    user_agent: str = "",
+) -> None:
+    token_hash = hash_password_reset_token(reset_token)
+    now = timezone.now()
+    token = (
+        PasswordResetToken.objects.select_related("user")
+        .select_for_update()
+        .filter(token_hash=token_hash)
+        .first()
+    )
+    if (
+        token is None
+        or token.consumed_at is not None
+        or token.revoked_at is not None
+        or token.expires_at <= now
+        or not token.user.is_active
+    ):
+        raise AuthenticationFailed()
+    user = token.user
+    if user.check_password(password):
+        raise ValidationError({"password": ["Enter a different password."]})
+    try:
+        validate_password(password, user=user)
+    except DjangoValidationError as exc:
+        raise ValidationError({"password": list(exc.messages)}) from exc
+    try:
+        set_reset_password(
+            token_hash=token_hash,
+            user=user,
+            password=password,
+            changed_at=now,
+        )
+    except InvitedIdentityError as exc:
+        raise AuthenticationFailed() from exc
+    try:
+        bump_password_reset_authz(user_id=user.id)
+    except InvitedIdentityError as exc:
+        raise AuthenticationFailed() from exc
+    revoke_all_user_sessions(user.id, reason="PASSWORD_RESET")
+    GymSelectionTicket.objects.filter(
+        user=user, consumed_at__isnull=True, revoked_at__isnull=True
+    ).update(revoked_at=now, revocation_reason="PASSWORD_RESET")
+    MFAChallenge.objects.filter(user=user, consumed_at__isnull=True).update(consumed_at=now)
+    write_platform_audit(
+        actor=user,
+        action="PASSWORD_RESET_COMPLETED",
+        target_type="PasswordResetToken",
+        target_id=token.id,
+        request_id=request_id,
+        outcome=Outcome.SUCCESS,
+        details={"reason": "RESET"},
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )

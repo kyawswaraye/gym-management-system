@@ -31,6 +31,8 @@ const ALLOWED_PATHS = new Set([
   "/api/v1/auth/mfa/challenge/",
   "/api/v1/owners/invitations/accept/",
   "/api/v1/staff/invitations/accept/",
+  "/api/v1/auth/password/forgot/",
+  "/api/v1/auth/password/reset/",
 ]);
 
 const MEMBER_PAYMENT_HISTORY_PATH =
@@ -191,6 +193,7 @@ const SECRET_KEYS = new Set([
   "gym_selection_ticket",
   "mfa_challenge_token",
   "invitation_token",
+  "reset_token",
 ]);
 
 const INBOUND_SECRET_KEYS = new Set([

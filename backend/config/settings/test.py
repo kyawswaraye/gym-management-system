@@ -14,6 +14,7 @@ MFA_TOKEN_PEPPER = "test-mfa-token-pepper"
 MFA_ENCRYPTION_KEY = "test-mfa-encryption-key"
 FINANCE_IDEMPOTENCY_ENCRYPTION_KEY = "test-finance-idempotency-key"
 INVITATION_TOKEN_PEPPER = "test-invitation-token-pepper"
+PASSWORD_RESET_TOKEN_PEPPER = "test-password-reset-token-pepper"
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 # Disposable verification uses a CREATEDB role, typically gym_admin. Runtime

@@ -174,6 +174,44 @@ class MemberLogoutTokenThrottle(_PresentedTokenThrottle):
     boundary = "member-logout"
 
 
+class PasswordForgotIPThrottle(_AddressBoundaryThrottle):
+    """Bound forgot-password attempts from one address, including unknown emails."""
+
+    scope = "password_forgot_ip"
+    boundary = "password-forgot-ip"
+
+
+class PasswordForgotThrottle(_ConfiguredRateThrottle):
+    """Limit forgot-password attempts by address and normalized email hash."""
+
+    scope = "password_forgot"
+
+    def get_cache_key(self, request: Request, view: Any) -> str:
+        email = request.data.get("email") if isinstance(request.data, dict) else ""
+        fingerprint = hash_refresh_token(f"password-forgot:{str(email).strip().lower()}")
+        return self._cache_key(fingerprint=fingerprint, request=request)
+
+
+class PasswordResetIPThrottle(_AddressBoundaryThrottle):
+    """Bound reset-password attempts from one address, including malformed tokens."""
+
+    scope = "password_reset_ip"
+    boundary = "password-reset-ip"
+
+
+class PasswordResetThrottle(_ConfiguredRateThrottle):
+    """Limit reset-password attempts by a peppered token hash and address."""
+
+    scope = "password_reset"
+
+    def get_cache_key(self, request: Request, view: Any) -> str | None:
+        token = request.data.get("reset_token") if isinstance(request.data, dict) else None
+        if not isinstance(token, str) or not token:
+            return None
+        fingerprint = hash_refresh_token(f"password-reset:{token}")
+        return self._cache_key(fingerprint=fingerprint, request=request)
+
+
 class GymSelectionIssueThrottle(_ConfiguredRateThrottle):
     scope = "gym_selection_issue"
 

@@ -22,6 +22,10 @@ from apps.users.throttling import (
     MemberLogoutTokenThrottle,
     MemberRefreshIPThrottle,
     MemberRefreshTokenThrottle,
+    PasswordForgotIPThrottle,
+    PasswordForgotThrottle,
+    PasswordResetIPThrottle,
+    PasswordResetThrottle,
 )
 
 _BOUNDARY_THROTTLES = (
@@ -36,6 +40,10 @@ _BOUNDARY_THROTTLES = (
     MemberLogoutTokenThrottle,
     MemberRefreshIPThrottle,
     MemberRefreshTokenThrottle,
+    PasswordForgotIPThrottle,
+    PasswordForgotThrottle,
+    PasswordResetIPThrottle,
+    PasswordResetThrottle,
 )
 
 
@@ -62,8 +70,13 @@ def _request(
 def test_security_boundaries_do_not_share_throttle_scopes_or_keys() -> None:
     credential = "gms-device:v1:selector-value-0001.secret-value"
     refresh_token = "member-refresh-token-not-a-cache-key"
+    reset_token = "password-reset-token-not-a-cache-key"
     request = _request(
-        data={"email": "Member@Example.test", "refresh_token": refresh_token},
+        data={
+            "email": "Member@Example.test",
+            "refresh_token": refresh_token,
+            "reset_token": reset_token,
+        },
         authorization=f"Device {credential}",
     )
     other_email = _request(data={"email": "other@example.test", "refresh_token": refresh_token})
@@ -94,6 +107,7 @@ def test_security_boundaries_do_not_share_throttle_scopes_or_keys() -> None:
     assert login.get_cache_key(request, None) != login.get_cache_key(other_email, None)
     rendered = " ".join(str(key) for key in keys.values())
     assert refresh_token not in rendered
+    assert reset_token not in rendered
     assert "secret-value" not in rendered
     assert "Member@Example.test" not in rendered
 

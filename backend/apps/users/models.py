@@ -195,3 +195,32 @@ class RefreshSession(UUIDTimestampModel):
                 name="refresh_principal_context_ck",
             ),
         ]
+
+
+class PasswordResetToken(UUIDTimestampModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="password_reset_tokens")
+    token_hash = models.CharField(max_length=64, unique=True, editable=False)
+    issued_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    request_id = models.CharField(max_length=128, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=512, blank=True)
+
+    class Meta:
+        db_table = "users_password_reset_token"
+        indexes = [
+            models.Index(fields=["user", "expires_at"], name="pwdreset_user_exp_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(expires_at__gt=models.F("issued_at")),
+                name="pwdreset_expiry_after_issue_ck",
+            ),
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(consumed_at__isnull=True, revoked_at__isnull=True),
+                name="pwdreset_one_live_per_user",
+            ),
+        ]

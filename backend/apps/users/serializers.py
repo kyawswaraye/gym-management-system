@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, cast
 
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
 
@@ -56,3 +57,22 @@ class MFAEnrollInputSerializer(StrictSerializer):
 class MFAConfirmInputSerializer(StrictSerializer):
     enrollment_token = serializers.CharField(trim_whitespace=False, write_only=True)
     code = serializers.RegexField(r"^\d{6}$", write_only=True)
+
+
+class PasswordForgotInputSerializer(StrictSerializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetInputSerializer(StrictSerializer):
+    reset_token = serializers.CharField(trim_whitespace=False, write_only=True)
+    password = serializers.CharField(trim_whitespace=False, write_only=True)
+    password_confirmation = serializers.CharField(trim_whitespace=False, write_only=True)
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        super().validate(attrs)
+        if attrs["password"] != attrs["password_confirmation"]:
+            raise serializers.ValidationError(
+                {"password_confirmation": ["Passwords do not match."]}
+            )
+        validate_password(str(attrs["password"]))
+        return attrs

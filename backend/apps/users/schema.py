@@ -93,6 +93,12 @@ class TokenEnvelopeSerializer(serializers.Serializer):
     message = serializers.CharField()
 
 
+class PasswordForgotEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    data = serializers.JSONField(allow_null=True)
+    message = serializers.CharField()
+
+
 class MemberTokenDataSerializer(TokenPairSerializer):
     member_id = serializers.UUIDField()
     gym_id = serializers.UUIDField()

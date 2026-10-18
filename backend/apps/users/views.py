@@ -44,6 +44,7 @@ from .schema import (
     MFAEnrollmentEnvelopeSerializer,
     MFARequiredEnvelopeSerializer,
     MFAStatusEnvelopeSerializer,
+    PasswordForgotEnvelopeSerializer,
     SelectionLoginEnvelopeSerializer,
     TokenEnvelopeSerializer,
 )
@@ -53,6 +54,8 @@ from .serializers import (
     MFAChallengeInputSerializer,
     MFAConfirmInputSerializer,
     MFAEnrollInputSerializer,
+    PasswordForgotInputSerializer,
+    PasswordResetInputSerializer,
     RefreshInputSerializer,
     SelectGymInputSerializer,
 )
@@ -62,11 +65,20 @@ from .services import (
     create_platform_session,
     create_staff_session,
     issue_gym_selection_ticket,
+    request_password_reset,
+    reset_password,
     revoke_all_user_sessions,
     revoke_refresh_token,
     rotate_refresh_token,
 )
-from .throttling import GymSelectionIssueThrottle, GymSelectionThrottle
+from .throttling import (
+    GymSelectionIssueThrottle,
+    GymSelectionThrottle,
+    PasswordForgotIPThrottle,
+    PasswordForgotThrottle,
+    PasswordResetIPThrottle,
+    PasswordResetThrottle,
+)
 
 BFF_HEADER_PARAMETER = OpenApiParameter(
     name="X-Gym-BFF-Secret",
@@ -579,18 +591,72 @@ class MeView(APIView):
         )
 
 
-class ProviderNeutralUnavailableView(APIView):
+class PasswordForgotView(APIView):
     authentication_classes: list[type] = []
     permission_classes = [AllowAny]
+    throttle_classes = [PasswordForgotIPThrottle, PasswordForgotThrottle]
 
     @extend_schema(
-        request=OpenApiTypes.OBJECT,
+        operation_id="auth_password_forgot",
+        request=PasswordForgotInputSerializer,
         parameters=[BFF_HEADER_PARAMETER],
         responses={
+            200: PasswordForgotEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
             403: ErrorEnvelopeSerializer,
-            501: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
         },
         auth=[],
+        description=(
+            "Accepts an email and always returns the same 200 envelope. "
+            "The body does not reveal account existence or provider failure."
+        ),
     )
     def post(self, request: Request) -> Response:
-        raise ProviderNotConfigured()
+        serializer = PasswordForgotInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        request_password_reset(
+            email=str(serializer.validated_data["email"]),
+            request_id=getattr(request, "request_id", "req_unknown"),
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+        return success_response(
+            None,
+            message="If an account exists for that email, a reset link will be sent.",
+        )
+
+
+class PasswordResetView(APIView):
+    authentication_classes: list[type] = []
+    permission_classes = [AllowAny]
+    throttle_classes = [PasswordResetIPThrottle, PasswordResetThrottle]
+
+    @extend_schema(
+        operation_id="auth_password_reset",
+        request=PasswordResetInputSerializer,
+        parameters=[BFF_HEADER_PARAMETER],
+        responses={
+            204: OpenApiResponse(response=None, description="Password updated. Sign in again."),
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
+        },
+        auth=[],
+        description=(
+            "Consumes a single-use reset token, installs a new password, and "
+            "revokes every login credential for that user. Issues no session."
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        serializer = PasswordResetInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        reset_password(
+            reset_token=str(serializer.validated_data["reset_token"]),
+            password=str(serializer.validated_data["password"]),
+            request_id=getattr(request, "request_id", "req_unknown"),
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)

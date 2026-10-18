@@ -104,6 +104,10 @@ REST_FRAMEWORK = {
         "salaries_command": "120/60",
         "inventory_command": "120/60",
         "retail_command": "120/60",
+        "password_forgot": "5/min",
+        "password_forgot_ip": "20/min",
+        "password_reset": "10/min",
+        "password_reset_ip": "20/min",
     },
 }
 
@@ -152,8 +156,13 @@ MFA_ENROLLMENT_TTL_SECONDS = int(os.environ.get("MFA_ENROLLMENT_TTL_SECONDS", "6
 MFA_STEP_UP_TTL_SECONDS = int(os.environ.get("MFA_STEP_UP_TTL_SECONDS", "600"))
 INVITATION_TOKEN_PEPPER = os.environ.get("INVITATION_TOKEN_PEPPER", REFRESH_TOKEN_PEPPER)
 INVITATION_TTL_SECONDS = int(os.environ.get("INVITATION_TTL_SECONDS", str(48 * 60 * 60)))
+PASSWORD_RESET_TOKEN_PEPPER = os.environ.get("PASSWORD_RESET_TOKEN_PEPPER", "")
+PASSWORD_RESET_TTL_SECONDS = int(os.environ.get("PASSWORD_RESET_TTL_SECONDS", str(30 * 60)))
 APP_PUBLIC_URL = os.environ.get("APP_PUBLIC_URL", "http://localhost:3000")
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_TIMEOUT_SECONDS = int(os.environ.get("RESEND_TIMEOUT_SECONDS", "10"))
+RESEND_MAX_RESPONSE_BYTES = int(os.environ.get("RESEND_MAX_RESPONSE_BYTES", "4096"))
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "no-reply@localhost")
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "25"))
@@ -173,7 +182,19 @@ MINIO_BUCKET = os.environ.get("MINIO_BUCKET", "")
 MINIO_REGION = os.environ.get("MINIO_REGION", "us-east-1")
 MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "")
 MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "")
+MINIO_SESSION_TOKEN = os.environ.get("MINIO_SESSION_TOKEN", "")
+MINIO_ADDRESSING_STYLE = os.environ.get("MINIO_ADDRESSING_STYLE", "path")
 MINIO_TIMEOUT_SECONDS = int(os.environ.get("MINIO_TIMEOUT_SECONDS", "5"))
+OBJECT_STORE_BUCKET_ALLOWLIST = tuple(
+    item.strip()
+    for item in os.environ.get("OBJECT_STORE_BUCKET_ALLOWLIST", "").split(",")
+    if item.strip()
+)
+OBJECT_STORE_ORIGIN_ALLOWLIST = tuple(
+    item.strip()
+    for item in os.environ.get("OBJECT_STORE_ORIGIN_ALLOWLIST", "").split(",")
+    if item.strip()
+)
 CLAMAV_HOST = os.environ.get("CLAMAV_HOST", "")
 CLAMAV_PORT = int(os.environ.get("CLAMAV_PORT", "3310"))
 CLAMAV_TIMEOUT_SECONDS = int(os.environ.get("CLAMAV_TIMEOUT_SECONDS", "15"))

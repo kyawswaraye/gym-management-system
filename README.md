@@ -122,7 +122,7 @@ not reopened. A correction requires the exact live permission, the finance
 entitlement, and an active same-gym membership. The creator, submitter, or
 receipt issuer may correct, including through a custom role that holds that
 permission. Approval and rejection still require a different protected Manager
-or Owner. Phase 4 increment 9 delivers the tenant staff pages for the published cash-book, payment, receipt, expense, salary, inventory, and full retail-void workflows. Navigation requires the matching view permission and the finance entitlement. Cash approval and cash correction select an open session the server returns for that caller. Product payment corrections stay on the retail return or full void. The retail page exposes a partial return for a posted sale. Phase 4 implementation is complete as of 2026-10-18 against the code and test gates. Manager finance and security evidence review is complete. Production deployment is not complete. Production email and object-storage gates remain open.
+or Owner. Phase 4 increment 9 delivers the tenant staff pages for the published cash-book, payment, receipt, expense, salary, inventory, and full retail-void workflows. Navigation requires the matching view permission and the finance entitlement. Cash approval and cash correction select an open session the server returns for that caller. Product payment corrections stay on the retail return or full void. The retail page exposes a partial return for a posted sale. Phase 4 implementation is complete as of 2026-10-18 against the code and test gates. Manager finance and security evidence review is complete. Production deployment is not complete. [ADR 0010](docs/adr/0010-production-provider-readiness.md) selects Resend and AWS S3 `ap-southeast-1` and records password recovery. The Resend client, password recovery, AWS virtual-hosted addressing, and ClamAV production fragment are implemented. The live Resend, AWS, and ClamAV proofs remain open. Legal retention stays draft-only.
 Increment 8C gate evidence: backend ruff, format, and mypy passed and migrations stayed in sync. 293 non-PostgreSQL backend tests passed and 252 were deselected. The PostgreSQL suite passed 252 tests and 293 were deselected, with zero failures. Web format, lint, typecheck, and build passed. Vitest passed 51 files and 288 tests. OpenAPI export and TypeScript generation were each run twice, and the second run matched the first. `git diff --exit-code` on the contract files still fails because this increment is not committed. `make e2e` passed 6 specs twice in a row, including the finance smoke and the manager partial-return journey. Each API start drops and recreates only `gym_platform_e2e`.
 Increment 6 gate evidence: backend ruff, format, and mypy passed and
 migrations stayed in sync; 273 non-PostgreSQL backend tests passed; the
@@ -163,18 +163,26 @@ increment is not committed. Phase 4 remains open.
 `is_pt_client` stays false until Phase 5 derives it from an active trainer
 assignment.
 
-Production deployment is not complete. These gates remain open:
+Production deployment is not complete. [ADR 0010](docs/adr/0010-production-provider-readiness.md) selects the providers. Code readiness is in the repository. These live gates remain open:
 
-- an approved transactional email provider that honors `X-Idempotency-Key`,
-  before invitation, password-recovery, or membership-expiry delivery is
-  production-ready;
-- production object-storage image and provider approval. Official MinIO images
-  are not anonymously distributable. Local and end-to-end Compose use the
-  digest-pinned third-party image `docker.io/pgsty/silo`, a MinIO-compatible
-  fork. That image is not official MinIO, and the end-to-end profile-photo
-  journey is interoperability evidence only;
-- production object-storage and ClamAV credentials and deployment. Those values
-  are not in the repository.
+- Resend at `POST https://api.resend.com/emails`, translating the application
+  `X-Idempotency-Key` to Resend `Idempotency-Key` (1–256 characters, retained
+  24 hours), before invitation, password-recovery, or membership-expiry
+  delivery is production-ready. The client is implemented. A verified
+  domain, API key, and live idempotency proof are still required. Password
+  forgot and reset are implemented; live Resend delivery is not proven;
+- AWS S3 in `ap-southeast-1` as the primary private bucket, with presigned
+  access over direct HTTPS. Production MinIO is no longer planned. Local and
+  end-to-end Compose still use digest-pinned `docker.io/pgsty/silo`, a
+  test-only MinIO-compatible fork, not official MinIO. The end-to-end
+  profile-photo journey is interoperability evidence only. The bucket, IAM,
+  CORS, and a live upload and download are not proven;
+- private ClamAV on the VPS. A deployed-host proof is not in the repository.
+
+Block Public Access, SSE-S3, and versioning are planned only. Current-object
+retention, noncurrent expiry, backup and replication, and jurisdiction or
+legal approval stay open. Phase 5 waits when those live gates must be closed
+first. The historical approximately $80 estimate is not an approved AWS price.
 
 - Django REST Framework API for the published foundation and Phase 1B contracts;
 - staff authentication, TOTP MFA, and rotating sessions;
@@ -237,7 +245,7 @@ development. Browser JavaScript never receives authentication tokens.
 
 `make e2e` runs the Playwright Chromium journeys against the real Next.js pages,
 the same-origin BFF, and the Django API on PostgreSQL. The member journey also
-uploads a profile photo through live MinIO, ClamAV, and the Caddy object proxy,
+uploads a profile photo through the test-only MinIO-compatible fork, ClamAV, and the Caddy object proxy,
 then checks that member in and out and shows the rotating desk QR. It does not
 redeem a scan.
 It uses only the disposable `gym_platform_e2e` database. Each API start drops
@@ -295,11 +303,9 @@ history, and staff check-in challenge issuance are published. Member login, refr
 and logout are published for one already linked member. The scan route
 stays unpublished.
 Notification HTTP routes and general payment and receipt endpoints remain
-unpublished. Production expiry delivery remains gated on an
-idempotency-capable transactional provider. Production object-storage image
-approval remains gated: Compose uses digest-pinned `docker.io/pgsty/silo`, a
-third-party MinIO-compatible fork, not official MinIO. Finance, PT, reports,
-and mobile routes stay excluded until their own phases.
+unpublished. Production expiry delivery follows [ADR 0010](docs/adr/0010-production-provider-readiness.md): Resend is selected and not yet called. Compose uses digest-pinned `docker.io/pgsty/silo`, a
+test-only MinIO-compatible fork, not official MinIO and not production S3. Finance, PT, reports,
+and mobile routes stay excluded until their own phases. Phase 5 waits when the live provider gates must close first.
 
 ## Documentation
 

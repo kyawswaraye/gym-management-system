@@ -11,6 +11,8 @@ import {
 } from "@/lib/api/server";
 import { POST as acceptOwnerInvitation } from "@/app/api/auth/accept-owner-invitation/route";
 import { POST as acceptStaffInvitation } from "@/app/api/auth/accept-staff-invitation/route";
+import { POST as forgotPassword } from "@/app/api/auth/password/forgot/route";
+import { POST as resetPassword } from "@/app/api/auth/password/reset/route";
 import { POST as selectGym } from "@/app/api/auth/select-gym/route";
 import {
   GET as gymGet,
@@ -1564,6 +1566,64 @@ describe("browser credential boundary", () => {
     expect(refreshCookie).toContain("staff-refresh");
     expect(refreshCookie).toContain("HttpOnly");
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards forgot and reset through the BFF without storing the token", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock
+      .mockResolvedValueOnce(
+        Response.json({
+          success: true,
+          data: null,
+          message:
+            "If an account exists for that email, a reset link will be sent.",
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const csrf = "x".repeat(43);
+    const headers = {
+      cookie: `gms_csrf=${csrf}`,
+      origin: "https://app.example.com",
+      "x-csrf-token": csrf,
+      "content-type": "application/json",
+    };
+    const forgot = await forgotPassword(
+      new NextRequest("https://app.example.com/api/auth/password/forgot", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ email: "staff@example.test" }),
+      }),
+    );
+    const reset = await resetPassword(
+      new NextRequest("https://app.example.com/api/auth/password/reset", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          reset_token: "reset-token-value",
+          password: "replaced horse battery staple",
+          password_confirmation: "replaced horse battery staple",
+        }),
+      }),
+    );
+    const forgotCall = fetchMock.mock.calls[0] as [string, RequestInit];
+    const resetCall = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(forgot.status).toBe(200);
+    expect(reset.status).toBe(204);
+    expect(forgotCall[0]).toBe(
+      "https://api.example.com/api/v1/auth/password/forgot/",
+    );
+    expect(resetCall[0]).toBe(
+      "https://api.example.com/api/v1/auth/password/reset/",
+    );
+    expect(JSON.parse(String(resetCall[1].body))).toEqual({
+      reset_token: "reset-token-value",
+      password: "replaced horse battery staple",
+      password_confirmation: "replaced horse battery staple",
+    });
+    expect(reset.headers.getSetCookie().join("")).not.toContain(
+      "reset-token-value",
+    );
+    expect(await reset.text()).not.toContain("reset-token-value");
   });
 
   it("forwards role and permission cursors and drops other query parameters", async () => {

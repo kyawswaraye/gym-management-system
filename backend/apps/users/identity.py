@@ -9,6 +9,7 @@ PBKDF2 hasher, which is the only encoded form that function accepts.
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from django.contrib.auth.hashers import make_password
 from django.db import DatabaseError, IntegrityError, connection, transaction
@@ -16,6 +17,8 @@ from django.db import DatabaseError, IntegrityError, connection, transaction
 from apps.users.models import User
 
 _PASSWORD_DENIED = "invitation password transition denied"
+_RESET_DENIED = "password reset transition denied"
+_AUTHZ_DENIED = "password reset authz bump denied"
 _PROFILE_DENIED = "invited profile confirmation denied"
 
 
@@ -66,6 +69,38 @@ def set_invitation_password(
             raise
     user.password = encoded
     user.password_changed_at = changed_at
+
+
+def set_reset_password(
+    *,
+    token_hash: str,
+    user: User,
+    password: str,
+    changed_at: datetime,
+) -> None:
+    encoded = make_password(password, hasher="pbkdf2_sha256")
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(
+                "SELECT app_accept_password_reset(%s, %s, %s)",
+                [token_hash, encoded, changed_at],
+            )
+        except DatabaseError as exc:
+            if _RESET_DENIED in str(exc):
+                raise InvitedIdentityError() from exc
+            raise
+    user.password = encoded
+    user.password_changed_at = changed_at
+
+
+def bump_password_reset_authz(*, user_id: UUID) -> None:
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute("SELECT app_bump_password_reset_authz(%s)", [user_id])
+        except DatabaseError as exc:
+            if _AUTHZ_DENIED in str(exc) or _RESET_DENIED in str(exc):
+                raise InvitedIdentityError() from exc
+            raise
 
 
 def confirm_invited_profile(

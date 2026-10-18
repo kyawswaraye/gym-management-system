@@ -50,6 +50,7 @@ e2e_apply_app_env() {
   export MFA_TOKEN_PEPPER="${E2E_MFA_TOKEN_PEPPER:-e2e-mfa-token-pepper-placeholder}"
   export REFRESH_TOKEN_PEPPER="${E2E_REFRESH_TOKEN_PEPPER:-e2e-refresh-pepper-placeholder-value}"
   export INVITATION_TOKEN_PEPPER="${E2E_INVITATION_TOKEN_PEPPER:-e2e-invitation-pepper-placeholder}"
+  export PASSWORD_RESET_TOKEN_PEPPER="${E2E_PASSWORD_RESET_TOKEN_PEPPER:-e2e-password-reset-pepper-placeholder}"
   export E2E_PLATFORM_PASSWORD="${E2E_PLATFORM_PASSWORD:-e2e-platform-password}"
   export E2E_PLATFORM_TOTP_SECRET="${E2E_PLATFORM_TOTP_SECRET:-E2EPLATFORMTOTPPLACEHOLDERAAAAAA}"
   export E2E_OWNER_PASSWORD="${E2E_OWNER_PASSWORD:-e2e-owner-password}"

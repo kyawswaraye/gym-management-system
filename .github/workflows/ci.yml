@@ -170,6 +170,7 @@ jobs:
       E2E_MFA_TOKEN_PEPPER: e2e-mfa-token-pepper-placeholder
       E2E_REFRESH_TOKEN_PEPPER: e2e-refresh-pepper-placeholder-value
       E2E_INVITATION_TOKEN_PEPPER: e2e-invitation-pepper-placeholder
+      E2E_PASSWORD_RESET_TOKEN_PEPPER: e2e-password-reset-pepper-placeholder
       E2E_PLATFORM_PASSWORD: e2e-platform-password
       E2E_PLATFORM_TOTP_SECRET: E2EPLATFORMTOTPPLACEHOLDERAAAAAA
       E2E_OWNER_PASSWORD: e2e-owner-password

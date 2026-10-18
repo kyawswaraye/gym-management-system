@@ -63,7 +63,7 @@ Desired topology: `Browser → Next.js BFF → private Django → PostgreSQL`. I
 
 - only Caddy (behind Cloudflare) publishes host ports 80/443;
 - the Django/Gunicorn container has **no published host port** and is reachable only on the private Docker network from the Next.js BFF;
-- PostgreSQL and MinIO have **no published host ports**;
+- PostgreSQL has **no published host port**. Production object storage is AWS S3 under [ADR 0010](./0010-production-provider-readiness.md), not a VPS MinIO container. Local and end-to-end object storage, and ClamAV, publish no host port;
 - host firewall and Docker networks match ADR 0001;
 - mobile/direct API clients, if any, never receive the BFF shared secret and never target a public Django listener.
 
