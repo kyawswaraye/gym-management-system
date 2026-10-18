@@ -692,17 +692,21 @@ def test_database_guards_runtime_cannot_void_or_delete(monkeypatch: pytest.Monke
                     "UPDATE salaries_salary_period SET description = %s WHERE id = %s",
                     ["Hacked", period_id],
                 )
-    with pytest.raises(DatabaseError, match="void is reserved"):
+    with pytest.raises(DatabaseError, match="each line requires one salary reversal"):
         with transaction.atomic():
             with connection.cursor() as cursor:
                 _as_runtime(cursor)
                 cursor.execute(
                     """
                     UPDATE salaries_salary_period
-                    SET status = 'VOID', voided_at = NOW(), reason = 'nope'
+                    SET status = 'VOID',
+                        voided_at = NOW(),
+                        voided_by_membership_id = %s,
+                        void_business_date = business_date,
+                        reason = 'incomplete'
                     WHERE id = %s
                     """,
-                    [period_id],
+                    [str(owner.id), period_id],
                 )
     with pytest.raises(DatabaseError, match="runtime inserts must start as drafts"):
         with transaction.atomic():

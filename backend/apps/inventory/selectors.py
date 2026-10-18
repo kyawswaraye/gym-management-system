@@ -1,8 +1,9 @@
 """Tenant-scoped catalog and stock reads.
 
-Quantity on hand is the sum of same-gym movements. Sold quantity, revenue,
-cost of goods sold, and gross profit are sums of posted, non-void retail
-lines. Draft, pending, rejected, cancelled, and void sales contribute nothing.
+Quantity on hand is the sum of same-gym movements, including a full void's
+positive sale return. Sold quantity, revenue, cost of goods sold, and gross
+profit count posted and voided sale lines, then subtract each full void once.
+Draft, pending, rejected, and cancelled sales contribute nothing.
 """
 
 from __future__ import annotations
@@ -14,7 +15,17 @@ from typing import Any
 from uuid import UUID
 
 from django.core import signing
-from django.db.models import DecimalField, F, OuterRef, Q, QuerySet, Subquery, Sum, Value
+from django.db.models import (
+    DecimalField,
+    ExpressionWrapper,
+    F,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+    Sum,
+    Value,
+)
 from django.db.models.functions import Coalesce
 from django.http import Http404
 from rest_framework.exceptions import ValidationError
@@ -53,25 +64,39 @@ def with_quantity_on_hand(queryset: QuerySet[Product], *, gym_id: UUID) -> Query
     )
 
 
-def _posted_sum(
-    field: str, *, gym_id: UUID, output: DecimalField[Decimal, Decimal], zero: Decimal
-) -> Coalesce:
-    posted = (
+def _line_sum(
+    field: str, *, gym_id: UUID, statuses: tuple[str, ...], output: DecimalField[Decimal, Decimal]
+) -> Subquery:
+    rows = (
         RetailSaleLine.objects.filter(
             gym_id=gym_id,
             product_id=OuterRef("pk"),
             sale__gym_id=gym_id,
-            sale__status="POSTED",
+            sale__status__in=statuses,
         )
         .values("product_id")
         .annotate(total=Sum(field))
         .values("total")
     )
-    return Coalesce(
-        Subquery(posted, output_field=output),
+    return Subquery(rows, output_field=output)
+
+
+def _posted_sum(
+    field: str, *, gym_id: UUID, output: DecimalField[Decimal, Decimal], zero: Decimal
+) -> ExpressionWrapper[Any]:
+    """Posted and void originals, minus each full void exactly once."""
+
+    original = Coalesce(
+        _line_sum(field, gym_id=gym_id, statuses=("POSTED", "VOID"), output=output),
         Value(zero, output_field=output),
         output_field=output,
     )
+    returned = Coalesce(
+        _line_sum(field, gym_id=gym_id, statuses=("VOID",), output=output),
+        Value(zero, output_field=output),
+        output_field=output,
+    )
+    return ExpressionWrapper(original - returned, output_field=output)
 
 
 def get_category(*, gym_id: UUID, category_id: UUID) -> ProductCategory:

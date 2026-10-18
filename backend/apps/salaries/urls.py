@@ -8,6 +8,7 @@ from apps.salaries.views import (
     SalaryPeriodListCreateView,
     SalaryPeriodRejectView,
     SalaryPeriodSubmitView,
+    SalaryPeriodVoidView,
 )
 
 urlpatterns = [
@@ -31,6 +32,11 @@ urlpatterns = [
         "salary-periods/<uuid:period_id>/approve/",
         SalaryPeriodApproveView.as_view(),
         name="salary-period-approve",
+    ),
+    path(
+        "salary-periods/<uuid:period_id>/void/",
+        SalaryPeriodVoidView.as_view(),
+        name="salary-period-void",
     ),
     path(
         "salary-periods/<uuid:period_id>/reject/",

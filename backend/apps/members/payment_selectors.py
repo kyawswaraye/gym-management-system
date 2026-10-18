@@ -142,10 +142,11 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
     Posted and void charges count as gross on their own business date. Posted
     refunds and reversals subtract on their own business date, in the original
     charge's purpose bucket. Product quantity, revenue, cost of goods sold, and
-    gross profit come from posted, non-void retail lines. ``product_total`` is
-    the net of ``PRODUCT`` payments and reconciles to that line revenue. Draft,
-    pending, rejected, and cancelled sales contribute nothing. PT and class
-    stay zero.
+    gross profit count posted and voided retail lines on the original business
+    date, then subtract a full void on its correction date. ``product_total``
+    is the net of ``PRODUCT`` payments and reconciles to that line revenue.
+    Draft, pending, rejected, and cancelled sales contribute nothing. PT and
+    class stay zero.
     """
 
     charges = Q(
@@ -192,17 +193,15 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
     reversed_amount = _money(totals["reversals"])
     net = gross - refunded - reversed_amount
     product_payment_net = _money(totals["product_charges"]) - _money(totals["product_returns"])
-    lines = RetailSaleLine.objects.filter(
-        gym_id=gym_id,
-        sale__gym_id=gym_id,
-        sale__status=RetailSale.Status.POSTED,
-        sale__business_date=business_date,
-    ).aggregate(
-        quantity=Coalesce(Sum("quantity"), Decimal("0.000")),
-        revenue=Coalesce(Sum("line_revenue"), _ZERO),
-        cogs=Coalesce(Sum("cost_of_goods_sold"), _ZERO),
-        profit=Coalesce(Sum("gross_profit"), _ZERO),
-    )
+    originals = _retail_lines(gym_id=gym_id, business_date=business_date, correction=False)
+    corrections = _retail_lines(gym_id=gym_id, business_date=business_date, correction=True)
+    lines = {
+        "quantity": (originals["quantity"] or Decimal("0.000"))
+        - (corrections["quantity"] or Decimal("0.000")),
+        "revenue": _money(originals["revenue"]) - _money(corrections["revenue"]),
+        "cogs": _money(originals["cogs"]) - _money(corrections["cogs"]),
+        "profit": _money(originals["profit"]) - _money(corrections["profit"]),
+    }
     return {
         "date": business_date.isoformat(),
         "currency": currency,
@@ -237,6 +236,26 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
         "product_cogs": money_text(_money(lines["cogs"])),
         "product_gross_profit": money_text(_money(lines["profit"])),
     }
+
+
+def _retail_lines(*, gym_id: UUID, business_date: date, correction: bool) -> dict[str, Any]:
+    queryset = RetailSaleLine.objects.filter(gym_id=gym_id, sale__gym_id=gym_id)
+    if correction:
+        queryset = queryset.filter(
+            sale__status=RetailSale.Status.VOID,
+            sale__void_business_date=business_date,
+        )
+    else:
+        queryset = queryset.filter(
+            sale__status__in=[RetailSale.Status.POSTED, RetailSale.Status.VOID],
+            sale__business_date=business_date,
+        )
+    return queryset.aggregate(
+        quantity=Coalesce(Sum("quantity"), Decimal("0.000")),
+        revenue=Coalesce(Sum("line_revenue"), _ZERO),
+        cogs=Coalesce(Sum("cost_of_goods_sold"), _ZERO),
+        profit=Coalesce(Sum("gross_profit"), _ZERO),
+    )
 
 
 def _sum(condition: Q) -> Coalesce:

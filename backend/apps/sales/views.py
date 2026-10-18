@@ -1,4 +1,4 @@
-"""Published retail sale routes. Void and returns stay unpublished."""
+"""Published retail sale routes, including one full void."""
 
 from __future__ import annotations
 
@@ -25,7 +25,8 @@ from apps.common.api.schema import ErrorEnvelopeSerializer
 from apps.common.db.tenant_context import set_gym_context
 from apps.common.finance.idempotency import IdempotentResponse, IdempotentResult, run_idempotent
 from apps.files.throttling import MembershipWindowThrottle
-from apps.members.payment_serializers import payment_payload, receipt_payload
+from apps.inventory.quantities import format_quantity
+from apps.members.payment_serializers import money_text, payment_payload, receipt_payload
 from apps.sales.selectors import get_sale, page_sales
 from apps.sales.serializers import (
     ApproveRetailSaleSerializer,
@@ -37,7 +38,9 @@ from apps.sales.serializers import (
     RetailSaleListEnvelopeSerializer,
     RetailSaleListQuerySerializer,
     RetailSaleUpdateSerializer,
+    RetailSaleVoidEnvelopeSerializer,
     RetailSaleWriteSerializer,
+    VoidRetailSaleSerializer,
     sale_payload,
 )
 from apps.sales.services import (
@@ -48,6 +51,7 @@ from apps.sales.services import (
     reject_sale,
     submit_sale,
     update_sale,
+    void_sale,
 )
 from apps.users.permissions import RequiresEntitlement, RequiresPermission
 
@@ -388,6 +392,94 @@ class RetailSaleApproveView(RetailCommandView):
             request=request,
         )
         return _stored_response(result)
+
+
+class RetailSaleVoidView(RetailCommandView):
+    required_permission = "retail.void"
+
+    @extend_schema(
+        operation_id="retail_sales_void",
+        parameters=[IDEMPOTENCY_HEADER],
+        request=VoidRetailSaleSerializer,
+        responses={
+            200: RetailSaleVoidEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+            422: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, sale_id: UUID) -> HttpResponse:
+        serializer = VoidRetailSaleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        key = require_idempotency_key(request.headers.get("Idempotency-Key"))
+        context = _audit_context(request)
+        fields = {
+            "reason": serializer.validated_data["reason"],
+            "business_date": serializer.validated_data.get("business_date"),
+            "cash_session_id": serializer.validated_data.get("cash_session_id"),
+        }
+        body = {"retail_sale_id": str(sale_id), **fields}
+
+        def mutate() -> IdempotentResponse:
+            result = void_sale(
+                gym=request.gym,
+                actor=request.gym_membership,
+                sale_id=sale_id,
+                **fields,
+                **context,
+            )
+            movement = result["cash_transaction"]
+            rendered = {
+                "success": True,
+                "data": {
+                    "retail_sale": sale_payload(result["sale"]),
+                    "original_payment": payment_payload(result["original"]),
+                    "reversal_payment": payment_payload(result["correction"]),
+                    "original_receipt": (
+                        None
+                        if result["original_receipt"] is None
+                        else receipt_payload(result["original_receipt"])
+                    ),
+                    "reversal_receipt": receipt_payload(result["correction_receipt"]),
+                    "cash_transaction": None if movement is None else transaction_payload(movement),
+                    "stock_movements": [
+                        {
+                            "id": row.id,
+                            "retail_sale_line_id": row.retail_sale_line_id,
+                            "product_id": row.product_id,
+                            "quantity": format_quantity(row.quantity),
+                            "movement_type": row.movement_type,
+                            "unit_cost_snapshot": money_text(row.unit_cost_snapshot),
+                            "business_date": row.business_date,
+                            "reverses_movement_id": row.reverses_movement_id,
+                        }
+                        for row in result["stock_movements"]
+                    ],
+                },
+                "message": "Retail sale voided",
+            }
+            return IdempotentResponse(
+                status=200,
+                body=JSONRenderer().render(rendered),
+                resource_type="RetailSale",
+                resource_id=result["sale"].id,
+            )
+
+        stored = run_idempotent(
+            gym_id=request.gym.id,
+            actor_membership_id=request.gym_membership.id,
+            http_method="POST",
+            route=command_route(sale_id=sale_id, action="void"),
+            idempotency_key=key,
+            body=body,
+            mutate=mutate,
+            request=request,
+        )
+        return _stored_response(stored)
 
 
 class RetailSaleRejectView(RetailCommandView):

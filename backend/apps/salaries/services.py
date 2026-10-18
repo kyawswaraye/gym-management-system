@@ -4,11 +4,14 @@ Lock order inside approval: salary period, its lines by id, the protected
 ``STAFF_SALARY`` category, then referenced cash sessions by id. ``mutate()``
 reloads the actor and live permission. Expense and cash writes happen only
 after those locks. Any failure rolls the period, lines, expenses, and cash
-movements back. Public void stays unpublished.
+movements back. Void locks the posted period, its lines, the original
+expenses and cash movements, then the named destination sessions. It does not
+reopen a closed till.
 """
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -23,8 +26,9 @@ from apps.cashbook.models import CashSession, CashTransaction
 from apps.cashbook.selectors import holds_protected_role, membership_has_permission
 from apps.cashbook.services import revalidate_cash_actor
 from apps.expenses.models import Expense
-from apps.expenses.services import post_staff_salary_expense
+from apps.expenses.services import post_staff_salary_expense, void_linked_salary_expense
 from apps.members.models import Payment
+from apps.members.services import gym_today
 from apps.salaries.exceptions import SalaryPostingConflict
 from apps.salaries.models import SalaryPeriod, StaffSalaryLine
 from apps.salaries.serializers import merged_period_fields, money_amount
@@ -336,6 +340,147 @@ def approve_period(
     return period, expenses, movements
 
 
+def void_period(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    period_id: UUID,
+    reason: str,
+    business_date: date | None,
+    cash_sessions: list[dict[str, Any]],
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> tuple[SalaryPeriod, list[tuple[StaffSalaryLine, Expense, CashTransaction | None]]]:
+    """Void one posted period and post one reversal expense per line."""
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Salary void requires an active transaction.")
+    gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="salaries.void")
+    period = _lock_period(gym_id=gym.id, period_id=period_id)
+    gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="salaries.void")
+    if period.status != SalaryPeriod.Status.POSTED:
+        raise SalaryPostingConflict()
+    lines = list(period.lines.select_for_update().order_by("id"))
+    if not lines:
+        raise SalaryPostingConflict()
+    expense_ids = [line.expense_id for line in lines if line.expense_id is not None]
+    expenses = {
+        expense.id: expense
+        for expense in Expense.objects.select_for_update()
+        .filter(gym_id=gym.id, id__in=expense_ids)
+        .order_by("id")
+    }
+    if set(expenses) != set(expense_ids) or len(expense_ids) != len(lines):
+        raise SalaryPostingConflict()
+    category_ids = sorted({expense.category_id for expense in expenses.values()}, key=str)
+    list(
+        ExpenseCategory.objects.select_for_update()
+        .filter(gym_id=gym.id, id__in=category_ids)
+        .order_by("id")
+    )
+    movement_ids = sorted(
+        (
+            expense.cash_transaction_id
+            for expense in expenses.values()
+            if expense.cash_transaction_id is not None
+        ),
+        key=str,
+    )
+    list(
+        CashTransaction.objects.select_for_update()
+        .filter(gym_id=gym.id, id__in=movement_ids)
+        .order_by("id")
+    )
+    existing = list(
+        Expense.objects.select_for_update()
+        .filter(gym_id=gym.id, original_expense_id__in=expense_ids)
+        .order_by("id")
+    )
+    if existing or any(expense.reversal_expense_id is not None for expense in expenses.values()):
+        raise SalaryPostingConflict()
+    chosen_date = _correction_date(
+        gym=gym, original_date=period.business_date, requested=business_date
+    )
+    by_id = {line.id: line for line in lines}
+    mappings = {row["line_id"]: row["cash_session_id"] for row in cash_sessions}
+    if set(mappings) - set(by_id):
+        raise ValidationError({"cash_sessions": ["Each mapping must name a line on this period."]})
+    cash_lines = [line for line in lines if line.payment_method == Payment.Method.CASH]
+    if set(mappings) != {line.id for line in cash_lines}:
+        raise ValidationError(
+            {"cash_sessions": ["Map every cash line once and do not map a non-cash line."]}
+        )
+    session_ids = sorted(set(mappings.values()), key=str)
+    sessions = {
+        session.id: session
+        for session in CashSession.objects.select_for_update()
+        .filter(gym_id=gym.id, id__in=session_ids)
+        .order_by("id")
+    }
+    if set(sessions) != set(session_ids):
+        raise ValidationError({"cash_sessions": ["Select an open cash session of this gym."]})
+    for line in cash_lines:
+        session = sessions[mappings[line.id]]
+        if (
+            session.status != CashSession.Status.OPEN
+            or session.gym_id != gym.id
+            or session.currency != line.currency
+            or session.business_date != chosen_date
+        ):
+            raise ValidationError(
+                {
+                    "cash_sessions": [
+                        "Each cash line requires an open session for the correction date."
+                    ]
+                }
+            )
+    reversals: list[tuple[StaffSalaryLine, Expense, CashTransaction | None]] = []
+    try:
+        for line in lines:
+            expense_id = line.expense_id
+            if expense_id is None:
+                raise SalaryPostingConflict()
+            original = expenses[expense_id]
+            _original, reversal, movement = void_linked_salary_expense(
+                gym=gym,
+                actor=actor,
+                original=original,
+                reason=reason,
+                business_date=chosen_date,
+                cash_session_id=mappings.get(line.id),
+                request_id=request_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+            reversals.append((line, reversal, movement))
+        now = timezone.now()
+        period.status = SalaryPeriod.Status.VOID
+        period.voided_at = now
+        period.voided_by_membership_id = actor.id
+        period.void_business_date = chosen_date
+        period.reason = reason
+        period.updated_by_membership_id = actor.id
+        period.save()
+    except IntegrityError as exc:
+        raise SalaryPostingConflict() from exc
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="SALARY_PERIOD_VOIDED",
+        period=period,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={
+            "line_count": len(lines),
+            "reversal_count": len(reversals),
+            "void_business_date": chosen_date.isoformat(),
+        },
+    )
+    return period, reversals
+
+
 def reject_period(
     *,
     gym: Gym,
@@ -481,6 +626,17 @@ def _assert_period_till(*, period: SalaryPeriod, session: CashSession) -> None:
                     ]
                 }
             )
+
+
+def _correction_date(*, gym: Gym, original_date: date, requested: date | None) -> date:
+    chosen = gym_today(gym) if requested is None else requested
+    if chosen > gym_today(gym):
+        raise ValidationError({"business_date": ["The business date cannot be after today."]})
+    if chosen < original_date:
+        raise ValidationError(
+            {"business_date": ["The business date cannot be before the original business date."]}
+        )
+    return chosen
 
 
 def _require_ordered_dates(fields: dict[str, Any]) -> None:

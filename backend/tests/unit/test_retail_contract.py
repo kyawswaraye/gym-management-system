@@ -7,7 +7,11 @@ from django.db.migrations.loader import MigrationLoader
 
 from apps.members.payment_serializers import PaymentWriteSerializer
 from apps.sales.pricing import extend_money
-from apps.sales.serializers import RetailSaleUpdateSerializer, RetailSaleWriteSerializer
+from apps.sales.serializers import (
+    RetailSaleUpdateSerializer,
+    RetailSaleWriteSerializer,
+    VoidRetailSaleSerializer,
+)
 from apps.sales.views import (
     RetailSaleApproveView,
     RetailSaleCancelView,
@@ -15,26 +19,28 @@ from apps.sales.views import (
     RetailSaleListCreateView,
     RetailSaleRejectView,
     RetailSaleSubmitView,
+    RetailSaleVoidView,
 )
 
 SALES_INITIAL = ("sales", "0001_retail_sale_foundation")
-SALES_LEAF = ("sales", "0002_rls_integrity_and_grants")
+SALES_RLS = ("sales", "0002_rls_integrity_and_grants")
+SALES_LEAF = ("sales", "0003_retail_sale_void")
 
 
 def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     loader = MigrationLoader(None, ignore_no_migrations=True)
     loader.graph.ensure_not_cyclic()
     assert loader.graph.leaf_nodes("sales") == [SALES_LEAF]
-    assert loader.graph.leaf_nodes("members") == [
-        ("members", "0019_payment_receipt_runtime_reversal")
-    ]
+    assert loader.graph.leaf_nodes("members") == [("members", "0020_retail_product_reversal")]
     inventory_leaf = ("inventory", "0003_retail_sale_foundation")
     members_leaf = ("members", "0018_retail_sale_foundation")
-    assert loader.graph.leaf_nodes("inventory") == [inventory_leaf]
+    inventory_runtime = ("inventory", "0004_sale_return_runtime")
+    members_runtime = ("members", "0020_retail_product_reversal")
+    assert loader.graph.leaf_nodes("inventory") == [inventory_runtime]
     initial = loader.disk_migrations[SALES_INITIAL].dependencies
     assert ("inventory", "0002_rls_integrity_and_grants") in initial
     assert ("members", "0017_payment_receipt_hardening") in initial
-    assert ("sales", "0002_rls_integrity_and_grants") not in initial
+    assert SALES_RLS not in initial
     assert inventory_leaf not in initial
     assert members_leaf not in initial
     assert SALES_INITIAL in loader.disk_migrations[members_leaf].dependencies
@@ -44,14 +50,24 @@ def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     ].dependencies
     assert members_leaf not in loader.disk_migrations[inventory_leaf].dependencies
     assert inventory_leaf not in loader.disk_migrations[members_leaf].dependencies
-    leaf = loader.disk_migrations[SALES_LEAF].dependencies
+    leaf = loader.disk_migrations[SALES_RLS].dependencies
     assert members_leaf in leaf
     assert inventory_leaf in leaf
-    assert SALES_LEAF not in loader.disk_migrations[inventory_leaf].dependencies
-    assert SALES_LEAF not in loader.disk_migrations[members_leaf].dependencies
-    plan = loader.graph.forwards_plan(SALES_LEAF)
-    assert plan.index(SALES_INITIAL) < plan.index(members_leaf) < plan.index(SALES_LEAF)
-    assert plan.index(SALES_INITIAL) < plan.index(inventory_leaf) < plan.index(SALES_LEAF)
+    assert SALES_RLS not in loader.disk_migrations[inventory_leaf].dependencies
+    assert SALES_RLS not in loader.disk_migrations[members_leaf].dependencies
+    assert loader.disk_migrations[SALES_LEAF].dependencies == [SALES_RLS]
+    assert SALES_LEAF in loader.disk_migrations[inventory_runtime].dependencies
+    assert inventory_leaf in loader.disk_migrations[inventory_runtime].dependencies
+    assert SALES_LEAF in loader.disk_migrations[members_runtime].dependencies
+    assert ("members", "0019_payment_receipt_runtime_reversal") in loader.disk_migrations[
+        members_runtime
+    ].dependencies
+    plan = loader.graph.forwards_plan(SALES_RLS)
+    assert plan.index(SALES_INITIAL) < plan.index(members_leaf) < plan.index(SALES_RLS)
+    assert plan.index(SALES_INITIAL) < plan.index(inventory_leaf) < plan.index(SALES_RLS)
+    runtime_plan = loader.graph.forwards_plan(inventory_runtime)
+    assert runtime_plan.index(SALES_LEAF) < runtime_plan.index(inventory_runtime)
+    assert inventory_runtime not in loader.graph.forwards_plan(SALES_LEAF)
 
 
 def test_quantity_times_money_rounds_half_up_to_minor_units() -> None:
@@ -157,3 +173,21 @@ def test_retail_routes_use_finance_entitlement_and_exact_permissions() -> None:
     assert RetailSaleApproveView.required_permission == "retail.approve"
     assert RetailSaleRejectView.required_permission == "retail.approve"
     assert RetailSaleCancelView.required_permission == "retail.update"
+    assert RetailSaleVoidView.required_permission == "retail.void"
+    assert RetailSaleVoidView.required_feature == "finance"
+
+
+def test_retail_void_request_rejects_blank_reason_and_server_fields() -> None:
+    blank = VoidRetailSaleSerializer(data={"reason": "  "})
+    assert not blank.is_valid()
+    assert "reason" in blank.errors
+    extra = VoidRetailSaleSerializer(
+        data={"reason": "Wrong sale", "status": "VOID", "payment_id": str(uuid4())}
+    )
+    assert not extra.is_valid()
+    accepted = VoidRetailSaleSerializer(
+        data={"reason": "  Customer changed their mind  ", "cash_session_id": None}
+    )
+    assert accepted.is_valid(), accepted.errors
+    assert accepted.validated_data["reason"] == "Customer changed their mind"
+    assert accepted.validated_data["cash_session_id"] is None

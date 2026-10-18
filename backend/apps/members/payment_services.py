@@ -1079,6 +1079,127 @@ def _reject_retail_charge(payment: Payment) -> None:
         raise RetailCorrectionUnavailable()
 
 
+def reverse_retail_product_payment(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    original: Payment,
+    receipts: list[Receipt],
+    reason: str,
+    business_date: date,
+    cash_session_id: UUID | None,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> dict[str, Any]:
+    """Reverse one locked posted product charge inside a retail void.
+
+    Public payment void and refund still reject ``PRODUCT``. The caller locks
+    the charge, its receipts, the original cash movement, and the destination
+    session before calling this helper.
+    """
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Retail payment reversal requires an active transaction.")
+    if (
+        original.gym_id != gym.id
+        or original.purpose != Payment.Purpose.PRODUCT
+        or original.retail_sale_id is None
+        or original.entry_type != Payment.EntryType.CHARGE
+        or original.status != Payment.Status.POSTED
+    ):
+        raise PaymentPostingConflict()
+    related = list(
+        Payment.objects.filter(gym_id=original.gym_id, original_payment_id=original.id).order_by(
+            "id"
+        )
+    )
+    if related or _refundable_amount(original, related) != Decimal(original.amount):
+        raise PaymentPostingConflict()
+    reversal_id = uuid4()
+    movement = _correction_cash(
+        gym=gym,
+        actor=actor,
+        original=original,
+        source_id=reversal_id,
+        amount=Decimal(original.amount),
+        business_date=business_date,
+        reason=reason,
+        cash_session_id=cash_session_id,
+        legacy=False,
+        link_original_movement=original.method == Payment.Method.CASH,
+    )
+    now = timezone.now()
+    reversal = _insert_posted_correction(
+        gym=gym,
+        actor=actor,
+        original=original,
+        correction_id=reversal_id,
+        entry_type=Payment.EntryType.REVERSAL,
+        amount=Decimal(original.amount),
+        method=original.method,
+        business_date=business_date,
+        description=f"Reversal: {original.description}"[:255],
+        reference_number=original.reference_number,
+        movement=movement,
+        legacy=False,
+        posted_at=now,
+        retail_sale_id=original.retail_sale_id,
+    )
+    number, sequence_value, sequence_year = _allocate_receipt_number(
+        gym=gym, payment=reversal, actor=actor
+    )
+    correction_receipt = _issue_receipt(
+        gym=gym,
+        actor=actor,
+        payment=reversal,
+        number=number,
+        sequence_value=sequence_value,
+        sequence_year=sequence_year,
+        issued_at=now,
+    )
+    original_receipt = _void_locked_receipt(
+        receipts=receipts, payment_id=original.id, actor=actor, reason=reason, voided_at=now
+    )
+    original.status = Payment.Status.VOID
+    original.voided_at = now
+    original.voided_by_membership_id = actor.id
+    original.void_reason = reason
+    original.reversal_payment = reversal
+    original.updated_by_membership_id = actor.id
+    original.save()
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="PAYMENT_VOIDED",
+        payment=original,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={
+            "reversal_payment_id": str(reversal.id),
+            "retail_sale_id": str(original.retail_sale_id),
+        },
+    )
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="PAYMENT_REVERSAL_POSTED",
+        payment=reversal,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={"original_payment_id": str(original.id)},
+    )
+    return {
+        "original": original,
+        "correction": reversal,
+        "original_receipt": original_receipt,
+        "correction_receipt": correction_receipt,
+        "cash_transaction": movement,
+    }
+
+
 def _lock_related_payments(original: Payment) -> list[Payment]:
     return list(
         Payment.objects.select_for_update()
@@ -1235,6 +1356,7 @@ def _insert_posted_correction(
     movement: CashTransaction | None,
     legacy: bool,
     posted_at: datetime,
+    retail_sale_id: UUID | None = None,
 ) -> Payment:
     reception = _holds_reception(gym_id=gym.id, membership_id=actor.id)
     return Payment.objects.create(
@@ -1242,6 +1364,7 @@ def _insert_posted_correction(
         gym=gym,
         member_id=original.member_id,
         membership_id=original.membership_id,
+        retail_sale_id=retail_sale_id,
         original_payment=original,
         entry_type=entry_type,
         purpose=original.purpose,

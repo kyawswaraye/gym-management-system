@@ -115,10 +115,9 @@ stay unpublished. Approval posts one sale movement per line, one product
 payment, one receipt, and one cash-in movement when the method is cash.
 Quantity times money rounds half up to minor units. Daily product metrics
 come from posted retail lines. Phase 4 remains open.
-Phase 4 increment 8A publishes payment void, payment refund, receipt void, and
-manual expense void. Salary void and retail void/returns stay unpublished:
-their public contract only says `reason`, and a cash-origin record may need an
-open destination session after the original till is closed. Product payment
+Phase 4 increment 8B publishes salary-period void and full retail-sale void.
+Partial retail returns stay unpublished. A cash correction names an open
+destination session and does not reopen the original till. Product payment
 corrections are rejected so posted retail stock and receipts stay aligned.
 A legacy unlinked cash void does not invent a movement. Closed sessions are
 not reopened. A correction requires the exact live permission, the finance
@@ -151,6 +150,16 @@ receipt void, and manual expense void, and omit salary void and retail
 void/returns. A second schema export matched the working tree. End-to-end
 browser tests were not run. The local `make check` contract step still reports
 the schema files because this increment is not committed. Phase 4 remains open.
+Increment 8B gate evidence: backend ruff, format, and mypy passed and
+migrations stayed in sync. 284 non-PostgreSQL backend tests passed and 248
+were deselected. The PostgreSQL suite passed 248 tests and 284 were
+deselected, with zero failures. Web format, lint, typecheck, and build passed,
+with 263 web tests.
+OpenAPI and the generated web types include salary-period void and full
+retail-sale void and omit a partial return route. A second schema export
+matched the working tree. End-to-end browser tests were not run. The local
+`make check` contract step still reports the schema files because this
+increment is not committed. Phase 4 remains open.
 
 `is_pt_client` stays false until Phase 5 derives it from an active trainer
 assignment.

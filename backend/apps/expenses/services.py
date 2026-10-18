@@ -634,6 +634,116 @@ def void_expense(
     return original, reversal, movement
 
 
+def void_linked_salary_expense(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    original: Expense,
+    reason: str,
+    business_date: date,
+    cash_session_id: UUID | None,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> tuple[Expense, Expense, CashTransaction | None]:
+    """Void one locked posted salary expense and post its equal reversal.
+
+    The public expense void route still rejects ``STAFF_SALARY``. Salary-period
+    void is the only caller. The original expense row must already be locked.
+    """
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Salary expense void requires an active transaction.")
+    if original.gym_id != gym.id:
+        raise Http404
+    category = ExpenseCategory.objects.filter(gym_id=gym.id, id=original.category_id).first()
+    if category is None or category.system_key != "STAFF_SALARY":
+        raise ProtectedExpenseCategory()
+    if original.status != Expense.Status.POSTED or original.original_expense_id is not None:
+        raise ExpensePostingConflict()
+    if original.reversal_expense_id is not None:
+        raise ExpensePostingConflict()
+    reversal_id = uuid4()
+    movement: CashTransaction | None = None
+    if original.payment_method == Payment.Method.CASH:
+        if cash_session_id is None:
+            raise ValidationError(
+                {"cash_sessions": ["A cash salary line requires an open destination session."]}
+            )
+        movement = record_cash_movement(
+            gym=gym,
+            actor=actor,
+            session_id=cash_session_id,
+            direction=CashTransaction.Direction.IN,
+            source_type=CashTransaction.SourceType.EXPENSE,
+            source_id=reversal_id,
+            amount=Decimal(original.amount),
+            currency=original.currency,
+            business_date=business_date,
+            description=f"Reversal: {original.description}"[:255],
+            reason=reason[:255],
+            reversal_of_id=original.cash_transaction_id,
+        )
+    elif cash_session_id is not None:
+        raise ValidationError(
+            {"cash_sessions": ["Do not map a cash session for a non-cash salary line."]}
+        )
+    now = timezone.now()
+    reception = _holds_reception(gym_id=gym.id, membership_id=actor.id)
+    reversal = Expense.objects.create(
+        id=reversal_id,
+        gym=gym,
+        category_id=original.category_id,
+        business_date=business_date,
+        description=f"Reversal: {original.description}"[:255],
+        amount=original.amount,
+        currency=original.currency,
+        payment_method=original.payment_method,
+        policy_note=original.policy_note,
+        status=Expense.Status.POSTED,
+        original_expense=original,
+        submitted_at=now,
+        submitted_by_membership_id=actor.id,
+        approved_at=now,
+        approved_by_membership_id=actor.id,
+        posted_at=now,
+        posted_by_membership_id=actor.id,
+        reason=reason,
+        cash_session=None if movement is None else movement.cash_session,
+        cash_transaction=movement,
+        created_with_reception_scope=reception,
+        submitted_with_reception_scope=reception,
+        created_by_membership_id=actor.id,
+        updated_by_membership_id=actor.id,
+    )
+    original.status = Expense.Status.VOID
+    original.voided_at = now
+    original.voided_by_membership_id = actor.id
+    original.reason = reason
+    original.reversal_expense = reversal
+    original.updated_by_membership_id = actor.id
+    original.save()
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="EXPENSE_VOIDED",
+        expense=original,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="EXPENSE_REVERSAL_POSTED",
+        expense=reversal,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    return original, reversal, movement
+
+
 def command_route(*, expense_id: UUID | None, action: str) -> str:
     if expense_id is None:
         return "/api/v1/expenses/"

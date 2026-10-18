@@ -12,7 +12,8 @@ class SalaryPeriod(TenantModel):
     ``created_with_reception_scope`` and ``submitted_with_reception_scope``
     snapshot the protected Reception assignment at create and submit. They stay
     immutable so a later role change cannot move a cash posting onto another
-    till. Void stays unpublished; runtime cannot leave ``POSTED``.
+    till. A posted period can be voided once. The correction names its own
+    business date and, for cash, an open destination session.
     """
 
     class Status(models.TextChoices):
@@ -40,6 +41,8 @@ class SalaryPeriod(TenantModel):
     cancelled_at = models.DateTimeField(null=True, blank=True)
     cancelled_by_membership_id = models.UUIDField(null=True, blank=True)
     voided_at = models.DateTimeField(null=True, blank=True)
+    voided_by_membership_id = models.UUIDField(null=True, blank=True)
+    void_business_date = models.DateField(null=True, blank=True)
     reason = models.TextField(blank=True, default="")
     created_with_reception_scope = models.BooleanField(default=False)
     submitted_with_reception_scope = models.BooleanField(default=False)

@@ -137,6 +137,23 @@ class CancelSalarySerializer(StrictSerializer):
         return _nonblank(value, "Enter a cancellation reason.")
 
 
+class VoidSalarySerializer(StrictSerializer):
+    reason = serializers.CharField(max_length=2000, trim_whitespace=True)
+    business_date = serializers.DateField(required=False)
+    cash_sessions = SalaryCashMappingSerializer(many=True, required=False)
+
+    def validate_reason(self, value: str) -> str:
+        return _nonblank(value, "Enter a reason.")
+
+    def validate_cash_sessions(self, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if len(value) > _MAX_LINES:
+            raise serializers.ValidationError("Too many cash-session mappings.")
+        line_ids = [row["line_id"] for row in value]
+        if len(line_ids) != len(set(line_ids)):
+            raise serializers.ValidationError("Each salary line can be mapped once.")
+        return sorted(value, key=lambda row: row["line_id"])
+
+
 class SalaryPeriodListQuerySerializer(StrictSerializer):
     status = serializers.ChoiceField(choices=SalaryPeriod.Status.choices, required=False)
     business_date = serializers.DateField(required=False)
@@ -186,6 +203,8 @@ class SalaryPeriodSerializer(serializers.Serializer):
     cancelled_at = serializers.DateTimeField(allow_null=True)
     cancelled_by_membership_id = serializers.UUIDField(allow_null=True)
     voided_at = serializers.DateTimeField(allow_null=True)
+    voided_by_membership_id = serializers.UUIDField(allow_null=True)
+    void_business_date = serializers.DateField(allow_null=True)
     reason = serializers.CharField()
     created_by_membership_id = serializers.UUIDField()
     updated_by_membership_id = serializers.UUIDField()
@@ -221,6 +240,24 @@ class SalaryApprovalSerializer(serializers.Serializer):
 class SalaryApprovalEnvelopeSerializer(serializers.Serializer):
     success = serializers.BooleanField()
     data = SalaryApprovalSerializer()
+    message = serializers.CharField()
+
+
+class SalaryLineReversalSerializer(serializers.Serializer):
+    line_id = serializers.UUIDField()
+    reversal_expense_id = serializers.UUIDField()
+    reversal_expense = ExpenseSerializer()
+    cash_transaction = CashTransactionSerializer(allow_null=True)
+
+
+class SalaryVoidSerializer(serializers.Serializer):
+    salary_period = SalaryPeriodSerializer()
+    reversals = SalaryLineReversalSerializer(many=True)
+
+
+class SalaryVoidEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    data = SalaryVoidSerializer()
     message = serializers.CharField()
 
 
@@ -270,6 +307,8 @@ def period_payload(period: SalaryPeriod) -> dict[str, object]:
         "cancelled_at": period.cancelled_at,
         "cancelled_by_membership_id": period.cancelled_by_membership_id,
         "voided_at": period.voided_at,
+        "voided_by_membership_id": period.voided_by_membership_id,
+        "void_business_date": period.void_business_date,
         "reason": period.reason,
         "created_by_membership_id": period.created_by_membership_id,
         "updated_by_membership_id": period.updated_by_membership_id,

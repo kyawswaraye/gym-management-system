@@ -11809,6 +11809,141 @@
                 }
             }
         },
+        "/api/v1/retail-sales/{sale_id}/void/": {
+            "post": {
+                "operationId": "retail_sales_void",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "High-entropy key reused only for retries of this retail command.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "sale_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "retail-sales"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidRetailSaleRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidRetailSaleRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidRetailSaleRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RetailSaleVoidEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/roles/": {
             "get": {
                 "operationId": "roles_list",
@@ -13324,6 +13459,141 @@
                         "description": ""
                     },
                     "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/salary-periods/{period_id}/void/": {
+            "post": {
+                "operationId": "salary_periods_void",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "High-entropy key reused only for retries of this salary command.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "period_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "salary-periods"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidSalaryRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidSalaryRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidSalaryRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SalaryVoidEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "422": {
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -21604,6 +21874,14 @@
                         "format": "uuid",
                         "nullable": true
                     },
+                    "void_business_date": {
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true
+                    },
+                    "void_reason": {
+                        "type": "string"
+                    },
                     "created_by_membership_id": {
                         "type": "string",
                         "format": "uuid"
@@ -21659,6 +21937,8 @@
                     "total_amount",
                     "updated_at",
                     "updated_by_membership_id",
+                    "void_business_date",
+                    "void_reason",
                     "voided_at",
                     "voided_by_membership_id"
                 ]
@@ -21848,6 +22128,73 @@
                     "next_after"
                 ]
             },
+            "RetailSaleVoid": {
+                "type": "object",
+                "properties": {
+                    "retail_sale": {
+                        "$ref": "#/components/schemas/RetailSale"
+                    },
+                    "original_payment": {
+                        "$ref": "#/components/schemas/Payment"
+                    },
+                    "reversal_payment": {
+                        "$ref": "#/components/schemas/Payment"
+                    },
+                    "original_receipt": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Receipt"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "reversal_receipt": {
+                        "$ref": "#/components/schemas/Receipt"
+                    },
+                    "cash_transaction": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/CashTransaction"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "stock_movements": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RetailVoidStockMovement"
+                        }
+                    }
+                },
+                "required": [
+                    "cash_transaction",
+                    "original_payment",
+                    "original_receipt",
+                    "retail_sale",
+                    "reversal_payment",
+                    "reversal_receipt",
+                    "stock_movements"
+                ]
+            },
+            "RetailSaleVoidEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/RetailSaleVoid"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
+                ]
+            },
             "RetailSaleWriteRequest": {
                 "type": "object",
                 "properties": {
@@ -21878,6 +22225,50 @@
                     "business_date",
                     "lines",
                     "payment_method"
+                ]
+            },
+            "RetailVoidStockMovement": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "retail_sale_line_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "product_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "quantity": {
+                        "type": "string"
+                    },
+                    "movement_type": {
+                        "type": "string"
+                    },
+                    "unit_cost_snapshot": {
+                        "type": "string"
+                    },
+                    "business_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "reverses_movement_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "business_date",
+                    "id",
+                    "movement_type",
+                    "product_id",
+                    "quantity",
+                    "retail_sale_line_id",
+                    "reverses_movement_id",
+                    "unit_cost_snapshot"
                 ]
             },
             "Role": {
@@ -22110,6 +22501,36 @@
                     "line_id"
                 ]
             },
+            "SalaryLineReversal": {
+                "type": "object",
+                "properties": {
+                    "line_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "reversal_expense_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "reversal_expense": {
+                        "$ref": "#/components/schemas/Expense"
+                    },
+                    "cash_transaction": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/CashTransaction"
+                            }
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "cash_transaction",
+                    "line_id",
+                    "reversal_expense",
+                    "reversal_expense_id"
+                ]
+            },
             "SalaryLineWriteRequest": {
                 "type": "object",
                 "properties": {
@@ -22261,6 +22682,16 @@
                         "format": "date-time",
                         "nullable": true
                     },
+                    "voided_by_membership_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "void_business_date": {
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true
+                    },
                     "reason": {
                         "type": "string"
                     },
@@ -22311,7 +22742,9 @@
                     "submitted_by_membership_id",
                     "updated_at",
                     "updated_by_membership_id",
-                    "voided_at"
+                    "void_business_date",
+                    "voided_at",
+                    "voided_by_membership_id"
                 ]
             },
             "SalaryPeriodEnvelope": {
@@ -22385,6 +22818,43 @@
                     "description",
                     "period_end",
                     "period_start"
+                ]
+            },
+            "SalaryVoid": {
+                "type": "object",
+                "properties": {
+                    "salary_period": {
+                        "$ref": "#/components/schemas/SalaryPeriod"
+                    },
+                    "reversals": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SalaryLineReversal"
+                        }
+                    }
+                },
+                "required": [
+                    "reversals",
+                    "salary_period"
+                ]
+            },
+            "SalaryVoidEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/SalaryVoid"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
                 ]
             },
             "ScopeEnum": {
@@ -23525,6 +23995,51 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 2000
+                    }
+                },
+                "required": [
+                    "reason"
+                ]
+            },
+            "VoidRetailSaleRequest": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                    },
+                    "business_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "cash_session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "reason"
+                ]
+            },
+            "VoidSalaryRequest": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                    },
+                    "business_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "cash_sessions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SalaryCashMappingRequest"
+                        }
                     }
                 },
                 "required": [

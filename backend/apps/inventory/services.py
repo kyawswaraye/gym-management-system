@@ -328,6 +328,56 @@ def post_sale_movement(
     )
 
 
+def post_sale_return(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    product: Product,
+    line: RetailSaleLine,
+    original: StockMovement,
+    business_date: Any,
+    reason: str,
+) -> StockMovement:
+    """Append one positive ``SALE_RETURN`` for a locked original sale movement.
+
+    The public adjustment command still rejects ``SALE`` and ``SALE_RETURN``.
+    The caller locks the product and the original movement before this insert.
+    The original movement is not updated.
+    """
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("A sale return requires an active transaction.")
+    if (
+        line.gym_id != gym.id
+        or product.gym_id != gym.id
+        or original.gym_id != gym.id
+        or line.product_id != product.id
+        or original.product_id != product.id
+        or original.retail_sale_line_id != line.id
+        or original.movement_type != StockMovement.Type.SALE
+        or original.reverses_movement_id is not None
+    ):
+        raise ValidationError({"lines": ["The sale movement does not match this line."]})
+    quantity = parse_quantity(line.quantity)
+    if quantity <= 0 or parse_quantity(original.quantity) != -quantity:
+        raise ValidationError({"quantity": ["A sale return must restore the sold quantity."]})
+    snapshot = parse_money(line.unit_cost_snapshot)
+    if snapshot != parse_money(original.unit_cost_snapshot):
+        raise ValidationError({"lines": ["The sale return must keep the sold unit cost."]})
+    return StockMovement.objects.create(
+        gym=gym,
+        product=product,
+        quantity=quantity,
+        movement_type=StockMovement.Type.SALE_RETURN,
+        unit_cost_snapshot=snapshot,
+        reason=reason,
+        business_date=business_date,
+        reverses_movement=original,
+        retail_sale_line=line,
+        created_by_membership_id=actor.id,
+    )
+
+
 def _category(*, gym_id: UUID, category_id: UUID) -> ProductCategory:
     category = ProductCategory.objects.filter(gym_id=gym_id, id=category_id).first()
     if category is None:

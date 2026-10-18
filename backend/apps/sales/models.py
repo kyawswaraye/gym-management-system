@@ -5,7 +5,8 @@ product lines. The server copies the gym currency and the current product
 SKU, name, sale price, and unit cost, then stores the exact line and sale
 totals. Only a ``DRAFT`` can change. Submission freezes those inputs.
 Approval posts stock, payment, receipt, and cash effects, or rolls them all
-back. Runtime cannot void a posted sale.
+back. A later full void restores stock and reverses the product charge
+without rewriting those posted facts.
 """
 
 from __future__ import annotations
@@ -21,7 +22,9 @@ class RetailSale(TenantModel):
 
     ``created_with_reception_scope`` and ``submitted_with_reception_scope``
     snapshot the protected Reception assignment at create and submit. Cash
-    approval must use that membership's own open till. Void stays unpublished.
+    approval must use that membership's own open till. A posted sale can be
+    voided once. The correction names its own business date and, for cash,
+    an open destination session.
     """
 
     class Status(models.TextChoices):
@@ -76,6 +79,7 @@ class RetailSale(TenantModel):
     cancelled_by_membership_id = models.UUIDField(null=True, blank=True)
     voided_at = models.DateTimeField(null=True, blank=True)
     voided_by_membership_id = models.UUIDField(null=True, blank=True)
+    void_business_date = models.DateField(null=True, blank=True)
     void_reason = models.TextField(blank=True, default="")
     reason = models.TextField(blank=True, default="")
     created_with_reception_scope = models.BooleanField(default=False)

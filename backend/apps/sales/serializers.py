@@ -148,6 +148,8 @@ class RetailSaleSerializer(serializers.Serializer):
     cancelled_by_membership_id = serializers.UUIDField(allow_null=True)
     voided_at = serializers.DateTimeField(allow_null=True)
     voided_by_membership_id = serializers.UUIDField(allow_null=True)
+    void_business_date = serializers.DateField(allow_null=True)
+    void_reason = serializers.CharField()
     created_by_membership_id = serializers.UUIDField()
     updated_by_membership_id = serializers.UUIDField()
     created_at = serializers.DateTimeField()
@@ -186,6 +188,45 @@ class RetailSaleApprovalEnvelopeSerializer(serializers.Serializer):
     message = serializers.CharField()
 
 
+class VoidRetailSaleSerializer(StrictSerializer):
+    reason = serializers.CharField(max_length=2000, trim_whitespace=True)
+    business_date = serializers.DateField(required=False)
+    cash_session_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_reason(self, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise serializers.ValidationError("Enter a reason.")
+        return stripped
+
+
+class RetailVoidStockMovementSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    retail_sale_line_id = serializers.UUIDField()
+    product_id = serializers.UUIDField()
+    quantity = serializers.CharField()
+    movement_type = serializers.CharField()
+    unit_cost_snapshot = serializers.CharField()
+    business_date = serializers.DateField()
+    reverses_movement_id = serializers.UUIDField()
+
+
+class RetailSaleVoidSerializer(serializers.Serializer):
+    retail_sale = RetailSaleSerializer()
+    original_payment = PaymentSerializer()
+    reversal_payment = PaymentSerializer()
+    original_receipt = ReceiptSerializer(allow_null=True)
+    reversal_receipt = ReceiptSerializer()
+    cash_transaction = CashTransactionSerializer(allow_null=True)
+    stock_movements = RetailVoidStockMovementSerializer(many=True)
+
+
+class RetailSaleVoidEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    data = RetailSaleVoidSerializer()
+    message = serializers.CharField()
+
+
 def sale_payload(sale: RetailSale) -> dict[str, object]:
     lines = list(sale.lines.order_by("product_id", "id"))
     body = {
@@ -217,6 +258,8 @@ def sale_payload(sale: RetailSale) -> dict[str, object]:
         "cancelled_by_membership_id": sale.cancelled_by_membership_id,
         "voided_at": sale.voided_at,
         "voided_by_membership_id": sale.voided_by_membership_id,
+        "void_business_date": sale.void_business_date,
+        "void_reason": sale.void_reason,
         "created_by_membership_id": sale.created_by_membership_id,
         "updated_by_membership_id": sale.updated_by_membership_id,
         "created_at": sale.created_at,

@@ -1,9 +1,16 @@
-"""Retail sale drafts and the single approval posting path.
+"""Retail sale drafts, approval posting, and one full void.
 
 Lock order inside approval: the sale, its lines, the member when present,
 then products ordered by id. Stock movements are appended only after those
 locks. The product payment, receipt, and cash movement are created next, and
 the sale is marked posted last. A failure rolls all of it back.
+
+Full void locks the posted sale, its lines, the original sale movements,
+products in id order, the product charge, receipts, the original cash
+movement, the named destination session, and any existing correction. It
+appends one ``SALE_RETURN`` per line, reverses the product charge, and marks
+the sale void last. Partial returns stay unpublished. A cash void names an
+open destination session and does not reopen the original till.
 
 Price and cost are copied when the draft is saved. Submission and approval
 compare those snapshots with the current active product and fail when they
@@ -16,6 +23,7 @@ originating Reception membership's own open till.
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -29,12 +37,15 @@ from apps.audit.services import write_tenant_audit
 from apps.cashbook.models import CashSession, CashTransaction
 from apps.cashbook.selectors import holds_protected_role, membership_has_permission
 from apps.cashbook.services import revalidate_cash_actor
-from apps.inventory.models import Product
+from apps.inventory.models import Product, StockMovement
 from apps.inventory.quantities import parse_quantity
-from apps.inventory.services import post_sale_movement
+from apps.inventory.services import post_sale_movement, post_sale_return
 from apps.members.models import Member, Payment, Receipt
 from apps.members.payment_serializers import money_text
-from apps.members.payment_services import post_retail_product_payment
+from apps.members.payment_services import (
+    post_retail_product_payment,
+    reverse_retail_product_payment,
+)
 from apps.members.services import gym_today
 from apps.sales.exceptions import RetailPostingConflict
 from apps.sales.models import RetailSale, RetailSaleLine
@@ -257,6 +268,152 @@ def approve_sale(
     return sale, payment, receipt, movement
 
 
+def void_sale(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    sale_id: UUID,
+    reason: str,
+    business_date: date | None,
+    cash_session_id: UUID | None,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> dict[str, Any]:
+    """Void one posted sale, restore its stock, and reverse its product charge."""
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Retail void requires an active transaction.")
+    gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="retail.void")
+    sale = _lock_sale(gym_id=gym.id, sale_id=sale_id)
+    gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="retail.void")
+    if sale.status != RetailSale.Status.POSTED or sale.payment_id is None:
+        raise RetailPostingConflict()
+    if sale.payment_method == Payment.Method.CASH:
+        if cash_session_id is None:
+            raise ValidationError(
+                {"cash_session_id": ["A cash sale void requires an open session."]}
+            )
+    elif cash_session_id is not None:
+        raise ValidationError(
+            {"cash_session_id": ["Only a cash sale void can use a cash session."]}
+        )
+    chosen_date = _correction_date(
+        gym=gym, original_date=sale.business_date, requested=business_date
+    )
+    lines = list(sale.lines.select_for_update().order_by("id"))
+    if not lines:
+        raise RetailPostingConflict()
+    line_ids = [line.id for line in lines]
+    originals = list(
+        StockMovement.objects.select_for_update()
+        .filter(
+            gym_id=gym.id,
+            retail_sale_line_id__in=line_ids,
+            movement_type=StockMovement.Type.SALE,
+        )
+        .order_by("id")
+    )
+    by_line = {movement.retail_sale_line_id: movement for movement in originals}
+    if set(by_line) != set(line_ids) or len(originals) != len(lines):
+        raise RetailPostingConflict()
+    products = _lock_products(gym_id=gym.id, lines=lines)
+    payment = Payment.objects.select_for_update().filter(gym_id=gym.id, id=sale.payment_id).first()
+    if payment is None or payment.retail_sale_id != sale.id:
+        raise RetailPostingConflict()
+    receipts = list(
+        Receipt.objects.select_for_update()
+        .filter(gym_id=gym.id, payment_id=payment.id)
+        .order_by("id")
+    )
+    if payment.cash_transaction_id is not None:
+        locked_cash = (
+            CashTransaction.objects.select_for_update()
+            .filter(gym_id=gym.id, id=payment.cash_transaction_id)
+            .first()
+        )
+        if locked_cash is None:
+            raise RetailPostingConflict()
+    if cash_session_id is not None:
+        session = (
+            CashSession.objects.select_for_update()
+            .filter(gym_id=gym.id, id=cash_session_id)
+            .first()
+        )
+        if (
+            session is None
+            or session.status != CashSession.Status.OPEN
+            or session.currency != sale.currency
+            or session.business_date != chosen_date
+        ):
+            raise ValidationError(
+                {
+                    "cash_session_id": [
+                        "Select an open cash session for the correction date and currency."
+                    ]
+                }
+            )
+    related = list(
+        Payment.objects.select_for_update()
+        .filter(gym_id=gym.id, original_payment_id=payment.id)
+        .order_by("id")
+    )
+    if related or payment.reversal_payment_id is not None:
+        raise RetailPostingConflict()
+    returns: list[StockMovement] = []
+    for line in lines:
+        returns.append(
+            post_sale_return(
+                gym=gym,
+                actor=actor,
+                product=products[line.product_id],
+                line=line,
+                original=by_line[line.id],
+                business_date=chosen_date,
+                reason=reason,
+            )
+        )
+    reversed_payment = reverse_retail_product_payment(
+        gym=gym,
+        actor=actor,
+        original=payment,
+        receipts=receipts,
+        reason=reason,
+        business_date=chosen_date,
+        cash_session_id=cash_session_id,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    now = timezone.now()
+    sale.status = RetailSale.Status.VOID
+    sale.voided_at = now
+    sale.voided_by_membership_id = actor.id
+    sale.void_business_date = chosen_date
+    sale.void_reason = reason
+    sale.updated_by_membership_id = actor.id
+    sale.save()
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="RETAIL_SALE_VOIDED",
+        sale=sale,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={
+            "void_business_date": chosen_date.isoformat(),
+            "reversal_payment_id": str(reversed_payment["correction"].id),
+            "stock_return_count": len(returns),
+        },
+    )
+    return {
+        "sale": sale,
+        "stock_movements": returns,
+        **reversed_payment,
+    }
+
+
 def reject_sale(
     *,
     gym: Gym,
@@ -406,6 +563,17 @@ def _member(*, gym: Gym, member_id: UUID | None) -> Member | None:
     if member is None or member.status != Member.Status.ACTIVE:
         raise ValidationError({"member_id": ["Select an active member of this gym."]})
     return member
+
+
+def _correction_date(*, gym: Gym, original_date: date, requested: date | None) -> date:
+    chosen = gym_today(gym) if requested is None else requested
+    if chosen > gym_today(gym):
+        raise ValidationError({"business_date": ["The business date cannot be after today."]})
+    if chosen < original_date:
+        raise ValidationError(
+            {"business_date": ["The business date cannot be before the original business date."]}
+        )
+    return chosen
 
 
 def _business_date(*, gym: Gym, value: Any) -> Any:

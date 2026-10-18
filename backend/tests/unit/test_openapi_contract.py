@@ -120,6 +120,7 @@ PUBLISHED_PATHS = {
     "/api/v1/salary-periods/{period_id}/approve/",
     "/api/v1/salary-periods/{period_id}/reject/",
     "/api/v1/salary-periods/{period_id}/cancel/",
+    "/api/v1/salary-periods/{period_id}/void/",
     "/api/v1/product-categories/",
     "/api/v1/products/",
     "/api/v1/products/low-stock/",
@@ -132,6 +133,7 @@ PUBLISHED_PATHS = {
     "/api/v1/retail-sales/{sale_id}/approve/",
     "/api/v1/retail-sales/{sale_id}/reject/",
     "/api/v1/retail-sales/{sale_id}/cancel/",
+    "/api/v1/retail-sales/{sale_id}/void/",
 }
 CONTRACT_PATH = Path(__file__).resolve().parents[3] / "contracts" / "openapi.v1.json"
 
@@ -168,8 +170,7 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
         "/api/v1/check-ins/scan/",
         "/api/v1/member/me/",
         "/api/v1/notifications/",
-        "/api/v1/salary-periods/{period_id}/void/",
-        "/api/v1/retail-sales/{sale_id}/void/",
+        "/api/v1/retail-sales/{sale_id}/return/",
         "/api/v1/product-categories/{id}/",
         "/api/v1/stock-movements/{id}/",
     )
@@ -1179,7 +1180,7 @@ def test_openapi_documents_expense_commands() -> None:
 def test_openapi_documents_salary_commands() -> None:
     document = generated_schema()
     paths = document["paths"]
-    assert "/api/v1/salary-periods/{period_id}/void/" not in paths
+    assert "/api/v1/salary-periods/{period_id}/void/" in paths
     writes = (
         (paths["/api/v1/salary-periods/"]["post"], "201"),
         (paths["/api/v1/salary-periods/{period_id}/"]["patch"], "200"),
@@ -1188,6 +1189,7 @@ def test_openapi_documents_salary_commands() -> None:
         (paths["/api/v1/salary-periods/{period_id}/approve/"]["post"], "200"),
         (paths["/api/v1/salary-periods/{period_id}/reject/"]["post"], "200"),
         (paths["/api/v1/salary-periods/{period_id}/cancel/"]["post"], "200"),
+        (paths["/api/v1/salary-periods/{period_id}/void/"]["post"], "200"),
     )
     for operation, success in writes:
         header = next(
@@ -1206,13 +1208,15 @@ def test_openapi_documents_salary_commands() -> None:
     assert "422" in approve["responses"]
     generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
     assert '"/api/v1/salary-periods/{period_id}/approve/"' in generated
+    assert '"/api/v1/salary-periods/{period_id}/void/"' in generated
     assert '"/api/v1/salary-periods/{period_id}/lines/"' in generated
 
 
 def test_openapi_documents_inventory_commands() -> None:
     document = generated_schema()
     paths = document["paths"]
-    assert "/api/v1/retail-sales/{sale_id}/void/" not in paths
+    assert "/api/v1/retail-sales/{sale_id}/void/" in paths
+    assert "/api/v1/retail-sales/{sale_id}/return/" not in paths
     assert "/api/v1/product-categories/{id}/" not in paths
     writes = (
         (paths["/api/v1/product-categories/"]["post"], "201"),
@@ -1246,7 +1250,7 @@ def test_openapi_documents_inventory_commands() -> None:
 def test_openapi_documents_retail_commands() -> None:
     document = generated_schema()
     paths = document["paths"]
-    assert "/api/v1/retail-sales/{sale_id}/void/" not in paths
+    assert "/api/v1/retail-sales/{sale_id}/return/" not in paths
     writes = (
         (paths["/api/v1/retail-sales/"]["post"], "201"),
         (paths["/api/v1/retail-sales/{sale_id}/"]["patch"], "200"),
@@ -1254,6 +1258,7 @@ def test_openapi_documents_retail_commands() -> None:
         (paths["/api/v1/retail-sales/{sale_id}/approve/"]["post"], "200"),
         (paths["/api/v1/retail-sales/{sale_id}/reject/"]["post"], "200"),
         (paths["/api/v1/retail-sales/{sale_id}/cancel/"]["post"], "200"),
+        (paths["/api/v1/retail-sales/{sale_id}/void/"]["post"], "200"),
     )
     for operation, success in writes:
         header = next(
@@ -1270,3 +1275,4 @@ def test_openapi_documents_retail_commands() -> None:
     }
     generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
     assert '"/api/v1/retail-sales/{sale_id}/approve/"' in generated
+    assert '"/api/v1/retail-sales/{sale_id}/void/"' in generated

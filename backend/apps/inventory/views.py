@@ -1,4 +1,4 @@
-"""Published catalog and manual stock routes. Retail stays unpublished."""
+"""Published catalog and manual stock routes."""
 
 from __future__ import annotations
 

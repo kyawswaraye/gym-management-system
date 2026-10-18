@@ -1,5 +1,5 @@
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from django.db.migrations.loader import MigrationLoader
 
@@ -9,30 +9,48 @@ from apps.salaries.serializers import (
     SalaryPeriodListQuerySerializer,
     SalaryPeriodUpdateSerializer,
     SalaryPeriodWriteSerializer,
+    VoidSalarySerializer,
 )
 
 EXPENSE_POSTING_COMMIT = ("expenses", "0003_expense_posting_commit_current_row")
 SALARY_INITIAL = ("salaries", "0001_salary_period_and_line")
-SALARY_LEAF = ("salaries", "0002_rls_integrity_and_grants")
+SALARY_RLS = ("salaries", "0002_rls_integrity_and_grants")
+SALARY_LEAF = ("salaries", "0003_salary_period_void")
+EXPENSE_LEAF = ("expenses", "0005_salary_void_set")
 SALARY_APP_PLAN = (
     ("expenses", "0001_expense_receipt_and_expense"),
     ("expenses", "0002_rls_integrity_and_grants"),
     EXPENSE_POSTING_COMMIT,
     SALARY_INITIAL,
-    SALARY_LEAF,
+    SALARY_RLS,
 )
 
 
 def test_salary_leaf_requires_expense_posting_commit_migration() -> None:
     loader = MigrationLoader(None, ignore_no_migrations=True)
-    first_plan = loader.graph.forwards_plan(SALARY_LEAF)
-    second_plan = loader.graph.forwards_plan(SALARY_LEAF)
+    first_plan = loader.graph.forwards_plan(SALARY_RLS)
+    second_plan = loader.graph.forwards_plan(SALARY_RLS)
     assert first_plan == second_plan
     salary_dependencies = [node for node in first_plan if node[0] in {"expenses", "salaries"}]
     assert tuple(salary_dependencies) == SALARY_APP_PLAN
     assert EXPENSE_POSTING_COMMIT in loader.disk_migrations[SALARY_INITIAL].dependencies
     assert loader.graph.leaf_nodes("salaries") == [SALARY_LEAF]
-    assert loader.graph.leaf_nodes("expenses") == [("expenses", "0004_correction_runtime_reversal")]
+    assert loader.graph.leaf_nodes("expenses") == [EXPENSE_LEAF]
+    assert SALARY_RLS in loader.disk_migrations[SALARY_LEAF].dependencies
+    assert ("expenses", "0004_correction_runtime_reversal") in loader.disk_migrations[
+        SALARY_LEAF
+    ].dependencies
+    assert SALARY_LEAF in loader.disk_migrations[EXPENSE_LEAF].dependencies
+    assert ("expenses", "0004_correction_runtime_reversal") in loader.disk_migrations[
+        EXPENSE_LEAF
+    ].dependencies
+    void_plan = loader.graph.forwards_plan(SALARY_LEAF)
+    assert void_plan.index(("expenses", "0004_correction_runtime_reversal")) < void_plan.index(
+        SALARY_LEAF
+    )
+    assert EXPENSE_LEAF not in void_plan
+    expense_plan = loader.graph.forwards_plan(EXPENSE_LEAF)
+    assert expense_plan.index(SALARY_LEAF) < expense_plan.index(EXPENSE_LEAF)
     assert SALARY_INITIAL in loader.graph.node_map[EXPENSE_POSTING_COMMIT].children
     loader.graph.ensure_not_cyclic()
 
@@ -152,3 +170,46 @@ def test_salary_lines_reject_duplicate_staff_and_approval_maps_once() -> None:
     assert not query.is_valid()
     bounded = SalaryPeriodListQuerySerializer(data={"status": "DRAFT", "limit": 25})
     assert bounded.is_valid(), bounded.errors
+
+
+def test_salary_void_request_sorts_mappings_and_rejects_extras() -> None:
+    first = UUID("00000000-0000-0000-0000-000000000001")
+    second = UUID("00000000-0000-0000-0000-000000000002")
+    blank = VoidSalarySerializer(data={"reason": "   ", "cash_sessions": []})
+    assert not blank.is_valid()
+    assert "reason" in blank.errors
+    duplicate = VoidSalarySerializer(
+        data={
+            "reason": "Duplicate till",
+            "cash_sessions": [
+                {"line_id": str(first), "cash_session_id": str(uuid4())},
+                {"line_id": str(first), "cash_session_id": str(uuid4())},
+            ],
+        }
+    )
+    assert not duplicate.is_valid()
+    assert "cash_sessions" in duplicate.errors
+    extra = VoidSalarySerializer(
+        data={
+            "reason": "Wrong field",
+            "status": "VOID",
+            "gym_id": str(uuid4()),
+            "cash_sessions": [],
+        }
+    )
+    assert not extra.is_valid()
+    ordered = VoidSalarySerializer(
+        data={
+            "reason": "  Payroll correction  ",
+            "cash_sessions": [
+                {"line_id": str(second), "cash_session_id": str(uuid4())},
+                {"line_id": str(first), "cash_session_id": str(uuid4())},
+            ],
+        }
+    )
+    assert ordered.is_valid(), ordered.errors
+    assert ordered.validated_data["reason"] == "Payroll correction"
+    assert [row["line_id"] for row in ordered.validated_data["cash_sessions"]] == [
+        first,
+        second,
+    ]

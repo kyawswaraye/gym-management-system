@@ -1660,6 +1660,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/retail-sales/{sale_id}/void/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["retail_sales_void"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/roles/": {
     parameters: {
       query?: never;
@@ -1830,6 +1846,22 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["salary_periods_submit"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/salary-periods/{period_id}/void/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["salary_periods_void"];
     delete?: never;
     options?: never;
     head?: never;
@@ -4131,6 +4163,9 @@ export interface components {
       voided_at: string | null;
       /** Format: uuid */
       voided_by_membership_id: string | null;
+      /** Format: date */
+      void_business_date: string | null;
+      void_reason: string;
       /** Format: uuid */
       created_by_membership_id: string;
       /** Format: uuid */
@@ -4190,6 +4225,20 @@ export interface components {
       has_more: boolean;
       next_after: string | null;
     };
+    RetailSaleVoid: {
+      retail_sale: components["schemas"]["RetailSale"];
+      original_payment: components["schemas"]["Payment"];
+      reversal_payment: components["schemas"]["Payment"];
+      original_receipt: components["schemas"]["Receipt"] | null;
+      reversal_receipt: components["schemas"]["Receipt"];
+      cash_transaction: components["schemas"]["CashTransaction"] | null;
+      stock_movements: components["schemas"]["RetailVoidStockMovement"][];
+    };
+    RetailSaleVoidEnvelope: {
+      success: boolean;
+      data: components["schemas"]["RetailSaleVoid"];
+      message: string;
+    };
     RetailSaleWriteRequest: {
       /** Format: uuid */
       member_id?: string | null;
@@ -4198,6 +4247,21 @@ export interface components {
       payment_method: components["schemas"]["PaymentMethodEnum"];
       reference_number?: string;
       lines: components["schemas"]["RetailSaleLineWriteRequest"][];
+    };
+    RetailVoidStockMovement: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      retail_sale_line_id: string;
+      /** Format: uuid */
+      product_id: string;
+      quantity: string;
+      movement_type: string;
+      unit_cost_snapshot: string;
+      /** Format: date */
+      business_date: string;
+      /** Format: uuid */
+      reverses_movement_id: string;
     };
     Role: {
       /** Format: uuid */
@@ -4259,6 +4323,14 @@ export interface components {
       /** Format: uuid */
       cash_session_id: string;
     };
+    SalaryLineReversal: {
+      /** Format: uuid */
+      line_id: string;
+      /** Format: uuid */
+      reversal_expense_id: string;
+      reversal_expense: components["schemas"]["Expense"];
+      cash_transaction: components["schemas"]["CashTransaction"] | null;
+    };
     SalaryLineWriteRequest: {
       /** Format: uuid */
       staff_profile_id: string;
@@ -4310,6 +4382,10 @@ export interface components {
       cancelled_by_membership_id: string | null;
       /** Format: date-time */
       voided_at: string | null;
+      /** Format: uuid */
+      voided_by_membership_id: string | null;
+      /** Format: date */
+      void_business_date: string | null;
       reason: string;
       /** Format: uuid */
       created_by_membership_id: string;
@@ -4340,6 +4416,15 @@ export interface components {
       /** Format: date */
       business_date: string;
       description: string;
+    };
+    SalaryVoid: {
+      salary_period: components["schemas"]["SalaryPeriod"];
+      reversals: components["schemas"]["SalaryLineReversal"][];
+    };
+    SalaryVoidEnvelope: {
+      success: boolean;
+      data: components["schemas"]["SalaryVoid"];
+      message: string;
     };
     /**
      * @description * `GYM` - GYM
@@ -4679,6 +4764,19 @@ export interface components {
     };
     VoidReceiptRequest: {
       reason: string;
+    };
+    VoidRetailSaleRequest: {
+      reason: string;
+      /** Format: date */
+      business_date?: string;
+      /** Format: uuid */
+      cash_session_id?: string | null;
+    };
+    VoidSalaryRequest: {
+      reason: string;
+      /** Format: date */
+      business_date?: string;
+      cash_sessions?: components["schemas"]["SalaryCashMappingRequest"][];
     };
   };
   responses: never;
@@ -12260,6 +12358,92 @@ export interface operations {
       };
     };
   };
+  retail_sales_void: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this retail command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        sale_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VoidRetailSaleRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["VoidRetailSaleRequest"];
+        "multipart/form-data": components["schemas"]["VoidRetailSaleRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RetailSaleVoidEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   roles_list: {
     parameters: {
       query?: {
@@ -13239,6 +13423,92 @@ export interface operations {
         };
       };
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  salary_periods_void: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this salary command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        period_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VoidSalaryRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["VoidSalaryRequest"];
+        "multipart/form-data": components["schemas"]["VoidSalaryRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SalaryVoidEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
         headers: {
           [name: string]: unknown;
         };

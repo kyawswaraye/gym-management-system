@@ -1,4 +1,4 @@
-"""Published salary period routes. Void stays unpublished."""
+"""Published salary period routes, including one full void."""
 
 from __future__ import annotations
 
@@ -39,6 +39,8 @@ from apps.salaries.serializers import (
     SalaryPeriodListQuerySerializer,
     SalaryPeriodUpdateSerializer,
     SalaryPeriodWriteSerializer,
+    SalaryVoidEnvelopeSerializer,
+    VoidSalarySerializer,
     period_payload,
 )
 from apps.salaries.services import (
@@ -50,6 +52,7 @@ from apps.salaries.services import (
     replace_lines,
     submit_period,
     update_period,
+    void_period,
 )
 from apps.users.permissions import RequiresEntitlement, RequiresPermission
 
@@ -439,6 +442,83 @@ class SalaryPeriodApproveView(SalaryCommandView):
             actor_membership_id=request.gym_membership.id,
             http_method="POST",
             route=command_route(period_id=period_id, action="approve"),
+            idempotency_key=key,
+            body=body,
+            mutate=mutate,
+            request=request,
+        )
+        return _stored_response(result)
+
+
+class SalaryPeriodVoidView(SalaryCommandView):
+    required_permission = "salaries.void"
+
+    @extend_schema(
+        operation_id="salary_periods_void",
+        parameters=[IDEMPOTENCY_HEADER],
+        request=VoidSalarySerializer,
+        responses={
+            200: SalaryVoidEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+            422: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, period_id: UUID) -> HttpResponse:
+        serializer = VoidSalarySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        key = require_idempotency_key(request.headers.get("Idempotency-Key"))
+        context = _audit_context(request)
+        mappings = list(serializer.validated_data.get("cash_sessions", []))
+        fields = {
+            "reason": serializer.validated_data["reason"],
+            "business_date": serializer.validated_data.get("business_date"),
+            "cash_sessions": mappings,
+        }
+        body = {"salary_period_id": str(period_id), **fields}
+
+        def mutate() -> IdempotentResponse:
+            period, reversals = void_period(
+                gym=request.gym,
+                actor=request.gym_membership,
+                period_id=period_id,
+                **fields,
+                **context,
+            )
+            rendered = {
+                "success": True,
+                "data": {
+                    "salary_period": period_payload(period),
+                    "reversals": [
+                        {
+                            "line_id": line.id,
+                            "reversal_expense_id": reversal.id,
+                            "reversal_expense": expense_payload(reversal),
+                            "cash_transaction": (
+                                None if movement is None else transaction_payload(movement)
+                            ),
+                        }
+                        for line, reversal, movement in reversals
+                    ],
+                },
+                "message": "Salary period voided",
+            }
+            return IdempotentResponse(
+                status=200,
+                body=JSONRenderer().render(rendered),
+                resource_type="SalaryPeriod",
+                resource_id=period.id,
+            )
+
+        result = run_idempotent(
+            gym_id=request.gym.id,
+            actor_membership_id=request.gym_membership.id,
+            http_method="POST",
+            route=command_route(period_id=period_id, action="void"),
             idempotency_key=key,
             body=body,
             mutate=mutate,

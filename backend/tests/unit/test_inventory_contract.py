@@ -22,7 +22,7 @@ from apps.inventory.views import (
 )
 
 INVENTORY_INITIAL = ("inventory", "0001_product_catalog_and_stock")
-INVENTORY_LEAF = ("inventory", "0003_retail_sale_foundation")
+INVENTORY_LEAF = ("inventory", "0004_sale_return_runtime")
 
 
 def test_inventory_leaf_depends_on_the_finance_permission_catalog() -> None:

@@ -116,6 +116,7 @@ def phase_1a_endpoints(endpoints: list[Endpoint]) -> list[Endpoint]:
             "/api/v1/salary-periods/{period_id}/approve/",
             "/api/v1/salary-periods/{period_id}/reject/",
             "/api/v1/salary-periods/{period_id}/cancel/",
+            "/api/v1/salary-periods/{period_id}/void/",
             "/api/v1/product-categories/",
             "/api/v1/products/",
             "/api/v1/products/{product_id}/",
@@ -128,6 +129,7 @@ def phase_1a_endpoints(endpoints: list[Endpoint]) -> list[Endpoint]:
             "/api/v1/retail-sales/{sale_id}/approve/",
             "/api/v1/retail-sales/{sale_id}/reject/",
             "/api/v1/retail-sales/{sale_id}/cancel/",
+            "/api/v1/retail-sales/{sale_id}/void/",
         }
     ]
 

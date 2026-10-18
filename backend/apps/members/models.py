@@ -467,6 +467,7 @@ class Payment(TenantModel):
             ),
             models.UniqueConstraint(
                 fields=["gym", "retail_sale"],
+                condition=models.Q(entry_type="CHARGE"),
                 name="payment_one_retail_sale_uniq",
             ),
         ]
