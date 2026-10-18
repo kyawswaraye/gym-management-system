@@ -790,3 +790,45 @@ def test_verification_covers_scan_decode_and_crash_recovery() -> None:
     assert blocked.objects["gym/object"].body == original
     assert ObjectMissing.__name__
     assert ObjectStoreUnavailable.__name__
+
+
+def _aws_store(**overrides: object) -> MinioObjectStore:
+    values = dict(
+        endpoint_url="https://s3.ap-southeast-1.amazonaws.com",
+        public_url="https://s3.ap-southeast-1.amazonaws.com",
+        bucket="gym-prod",
+        region="ap-southeast-1",
+        access_key="AKIAEXAMPLE",
+        secret_key="aws-secret-value",
+        timeout_seconds=5,
+        addressing_style="virtual",
+        session_token="",
+    )
+    values.update(overrides)
+    return MinioObjectStore(**values)  # type: ignore[arg-type]
+
+
+def test_virtual_hosted_presign_uses_bucket_host_and_optional_session_token() -> None:
+    store = _aws_store(session_token="session-token-value")
+    posted = store.presign_post(object_key="gym/object", content_type="image/png", moment=MOMENT)
+    fetched = store.presign_get(
+        object_key="gym/object",
+        content_type="image/webp",
+        filename="profile-photo.webp",
+        moment=MOMENT,
+    )
+    policy = json.loads(base64.b64decode(posted.fields["policy"]))
+    assert posted.url == "https://gym-prod.s3.ap-southeast-1.amazonaws.com"
+    assert posted.fields["x-amz-security-token"] == "session-token-value"
+    assert ["eq", "$x-amz-security-token", "session-token-value"] in policy["conditions"]
+    assert fetched.url.startswith("https://gym-prod.s3.ap-southeast-1.amazonaws.com/gym/object?")
+    assert "X-Amz-Security-Token=session-token-value" in fetched.url
+    assert "/gym-prod/gym/object" not in fetched.url
+    assert "aws-secret-value" not in fetched.url
+    assert "aws-secret-value" not in json.dumps(posted.fields)
+
+
+def test_path_style_minio_behavior_is_unchanged_without_a_session_token() -> None:
+    signed = _store().presign_post(object_key="gym/object", content_type="image/png", moment=MOMENT)
+    assert signed.url == "https://files.example.com/gym-private"
+    assert "x-amz-security-token" not in signed.fields

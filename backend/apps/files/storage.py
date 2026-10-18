@@ -32,6 +32,7 @@ from apps.files.signing import (
     canonical_request,
     hex_signature,
     host_header,
+    quote_object_key,
     signing_key,
     string_to_sign,
 )
@@ -83,6 +84,8 @@ class MinioObjectStore:
         access_key: str,
         secret_key: str,
         timeout_seconds: float,
+        addressing_style: str = "path",
+        session_token: str = "",
     ) -> None:
         self.endpoint_url = endpoint_url.rstrip("/")
         self.public_url = public_url.rstrip("/")
@@ -91,6 +94,8 @@ class MinioObjectStore:
         self.access_key = access_key
         self.secret_key = secret_key
         self.timeout_seconds = timeout_seconds
+        self.addressing_style = addressing_style if addressing_style == "virtual" else "path"
+        self.session_token = session_token
 
     @classmethod
     def from_settings(cls) -> MinioObjectStore:
@@ -102,6 +107,8 @@ class MinioObjectStore:
             access_key=str(settings.MINIO_ACCESS_KEY),
             secret_key=str(settings.MINIO_SECRET_KEY),
             timeout_seconds=float(settings.MINIO_TIMEOUT_SECONDS),
+            addressing_style=str(getattr(settings, "MINIO_ADDRESSING_STYLE", "path")),
+            session_token=str(getattr(settings, "MINIO_SESSION_TOKEN", "") or ""),
         )
 
     def presign_post(
@@ -116,21 +123,33 @@ class MinioObjectStore:
         amz_date, date_stamp = amz_timestamp(moment)
         credential = self._credential(date_stamp)
         # S3 and MinIO require an exact condition for every submitted form field
-        # except file, policy, and x-amz-signature. Static credentials omit
-        # x-amz-security-token, so that field is neither returned nor conditioned.
-        # The bucket condition stays even though the bucket is in the URL.
+        # except file, policy, and x-amz-signature. Session credentials add
+        # x-amz-security-token. The bucket condition stays even though the
+        # bucket may already be in a virtual-hosted URL.
+        conditions: list[object] = [
+            {"bucket": self.bucket},
+            ["eq", "$key", object_key],
+            ["eq", "$Content-Type", content_type],
+            ["content-length-range", 1, MAX_UPLOAD_BYTES],
+            ["eq", "$success_action_status", "204"],
+            ["eq", "$x-amz-algorithm", "AWS4-HMAC-SHA256"],
+            ["eq", "$x-amz-credential", credential],
+            ["eq", "$x-amz-date", amz_date],
+        ]
+        fields = {
+            "key": object_key,
+            "Content-Type": content_type,
+            "x-amz-algorithm": "AWS4-HMAC-SHA256",
+            "x-amz-credential": credential,
+            "x-amz-date": amz_date,
+            "success_action_status": "204",
+        }
+        if self.session_token:
+            conditions.append(["eq", "$x-amz-security-token", self.session_token])
+            fields["x-amz-security-token"] = self.session_token
         policy = {
             "expiration": expires_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "conditions": [
-                {"bucket": self.bucket},
-                ["eq", "$key", object_key],
-                ["eq", "$Content-Type", content_type],
-                ["content-length-range", 1, MAX_UPLOAD_BYTES],
-                ["eq", "$success_action_status", "204"],
-                ["eq", "$x-amz-algorithm", "AWS4-HMAC-SHA256"],
-                ["eq", "$x-amz-credential", credential],
-                ["eq", "$x-amz-date", amz_date],
-            ],
+            "conditions": conditions,
         }
         encoded = base64.b64encode(
             json.dumps(policy, separators=(",", ":")).encode("utf-8")
@@ -139,19 +158,12 @@ class MinioObjectStore:
             key=signing_key(secret=self.secret_key, date_stamp=date_stamp, region=self.region),
             message=encoded,
         )
+        fields["policy"] = encoded
+        fields["x-amz-signature"] = signature
         return PresignedPost(
-            url=f"{self.public_url}/{self.bucket}",
+            url=self._public_object_url(""),
             expires_at=expires_at,
-            fields={
-                "key": object_key,
-                "Content-Type": content_type,
-                "policy": encoded,
-                "x-amz-algorithm": "AWS4-HMAC-SHA256",
-                "x-amz-credential": credential,
-                "x-amz-date": amz_date,
-                "x-amz-signature": signature,
-                "success_action_status": "204",
-            },
+            fields=fields,
         )
 
     def presign_get(
@@ -179,9 +191,11 @@ class MinioObjectStore:
             "response-content-disposition": f'inline; filename="{filename}"',
             "response-content-type": content_type,
         }
-        path = canonical_object_path(self.bucket, object_key)
+        if self.session_token:
+            parameters["X-Amz-Security-Token"] = self.session_token
+        path = self._object_path(object_key)
         query = canonical_query(parameters)
-        host = host_header(self.public_url)
+        host = self._request_host(self.public_url)
         request = canonical_request(
             method="GET",
             path=path,
@@ -195,7 +209,7 @@ class MinioObjectStore:
             message=string_to_sign(amz_date=amz_date, credential_scope=scope, request=request),
         )
         return PresignedGet(
-            url=f"{self.public_url}{path}?{query}&X-Amz-Signature={signature}",
+            url=f"{self._public_origin()}{path}?{query}&X-Amz-Signature={signature}",
             expires_at=expires_at,
         )
 
@@ -255,8 +269,8 @@ class MinioObjectStore:
     ) -> tuple[int, dict[str, str], bytes]:
         self._require_config(public=False)
         parts = urlsplit(self.endpoint_url)
-        path = canonical_object_path(self.bucket, object_key)
-        host = host_header(self.endpoint_url)
+        path = self._object_path(object_key)
+        host = self._request_host(self.endpoint_url)
         amz_date, date_stamp = amz_timestamp(_clock())
         content_hash = payload_hash if payload_hash is not None else _EMPTY_PAYLOAD
         headers = {
@@ -264,6 +278,8 @@ class MinioObjectStore:
             "x-amz-content-sha256": content_hash,
             "x-amz-date": amz_date,
         }
+        if self.session_token:
+            headers["x-amz-security-token"] = self.session_token
         if extra_headers:
             headers.update(extra_headers)
         signed = ";".join(sorted(headers))
@@ -287,7 +303,8 @@ class MinioObjectStore:
         )
         connection_type = HTTPSConnection if parts.scheme == "https" else HTTPConnection
         port = parts.port or (443 if parts.scheme == "https" else 80)
-        connection = connection_type(parts.hostname or "", port, timeout=self.timeout_seconds)
+        connect_host = urlsplit(f"{parts.scheme}://{host}").hostname or parts.hostname or ""
+        connection = connection_type(connect_host, port, timeout=self.timeout_seconds)
         try:
             connection.request(
                 method, path, body=body if method != "HEAD" else None, headers=headers
@@ -317,6 +334,35 @@ class MinioObjectStore:
 
     def _scope(self, date_stamp: str) -> str:
         return f"{date_stamp}/{self.region}/s3/aws4_request"
+
+    def _uses_virtual_host(self) -> bool:
+        return self.addressing_style == "virtual"
+
+    def _object_path(self, object_key: str) -> str:
+        if self._uses_virtual_host():
+            return "/" + quote_object_key(object_key)
+        return canonical_object_path(self.bucket, object_key)
+
+    def _request_host(self, url: str) -> str:
+        host = host_header(url)
+        if self._uses_virtual_host() and self.bucket and not host.startswith(f"{self.bucket}."):
+            return f"{self.bucket}.{host}"
+        return host
+
+    def _public_origin(self) -> str:
+        if not self._uses_virtual_host():
+            return self.public_url
+        parts = urlsplit(self.public_url)
+        host = self._request_host(self.public_url)
+        return f"{parts.scheme}://{host}"
+
+    def _public_object_url(self, object_key: str) -> str:
+        if self._uses_virtual_host():
+            suffix = f"/{quote_object_key(object_key)}" if object_key else ""
+            return f"{self._public_origin()}{suffix}"
+        if object_key:
+            return f"{self.public_url}{canonical_object_path(self.bucket, object_key)}"
+        return f"{self.public_url}/{self.bucket}"
 
     def _require_config(self, *, public: bool) -> None:
         required = (self.bucket, self.region, self.access_key, self.secret_key)

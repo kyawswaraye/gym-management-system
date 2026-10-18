@@ -44,9 +44,12 @@ def host_header(url: str) -> str:
     return f"{host}:{port}"
 
 
+def quote_object_key(object_key: str) -> str:
+    return "/".join(quote(segment, safe="-_.~") for segment in object_key.split("/"))
+
+
 def canonical_object_path(bucket: str, object_key: str) -> str:
-    segments = [bucket, *object_key.split("/")]
-    return "/" + "/".join(quote(segment, safe="-_.~") for segment in segments)
+    return "/" + "/".join((quote(bucket, safe="-_.~"), quote_object_key(object_key)))
 
 
 def canonical_query(parameters: Mapping[str, str]) -> str:

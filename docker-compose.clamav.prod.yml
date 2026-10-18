@@ -1,0 +1,27 @@
+# Production ClamAV fragment. Merge this with the VPS Compose file.
+# The daemon publishes no host port. Django reaches it only on the private
+# application network. This file is not live-host proof.
+services:
+  clamav:
+    image: clamav/clamav:1.4
+    networks:
+      - app_private
+    expose:
+      - "3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    restart: unless-stopped
+    # No ports: mapping. The scanner stays off the public interface.
+
+networks:
+  app_private:
+    external: true
+
+volumes:
+  clamav_data:
