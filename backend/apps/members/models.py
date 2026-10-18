@@ -445,6 +445,13 @@ class Payment(TenantModel):
         blank=True,
         related_name="source_payment",
     )
+    retail_sale = models.ForeignKey(
+        "sales.RetailSale",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="source_payments",
+    )
     legacy_unlinked_cash = models.BooleanField(default=False)
     created_with_reception_scope = models.BooleanField(default=False)
     submitted_with_reception_scope = models.BooleanField(default=False)
@@ -457,6 +464,10 @@ class Payment(TenantModel):
             models.UniqueConstraint(fields=["gym", "id"], name="payment_gym_id_uniq"),
             models.CheckConstraint(
                 condition=models.Q(amount__gt=0), name="payment_amount_positive_ck"
+            ),
+            models.UniqueConstraint(
+                fields=["gym", "retail_sale"],
+                name="payment_one_retail_sale_uniq",
             ),
         ]
         indexes = [
@@ -475,6 +486,7 @@ class Payment(TenantModel):
                 fields=["gym", "method", "business_date"], name="payment_gym_method_date_idx"
             ),
             models.Index(fields=["gym", "original_payment"], name="payment_gym_original_idx"),
+            models.Index(fields=["gym", "retail_sale"], name="payment_gym_retail_sale_idx"),
         ]
 
 

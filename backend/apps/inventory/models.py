@@ -7,9 +7,9 @@ instead of rounding it. ``current_unit_cost`` is product master data. A
 movement copies that value into ``unit_cost_snapshot`` and does not
 recalculate a weighted average.
 
-``SALE`` and ``SALE_RETURN`` are named in the type catalog. Increment 6 does
-not create a retail-sale line, so the database rejects those types and any
-reversal link until that table exists.
+``SALE`` is appended only by retail approval, with a negative quantity and
+``retail_sale_line``. ``SALE_RETURN`` and reversal links stay rejected until
+retail returns exist. Manual adjustment cannot write either type.
 """
 
 from __future__ import annotations
@@ -198,6 +198,13 @@ class StockMovement(TenantModel):
         blank=True,
         related_name="reversed_by",
     )
+    retail_sale_line = models.ForeignKey(
+        "sales.RetailSaleLine",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="stock_movements",
+    )
     created_by_membership_id = models.UUIDField()
 
     class Meta:
@@ -227,7 +234,7 @@ class StockMovement(TenantModel):
                         models.Q(movement_type__in=["ADJUSTMENT", "CORRECTION"])
                         & ~models.Q(quantity=0)
                     )
-                    | models.Q(movement_type__in=["SALE", "SALE_RETURN"])
+                    | models.Q(movement_type="SALE", quantity__lt=0)
                 ),
                 name="stock_quantity_sign_ck",
             ),
@@ -246,18 +253,32 @@ class StockMovement(TenantModel):
                 name="stock_reason_ck",
             ),
             models.CheckConstraint(
-                condition=models.Q(
-                    movement_type__in=[
-                        "OPENING",
-                        "PURCHASE",
-                        "DAMAGE",
-                        "LOSS",
-                        "ADJUSTMENT",
-                        "CORRECTION",
-                    ],
-                    reverses_movement__isnull=True,
+                condition=(
+                    models.Q(
+                        movement_type__in=[
+                            "OPENING",
+                            "PURCHASE",
+                            "DAMAGE",
+                            "LOSS",
+                            "ADJUSTMENT",
+                            "CORRECTION",
+                        ],
+                        reverses_movement__isnull=True,
+                        retail_sale_line__isnull=True,
+                    )
+                    | models.Q(
+                        movement_type="SALE",
+                        quantity__lt=0,
+                        reverses_movement__isnull=True,
+                        retail_sale_line__isnull=False,
+                    )
                 ),
                 name="stock_evidence_ck",
+            ),
+            models.UniqueConstraint(
+                fields=["gym", "retail_sale_line"],
+                condition=models.Q(movement_type="SALE"),
+                name="stock_one_sale_line_uniq",
             ),
         ]
         indexes = [
@@ -270,5 +291,9 @@ class StockMovement(TenantModel):
             models.Index(
                 fields=["gym", "business_date", "-created_at", "-id"],
                 name="stock_gym_date_idx",
+            ),
+            models.Index(
+                fields=["gym", "retail_sale_line"],
+                name="stock_gym_sale_line_idx",
             ),
         ]

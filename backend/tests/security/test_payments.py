@@ -437,7 +437,7 @@ def test_daily_sales_uses_posted_rows_and_a_constant_query() -> None:
     assert data["net_total"] == "100.00"
     assert data["new_member_total"] == "100.00"
     assert data["pt_total"] == "0.00"
-    assert data["product_quantity"] == "0.00"
+    assert data["product_quantity"] == "0.000"
     assert data["product_cogs"] == "0.00"
     assert data["product_gross_profit"] == "0.00"
 

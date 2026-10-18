@@ -164,8 +164,12 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   remains unpublished.
   Increment 6 publishes product-category list/create, product
   list/create/detail/update, low-stock, stock-movement list, and manual
-  adjustment. Category update, retail, and void/refund routes remain
-  unpublished. Catalog and stock commands use the finance entitlement.
+  adjustment. Category update and void/refund routes remain unpublished.
+  Catalog and stock commands use the finance entitlement.
+  Increment 7 publishes retail-sale list/create/detail/update and
+  submit/approve/reject/cancel. Retail void, returns, and the retail UI
+  remain unpublished. Approval posts stock, a product payment, a receipt,
+  and a cash movement in one transaction.
 - Platform gym provisioning, lifecycle, owner invitation, platform audit reads,
   tenant audit reads, staff invitation/acceptance, staff profiles, staff
   activate/suspend, and tenant role/permission management are in place.
@@ -208,11 +212,12 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   member QR redemption, and display-device enrollment, rotation, revocation,
   and device challenge issuance, Increment 3 payment, receipt, and daily-sales
   routes, Increment 4 expense-category and expense approval routes, Increment 5
-  salary-period routes, and Increment 6 product-category, product, low-stock,
-  and stock-movement routes. It leaves
+  salary-period routes, Increment 6 product-category, product, low-stock,
+  and stock-movement routes, and Increment 7 retail-sale routes. It leaves
   the generic staff scan
   path, trainer scan, notification, member profile, payment void, refund, receipt
-  void, expense void, salary void, category update, and retail routes unpublished.
+  void, expense void, salary void, category update, and retail void/return
+  routes unpublished.
   `profile_photo_asset_id` remains a nullable identifier with no foreign key to
   `FileAsset`. The staff API does not accept or return it. Attaching it later
   requires a same-gym asset whose scan status is CLEAN.

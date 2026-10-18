@@ -22,7 +22,7 @@ from apps.inventory.views import (
 )
 
 INVENTORY_INITIAL = ("inventory", "0001_product_catalog_and_stock")
-INVENTORY_LEAF = ("inventory", "0002_rls_integrity_and_grants")
+INVENTORY_LEAF = ("inventory", "0003_retail_sale_foundation")
 
 
 def test_inventory_leaf_depends_on_the_finance_permission_catalog() -> None:
@@ -32,7 +32,13 @@ def test_inventory_leaf_depends_on_the_finance_permission_catalog() -> None:
     assert ("tenants", "0025_finance_permission_catalog") in loader.disk_migrations[
         INVENTORY_INITIAL
     ].dependencies
-    assert INVENTORY_INITIAL in loader.disk_migrations[INVENTORY_LEAF].dependencies
+    assert ("inventory", "0002_rls_integrity_and_grants") in loader.graph.forwards_plan(
+        INVENTORY_LEAF
+    )
+    assert (
+        INVENTORY_INITIAL
+        in loader.disk_migrations[("inventory", "0002_rls_integrity_and_grants")].dependencies
+    )
     assert loader.graph.leaf_nodes("inventory") == [INVENTORY_LEAF]
     loader.graph.ensure_not_cyclic()
 

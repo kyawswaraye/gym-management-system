@@ -22,7 +22,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from django.db import IntegrityError
+from django.db import IntegrityError, connection
 from django.db.models import Sum
 from django.http import Http404
 from django.utils import timezone
@@ -35,6 +35,7 @@ from apps.inventory.models import Product, ProductCategory, StockMovement
 from apps.inventory.normalization import canonical_category_name, canonical_display_name
 from apps.inventory.quantities import parse_quantity
 from apps.inventory.selectors import get_product
+from apps.sales.models import RetailSaleLine
 from apps.tenants.models import Gym, GymMembership
 
 _POSITIVE = frozenset({StockMovement.Type.OPENING, StockMovement.Type.PURCHASE})
@@ -280,6 +281,51 @@ def adjust_stock(
         user_agent=user_agent,
     )
     return movement, get_product(gym_id=gym.id, product_id=product.id)
+
+
+def post_sale_movement(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    product: Product,
+    line: RetailSaleLine,
+    business_date: Any,
+) -> StockMovement:
+    """Append one negative ``SALE`` movement for a locked retail line.
+
+    The public adjustment command still rejects ``SALE``, ``SALE_RETURN``, and
+    reversal links. The caller must already be inside a transaction and should
+    lock products in id order before calling this helper.
+    """
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("A sale movement requires an active transaction.")
+    if line.gym_id != gym.id or product.gym_id != gym.id or line.product_id != product.id:
+        raise ValidationError({"lines": ["Select a product of this gym."]})
+    quantity = -parse_quantity(line.quantity)
+    if quantity >= 0:
+        raise ValidationError({"quantity": ["A sale movement must reduce stock."]})
+    locked = Product.objects.select_for_update().filter(gym_id=gym.id, id=product.id).first()
+    if locked is None:
+        raise Http404
+    on_hand = _on_hand(gym_id=gym.id, product_id=locked.id)
+    if on_hand + quantity < 0:
+        raise ValidationError({"quantity": ["Available stock is not enough for this sale."]})
+    snapshot = parse_money(locked.current_unit_cost)
+    if snapshot != parse_money(line.unit_cost_snapshot):
+        raise ValidationError({"lines": ["The product price or cost changed since submission."]})
+    return StockMovement.objects.create(
+        gym=gym,
+        product=locked,
+        quantity=quantity,
+        movement_type=StockMovement.Type.SALE,
+        unit_cost_snapshot=snapshot,
+        reason="",
+        business_date=business_date,
+        reverses_movement=None,
+        retail_sale_line=line,
+        created_by_membership_id=actor.id,
+    )
 
 
 def _category(*, gym_id: UUID, category_id: UUID) -> ProductCategory:

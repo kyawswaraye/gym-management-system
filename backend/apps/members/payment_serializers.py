@@ -166,6 +166,7 @@ class PaymentSerializer(serializers.Serializer):
     voided_by_membership_id = serializers.UUIDField(allow_null=True)
     cash_session_id = serializers.UUIDField(allow_null=True)
     cash_transaction_id = serializers.UUIDField(allow_null=True)
+    retail_sale_id = serializers.UUIDField(allow_null=True)
     created_by_membership_id = serializers.UUIDField()
     updated_by_membership_id = serializers.UUIDField()
     created_at = serializers.DateTimeField()

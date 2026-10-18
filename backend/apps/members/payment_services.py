@@ -13,7 +13,7 @@ session setting is not an authorization boundary.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -626,6 +626,140 @@ def _audit(
         ip_address=ip_address,
         user_agent=user_agent,
     )
+
+
+def post_retail_product_payment(
+    *,
+    gym: Gym,
+    approver: GymMembership,
+    retail_sale_id: UUID,
+    member: Member | None,
+    created_by_membership_id: UUID,
+    submitted_by_membership_id: UUID | None,
+    amount: Decimal,
+    currency: str,
+    method: str,
+    business_date: Any,
+    reference_number: str,
+    cash_session_id: UUID | None,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> tuple[Payment, Receipt, CashTransaction | None]:
+    """Post one product charge for a retail sale inside the caller's transaction.
+
+    Public payment drafts still reject ``PRODUCT``. This path inserts a draft,
+    submits it, and posts it so the payment guards, receipt allocation, and
+    cash rules stay in force. The retail approval service is the only caller.
+    """
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Retail payment posting requires an active transaction.")
+    if currency != gym.currency:
+        raise ValidationError({"currency": ["Currency must match the selected gym."]})
+    if submitted_by_membership_id is None:
+        raise ValidationError({"status": ["Only a submitted retail sale can be posted."]})
+    if approver.id in {created_by_membership_id, submitted_by_membership_id}:
+        raise PermissionDenied()
+    if method != Payment.Method.CASH and cash_session_id is not None:
+        raise ValidationError({"cash_session_id": ["Only a cash sale can use a cash session."]})
+    if method == Payment.Method.CASH and cash_session_id is None:
+        raise ValidationError({"cash_session_id": ["A cash sale requires an open session."]})
+    received_at = _retail_received_at(gym=gym, business_date=business_date)
+    now = timezone.now()
+    payment = Payment.objects.create(
+        gym=gym,
+        member=member,
+        membership=None,
+        retail_sale_id=retail_sale_id,
+        entry_type=Payment.EntryType.CHARGE,
+        purpose=Payment.Purpose.PRODUCT,
+        description="Retail sale",
+        amount=amount,
+        currency=currency,
+        method=method,
+        business_date=business_date,
+        received_at=received_at,
+        reference_number=reference_number,
+        status=Payment.Status.DRAFT,
+        legacy_unlinked_cash=False,
+        created_with_reception_scope=_holds_reception(
+            gym_id=gym.id, membership_id=created_by_membership_id
+        ),
+        created_by_membership_id=created_by_membership_id,
+        updated_by_membership_id=approver.id,
+    )
+    payment.status = Payment.Status.PENDING_APPROVAL
+    payment.submitted_at = now
+    payment.submitted_by_membership_id = submitted_by_membership_id
+    payment.submitted_with_reception_scope = _holds_reception(
+        gym_id=gym.id, membership_id=submitted_by_membership_id
+    )
+    payment.updated_by_membership_id = approver.id
+    payment.save()
+    movement: CashTransaction | None = None
+    if method == Payment.Method.CASH:
+        assert cash_session_id is not None
+        movement = record_cash_movement(
+            gym=gym,
+            actor=approver,
+            session_id=cash_session_id,
+            direction=CashTransaction.Direction.IN,
+            source_type=CashTransaction.SourceType.PAYMENT,
+            source_id=payment.id,
+            amount=payment.amount,
+            currency=payment.currency,
+            business_date=payment.business_date,
+            description=payment.description,
+            reason="",
+            reversal_of_id=None,
+        )
+        _assert_reception_till(payment=payment, session=movement.cash_session)
+    number, sequence_value, sequence_year = _allocate_receipt_number(
+        gym=gym, payment=payment, actor=approver
+    )
+    posted_at = timezone.now()
+    payment.status = Payment.Status.POSTED
+    payment.approved_at = posted_at
+    payment.approved_by_membership_id = approver.id
+    payment.posted_at = posted_at
+    payment.posted_by_membership_id = approver.id
+    payment.updated_by_membership_id = approver.id
+    payment.legacy_unlinked_cash = False
+    if movement is not None:
+        payment.cash_session = movement.cash_session
+        payment.cash_transaction = movement
+    payment.save()
+    receipt = _issue_receipt(
+        gym=gym,
+        actor=approver,
+        payment=payment,
+        number=number,
+        sequence_value=sequence_value,
+        sequence_year=sequence_year,
+        issued_at=posted_at,
+    )
+    _audit(
+        gym=gym,
+        actor=approver,
+        action="PAYMENT_APPROVED_POSTED",
+        payment=payment,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={"receipt_number": receipt.receipt_number, "retail_sale_id": str(retail_sale_id)},
+    )
+    return payment, receipt, movement
+
+
+def _retail_received_at(*, gym: Gym, business_date: Any) -> datetime:
+    zone = ZoneInfo(gym.timezone)
+    now = timezone.now()
+    if business_date > now.astimezone(zone).date():
+        raise ValidationError({"business_date": ["Business date cannot be in the future."]})
+    if business_date == now.astimezone(zone).date():
+        return now
+    return datetime.combine(business_date, time(12, 0), tzinfo=zone)
 
 
 def command_route(*, payment_id: UUID | None, action: str) -> str:

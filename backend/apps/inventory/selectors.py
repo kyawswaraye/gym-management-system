@@ -1,8 +1,8 @@
 """Tenant-scoped catalog and stock reads.
 
 Quantity on hand is the sum of same-gym movements. Sold quantity, revenue,
-cost of goods sold, and profit stay zero until retail lines exist; those
-placeholders are added by the serializer, not by this query.
+cost of goods sold, and gross profit are sums of posted, non-void retail
+lines. Draft, pending, rejected, cancelled, and void sales contribute nothing.
 """
 
 from __future__ import annotations
@@ -14,12 +14,13 @@ from typing import Any
 from uuid import UUID
 
 from django.core import signing
-from django.db.models import DecimalField, F, Q, QuerySet, Sum, Value
+from django.db.models import DecimalField, F, OuterRef, Q, QuerySet, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import Http404
 from rest_framework.exceptions import ValidationError
 
 from apps.inventory.models import Product, ProductCategory, StockMovement
+from apps.sales.models import RetailSaleLine
 
 _CATEGORY_SALT = "product-category-list"
 _PRODUCT_SALT = "product-list"
@@ -27,6 +28,9 @@ _LOW_STOCK_SALT = "product-low-stock"
 _MOVEMENT_SALT = "stock-movement-list"
 _CURSOR_MAX_AGE = 24 * 60 * 60
 _ZERO = Decimal("0.000")
+_ZERO_MONEY = Decimal("0.00")
+_QTY_FIELD: DecimalField[Decimal, Decimal] = DecimalField(max_digits=18, decimal_places=3)
+_MONEY_FIELD: DecimalField[Decimal, Decimal] = DecimalField(max_digits=18, decimal_places=2)
 
 
 def with_quantity_on_hand(queryset: QuerySet[Product], *, gym_id: UUID) -> QuerySet[Product]:
@@ -34,8 +38,39 @@ def with_quantity_on_hand(queryset: QuerySet[Product], *, gym_id: UUID) -> Query
         quantity_on_hand=Coalesce(
             Sum("stock_movements__quantity", filter=Q(stock_movements__gym_id=gym_id)),
             Value(_ZERO),
-            output_field=DecimalField(max_digits=18, decimal_places=3),
+            output_field=_QTY_FIELD,
+        ),
+        sold_quantity=_posted_sum("quantity", gym_id=gym_id, output=_QTY_FIELD, zero=_ZERO),
+        retail_revenue=_posted_sum(
+            "line_revenue", gym_id=gym_id, output=_MONEY_FIELD, zero=_ZERO_MONEY
+        ),
+        retail_cogs=_posted_sum(
+            "cost_of_goods_sold", gym_id=gym_id, output=_MONEY_FIELD, zero=_ZERO_MONEY
+        ),
+        retail_gross_profit=_posted_sum(
+            "gross_profit", gym_id=gym_id, output=_MONEY_FIELD, zero=_ZERO_MONEY
+        ),
+    )
+
+
+def _posted_sum(
+    field: str, *, gym_id: UUID, output: DecimalField[Decimal, Decimal], zero: Decimal
+) -> Coalesce:
+    posted = (
+        RetailSaleLine.objects.filter(
+            gym_id=gym_id,
+            product_id=OuterRef("pk"),
+            sale__gym_id=gym_id,
+            sale__status="POSTED",
         )
+        .values("product_id")
+        .annotate(total=Sum(field))
+        .values("total")
+    )
+    return Coalesce(
+        Subquery(posted, output_field=output),
+        Value(zero, output_field=output),
+        output_field=output,
     )
 
 

@@ -104,11 +104,17 @@ local `make check` contract step still reports those files because this
 increment is not committed.
 Phase 4 increment 6 publishes product-category list and create, product list,
 create, detail, and update, low-stock, stock-movement list, and manual stock
-adjustment. Category update, retail sales, returns, inventory UI, and every
-void/refund route stay unpublished. Quantity on hand is the sum of append-only
-movements. Adjustment snapshots current unit cost and does not compute a
-weighted average. Catalog and stock commands use the finance entitlement.
+adjustment. Category update, returns, inventory UI, and every void/refund
+route stay unpublished. Quantity on hand is the sum of append-only movements.
+Adjustment snapshots current unit cost and does not compute a weighted
+average. Catalog and stock commands use the finance entitlement.
 The inventory staff UI is deferred.
+Phase 4 increment 7 publishes retail-sale list, create, detail, update,
+submit, approve, reject, and cancel. Retail void, returns, and the retail UI
+stay unpublished. Approval posts one sale movement per line, one product
+payment, one receipt, and one cash-in movement when the method is cash.
+Quantity times money rounds half up to minor units. Daily product metrics
+come from posted retail lines. Phase 4 remains open.
 Increment 6 gate evidence: backend ruff, format, and mypy passed and
 migrations stayed in sync; 273 non-PostgreSQL backend tests passed; the
 PostgreSQL suite passed 234 tests; web format, lint, typecheck, and build
@@ -116,6 +122,14 @@ passed, with 263 web tests. OpenAPI and the generated web types include the
 product-category, product, low-stock, and stock-movement routes. A second
 schema export matched the working tree. The local `make check` contract step
 still reports those files because this increment is not committed.
+Increment 7 gate evidence: backend ruff, format, and mypy passed and
+migrations stayed in sync; 279 non-PostgreSQL backend tests passed; the
+PostgreSQL suite passed 239 tests; web format, lint, typecheck, and build
+passed, with 263 web tests. OpenAPI and the generated web types include the
+retail-sale routes and omit retail void. A second schema export matched the
+working tree. End-to-end browser tests were not run. The local `make check`
+contract step still reports the schema files because this increment is not
+committed. Phase 4 remains open.
 
 `is_pt_client` stays false until Phase 5 derives it from an active trainer
 assignment.

@@ -1500,6 +1500,102 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/retail-sales/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["retail_sales_list"];
+    put?: never;
+    post: operations["retail_sales_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/retail-sales/{sale_id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["retail_sales_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["retail_sales_update"];
+    trace?: never;
+  };
+  "/api/v1/retail-sales/{sale_id}/approve/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["retail_sales_approve"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/retail-sales/{sale_id}/cancel/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["retail_sales_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/retail-sales/{sale_id}/reject/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["retail_sales_reject"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/retail-sales/{sale_id}/submit/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["retail_sales_submit"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/roles/": {
     parameters: {
       query?: never;
@@ -2100,6 +2196,10 @@ export interface components {
       /** Format: uuid */
       cash_session_id?: string | null;
     };
+    ApproveRetailSaleRequest: {
+      /** Format: uuid */
+      cash_session_id?: string | null;
+    };
     ApproveSalaryRequest: {
       cash_sessions?: components["schemas"]["SalaryCashMappingRequest"][];
     };
@@ -2107,6 +2207,9 @@ export interface components {
       reason: string;
     };
     CancelPaymentRequest: {
+      reason: string;
+    };
+    CancelRetailSaleRequest: {
       reason: string;
     };
     CancelSalaryRequest: {
@@ -3475,6 +3578,15 @@ export interface components {
       low_stock_threshold?: string;
       is_active?: boolean;
     };
+    PatchedRetailSaleUpdateRequest: {
+      /** Format: uuid */
+      member_id?: string | null;
+      /** Format: date */
+      business_date?: string;
+      payment_method?: components["schemas"]["PaymentMethodEnum"];
+      reference_number?: string;
+      lines?: components["schemas"]["RetailSaleLineWriteRequest"][];
+    };
     PatchedRoleUpdateRequest: {
       key?: string;
       name?: string;
@@ -3555,6 +3667,8 @@ export interface components {
       cash_session_id: string | null;
       /** Format: uuid */
       cash_transaction_id: string | null;
+      /** Format: uuid */
+      retail_sale_id: string | null;
       /** Format: uuid */
       created_by_membership_id: string;
       /** Format: uuid */
@@ -3860,8 +3974,125 @@ export interface components {
     RejectPaymentRequest: {
       rejection_reason: string;
     };
+    RejectRetailSaleRequest: {
+      rejection_reason: string;
+    };
     RejectSalaryRequest: {
       rejection_reason: string;
+    };
+    RetailSale: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      member_id: string | null;
+      /** Format: date */
+      business_date: string;
+      currency: string;
+      payment_method: string;
+      reference_number: string;
+      status: string;
+      subtotal: string;
+      discount_total: string;
+      total_amount: string;
+      cogs_total: string;
+      gross_profit_total: string;
+      /** Format: uuid */
+      payment_id: string | null;
+      /** Format: uuid */
+      receipt_id: string | null;
+      rejection_reason: string;
+      reason: string;
+      /** Format: date-time */
+      submitted_at: string | null;
+      /** Format: uuid */
+      submitted_by_membership_id: string | null;
+      /** Format: date-time */
+      approved_at: string | null;
+      /** Format: uuid */
+      approved_by_membership_id: string | null;
+      /** Format: date-time */
+      rejected_at: string | null;
+      /** Format: uuid */
+      rejected_by_membership_id: string | null;
+      /** Format: date-time */
+      posted_at: string | null;
+      /** Format: uuid */
+      posted_by_membership_id: string | null;
+      /** Format: date-time */
+      cancelled_at: string | null;
+      /** Format: uuid */
+      cancelled_by_membership_id: string | null;
+      /** Format: date-time */
+      voided_at: string | null;
+      /** Format: uuid */
+      voided_by_membership_id: string | null;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: uuid */
+      updated_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+      lines: components["schemas"]["RetailSaleLine"][];
+    };
+    RetailSaleApproval: {
+      retail_sale: components["schemas"]["RetailSale"];
+      payment: components["schemas"]["Payment"];
+      receipt: components["schemas"]["Receipt"];
+      cash_transaction: components["schemas"]["CashTransaction"] | null;
+    };
+    RetailSaleApprovalEnvelope: {
+      success: boolean;
+      data: components["schemas"]["RetailSaleApproval"];
+      message: string;
+    };
+    RetailSaleEnvelope: {
+      success: boolean;
+      data: components["schemas"]["RetailSale"];
+      message: string;
+    };
+    RetailSaleLine: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      product_id: string;
+      quantity: string;
+      discount: string;
+      sku: string;
+      product_name: string;
+      unit_price: string;
+      unit_cost: string;
+      line_revenue: string;
+      cost_of_goods_sold: string;
+      gross_profit: string;
+    };
+    RetailSaleLineWriteRequest: {
+      /** Format: uuid */
+      product_id: string;
+      /** Format: decimal */
+      quantity: string;
+      /** Format: decimal */
+      discount: string;
+    };
+    RetailSaleListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["RetailSale"][];
+      meta: components["schemas"]["RetailSaleListMeta"];
+      message: string;
+    };
+    RetailSaleListMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    RetailSaleWriteRequest: {
+      /** Format: uuid */
+      member_id?: string | null;
+      /** Format: date */
+      business_date: string;
+      payment_method: components["schemas"]["PaymentMethodEnum"];
+      reference_number?: string;
+      lines: components["schemas"]["RetailSaleLineWriteRequest"][];
     };
     Role: {
       /** Format: uuid */
@@ -10994,6 +11225,566 @@ export interface operations {
         };
       };
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  retail_sales_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        business_date?: string;
+        limit?: number;
+        member?: string;
+        /**
+         * @description * `DRAFT` - Draft
+         *     * `PENDING_APPROVAL` - Pending Approval
+         *     * `POSTED` - Posted
+         *     * `REJECTED` - Rejected
+         *     * `CANCELLED` - Cancelled
+         *     * `VOID` - Void
+         */
+        status?:
+          | "DRAFT"
+          | "PENDING_APPROVAL"
+          | "POSTED"
+          | "REJECTED"
+          | "CANCELLED"
+          | "VOID";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RetailSaleListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  retail_sales_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this retail command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RetailSaleWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["RetailSaleWriteRequest"];
+        "multipart/form-data": components["schemas"]["RetailSaleWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RetailSaleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  retail_sales_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        sale_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RetailSaleEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  retail_sales_update: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this retail command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        sale_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedRetailSaleUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedRetailSaleUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedRetailSaleUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RetailSaleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  retail_sales_approve: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this retail command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        sale_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ApproveRetailSaleRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ApproveRetailSaleRequest"];
+        "multipart/form-data": components["schemas"]["ApproveRetailSaleRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RetailSaleApprovalEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  retail_sales_cancel: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this retail command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        sale_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CancelRetailSaleRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CancelRetailSaleRequest"];
+        "multipart/form-data": components["schemas"]["CancelRetailSaleRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RetailSaleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  retail_sales_reject: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this retail command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        sale_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RejectRetailSaleRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["RejectRetailSaleRequest"];
+        "multipart/form-data": components["schemas"]["RejectRetailSaleRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RetailSaleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  retail_sales_submit: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this retail command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        sale_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RetailSaleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
         headers: {
           [name: string]: unknown;
         };

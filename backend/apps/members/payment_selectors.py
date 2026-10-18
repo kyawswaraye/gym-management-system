@@ -14,8 +14,10 @@ from django.db.models.functions import Coalesce
 from django.http import Http404
 from rest_framework.exceptions import ValidationError
 
+from apps.inventory.quantities import format_quantity, parse_quantity
 from apps.members.models import Membership, Payment, Receipt
 from apps.members.payment_serializers import money_text
+from apps.sales.models import RetailSale, RetailSaleLine
 
 _PAYMENT_SALT = "payment-list"
 _RECEIPT_SALT = "receipt-list"
@@ -139,7 +141,11 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
 
     Posted and void charges count as gross on their own business date. Posted
     refunds and reversals subtract on their own business date, in the original
-    charge's purpose bucket. Product columns stay zero until retail.
+    charge's purpose bucket. Product quantity, revenue, cost of goods sold, and
+    gross profit come from posted, non-void retail lines. ``product_total`` is
+    the net of ``PRODUCT`` payments and reconciles to that line revenue. Draft,
+    pending, rejected, and cancelled sales contribute nothing. PT and class
+    stay zero.
     """
 
     charges = Q(
@@ -156,6 +162,7 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
     new_member = Q(membership__revenue_source=Membership.RevenueSource.NEW_MEMBER)
     renewal = Q(membership__revenue_source=Membership.RevenueSource.RENEWAL)
     other = Q(purpose=Payment.Purpose.OTHER)
+    product = Q(purpose=Payment.Purpose.PRODUCT)
     original_membership = Q(original_payment__purpose=Payment.Purpose.MEMBERSHIP)
     original_new = Q(
         original_payment__membership__revenue_source=Membership.RevenueSource.NEW_MEMBER
@@ -164,6 +171,7 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
         original_payment__membership__revenue_source=Membership.RevenueSource.RENEWAL
     )
     original_other = Q(original_payment__purpose=Payment.Purpose.OTHER)
+    original_product = Q(original_payment__purpose=Payment.Purpose.PRODUCT)
     totals = finalized.aggregate(
         gross=_sum(charges),
         refunds=_sum(refunds),
@@ -174,6 +182,8 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
         renewal_returns=_sum(returns & original_membership & original_renewal),
         other_charges=_sum(charges & other),
         other_returns=_sum(returns & original_other),
+        product_charges=_sum(charges & product),
+        product_returns=_sum(returns & original_product),
         **{f"method_{method}_charges": _sum(charges & Q(method=method)) for method in _METHODS},
         **{f"method_{method}_returns": _sum(returns & Q(method=method)) for method in _METHODS},
     )
@@ -181,6 +191,18 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
     refunded = _money(totals["refunds"])
     reversed_amount = _money(totals["reversals"])
     net = gross - refunded - reversed_amount
+    product_payment_net = _money(totals["product_charges"]) - _money(totals["product_returns"])
+    lines = RetailSaleLine.objects.filter(
+        gym_id=gym_id,
+        sale__gym_id=gym_id,
+        sale__status=RetailSale.Status.POSTED,
+        sale__business_date=business_date,
+    ).aggregate(
+        quantity=Coalesce(Sum("quantity"), Decimal("0.000")),
+        revenue=Coalesce(Sum("line_revenue"), _ZERO),
+        cogs=Coalesce(Sum("cost_of_goods_sold"), _ZERO),
+        profit=Coalesce(Sum("gross_profit"), _ZERO),
+    )
     return {
         "date": business_date.isoformat(),
         "currency": currency,
@@ -206,14 +228,14 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
         ),
         "pt_total": money_text(_ZERO),
         "class_total": money_text(_ZERO),
-        "product_total": money_text(_ZERO),
+        "product_total": money_text(product_payment_net),
         "other_total": money_text(
             _money(totals["other_charges"]) - _money(totals["other_returns"])
         ),
-        "product_quantity": money_text(_ZERO),
-        "product_revenue": money_text(_ZERO),
-        "product_cogs": money_text(_ZERO),
-        "product_gross_profit": money_text(_ZERO),
+        "product_quantity": format_quantity(parse_quantity(lines["quantity"] or Decimal("0.000"))),
+        "product_revenue": money_text(_money(lines["revenue"])),
+        "product_cogs": money_text(_money(lines["cogs"])),
+        "product_gross_profit": money_text(_money(lines["profit"])),
     }
 
 

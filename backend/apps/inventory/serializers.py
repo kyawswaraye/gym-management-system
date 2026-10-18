@@ -277,6 +277,10 @@ def category_payload(category: ProductCategory) -> dict[str, object]:
 
 def product_payload(product: Product) -> dict[str, object]:
     on_hand = getattr(product, "quantity_on_hand", _ZERO_QTY)
+    sold = getattr(product, "sold_quantity", _ZERO_QTY)
+    revenue = getattr(product, "retail_revenue", _ZERO_MONEY)
+    cogs = getattr(product, "retail_cogs", _ZERO_MONEY)
+    profit = getattr(product, "retail_gross_profit", _ZERO_MONEY)
     body = {
         "id": product.id,
         "sku": product.sku,
@@ -289,10 +293,10 @@ def product_payload(product: Product) -> dict[str, object]:
         "default_unit_cost": money_text(product.default_unit_cost),
         "low_stock_threshold": format_quantity(product.low_stock_threshold),
         "quantity_on_hand": format_quantity(on_hand),
-        "sold_quantity": "0.000",
-        "revenue": "0.00",
-        "cost_of_goods_sold": "0.00",
-        "gross_profit": "0.00",
+        "sold_quantity": format_quantity(sold),
+        "revenue": money_text(revenue),
+        "cost_of_goods_sold": money_text(cogs),
+        "gross_profit": money_text(profit),
         "is_active": product.is_active,
         "archived_at": product.archived_at,
         "created_by_membership_id": product.created_by_membership_id,
@@ -319,6 +323,7 @@ def movement_payload(movement: StockMovement) -> dict[str, object]:
 
 
 _ZERO_QTY = Decimal("0.000")
+_ZERO_MONEY = Decimal("0.00")
 
 
 def _display(value: str) -> str:

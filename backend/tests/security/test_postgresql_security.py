@@ -79,6 +79,8 @@ TENANT_TABLES = {
     "inventory_product_category",
     "inventory_product",
     "inventory_stock_movement",
+    "sales_retail_sale",
+    "sales_retail_sale_line",
 }
 POLICY_COMMANDS = {"r", "a", "w", "d"}
 
