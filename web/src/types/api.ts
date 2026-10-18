@@ -204,10 +204,13 @@ export type RetailSaleLineWriteRequest =
   components["schemas"]["RetailSaleLineWriteRequest"];
 export type RetailSaleApproval = components["schemas"]["RetailSaleApproval"];
 export type RetailSaleVoid = components["schemas"]["RetailSaleVoid"];
+export type RetailSaleReturn = components["schemas"]["RetailSaleReturn"];
 export type ApproveRetailSaleRequest =
   components["schemas"]["ApproveRetailSaleRequest"];
 export type VoidRetailSaleRequest =
   components["schemas"]["VoidRetailSaleRequest"];
+export type ReturnRetailSaleRequest =
+  components["schemas"]["ReturnRetailSaleRequest"];
 export type Direction = components["schemas"]["DirectionEnum"];
 
 export type DashboardData = {

@@ -2,17 +2,23 @@ from __future__ import annotations
 
 import os
 import re
+import uuid
 from collections.abc import Callable
 from decimal import Decimal
 from typing import Any
 
+from django.core import mail
+from django.core.mail.backends.locmem import EmailBackend
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 from django.db.models import Q, QuerySet
 
 from apps.audit.models import AuditLog, PlatformAuditLog
+from apps.cashbook.models import CashSession
 from apps.common.db.tenant_context import set_gym_context
 from apps.files.models import FileAsset
+from apps.inventory.models import Product, ProductCategory, StockMovement
+from apps.inventory.services import adjust_stock, create_category, create_product
 from apps.members.models import (
     CheckIn,
     CheckInChallenge,
@@ -30,9 +36,13 @@ from apps.members.services import (
     link_member_identity,
 )
 from apps.notifications.models import Notification
+from apps.sales.models import RetailReturn, RetailReturnLine, RetailSale, RetailSaleLine
+from apps.sales.services import approve_sale, create_sale, submit_sale
+from apps.tenants import staff_services
 from apps.tenants.e2e import (
     E2E_DATABASE_NAME,
     GYM_CODE_PREFIX,
+    MANAGER_EMAIL,
     MEMBER_EMAIL,
     OWNER_EMAIL,
     PLATFORM_EMAIL,
@@ -89,7 +99,7 @@ def _env_secret(name: str, *, minimum: int) -> str:
 
 def _totp_secret(name: str) -> str:
     value = os.environ.get(name, "").strip().upper()
-    if _BASE32_SECRET.fullmatch(value) is None:
+    if _BASE32_SECRET.fullmatch(value) is None or len(value) % 8 != 0:
         raise CommandError(f"{name} must be an unpadded base32 E2E placeholder.")
     return value
 
@@ -99,6 +109,26 @@ def _e2e_users() -> QuerySet[User]:
         normalized_email__startswith=USER_EMAIL_PREFIX,
         normalized_email__endswith=USER_EMAIL_SUFFIX,
     )
+
+
+def _delete_retail(gym_id: Any) -> None:
+    """Remove retail evidence only when the database still allows the delete.
+
+    Posted sales, returns, stock, payments, and receipts are immutable in
+    PostgreSQL. This does not disable those triggers. The browser reset drops
+    gym_platform_e2e before migrate, so a repeatable run never needs this
+    path. A later seed against an existing finance gym raises the original
+    database error instead of bypassing it.
+    """
+
+    RetailReturnLine.objects.filter(gym_id=gym_id).delete()
+    RetailReturn.objects.filter(gym_id=gym_id).delete()
+    RetailSaleLine.objects.filter(gym_id=gym_id).delete()
+    RetailSale.objects.filter(gym_id=gym_id).delete()
+    StockMovement.objects.filter(gym_id=gym_id).delete()
+    Product.objects.filter(gym_id=gym_id).delete()
+    ProductCategory.objects.filter(gym_id=gym_id).delete()
+    CashSession.objects.filter(gym_id=gym_id).delete()
 
 
 def _delete_payments(gym_id: Any) -> None:
@@ -112,6 +142,7 @@ def _delete_payments(gym_id: Any) -> None:
 
 def _delete_gym_tree(gym: Gym) -> None:
     set_gym_context(gym_id=gym.id)
+    _delete_retail(gym.id)
     Notification.objects.filter(gym_id=gym.id).delete()
     CheckIn.objects.filter(gym_id=gym.id).delete()
     _delete_payments(gym.id)
@@ -313,7 +344,195 @@ def _seed_linked_member(gym: Gym, actor: GymMembership, password: str) -> None:
         )
 
 
-def _seed_owner_gym(password: str, secret: str, member_password: str) -> None:
+def _invitation_token() -> str:
+    message = mail.outbox[-1].body
+    marker = "token="
+    token = message.split(marker, 1)[1].split()[0]
+    if not token:
+        raise CommandError("The E2E manager invitation did not include a token.")
+    return token
+
+
+def _migration_staff_invitation_bootstrap(token_hash: str) -> tuple[uuid.UUID, uuid.UUID]:
+    """Resolve an invitation with the role that may execute the lookup.
+
+    ``seed_e2e`` connects as ``gym_migration``. That role owns the tables but
+    cannot execute ``app_staff_invitation``. It can assume ``gym_auth_bootstrap``
+    for that one lookup, then return to itself for the acceptance writes.
+    This does not grant a new privilege or disable a trigger.
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute("SET LOCAL ROLE gym_auth_bootstrap")
+        try:
+            cursor.execute(
+                "SELECT invitation_id, gym_id FROM app_staff_invitation(%s)",
+                [token_hash],
+            )
+            row = cursor.fetchone()
+        finally:
+            cursor.execute("RESET ROLE")
+    if row is None:
+        raise CommandError("The manager invitation could not be accepted.")
+    return uuid.UUID(str(row[0])), uuid.UUID(str(row[1]))
+
+
+def _seed_manager(
+    gym: Gym,
+    owner: GymMembership,
+    *,
+    password: str,
+    secret: str,
+) -> GymMembership:
+    """Invite and accept one protected Manager through the staff workflow."""
+
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        role = Role.objects.get(
+            gym=gym,
+            key="MANAGER",
+            is_active=True,
+            source_template__key="MANAGER",
+        )
+    EmailBackend()
+    mail.outbox.clear()
+    staff_services.invite_staff(
+        gym_id=gym.id,
+        actor=owner.user,
+        actor_membership_id=owner.id,
+        staff_data={
+            "email": MANAGER_EMAIL,
+            "first_name": "E2E",
+            "last_name": "Manager",
+            "staff_code": "E2EMGR",
+            "display_name": "E2E Manager",
+            "joined_date": gym_today(gym),
+            "employment_title": "Manager",
+            "default_commission_percent": Decimal("0"),
+        },
+        role_ids=[role.id],
+        request_id="e2e-manager-invite",
+        user_agent="e2e-seed",
+    )
+    original_bootstrap = staff_services._staff_invitation_bootstrap
+    staff_services._staff_invitation_bootstrap = _migration_staff_invitation_bootstrap
+    try:
+        membership = staff_services.accept_staff_invitation(
+            plaintext_token=_invitation_token(),
+            password=password,
+            confirmation={"display_name": "E2E Manager"},
+            request_id="e2e-manager-accept",
+            user_agent="e2e-seed",
+        )
+    finally:
+        staff_services._staff_invitation_bootstrap = original_bootstrap
+    _enable_mfa(membership.user, password=password, secret=secret)
+    return membership
+
+
+def _seed_posted_retail_sale(
+    gym: Gym,
+    *,
+    manager: GymMembership,
+    owner: GymMembership,
+) -> None:
+    """Post one card sale through catalog, stock, submit, and approval services.
+
+    The manager creates and submits it. The owner approves it. The browser
+    journey then returns one unit as the manager.
+    """
+
+    request_id = "e2e-retail-seed"
+    user_agent = "e2e-seed"
+    today = gym_today(gym)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        category = create_category(
+            gym=gym,
+            actor=manager,
+            fields={"code": "E2EDRINKS", "name": "E2E Drinks", "is_active": True},
+            request_id=request_id,
+            ip_address=None,
+            user_agent=user_agent,
+        )
+        product = create_product(
+            gym=gym,
+            actor=manager,
+            fields={
+                "category_id": category.id,
+                "sku": "E2EBOTTLE",
+                "name": "E2E Bottle",
+                "unit": "PIECE",
+                "sale_price": Decimal("10.00"),
+                "current_unit_cost": Decimal("4.00"),
+                "default_unit_cost": Decimal("4.00"),
+                "low_stock_threshold": Decimal("1.000"),
+                "is_active": True,
+            },
+            request_id=request_id,
+            ip_address=None,
+            user_agent=user_agent,
+        )
+        adjust_stock(
+            gym=gym,
+            actor=manager,
+            fields={
+                "product_id": product.id,
+                "movement_type": StockMovement.Type.OPENING,
+                "quantity": Decimal("5.000"),
+                "reason": "E2E opening stock",
+                "business_date": today,
+            },
+            request_id=request_id,
+            ip_address=None,
+            user_agent=user_agent,
+        )
+        sale = create_sale(
+            gym=gym,
+            actor=manager,
+            fields={
+                "member_id": None,
+                "business_date": today,
+                "payment_method": Payment.Method.CARD,
+                "reference_number": "E2E-RETAIL",
+                "lines": [
+                    {
+                        "product_id": product.id,
+                        "quantity": Decimal("3.000"),
+                        "discount": Decimal("0.00"),
+                    }
+                ],
+            },
+            request_id=request_id,
+            ip_address=None,
+            user_agent=user_agent,
+        )
+        submit_sale(
+            gym=gym,
+            actor=manager,
+            sale_id=sale.id,
+            request_id=request_id,
+            ip_address=None,
+            user_agent=user_agent,
+        )
+        approve_sale(
+            gym=gym,
+            actor=owner,
+            sale_id=sale.id,
+            cash_session_id=None,
+            request_id=request_id,
+            ip_address=None,
+            user_agent=user_agent,
+        )
+
+
+def _seed_owner_gym(
+    password: str,
+    secret: str,
+    member_password: str,
+    manager_password: str,
+    manager_secret: str,
+) -> None:
     result = provision_gym(
         code=SEEDED_GYM_CODE,
         name=SEEDED_GYM_NAME,
@@ -374,6 +593,13 @@ def _seed_owner_gym(password: str, secret: str, member_password: str) -> None:
         settings.require_separate_finance_approval = True
         settings.save()
     _seed_linked_member(gym, result.owner_membership, member_password)
+    manager = _seed_manager(
+        gym,
+        result.owner_membership,
+        password=manager_password,
+        secret=manager_secret,
+    )
+    _seed_posted_retail_sale(gym, manager=manager, owner=result.owner_membership)
 
 
 class Command(BaseCommand):
@@ -395,11 +621,19 @@ class Command(BaseCommand):
         platform_password = _env_secret("E2E_PLATFORM_PASSWORD", minimum=12)
         owner_password = _env_secret("E2E_OWNER_PASSWORD", minimum=12)
         member_password = _env_secret("E2E_MEMBER_PASSWORD", minimum=12)
+        manager_password = _env_secret("E2E_MANAGER_PASSWORD", minimum=12)
         platform_secret = _totp_secret("E2E_PLATFORM_TOTP_SECRET")
         owner_secret = _totp_secret("E2E_OWNER_TOTP_SECRET")
+        manager_secret = _totp_secret("E2E_MANAGER_TOTP_SECRET")
         removed = _purge_e2e_rows()
         _seed_platform_admin(platform_password, platform_secret)
-        _seed_owner_gym(owner_password, owner_secret, member_password)
+        _seed_owner_gym(
+            owner_password,
+            owner_secret,
+            member_password,
+            manager_password,
+            manager_secret,
+        )
         self.stdout.write(
             self.style.SUCCESS(
                 f"Seeded {PLATFORM_EMAIL} and gym {SEEDED_GYM_CODE} "

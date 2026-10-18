@@ -17,7 +17,7 @@ from rest_framework.exceptions import ValidationError
 from apps.inventory.quantities import format_quantity, parse_quantity
 from apps.members.models import Membership, Payment, Receipt
 from apps.members.payment_serializers import money_text
-from apps.sales.models import RetailSale, RetailSaleLine
+from apps.sales.models import RetailReturnLine, RetailSale, RetailSaleLine
 
 _PAYMENT_SALT = "payment-list"
 _RECEIPT_SALT = "receipt-list"
@@ -141,10 +141,11 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
 
     Posted and void charges count as gross on their own business date. Posted
     refunds and reversals subtract on their own business date, in the original
-    charge's purpose bucket. Product quantity, revenue, cost of goods sold, and
+    charge's purpose bucket.     Product quantity, revenue, cost of goods sold, and
     gross profit count posted and voided retail lines on the original business
-    date, then subtract a full void on its correction date. ``product_total``
-    is the net of ``PRODUCT`` payments and reconciles to that line revenue.
+    date, then subtract a full void and each partial return on its correction
+    date. ``product_total`` is the net of ``PRODUCT`` payments and reconciles
+    to that line revenue.
     Draft, pending, rejected, and cancelled sales contribute nothing. PT and
     class stay zero.
     """
@@ -195,12 +196,18 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
     product_payment_net = _money(totals["product_charges"]) - _money(totals["product_returns"])
     originals = _retail_lines(gym_id=gym_id, business_date=business_date, correction=False)
     corrections = _retail_lines(gym_id=gym_id, business_date=business_date, correction=True)
+    returned = _returned_lines(gym_id=gym_id, business_date=business_date)
     lines = {
         "quantity": (originals["quantity"] or Decimal("0.000"))
-        - (corrections["quantity"] or Decimal("0.000")),
-        "revenue": _money(originals["revenue"]) - _money(corrections["revenue"]),
-        "cogs": _money(originals["cogs"]) - _money(corrections["cogs"]),
-        "profit": _money(originals["profit"]) - _money(corrections["profit"]),
+        - (corrections["quantity"] or Decimal("0.000"))
+        - (returned["quantity"] or Decimal("0.000")),
+        "revenue": _money(originals["revenue"])
+        - _money(corrections["revenue"])
+        - _money(returned["revenue"]),
+        "cogs": _money(originals["cogs"]) - _money(corrections["cogs"]) - _money(returned["cogs"]),
+        "profit": _money(originals["profit"])
+        - _money(corrections["profit"])
+        - _money(returned["profit"]),
     }
     return {
         "date": business_date.isoformat(),
@@ -253,6 +260,21 @@ def _retail_lines(*, gym_id: UUID, business_date: date, correction: bool) -> dic
     return queryset.aggregate(
         quantity=Coalesce(Sum("quantity"), Decimal("0.000")),
         revenue=Coalesce(Sum("line_revenue"), _ZERO),
+        cogs=Coalesce(Sum("cost_of_goods_sold"), _ZERO),
+        profit=Coalesce(Sum("gross_profit"), _ZERO),
+    )
+
+
+def _returned_lines(*, gym_id: UUID, business_date: date) -> dict[str, Any]:
+    """Partial-return slices posted on the correction date."""
+
+    return RetailReturnLine.objects.filter(
+        gym_id=gym_id,
+        retail_return__gym_id=gym_id,
+        retail_return__business_date=business_date,
+    ).aggregate(
+        quantity=Coalesce(Sum("quantity"), Decimal("0.000")),
+        revenue=Coalesce(Sum("refund_revenue"), _ZERO),
         cogs=Coalesce(Sum("cost_of_goods_sold"), _ZERO),
         profit=Coalesce(Sum("gross_profit"), _ZERO),
     )

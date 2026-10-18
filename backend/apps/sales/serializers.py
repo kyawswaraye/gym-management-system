@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any, cast
+from uuid import UUID
 
+from django.db.models import Count, Sum
 from rest_framework import serializers
 
 from apps.cashbook.serializers import CashTransactionSerializer, ExactMoneyField
@@ -19,7 +21,7 @@ from apps.inventory.quantities import format_quantity
 from apps.inventory.serializers import ExactQuantityField
 from apps.members.models import Payment
 from apps.members.payment_serializers import PaymentSerializer, ReceiptSerializer, money_text
-from apps.sales.models import RetailSale, RetailSaleLine
+from apps.sales.models import RetailReturn, RetailReturnLine, RetailSale, RetailSaleLine
 from apps.users.serializers import StrictSerializer
 
 MAX_LINES = 100
@@ -105,10 +107,37 @@ class RetailSaleListQuerySerializer(StrictSerializer):
     after = serializers.CharField(required=False, allow_blank=False, max_length=2048)
 
 
+class ReturnRetailSaleLineSerializer(StrictSerializer):
+    line_id = serializers.UUIDField()
+    quantity = ExactQuantityField(nonzero=True, min_value=Decimal("0.001"))
+
+
+class ReturnRetailSaleSerializer(StrictSerializer):
+    reason = serializers.CharField(max_length=2000, trim_whitespace=True)
+    business_date = serializers.DateField(required=False)
+    cash_session_id = serializers.UUIDField(required=False, allow_null=True)
+    lines = ReturnRetailSaleLineSerializer(many=True)
+
+    def validate_reason(self, value: str) -> str:
+        return _nonblank(value, "Enter a reason.")
+
+    def validate_lines(self, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not value:
+            raise serializers.ValidationError("Enter at least one return line.")
+        if len(value) > MAX_LINES:
+            raise serializers.ValidationError("A retail return can contain at most 100 lines.")
+        line_ids = [row["line_id"] for row in value]
+        if len(line_ids) != len(set(line_ids)):
+            raise serializers.ValidationError("Each sale line can appear once.")
+        return sorted(value, key=lambda row: row["line_id"])
+
+
 class RetailSaleLineSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     product_id = serializers.UUIDField()
     quantity = serializers.CharField()
+    returned_quantity = serializers.CharField()
+    remaining_quantity = serializers.CharField()
     discount = serializers.CharField()
     sku = serializers.CharField()
     product_name = serializers.CharField()
@@ -154,6 +183,8 @@ class RetailSaleSerializer(serializers.Serializer):
     updated_by_membership_id = serializers.UUIDField()
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
+    returned_amount = serializers.CharField()
+    return_count = serializers.IntegerField()
     lines = RetailSaleLineSerializer(many=True)
 
 
@@ -227,8 +258,57 @@ class RetailSaleVoidEnvelopeSerializer(serializers.Serializer):
     message = serializers.CharField()
 
 
+class RetailReturnLineSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    sale_line_id = serializers.UUIDField()
+    quantity = serializers.CharField()
+    discount = serializers.CharField()
+    refund_revenue = serializers.CharField()
+    cost_of_goods_sold = serializers.CharField()
+    gross_profit = serializers.CharField()
+    stock_movement_id = serializers.UUIDField()
+
+
+class RetailReturnSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    sale_id = serializers.UUIDField()
+    business_date = serializers.DateField()
+    reason = serializers.CharField()
+    currency = serializers.CharField()
+    payment_method = serializers.CharField()
+    refund_amount = serializers.CharField()
+    discount_total = serializers.CharField()
+    cogs_total = serializers.CharField()
+    gross_profit_total = serializers.CharField()
+    payment_id = serializers.UUIDField(allow_null=True)
+    receipt_id = serializers.UUIDField(allow_null=True)
+    cash_session_id = serializers.UUIDField(allow_null=True)
+    returned_by_membership_id = serializers.UUIDField()
+    lines = RetailReturnLineSerializer(many=True)
+
+
+class RetailSaleReturnSerializer(serializers.Serializer):
+    retail_sale = RetailSaleSerializer()
+    retail_return = RetailReturnSerializer()
+    refund_payment = PaymentSerializer(allow_null=True)
+    correction_receipt = ReceiptSerializer(allow_null=True)
+    cash_transaction = CashTransactionSerializer(allow_null=True)
+    stock_movements = RetailVoidStockMovementSerializer(many=True)
+
+
+class RetailSaleReturnEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    data = RetailSaleReturnSerializer()
+    message = serializers.CharField()
+
+
 def sale_payload(sale: RetailSale) -> dict[str, object]:
     lines = list(sale.lines.order_by("product_id", "id"))
+    returned = _returned_by_line(gym_id=sale.gym_id, line_ids=[line.id for line in lines])
+    summary = RetailReturn.objects.filter(gym_id=sale.gym_id, sale_id=sale.id).aggregate(
+        count=Count("id"),
+        amount=Sum("refund_amount"),
+    )
     body = {
         "id": sale.id,
         "member_id": sale.member_id,
@@ -264,16 +344,65 @@ def sale_payload(sale: RetailSale) -> dict[str, object]:
         "updated_by_membership_id": sale.updated_by_membership_id,
         "created_at": sale.created_at,
         "updated_at": sale.updated_at,
-        "lines": [_line_body(line) for line in lines],
+        "returned_amount": money_text(summary["amount"] or Decimal("0.00")),
+        "return_count": summary["count"] or 0,
+        "lines": [_line_body(line, returned.get(line.id)) for line in lines],
     }
     return cast(dict[str, object], RetailSaleSerializer(body).data)
 
 
-def _line_body(line: RetailSaleLine) -> dict[str, object]:
+def return_payload(retail_return: RetailReturn, lines: list[RetailReturnLine]) -> dict[str, object]:
+    body = {
+        "id": retail_return.id,
+        "sale_id": retail_return.sale_id,
+        "business_date": retail_return.business_date,
+        "reason": retail_return.reason,
+        "currency": retail_return.currency,
+        "payment_method": retail_return.payment_method,
+        "refund_amount": money_text(retail_return.refund_amount),
+        "discount_total": money_text(retail_return.discount_total),
+        "cogs_total": money_text(retail_return.cogs_total),
+        "gross_profit_total": money_text(retail_return.gross_profit_total),
+        "payment_id": retail_return.payment_id,
+        "receipt_id": retail_return.receipt_id,
+        "cash_session_id": retail_return.cash_session_id,
+        "returned_by_membership_id": retail_return.returned_by_membership_id,
+        "lines": [
+            {
+                "id": line.id,
+                "sale_line_id": line.sale_line_id,
+                "quantity": format_quantity(line.quantity),
+                "discount": money_text(line.discount),
+                "refund_revenue": money_text(line.refund_revenue),
+                "cost_of_goods_sold": money_text(line.cost_of_goods_sold),
+                "gross_profit": money_text(line.gross_profit),
+                "stock_movement_id": line.stock_movement_id,
+            }
+            for line in lines
+        ],
+    }
+    return cast(dict[str, object], RetailReturnSerializer(body).data)
+
+
+def _returned_by_line(*, gym_id: UUID, line_ids: list[UUID]) -> dict[UUID, dict[str, Decimal]]:
+    if not line_ids:
+        return {}
+    rows = (
+        RetailReturnLine.objects.filter(gym_id=gym_id, sale_line_id__in=line_ids)
+        .values("sale_line_id")
+        .annotate(quantity=Sum("quantity"))
+    )
+    return {row["sale_line_id"]: {"quantity": row["quantity"] or Decimal("0.000")} for row in rows}
+
+
+def _line_body(line: RetailSaleLine, returned: dict[str, Decimal] | None) -> dict[str, object]:
+    taken = Decimal("0.000") if returned is None else returned["quantity"]
     return {
         "id": line.id,
         "product_id": line.product_id,
         "quantity": format_quantity(line.quantity),
+        "returned_quantity": format_quantity(taken),
+        "remaining_quantity": format_quantity(line.quantity - taken),
         "discount": money_text(line.discount),
         "sku": line.sku_snapshot,
         "product_name": line.name_snapshot,

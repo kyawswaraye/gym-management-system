@@ -8,8 +8,11 @@ movement copies that value into ``unit_cost_snapshot`` and does not
 recalculate a weighted average.
 
 ``SALE`` is appended only by retail approval, with a negative quantity and
-``retail_sale_line``. A full retail void appends one positive ``SALE_RETURN``
-that reverses that sale movement. Manual adjustment cannot write either type.
+``retail_sale_line``. A full void appends one positive ``SALE_RETURN`` for the
+sold quantity. A partial return appends one positive ``SALE_RETURN`` per
+returned quantity, and the cumulative returned quantity cannot exceed the
+line. Every return reverses that line's original ``SALE``. Manual adjustment
+cannot write either type.
 """
 
 from __future__ import annotations
@@ -167,9 +170,11 @@ class StockMovement(TenantModel):
     ``ADJUSTMENT``, and ``CORRECTION``. ``OPENING`` and ``PURCHASE`` are
     positive. ``DAMAGE`` and ``LOSS`` are negative. Adjustments and
     corrections are signed and nonzero. ``LOSS``, ``ADJUSTMENT``, and
-    ``CORRECTION`` require a nonblank reason. ``SALE`` is negative and
-    ``SALE_RETURN`` is an equal positive reversal of that sale. The resulting
-    sum cannot be negative.
+    ``CORRECTION`` require a nonblank reason. ``SALE`` is negative.
+    ``SALE_RETURN`` is a positive reversal of that sale. A full void restores
+    the whole line in one row. Partial returns may add more than one row for
+    the same line, and their quantities cannot exceed the quantity sold. The
+    resulting sum cannot be negative.
     """
 
     class Type(models.TextChoices):
@@ -287,16 +292,6 @@ class StockMovement(TenantModel):
                 fields=["gym", "retail_sale_line"],
                 condition=models.Q(movement_type="SALE"),
                 name="stock_one_sale_line_uniq",
-            ),
-            models.UniqueConstraint(
-                fields=["gym", "retail_sale_line"],
-                condition=models.Q(movement_type="SALE_RETURN"),
-                name="stock_one_return_line_uniq",
-            ),
-            models.UniqueConstraint(
-                fields=["gym", "reverses_movement"],
-                condition=models.Q(reverses_movement__isnull=False),
-                name="stock_one_reversal_uniq",
             ),
         ]
         indexes = [

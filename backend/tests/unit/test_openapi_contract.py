@@ -134,6 +134,7 @@ PUBLISHED_PATHS = {
     "/api/v1/retail-sales/{sale_id}/reject/",
     "/api/v1/retail-sales/{sale_id}/cancel/",
     "/api/v1/retail-sales/{sale_id}/void/",
+    "/api/v1/retail-sales/{sale_id}/return/",
 }
 CONTRACT_PATH = Path(__file__).resolve().parents[3] / "contracts" / "openapi.v1.json"
 
@@ -170,7 +171,6 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
         "/api/v1/check-ins/scan/",
         "/api/v1/member/me/",
         "/api/v1/notifications/",
-        "/api/v1/retail-sales/{sale_id}/return/",
         "/api/v1/product-categories/{id}/",
         "/api/v1/stock-movements/{id}/",
     )
@@ -1216,7 +1216,7 @@ def test_openapi_documents_inventory_commands() -> None:
     document = generated_schema()
     paths = document["paths"]
     assert "/api/v1/retail-sales/{sale_id}/void/" in paths
-    assert "/api/v1/retail-sales/{sale_id}/return/" not in paths
+    assert "/api/v1/retail-sales/{sale_id}/return/" in paths
     assert "/api/v1/product-categories/{id}/" not in paths
     writes = (
         (paths["/api/v1/product-categories/"]["post"], "201"),
@@ -1250,7 +1250,6 @@ def test_openapi_documents_inventory_commands() -> None:
 def test_openapi_documents_retail_commands() -> None:
     document = generated_schema()
     paths = document["paths"]
-    assert "/api/v1/retail-sales/{sale_id}/return/" not in paths
     writes = (
         (paths["/api/v1/retail-sales/"]["post"], "201"),
         (paths["/api/v1/retail-sales/{sale_id}/"]["patch"], "200"),
@@ -1259,6 +1258,7 @@ def test_openapi_documents_retail_commands() -> None:
         (paths["/api/v1/retail-sales/{sale_id}/reject/"]["post"], "200"),
         (paths["/api/v1/retail-sales/{sale_id}/cancel/"]["post"], "200"),
         (paths["/api/v1/retail-sales/{sale_id}/void/"]["post"], "200"),
+        (paths["/api/v1/retail-sales/{sale_id}/return/"]["post"], "200"),
     )
     for operation, success in writes:
         header = next(

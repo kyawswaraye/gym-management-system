@@ -1,8 +1,8 @@
 """Tenant-scoped catalog and stock reads.
 
-Quantity on hand is the sum of same-gym movements, including a full void's
-positive sale return. Sold quantity, revenue, cost of goods sold, and gross
-profit count posted and voided sale lines, then subtract each full void once.
+Quantity on hand is the sum of same-gym movements, including sale returns.
+Sold quantity, revenue, cost of goods sold, and gross profit count posted and
+voided sale lines, then subtract each full void once and every partial return.
 Draft, pending, rejected, and cancelled sales contribute nothing.
 """
 
@@ -31,7 +31,7 @@ from django.http import Http404
 from rest_framework.exceptions import ValidationError
 
 from apps.inventory.models import Product, ProductCategory, StockMovement
-from apps.sales.models import RetailSaleLine
+from apps.sales.models import RetailReturnLine, RetailSaleLine
 
 _CATEGORY_SALT = "product-category-list"
 _PRODUCT_SALT = "product-list"
@@ -81,22 +81,49 @@ def _line_sum(
     return Subquery(rows, output_field=output)
 
 
+_RETURN_FIELD = {
+    "quantity": "quantity",
+    "line_revenue": "refund_revenue",
+    "cost_of_goods_sold": "cost_of_goods_sold",
+    "gross_profit": "gross_profit",
+}
+
+
+def _return_sum(field: str, *, gym_id: UUID, output: DecimalField[Decimal, Decimal]) -> Subquery:
+    rows = (
+        RetailReturnLine.objects.filter(
+            gym_id=gym_id,
+            sale_line__gym_id=gym_id,
+            sale_line__product_id=OuterRef("pk"),
+        )
+        .values("sale_line__product_id")
+        .annotate(total=Sum(_RETURN_FIELD[field]))
+        .values("total")
+    )
+    return Subquery(rows, output_field=output)
+
+
 def _posted_sum(
     field: str, *, gym_id: UUID, output: DecimalField[Decimal, Decimal], zero: Decimal
 ) -> ExpressionWrapper[Any]:
-    """Posted and void originals, minus each full void exactly once."""
+    """Posted and void originals, minus each full void and every partial return."""
 
     original = Coalesce(
         _line_sum(field, gym_id=gym_id, statuses=("POSTED", "VOID"), output=output),
         Value(zero, output_field=output),
         output_field=output,
     )
-    returned = Coalesce(
+    voided = Coalesce(
         _line_sum(field, gym_id=gym_id, statuses=("VOID",), output=output),
         Value(zero, output_field=output),
         output_field=output,
     )
-    return ExpressionWrapper(original - returned, output_field=output)
+    returned = Coalesce(
+        _return_sum(field, gym_id=gym_id, output=output),
+        Value(zero, output_field=output),
+        output_field=output,
+    )
+    return ExpressionWrapper(original - voided - returned, output_field=output)
 
 
 def get_category(*, gym_id: UUID, category_id: UUID) -> ProductCategory:

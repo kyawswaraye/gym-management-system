@@ -64,6 +64,8 @@ def test_seed_refuses_reused_object_keys_and_drops_members_first() -> None:
     )
     handle = inspect.getsource(Command.handle)
     assert "E2E_MEMBER_PASSWORD" in handle
+    assert "E2E_MANAGER_PASSWORD" in handle
+    assert "e2e-manager@example.test" not in handle
     assert "e2e-member@example.test" not in handle
     assert source.index("Member.objects.filter") < source.index("FileAsset.objects.filter")
 
@@ -121,6 +123,8 @@ def test_cleanup_does_not_disable_finance_protections() -> None:
         "inventory",
         "idempotency",
         "receipt",
+        "retail",
+        "stock",
     ):
         assert protected not in joined
     assert "finally" not in inspect.getsource(_with_e2e_cleanup_triggers)

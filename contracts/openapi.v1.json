@@ -11704,6 +11704,141 @@
                 }
             }
         },
+        "/api/v1/retail-sales/{sale_id}/return/": {
+            "post": {
+                "operationId": "retail_sales_return",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "High-entropy key reused only for retries of this retail command.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "sale_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "retail-sales"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReturnRetailSaleRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReturnRetailSaleRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReturnRetailSaleRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RetailSaleReturnEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/retail-sales/{sale_id}/submit/": {
             "post": {
                 "operationId": "retail_sales_submit",
@@ -21755,6 +21890,128 @@
                     "rejection_reason"
                 ]
             },
+            "RetailReturn": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "sale_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "business_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "payment_method": {
+                        "type": "string"
+                    },
+                    "refund_amount": {
+                        "type": "string"
+                    },
+                    "discount_total": {
+                        "type": "string"
+                    },
+                    "cogs_total": {
+                        "type": "string"
+                    },
+                    "gross_profit_total": {
+                        "type": "string"
+                    },
+                    "payment_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "receipt_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "cash_session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "returned_by_membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RetailReturnLine"
+                        }
+                    }
+                },
+                "required": [
+                    "business_date",
+                    "cash_session_id",
+                    "cogs_total",
+                    "currency",
+                    "discount_total",
+                    "gross_profit_total",
+                    "id",
+                    "lines",
+                    "payment_id",
+                    "payment_method",
+                    "reason",
+                    "receipt_id",
+                    "refund_amount",
+                    "returned_by_membership_id",
+                    "sale_id"
+                ]
+            },
+            "RetailReturnLine": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "sale_line_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "quantity": {
+                        "type": "string"
+                    },
+                    "discount": {
+                        "type": "string"
+                    },
+                    "refund_revenue": {
+                        "type": "string"
+                    },
+                    "cost_of_goods_sold": {
+                        "type": "string"
+                    },
+                    "gross_profit": {
+                        "type": "string"
+                    },
+                    "stock_movement_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "cost_of_goods_sold",
+                    "discount",
+                    "gross_profit",
+                    "id",
+                    "quantity",
+                    "refund_revenue",
+                    "sale_line_id",
+                    "stock_movement_id"
+                ]
+            },
             "RetailSale": {
                 "type": "object",
                 "properties": {
@@ -21898,6 +22155,12 @@
                         "type": "string",
                         "format": "date-time"
                     },
+                    "returned_amount": {
+                        "type": "string"
+                    },
+                    "return_count": {
+                        "type": "integer"
+                    },
                     "lines": {
                         "type": "array",
                         "items": {
@@ -21930,6 +22193,8 @@
                     "rejected_at",
                     "rejected_by_membership_id",
                     "rejection_reason",
+                    "return_count",
+                    "returned_amount",
                     "status",
                     "submitted_at",
                     "submitted_by_membership_id",
@@ -22023,6 +22288,12 @@
                     "quantity": {
                         "type": "string"
                     },
+                    "returned_quantity": {
+                        "type": "string"
+                    },
+                    "remaining_quantity": {
+                        "type": "string"
+                    },
                     "discount": {
                         "type": "string"
                     },
@@ -22057,6 +22328,8 @@
                     "product_id",
                     "product_name",
                     "quantity",
+                    "remaining_quantity",
+                    "returned_quantity",
                     "sku",
                     "unit_cost",
                     "unit_price"
@@ -22126,6 +22399,74 @@
                 "required": [
                     "has_more",
                     "next_after"
+                ]
+            },
+            "RetailSaleReturn": {
+                "type": "object",
+                "properties": {
+                    "retail_sale": {
+                        "$ref": "#/components/schemas/RetailSale"
+                    },
+                    "retail_return": {
+                        "$ref": "#/components/schemas/RetailReturn"
+                    },
+                    "refund_payment": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Payment"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "correction_receipt": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Receipt"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "cash_transaction": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/CashTransaction"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "stock_movements": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RetailVoidStockMovement"
+                        }
+                    }
+                },
+                "required": [
+                    "cash_transaction",
+                    "correction_receipt",
+                    "refund_payment",
+                    "retail_return",
+                    "retail_sale",
+                    "stock_movements"
+                ]
+            },
+            "RetailSaleReturnEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/RetailSaleReturn"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
                 ]
             },
             "RetailSaleVoid": {
@@ -22269,6 +22610,53 @@
                     "retail_sale_line_id",
                     "reverses_movement_id",
                     "unit_cost_snapshot"
+                ]
+            },
+            "ReturnRetailSaleLineRequest": {
+                "type": "object",
+                "properties": {
+                    "line_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "quantity": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,15}(?:\\.\\d{0,3})?$"
+                    }
+                },
+                "required": [
+                    "line_id",
+                    "quantity"
+                ]
+            },
+            "ReturnRetailSaleRequest": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                    },
+                    "business_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "cash_session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ReturnRetailSaleLineRequest"
+                        }
+                    }
+                },
+                "required": [
+                    "lines",
+                    "reason"
                 ]
             },
             "Role": {

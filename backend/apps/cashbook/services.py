@@ -335,11 +335,7 @@ def record_cash_movement(
         raise ValidationError({"amount": ["Enter an amount greater than zero."]})
     reversal = None
     if reversal_of_id is not None:
-        reversal = (
-            CashTransaction.objects.select_for_update()
-            .filter(gym_id=gym.id, id=reversal_of_id)
-            .first()
-        )
+        reversal = CashTransaction.objects.filter(gym_id=gym.id, id=reversal_of_id).first()
         if reversal is None:
             raise CashSessionUnavailable()
     movement = CashTransaction.objects.create(
@@ -363,17 +359,21 @@ def record_cash_movement(
 
 
 def recompute_cash_totals(session: CashSession) -> tuple[Decimal, Decimal, Decimal]:
-    """Derive sales, expenses, and signed manual net from immutable movements."""
+    """Derive sales, expenses, and signed manual net from immutable movements.
+
+    The caller already holds the session lock. Movements are insert-only for
+    the runtime role, so this read does not use ``SELECT FOR UPDATE``.
+    """
 
     locked = list(
-        CashTransaction.objects.select_for_update()
-        .filter(gym_id=session.gym_id, cash_session_id=session.id)
-        .order_by("occurred_at", "id")
+        CashTransaction.objects.filter(gym_id=session.gym_id, cash_session_id=session.id).order_by(
+            "occurred_at", "id"
+        )
     )
     reversal_ids = [txn.reversal_of_id for txn in locked if txn.reversal_of_id is not None]
     originals = {
         row.id: row
-        for row in CashTransaction.objects.select_for_update().filter(
+        for row in CashTransaction.objects.filter(
             gym_id=session.gym_id,
             id__in=reversal_ids,
         )

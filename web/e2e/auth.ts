@@ -28,6 +28,12 @@ export const ownerAccount: E2EAccount = {
   totpSecret: requiredEnv("E2E_OWNER_TOTP_SECRET"),
 };
 
+export const managerAccount: E2EAccount = {
+  email: "e2e-manager@example.test",
+  password: requiredEnv("E2E_MANAGER_PASSWORD"),
+  totpSecret: requiredEnv("E2E_MANAGER_TOTP_SECRET"),
+};
+
 export function memberAccount(): E2EAccount {
   return {
     email: "e2e-member@example.test",

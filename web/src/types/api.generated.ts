@@ -1644,6 +1644,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/retail-sales/{sale_id}/return/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["retail_sales_return"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/retail-sales/{sale_id}/submit/": {
     parameters: {
       query?: never;
@@ -4117,6 +4133,43 @@ export interface components {
     RejectSalaryRequest: {
       rejection_reason: string;
     };
+    RetailReturn: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      sale_id: string;
+      /** Format: date */
+      business_date: string;
+      reason: string;
+      currency: string;
+      payment_method: string;
+      refund_amount: string;
+      discount_total: string;
+      cogs_total: string;
+      gross_profit_total: string;
+      /** Format: uuid */
+      payment_id: string | null;
+      /** Format: uuid */
+      receipt_id: string | null;
+      /** Format: uuid */
+      cash_session_id: string | null;
+      /** Format: uuid */
+      returned_by_membership_id: string;
+      lines: components["schemas"]["RetailReturnLine"][];
+    };
+    RetailReturnLine: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      sale_line_id: string;
+      quantity: string;
+      discount: string;
+      refund_revenue: string;
+      cost_of_goods_sold: string;
+      gross_profit: string;
+      /** Format: uuid */
+      stock_movement_id: string;
+    };
     RetailSale: {
       /** Format: uuid */
       id: string;
@@ -4174,6 +4227,8 @@ export interface components {
       created_at: string;
       /** Format: date-time */
       updated_at: string;
+      returned_amount: string;
+      return_count: number;
       lines: components["schemas"]["RetailSaleLine"][];
     };
     RetailSaleApproval: {
@@ -4198,6 +4253,8 @@ export interface components {
       /** Format: uuid */
       product_id: string;
       quantity: string;
+      returned_quantity: string;
+      remaining_quantity: string;
       discount: string;
       sku: string;
       product_name: string;
@@ -4224,6 +4281,19 @@ export interface components {
     RetailSaleListMeta: {
       has_more: boolean;
       next_after: string | null;
+    };
+    RetailSaleReturn: {
+      retail_sale: components["schemas"]["RetailSale"];
+      retail_return: components["schemas"]["RetailReturn"];
+      refund_payment: components["schemas"]["Payment"] | null;
+      correction_receipt: components["schemas"]["Receipt"] | null;
+      cash_transaction: components["schemas"]["CashTransaction"] | null;
+      stock_movements: components["schemas"]["RetailVoidStockMovement"][];
+    };
+    RetailSaleReturnEnvelope: {
+      success: boolean;
+      data: components["schemas"]["RetailSaleReturn"];
+      message: string;
     };
     RetailSaleVoid: {
       retail_sale: components["schemas"]["RetailSale"];
@@ -4262,6 +4332,20 @@ export interface components {
       business_date: string;
       /** Format: uuid */
       reverses_movement_id: string;
+    };
+    ReturnRetailSaleLineRequest: {
+      /** Format: uuid */
+      line_id: string;
+      /** Format: decimal */
+      quantity: string;
+    };
+    ReturnRetailSaleRequest: {
+      reason: string;
+      /** Format: date */
+      business_date?: string;
+      /** Format: uuid */
+      cash_session_id?: string | null;
+      lines: components["schemas"]["ReturnRetailSaleLineRequest"][];
     };
     Role: {
       /** Format: uuid */
@@ -12269,6 +12353,92 @@ export interface operations {
         };
       };
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  retail_sales_return: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this retail command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        sale_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ReturnRetailSaleRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ReturnRetailSaleRequest"];
+        "multipart/form-data": components["schemas"]["ReturnRetailSaleRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RetailSaleReturnEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
         headers: {
           [name: string]: unknown;
         };

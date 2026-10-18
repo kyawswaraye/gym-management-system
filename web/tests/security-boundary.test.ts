@@ -307,9 +307,8 @@ describe("browser credential boundary", () => {
     }
 
     const csrf = "x".repeat(43);
-    const mutation = new NextRequest(
-      "https://app.example.com/api/operations/members",
-      {
+    const mutation = () =>
+      new NextRequest("https://app.example.com/api/operations/members", {
         method: "POST",
         headers: {
           cookie: `gms_access=access; gms_csrf=${csrf}`,
@@ -318,19 +317,33 @@ describe("browser credential boundary", () => {
           "content-type": "application/json",
         },
         body: "{}",
-      },
-    );
+      });
+    expect(
+      (await authenticatedMutation(mutation(), "/api/v1/retail-sales/return/"))
+        .status,
+    ).toBe(503);
     expect(
       (
         await authenticatedMutation(
-          mutation,
+          mutation(),
+          `/api/v1/retail-sales/${memberId}/return/`,
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await authenticatedMutation(
+          mutation(),
           `/api/v1/members/${memberId}/payments/`,
         )
       ).status,
     ).toBe(503);
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       `https://api.example.com/api/v1/members/${memberId}/payments/`,
+    );
+    expect(fetchMock.mock.calls[4]?.[0]).toBe(
+      `https://api.example.com/api/v1/retail-sales/${memberId}/return/`,
     );
   });
 

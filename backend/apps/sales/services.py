@@ -1,16 +1,25 @@
-"""Retail sale drafts, approval posting, and one full void.
+"""Retail sale drafts, approval posting, full void, and partial return.
 
 Lock order inside approval: the sale, its lines, the member when present,
 then products ordered by id. Stock movements are appended only after those
 locks. The product payment, receipt, and cash movement are created next, and
 the sale is marked posted last. A failure rolls all of it back.
 
-Full void locks the posted sale, its lines, the original sale movements,
-products in id order, the product charge, receipts, the original cash
-movement, the named destination session, and any existing correction. It
-appends one ``SALE_RETURN`` per line, reverses the product charge, and marks
-the sale void last. Partial returns stay unpublished. A cash void names an
-open destination session and does not reopen the original till.
+Full void locks the posted sale, its lines, products in id order, the product
+charge, receipts, the named destination session, and any existing correction.
+The original sale movements and cash movement are read under that sale lock.
+Those tables, and the return tables, are insert-only for the runtime role, so
+they are not locked with ``SELECT FOR UPDATE``. The void appends one
+``SALE_RETURN`` per line, reverses the product charge, and marks the sale void
+last. A return row makes that void invalid. A cash void names an open
+destination session and does not reopen the original till.
+
+A partial return locks the posted sale first, then the requested lines,
+products, the product charge, receipts, the destination session, and existing
+corrections. Prior returns and the original sale movements are read under the
+sale lock. It appends one ``SALE_RETURN`` per requested line, posts a product
+refund and correction receipt only when the allocated refund is positive, then
+writes the immutable return header and lines. The sale stays posted.
 
 Price and cost are copied when the draft is saved. Submission and approval
 compare those snapshots with the current active product and fail when they
@@ -28,7 +37,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from django.db import IntegrityError, connection
+from django.db import DatabaseError, IntegrityError, connection
 from django.http import Http404
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -44,12 +53,13 @@ from apps.members.models import Member, Payment, Receipt
 from apps.members.payment_serializers import money_text
 from apps.members.payment_services import (
     post_retail_product_payment,
+    post_retail_product_refund,
     reverse_retail_product_payment,
 )
 from apps.members.services import gym_today
 from apps.sales.exceptions import RetailPostingConflict
-from apps.sales.models import RetailSale, RetailSaleLine
-from apps.sales.pricing import extend_money
+from apps.sales.models import RetailReturn, RetailReturnLine, RetailSale, RetailSaleLine
+from apps.sales.pricing import allocate_return_slice, extend_money
 from apps.sales.selectors import visible_sales
 from apps.tenants.models import Gym, GymMembership
 
@@ -289,6 +299,8 @@ def void_sale(
     gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="retail.void")
     if sale.status != RetailSale.Status.POSTED or sale.payment_id is None:
         raise RetailPostingConflict()
+    if RetailReturn.objects.filter(gym_id=gym.id, sale_id=sale.id).exists():
+        raise RetailPostingConflict()
     if sale.payment_method == Payment.Method.CASH:
         if cash_session_id is None:
             raise ValidationError(
@@ -306,13 +318,11 @@ def void_sale(
         raise RetailPostingConflict()
     line_ids = [line.id for line in lines]
     originals = list(
-        StockMovement.objects.select_for_update()
-        .filter(
+        StockMovement.objects.filter(
             gym_id=gym.id,
             retail_sale_line_id__in=line_ids,
             movement_type=StockMovement.Type.SALE,
-        )
-        .order_by("id")
+        ).order_by("id")
     )
     by_line = {movement.retail_sale_line_id: movement for movement in originals}
     if set(by_line) != set(line_ids) or len(originals) != len(lines):
@@ -327,11 +337,9 @@ def void_sale(
         .order_by("id")
     )
     if payment.cash_transaction_id is not None:
-        locked_cash = (
-            CashTransaction.objects.select_for_update()
-            .filter(gym_id=gym.id, id=payment.cash_transaction_id)
-            .first()
-        )
+        locked_cash = CashTransaction.objects.filter(
+            gym_id=gym.id, id=payment.cash_transaction_id
+        ).first()
         if locked_cash is None:
             raise RetailPostingConflict()
     if cash_session_id is not None:
@@ -411,6 +419,265 @@ def void_sale(
         "sale": sale,
         "stock_movements": returns,
         **reversed_payment,
+    }
+
+
+def return_sale(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    sale_id: UUID,
+    reason: str,
+    business_date: date | None,
+    cash_session_id: UUID | None,
+    lines: list[dict[str, Any]],
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> dict[str, Any]:
+    """Return part of a posted sale and leave that sale posted.
+
+    Amounts come from the cumulative half-up slices of the immutable lines.
+    Stock is restored first. A positive refund then posts one product refund,
+    one correction receipt, and, for cash, one outbound movement that does not
+    set ``reversal_of``. The return header and lines are last. Deferred
+    database checks run before this function returns.
+    """
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Retail return requires an active transaction.")
+    gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="retail.void")
+    sale = _lock_sale(gym_id=gym.id, sale_id=sale_id)
+    if not lines or len(lines) > 100:
+        raise ValidationError({"lines": ["Enter from 1 to 100 return lines."]})
+    requested = {UUID(str(row["line_id"])): parse_quantity(row["quantity"]) for row in lines}
+    if len(requested) != len(lines):
+        raise ValidationError({"lines": ["Each sale line can appear once."]})
+    locked_lines = list(
+        RetailSaleLine.objects.select_for_update()
+        .filter(gym_id=gym.id, sale_id=sale.id, id__in=requested)
+        .order_by("id")
+    )
+    if len(locked_lines) != len(requested):
+        raise ValidationError({"lines": ["Select a line of this sale."]})
+    prior_headers = list(
+        RetailReturn.objects.filter(gym_id=gym.id, sale_id=sale.id).order_by("created_at", "id")
+    )
+    prior_lines = list(
+        RetailReturnLine.objects.filter(
+            gym_id=gym.id, retail_return_id__in=[row.id for row in prior_headers]
+        ).order_by("id")
+    )
+    originals = list(
+        StockMovement.objects.filter(
+            gym_id=gym.id,
+            retail_sale_line_id__in=requested,
+            movement_type=StockMovement.Type.SALE,
+        ).order_by("id")
+    )
+    by_line = {movement.retail_sale_line_id: movement for movement in originals}
+    if set(by_line) != set(requested) or len(originals) != len(locked_lines):
+        raise RetailPostingConflict()
+    products = _lock_products(gym_id=gym.id, lines=locked_lines)
+    if sale.payment_id is None or sale.receipt_id is None:
+        raise RetailPostingConflict()
+    payment = Payment.objects.select_for_update().filter(gym_id=gym.id, id=sale.payment_id).first()
+    if (
+        payment is None
+        or payment.retail_sale_id != sale.id
+        or payment.status != Payment.Status.POSTED
+        or payment.entry_type != Payment.EntryType.CHARGE
+        or payment.reversal_payment_id is not None
+    ):
+        raise RetailPostingConflict()
+    receipts = list(
+        Receipt.objects.select_for_update()
+        .filter(gym_id=gym.id, payment_id=payment.id)
+        .order_by("id")
+    )
+    issued_original = any(
+        row.status == Receipt.Status.ISSUED and row.id == sale.receipt_id for row in receipts
+    )
+    if not issued_original:
+        raise RetailPostingConflict()
+    if payment.cash_transaction_id is not None:
+        locked_cash = CashTransaction.objects.filter(
+            gym_id=gym.id, id=payment.cash_transaction_id
+        ).first()
+        if locked_cash is None:
+            raise RetailPostingConflict()
+    related = list(
+        Payment.objects.select_for_update()
+        .filter(gym_id=gym.id, original_payment_id=payment.id)
+        .order_by("id")
+    )
+    if any(row.entry_type == Payment.EntryType.REVERSAL for row in related):
+        raise RetailPostingConflict()
+    gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="retail.void")
+    if sale.status != RetailSale.Status.POSTED:
+        raise RetailPostingConflict()
+    chosen_date = _correction_date(
+        gym=gym, original_date=sale.business_date, requested=business_date
+    )
+    prior_taken: dict[UUID, Decimal] = {}
+    for prior in prior_lines:
+        prior_taken[prior.sale_line_id] = prior_taken.get(
+            prior.sale_line_id, Decimal("0.000")
+        ) + parse_quantity(prior.quantity)
+    priced: list[dict[str, Any]] = []
+    for line in locked_lines:
+        quantity = requested[line.id]
+        sold = parse_quantity(line.quantity)
+        already = prior_taken.get(line.id, Decimal("0.000"))
+        if quantity > sold - already:
+            raise RetailPostingConflict()
+        discount = allocate_return_slice(Decimal(line.discount), already, quantity, sold)
+        revenue = allocate_return_slice(Decimal(line.line_revenue), already, quantity, sold)
+        cost = allocate_return_slice(Decimal(line.cost_of_goods_sold), already, quantity, sold)
+        priced.append(
+            {
+                "line": line,
+                "quantity": quantity,
+                "discount": discount,
+                "refund_revenue": revenue,
+                "cost_of_goods_sold": cost,
+                "gross_profit": revenue - cost,
+            }
+        )
+    refund_amount = sum((row["refund_revenue"] for row in priced), Decimal("0.00"))
+    discount_total = sum((row["discount"] for row in priced), Decimal("0.00"))
+    cogs_total = sum((row["cost_of_goods_sold"] for row in priced), Decimal("0.00"))
+    gross_profit_total = refund_amount - cogs_total
+    refunded_already = sum(
+        (
+            Decimal(row.amount)
+            for row in related
+            if row.status == Payment.Status.POSTED and row.entry_type == Payment.EntryType.REFUND
+        ),
+        Decimal("0.00"),
+    )
+    if refund_amount > Decimal(payment.amount) - refunded_already:
+        raise RetailPostingConflict()
+    if sale.payment_method == Payment.Method.CASH and refund_amount > 0:
+        if cash_session_id is None:
+            raise ValidationError({"cash_session_id": ["A cash refund requires an open session."]})
+    elif cash_session_id is not None:
+        raise ValidationError(
+            {"cash_session_id": ["Only a positive cash refund can use a cash session."]}
+        )
+    session = None
+    if cash_session_id is not None:
+        session = (
+            CashSession.objects.select_for_update()
+            .filter(gym_id=gym.id, id=cash_session_id)
+            .first()
+        )
+        if (
+            session is None
+            or session.status != CashSession.Status.OPEN
+            or session.currency != sale.currency
+            or session.business_date != chosen_date
+        ):
+            raise ValidationError(
+                {
+                    "cash_session_id": [
+                        "Select an open cash session for the correction date and currency."
+                    ]
+                }
+            )
+    try:
+        movements: list[StockMovement] = []
+        for row in priced:
+            movements.append(
+                post_sale_return(
+                    gym=gym,
+                    actor=actor,
+                    product=products[row["line"].product_id],
+                    line=row["line"],
+                    original=by_line[row["line"].id],
+                    business_date=chosen_date,
+                    reason=reason,
+                    quantity=row["quantity"],
+                )
+            )
+        refund_payment = None
+        correction_receipt = None
+        movement = None
+        if refund_amount > 0:
+            refund_payment, correction_receipt, movement = post_retail_product_refund(
+                gym=gym,
+                actor=actor,
+                original=payment,
+                amount=refund_amount,
+                business_date=chosen_date,
+                reason=reason,
+                cash_session_id=None if session is None else session.id,
+                request_id=request_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+        retail_return = RetailReturn.objects.create(
+            gym=gym,
+            sale=sale,
+            business_date=chosen_date,
+            reason=reason,
+            currency=sale.currency,
+            payment_method=sale.payment_method,
+            refund_amount=refund_amount,
+            discount_total=discount_total,
+            cogs_total=cogs_total,
+            gross_profit_total=gross_profit_total,
+            payment=refund_payment,
+            receipt=correction_receipt,
+            cash_session=session,
+            returned_by_membership_id=actor.id,
+        )
+        RetailReturnLine.objects.bulk_create(
+            [
+                RetailReturnLine(
+                    gym=gym,
+                    retail_return=retail_return,
+                    sale_line=row["line"],
+                    quantity=row["quantity"],
+                    discount=row["discount"],
+                    refund_revenue=row["refund_revenue"],
+                    cost_of_goods_sold=row["cost_of_goods_sold"],
+                    gross_profit=row["gross_profit"],
+                    stock_movement=stock,
+                    created_by_membership_id=actor.id,
+                )
+                for row, stock in zip(priced, movements, strict=True)
+            ]
+        )
+        with connection.cursor() as cursor:
+            cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+    except DatabaseError as exc:
+        if _return_guard_conflict(exc):
+            raise RetailPostingConflict() from exc
+        raise
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="RETAIL_SALE_RETURNED",
+        sale=sale,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={
+            "retail_return_id": str(retail_return.id),
+            "business_date": chosen_date.isoformat(),
+            "refund_amount": money_text(refund_amount),
+            "stock_return_count": len(movements),
+        },
+    )
+    return {
+        "sale": sale,
+        "retail_return": retail_return,
+        "return_lines": list(retail_return.lines.order_by("sale_line_id", "id")),
+        "refund_payment": refund_payment,
+        "correction_receipt": correction_receipt,
+        "cash_transaction": movement,
+        "stock_movements": movements,
     }
 
 
@@ -755,6 +1022,22 @@ def _assert_sale_till(*, sale: RetailSale, session: CashSession) -> None:
                     ]
                 }
             )
+
+
+def _return_guard_conflict(exc: DatabaseError) -> bool:
+    message = str(exc)
+    return any(
+        token in message
+        for token in (
+            "retail_return:",
+            "retail_guard:",
+            "retail_posting:",
+            "stock_guard:",
+            "payment_guard:",
+            "payment_refund:",
+            "payment_posting:",
+        )
+    )
 
 
 def _audit(

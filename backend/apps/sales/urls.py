@@ -6,6 +6,7 @@ from apps.sales.views import (
     RetailSaleDetailView,
     RetailSaleListCreateView,
     RetailSaleRejectView,
+    RetailSaleReturnView,
     RetailSaleSubmitView,
     RetailSaleVoidView,
 )
@@ -27,6 +28,11 @@ urlpatterns = [
         "retail-sales/<uuid:sale_id>/void/",
         RetailSaleVoidView.as_view(),
         name="retail-sale-void",
+    ),
+    path(
+        "retail-sales/<uuid:sale_id>/return/",
+        RetailSaleReturnView.as_view(),
+        name="retail-sale-return",
     ),
     path(
         "retail-sales/<uuid:sale_id>/reject/",

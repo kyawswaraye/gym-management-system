@@ -4,9 +4,10 @@ Lock order inside approval: salary period, its lines by id, the protected
 ``STAFF_SALARY`` category, then referenced cash sessions by id. ``mutate()``
 reloads the actor and live permission. Expense and cash writes happen only
 after those locks. Any failure rolls the period, lines, expenses, and cash
-movements back. Void locks the posted period, its lines, the original
-expenses and cash movements, then the named destination sessions. It does not
-reopen a closed till.
+movements back. Void locks the posted period, its lines, and the original
+expenses, then the named destination sessions. Original cash movements are
+read under that lock because the runtime role cannot use ``SELECT FOR UPDATE``
+on an insert-only table. It does not reopen a closed till.
 """
 
 from __future__ import annotations
@@ -387,11 +388,7 @@ def void_period(
         ),
         key=str,
     )
-    list(
-        CashTransaction.objects.select_for_update()
-        .filter(gym_id=gym.id, id__in=movement_ids)
-        .order_by("id")
-    )
+    list(CashTransaction.objects.filter(gym_id=gym.id, id__in=movement_ids).order_by("id"))
     existing = list(
         Expense.objects.select_for_update()
         .filter(gym_id=gym.id, original_expense_id__in=expense_ids)

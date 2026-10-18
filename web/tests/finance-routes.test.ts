@@ -8,7 +8,7 @@ import { resetEnvForTests } from "@/lib/env";
 const ID = "f52030c1-18af-4e18-a1ec-50997d892ef4";
 
 describe("finance route allowlist", () => {
-  it("accepts published list filters and rejects partial returns", () => {
+  it("accepts published list filters and the retail return command", () => {
     expect(
       allowsFinanceRoute(
         "/api/v1/cash-sessions/",
@@ -25,7 +25,17 @@ describe("finance route allowlist", () => {
     ).toBe(true);
     expect(
       allowsFinanceRoute(`/api/v1/retail-sales/${ID}/return/`, "", "POST"),
-    ).toBeNull();
+    ).toBe(true);
+    expect(
+      allowsFinanceRoute(`/api/v1/retail-sales/${ID}/return/`, "", "GET"),
+    ).toBe(false);
+    expect(
+      allowsFinanceRoute(
+        `/api/v1/retail-sales/${ID}/return/`,
+        "?limit=1",
+        "POST",
+      ),
+    ).toBe(false);
     expect(
       allowsFinanceRoute("/api/v1/payments/", "?gym_id=other", "GET"),
     ).toBe(false);
@@ -75,20 +85,21 @@ describe("finance BFF proxy", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const csrf = "x".repeat(43);
-    const mutation = new NextRequest("https://app.example.com/api/operations", {
-      method: "POST",
-      headers: {
-        cookie: `gms_access=access; gms_csrf=${csrf}`,
-        origin: "https://app.example.com",
-        "x-csrf-token": csrf,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ reason: "Counted short" }),
-    });
+    const mutation = () =>
+      new NextRequest("https://app.example.com/api/operations", {
+        method: "POST",
+        headers: {
+          cookie: `gms_access=access; gms_csrf=${csrf}`,
+          origin: "https://app.example.com",
+          "x-csrf-token": csrf,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ reason: "Counted short" }),
+      });
     expect(
       (
         await authenticatedMutation(
-          mutation,
+          mutation(),
           `/api/v1/payments/${ID}/void/`,
           "POST",
         )
@@ -99,6 +110,23 @@ describe("finance BFF proxy", () => {
     );
     expect(headers.get("Idempotency-Key")).toMatch(/^[A-Za-z0-9._:-]{16,128}$/);
     expect(headers.get("Authorization")).toBe("Bearer access");
+
+    expect(
+      (
+        await authenticatedMutation(
+          mutation(),
+          `/api/v1/retail-sales/${ID}/return/`,
+          "POST",
+        )
+      ).status,
+    ).toBe(200);
+    const returnHeaders = new Headers(
+      (fetchMock.mock.calls.at(-1)?.[1] as RequestInit).headers,
+    );
+    expect(returnHeaders.get("Idempotency-Key")).toMatch(
+      /^[A-Za-z0-9._:-]{16,128}$/,
+    );
+    expect(returnHeaders.get("Authorization")).toBe("Bearer access");
   });
 
   it("does not invent an idempotency key for a check-in challenge", async () => {

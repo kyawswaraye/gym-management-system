@@ -81,6 +81,8 @@ TENANT_TABLES = {
     "inventory_stock_movement",
     "sales_retail_sale",
     "sales_retail_sale_line",
+    "sales_retail_return",
+    "sales_retail_return_line",
 }
 POLICY_COMMANDS = {"r", "a", "w", "d"}
 
@@ -213,6 +215,52 @@ def test_runtime_invitation_access_is_limited_to_tenant_writes() -> None:
         )
         privileges = cursor.fetchone()
     assert privileges == (True, True, True, False, True, True, True, False, True)
+
+
+def test_runtime_retail_return_access_is_insert_only() -> None:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT
+              has_table_privilege('gym_runtime', 'sales_retail_return', 'SELECT'),
+              has_table_privilege('gym_runtime', 'sales_retail_return', 'INSERT'),
+              has_table_privilege('gym_runtime', 'sales_retail_return', 'UPDATE'),
+              has_table_privilege('gym_runtime', 'sales_retail_return', 'DELETE'),
+              has_table_privilege('gym_runtime', 'sales_retail_return_line', 'SELECT'),
+              has_table_privilege('gym_runtime', 'sales_retail_return_line', 'INSERT'),
+              has_table_privilege('gym_runtime', 'sales_retail_return_line', 'UPDATE'),
+              has_table_privilege('gym_runtime', 'sales_retail_return_line', 'DELETE')
+            """
+        )
+        privileges = cursor.fetchone()
+        cursor.execute(
+            """
+            SELECT name
+            FROM (
+              SELECT conname AS name
+              FROM pg_constraint
+              UNION ALL
+              SELECT c.relname AS name
+              FROM pg_class c
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+              WHERE n.nspname = 'public' AND c.relkind = 'i'
+            ) objects
+            WHERE name IN (
+              'stock_one_return_line_uniq',
+              'stock_one_reversal_uniq',
+              'stock_one_sale_line_uniq',
+              'rret_settlement_ck',
+              'rretline_one_movement_uniq'
+            )
+            """
+        )
+        names = {row[0] for row in cursor.fetchall()}
+    assert privileges == (True, True, False, False, True, True, False, False)
+    assert names == {
+        "stock_one_sale_line_uniq",
+        "rret_settlement_ck",
+        "rretline_one_movement_uniq",
+    }
 
 
 def test_runtime_staff_profile_access_excludes_delete() -> None:

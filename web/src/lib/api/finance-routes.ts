@@ -410,6 +410,10 @@ const FINANCE_ROUTES: readonly Rule[] = [
     pattern: action("retail-sales", "void"),
     methods: COMMAND,
   },
+  {
+    pattern: action("retail-sales", "return"),
+    methods: COMMAND,
+  },
 ];
 
 export const FINANCE_PATH_PATTERNS: readonly RegExp[] = FINANCE_ROUTES.map(

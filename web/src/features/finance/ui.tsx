@@ -144,6 +144,7 @@ export function CommandForm({
 
   return (
     <form
+      aria-busy={pending}
       className="grid gap-3 rounded-lg border border-slate-200 p-4"
       onSubmit={submit}
     >

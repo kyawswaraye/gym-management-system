@@ -17,8 +17,8 @@ export default async function RetailSalesPage() {
         Retail sales
       </h1>
       <p className="muted mb-6 mt-2">
-        Build a draft sale and submit it for approval. A posted sale is
-        corrected by voiding the whole sale.
+        Build a draft sale and submit it for approval. A posted sale can be
+        returned in part, or voided in full while nothing has been returned.
       </p>
       <RetailSalesManager
         canApprove={session.permissions.includes("retail.approve")}

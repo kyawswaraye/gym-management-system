@@ -41,8 +41,10 @@ import type {
   RetailSale,
   RetailSaleApproval,
   RetailSaleUpdateRequest,
+  RetailSaleReturn,
   RetailSaleVoid,
   RetailSaleWriteRequest,
+  ReturnRetailSaleRequest,
   SalaryApproval,
   SalaryLinesReplaceRequest,
   SalaryPeriod,
@@ -623,6 +625,16 @@ export function voidRetailSale(
 ): Promise<RetailSaleVoid> {
   return command<RetailSaleVoid>(
     `retail-sales/${resourceId(saleId, "Retail sale")}/void/`,
+    body,
+  );
+}
+
+export function returnRetailSale(
+  saleId: string,
+  body: ReturnRetailSaleRequest,
+): Promise<RetailSaleReturn> {
+  return command<RetailSaleReturn>(
+    `retail-sales/${resourceId(saleId, "Retail sale")}/return/`,
     body,
   );
 }

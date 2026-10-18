@@ -49,12 +49,14 @@ export function CashSessionSelect({
   label,
   name = "cash_session_id",
   error,
+  required = true,
 }: {
   sessions: readonly CashSession[];
   currency: string;
   label: string;
   name?: string;
   error?: string | undefined;
+  required?: boolean;
 }) {
   const matches = sessions.filter(
     (session) => session.status === "OPEN" && session.currency === currency,
@@ -62,7 +64,7 @@ export function CashSessionSelect({
   return (
     <div className="grid gap-1">
       <Field error={error} label={label}>
-        <SelectInput name={name} required>
+        <SelectInput name={name} required={required}>
           <option value="">Select an open session</option>
           {matches.map((session) => (
             <option key={session.id} value={session.id}>

@@ -769,6 +769,102 @@ def post_retail_product_payment(
     return payment, receipt, movement
 
 
+def post_retail_product_refund(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    original: Payment,
+    amount: Decimal,
+    business_date: date,
+    reason: str,
+    cash_session_id: UUID | None,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> tuple[Payment, Receipt, CashTransaction | None]:
+    """Post one product refund without voiding the original charge or receipt.
+
+    Public payment refund still rejects ``PRODUCT``. The retail return service
+    is the only caller. It locks the charge, its corrections, receipts, and
+    the destination session before this insert. The refund copies the original
+    method and reference. Cash uses an outbound movement with ``reversal_of``
+    empty so several refunds can share the original in movement.
+    """
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Retail product refund requires an active transaction.")
+    if (
+        original.gym_id != gym.id
+        or original.purpose != Payment.Purpose.PRODUCT
+        or original.entry_type != Payment.EntryType.CHARGE
+        or original.status != Payment.Status.POSTED
+        or original.retail_sale_id is None
+        or original.reversal_payment_id is not None
+        or original.membership_id is not None
+        or original.legacy_unlinked_cash
+    ):
+        raise PaymentPostingConflict()
+    refund_amount = Decimal(amount).quantize(Decimal("0.01"))
+    if refund_amount <= 0 or refund_amount > Decimal(original.amount):
+        raise RefundExceedsBalance()
+    refund_id = uuid4()
+    movement = _refund_cash(
+        gym=gym,
+        actor=actor,
+        source_id=refund_id,
+        amount=refund_amount,
+        currency=original.currency,
+        method=original.method,
+        business_date=business_date,
+        description=f"Refund: {original.description}"[:255],
+        reason=reason,
+        cash_session_id=cash_session_id,
+    )
+    now = timezone.now()
+    refund = _insert_posted_correction(
+        gym=gym,
+        actor=actor,
+        original=original,
+        correction_id=refund_id,
+        entry_type=Payment.EntryType.REFUND,
+        amount=refund_amount,
+        method=original.method,
+        business_date=business_date,
+        description=f"Refund: {original.description}"[:255],
+        reference_number=original.reference_number,
+        movement=movement,
+        legacy=False,
+        posted_at=now,
+        retail_sale_id=original.retail_sale_id,
+    )
+    number, sequence_value, sequence_year = _allocate_receipt_number(
+        gym=gym, payment=refund, actor=actor
+    )
+    receipt = _issue_receipt(
+        gym=gym,
+        actor=actor,
+        payment=refund,
+        number=number,
+        sequence_value=sequence_value,
+        sequence_year=sequence_year,
+        issued_at=now,
+    )
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="PAYMENT_REFUND_POSTED",
+        payment=refund,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={
+            "original_payment_id": str(original.id),
+            "retail_sale_id": str(original.retail_sale_id),
+        },
+    )
+    return refund, receipt, movement
+
+
 def _retail_received_at(*, gym: Gym, business_date: Any) -> datetime:
     zone = ZoneInfo(gym.timezone)
     now = timezone.now()

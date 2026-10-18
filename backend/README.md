@@ -22,12 +22,12 @@ Member-self QR redemption is published at `POST /api/v1/member/check-ins/scan/`.
 Display-device list, enroll, rotate, and revoke are published, as is
 `POST /api/v1/device/check-in-challenges/`. NFC and biometric ingestion is published at `POST /api/v1/device/check-ins/`.
 The generic staff scan path, trainer scan, notification HTTP routes, and
-Payment draft, submit, approve, reject, cancel, void, refund, receipt list, detail, download, receipt void, and daily sales are published. Salary-period void and full retail-sale void are published in Increment 8B. Partial retail returns remain unpublished. Cash-session
+Payment draft, submit, approve, reject, cancel, void, refund, receipt list, detail, download, receipt void, and daily sales are published. Salary-period void and full retail-sale void are published in Increment 8B. Increment 8C publishes partial retail returns. Cash-session
 list, detail, open, adjustment, and reconcile, plus the cash-transaction
-list, are published. The cash-book, payment, expense, salary, inventory, and retail staff pages are delivered in increment 9. Partial retail returns remain unpublished. Expense-category and expense
+list, are published. The cash-book, payment, expense, salary, inventory, and retail staff pages are delivered in increment 9. Increment 8C publishes partial retail returns. Expense-category and expense
 approval routes are published. Manual expense void is published in Increment 8A. Salary-period
 list, detail, create, update, line replacement, submit, approve, reject, and
-cancel, and void are published. Partial retail returns remain unpublished. Product-category
+cancel, and void are published. Increment 8C publishes partial retail returns. Product-category
 list and create, product list, detail, create, and update, low-stock, and
 stock-movement list and adjustment are published; category update remains
 unpublished. Full retail-sale void is published in Increment 8B. Trainer scan
@@ -97,10 +97,15 @@ salary, inventory, and idempotency protections stay enabled. The repeatable
 browser reset drops and recreates `gym_platform_e2e` before migrate; prefix
 deletion is not a substitute once those protected rows exist. If a protected
 row blocks deletion, the original database error is raised. The command then
-creates one MFA-enabled platform admin, one MFA-enabled owner gym, and one
-already-linked member with an eligible membership. The member password is
-`E2E_MEMBER_PASSWORD`. Member MFA stays off because member login has no
-challenge contract. The command does not change production authentication.
+creates one MFA-enabled platform admin, one MFA-enabled owner gym, one
+MFA-enabled protected Manager, and one already-linked member with an eligible
+membership. The manager is invited and accepted through the staff workflow.
+That manager then creates the catalog item and opening stock, submits a card
+retail sale, and the owner approves it. The member password is
+`E2E_MEMBER_PASSWORD` and the manager password is `E2E_MANAGER_PASSWORD`.
+Member MFA stays off because member login has no challenge contract. The
+command does not change production authentication and does not disable finance,
+stock, or retail immutability triggers.
 
 ## Checks
 
@@ -166,7 +171,7 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   Increment 8A publishes payment void, payment refund, receipt void, and
   manual expense void. Increment 8B publishes salary-period void and full
   retail-sale void. A cash correction names an open destination session.
-  Partial retail returns remain unpublished.
+  Increment 8C publishes partial retail returns.
   Increment 5 publishes salary-period and salary-line routes.
   Increment 6 publishes product-category list/create, product
   list/create/detail/update, low-stock, stock-movement list, and manual
@@ -175,7 +180,8 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   Catalog and stock commands use the finance entitlement.
   Increment 7 publishes retail-sale list/create/detail/update and
   submit/approve/reject/cancel. Increment 8B publishes full retail void.
-  Partial returns and the retail UI remain unpublished. Approval posts stock, a product payment, a receipt,
+  Increment 8C later publishes `POST /api/v1/retail-sales/{id}/return/`.
+  The retail staff page exposes that return for a posted sale. Approval posts stock, a product payment, a receipt,
   and a cash movement in one transaction.
 - Platform gym provisioning, lifecycle, owner invitation, platform audit reads,
   tenant audit reads, staff invitation/acceptance, staff profiles, staff
@@ -222,9 +228,10 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   salary-period routes, Increment 6 product-category, product, low-stock,
   and stock-movement routes, Increment 7 retail-sale routes, Increment 8A
   payment void, payment refund, receipt void, and expense void, and Increment
-  8B salary-period void and full retail-sale void. It leaves the generic staff
-  scan path, trainer scan, notification, member profile, category update, and
-  partial retail-return routes unpublished.
+  8B salary-period void and full retail-sale void, and the Increment 8C
+  `POST /api/v1/retail-sales/{id}/return/` route. The retail staff page exposes
+  that return. It leaves the generic staff scan path, trainer scan,
+  notification, member profile, and category update unpublished.
   `profile_photo_asset_id` remains a nullable identifier with no foreign key to
   `FileAsset`. The staff API does not accept or return it. Attaching it later
   requires a same-gym asset whose scan status is CLEAN.

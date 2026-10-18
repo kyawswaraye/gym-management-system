@@ -6,7 +6,8 @@ SKU, name, sale price, and unit cost, then stores the exact line and sale
 totals. Only a ``DRAFT`` can change. Submission freezes those inputs.
 Approval posts stock, payment, receipt, and cash effects, or rolls them all
 back. A later full void restores stock and reverses the product charge
-without rewriting those posted facts.
+without rewriting those posted facts. A partial return leaves the sale
+``POSTED`` and appends immutable return evidence instead.
 """
 
 from __future__ import annotations
@@ -200,4 +201,198 @@ class RetailSaleLine(TenantModel):
         indexes = [
             models.Index(fields=["gym", "sale", "product"], name="rsline_gym_sale_product_idx"),
             models.Index(fields=["gym", "product"], name="rsline_gym_product_idx"),
+        ]
+
+
+class RetailReturn(TenantModel):
+    """Immutable partial return of a posted sale.
+
+    The sale stays ``POSTED``. The server owns every amount. A positive
+    refund links one ``PRODUCT`` ``REFUND`` payment and one issued correction
+    receipt. A zero refund restores stock and has neither. Cash names the
+    open destination session only when money is refunded. Rows are not
+    updated or deleted.
+    """
+
+    sale = models.ForeignKey(
+        RetailSale,
+        on_delete=models.RESTRICT,
+        related_name="returns",
+    )
+    business_date = models.DateField()
+    reason = models.TextField()
+    currency = models.CharField(max_length=3)
+    payment_method = models.CharField(max_length=20, choices=Payment.Method)
+    refund_amount = models.DecimalField(max_digits=18, decimal_places=2)
+    discount_total = models.DecimalField(max_digits=18, decimal_places=2)
+    cogs_total = models.DecimalField(max_digits=18, decimal_places=2)
+    gross_profit_total = models.DecimalField(max_digits=18, decimal_places=2)
+    payment = models.ForeignKey(
+        "members.Payment",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="retail_returns",
+    )
+    receipt = models.ForeignKey(
+        "members.Receipt",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="retail_returns",
+    )
+    cash_session = models.ForeignKey(
+        "cashbook.CashSession",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="retail_returns",
+    )
+    returned_by_membership_id = models.UUIDField()
+
+    class Meta:
+        db_table = "sales_retail_return"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="rret_gym_id_uniq"),
+            models.UniqueConstraint(
+                fields=["gym", "payment"],
+                condition=models.Q(payment__isnull=False),
+                name="rret_one_payment_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["gym", "receipt"],
+                condition=models.Q(receipt__isnull=False),
+                name="rret_one_receipt_uniq",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(currency__regex=r"^[A-Z]{3}$"),
+                name="rret_currency_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    payment_method__in=[
+                        "CASH",
+                        "BANK_TRANSFER",
+                        "CARD",
+                        "MOBILE_PAYMENT",
+                        "OTHER",
+                    ]
+                ),
+                name="rret_method_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(reason__regex=r"[^[:space:]]"),
+                name="rret_reason_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(refund_amount__gte=0)
+                    & models.Q(discount_total__gte=0)
+                    & models.Q(cogs_total__gte=0)
+                    & models.Q(
+                        gross_profit_total=models.F("refund_amount") - models.F("cogs_total")
+                    )
+                ),
+                name="rret_money_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        refund_amount__gt=0,
+                        payment__isnull=False,
+                        receipt__isnull=False,
+                    )
+                    | models.Q(
+                        refund_amount=0,
+                        payment__isnull=True,
+                        receipt__isnull=True,
+                    )
+                ),
+                name="rret_settlement_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        payment_method="CASH",
+                        refund_amount__gt=0,
+                        cash_session__isnull=False,
+                    )
+                    | models.Q(
+                        payment_method="CASH",
+                        refund_amount=0,
+                        cash_session__isnull=True,
+                    )
+                    | (~models.Q(payment_method="CASH") & models.Q(cash_session__isnull=True))
+                ),
+                name="rret_cash_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["gym", "sale", "created_at", "id"], name="rret_gym_sale_idx"),
+            models.Index(fields=["gym", "business_date", "id"], name="rret_gym_date_idx"),
+        ]
+
+
+class RetailReturnLine(TenantModel):
+    """One returned sale line. Quantity and money are server-owned.
+
+    Discount, refund revenue, and cost are cumulative ``ROUND_HALF_UP``
+    slices of the immutable sale line. The final returned quantity receives
+    the exact remainder. Gross profit is refund revenue minus cost. The row
+    points at the positive ``SALE_RETURN`` movement for this quantity.
+    """
+
+    retail_return = models.ForeignKey(
+        RetailReturn,
+        on_delete=models.RESTRICT,
+        related_name="lines",
+    )
+    sale_line = models.ForeignKey(
+        RetailSaleLine,
+        on_delete=models.RESTRICT,
+        related_name="return_lines",
+    )
+    quantity = models.DecimalField(max_digits=18, decimal_places=3)
+    discount = models.DecimalField(max_digits=18, decimal_places=2)
+    refund_revenue = models.DecimalField(max_digits=18, decimal_places=2)
+    cost_of_goods_sold = models.DecimalField(max_digits=18, decimal_places=2)
+    gross_profit = models.DecimalField(max_digits=18, decimal_places=2)
+    stock_movement = models.ForeignKey(
+        "inventory.StockMovement",
+        on_delete=models.RESTRICT,
+        related_name="retail_return_lines",
+    )
+    created_by_membership_id = models.UUIDField()
+
+    class Meta:
+        db_table = "sales_retail_return_line"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="rretline_gym_id_uniq"),
+            models.UniqueConstraint(
+                fields=["gym", "retail_return", "sale_line"],
+                name="rretline_return_line_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["gym", "stock_movement"],
+                name="rretline_one_movement_uniq",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(quantity__gt=0),
+                name="rretline_quantity_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(discount__gte=0)
+                    & models.Q(refund_revenue__gte=0)
+                    & models.Q(cost_of_goods_sold__gte=0)
+                    & models.Q(
+                        gross_profit=models.F("refund_revenue") - models.F("cost_of_goods_sold")
+                    )
+                ),
+                name="rretline_money_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["gym", "sale_line"], name="rretline_gym_sale_line_idx"),
+            models.Index(fields=["gym", "retail_return"], name="rretline_gym_return_idx"),
         ]

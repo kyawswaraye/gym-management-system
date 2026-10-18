@@ -734,7 +734,7 @@ def test_retail_card_void_reconciles_same_day_and_later_day() -> None:
         HTTP_IDEMPOTENCY_KEY=_key("return"),
         **headers,
     )
-    assert missing_return.status_code == 404
+    assert missing_return.status_code == 400
     forged = api.post(
         "/api/v1/stock-movements/adjust/",
         {

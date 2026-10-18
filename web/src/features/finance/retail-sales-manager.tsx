@@ -13,6 +13,7 @@ import {
   getRetailSale,
   listRetailSales,
   rejectRetailSale,
+  returnRetailSale,
   submitRetailSale,
   updateRetailSale,
   voidRetailSale,
@@ -46,7 +47,9 @@ import type {
   RetailSale,
   RetailSaleApproval,
   RetailSaleLineWriteRequest,
+  RetailSaleReturn,
   RetailSaleVoid,
+  ReturnRetailSaleRequest,
   VoidRetailSaleRequest,
 } from "@/types/api";
 
@@ -69,6 +72,12 @@ type LineDraft = {
 function text(form: FormData, name: string): string {
   const value = form.get(name);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function quantityScale(value: string): bigint | null {
+  const canonical = canonicalQuantity(value, { allowZero: true });
+  if (!canonical || canonical.startsWith("-")) return null;
+  return BigInt(canonical.replace(".", ""));
 }
 
 function blankLine(): LineDraft {
@@ -110,11 +119,14 @@ export function RetailSalesManager({
   const [reference, setReference] = useState("");
   const [editing, setEditing] = useState(false);
   const [action, setAction] = useState<
-    "submit" | "approve" | "reject" | "cancel" | "void" | null
+    "submit" | "approve" | "reject" | "cancel" | "void" | "return" | null
   >(null);
   const [correctionDate, setCorrectionDate] = useState(defaultDate);
   const [approval, setApproval] = useState<RetailSaleApproval | null>(null);
   const [voidResult, setVoidResult] = useState<RetailSaleVoid | null>(null);
+  const [returnResult, setReturnResult] = useState<RetailSaleReturn | null>(
+    null,
+  );
   const [formError, setFormError] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
@@ -128,7 +140,8 @@ export function RetailSalesManager({
   const sessions = useOpenCashSessions(
     action === "approve" && sale
       ? sale.business_date
-      : action === "void"
+      : action === "void" ||
+          (action === "return" && sale?.payment_method === "CASH")
         ? correctionDate
         : businessDate,
   );
@@ -502,6 +515,8 @@ export function RetailSalesManager({
               },
               { label: "COGS", value: sale.cogs_total },
               { label: "Gross profit", value: sale.gross_profit_total },
+              { label: "Returned amount", value: sale.returned_amount },
+              { label: "Returns", value: String(sale.return_count) },
               { label: "Payment", value: sale.payment_id ?? "None" },
               { label: "Receipt", value: sale.receipt_id ?? "None" },
             ]}
@@ -509,8 +524,9 @@ export function RetailSalesManager({
           <ul>
             {sale.lines.map((line) => (
               <li key={line.id}>
-                {line.product_name}: {line.quantity} at {line.unit_price},
-                discount {line.discount}, revenue {line.line_revenue}
+                {line.product_name}: sold {line.quantity}, returned{" "}
+                {line.returned_quantity}, remaining {line.remaining_quantity},
+                revenue {line.line_revenue}
               </li>
             ))}
           </ul>
@@ -560,13 +576,22 @@ export function RetailSalesManager({
                 Cancel draft
               </button>
             )}
-            {sale.status === "POSTED" && canVoid && (
+            {sale.status === "POSTED" && canVoid && sale.return_count === 0 && (
               <button
                 className="underline"
                 onClick={() => setAction("void")}
                 type="button"
               >
                 Void sale
+              </button>
+            )}
+            {sale.status === "POSTED" && canVoid && (
+              <button
+                className="underline"
+                onClick={() => setAction("return")}
+                type="button"
+              >
+                Partial return
               </button>
             )}
           </div>
@@ -742,6 +767,138 @@ export function RetailSalesManager({
               )}
             </CommandForm>
           )}
+          {action === "return" && (
+            <CommandForm
+              confirmLabel="Confirm return"
+              error={formError}
+              onCancel={() => setAction(null)}
+              onSubmit={(form) => {
+                setFields({});
+                setFormError("");
+                const chosen: ReturnRetailSaleRequest["lines"] = [];
+                const nextFields: Record<string, string> = {};
+                for (const line of sale.lines) {
+                  const raw = text(form, `quantity_${line.id}`);
+                  if (!raw) continue;
+                  const quantity = canonicalQuantity(raw);
+                  const entered = quantity ? quantityScale(quantity) : null;
+                  const remaining = quantityScale(line.remaining_quantity);
+                  if (!quantity || entered === null || remaining === null) {
+                    nextFields[line.id] =
+                      "Enter a positive quantity with up to three decimal places.";
+                    continue;
+                  }
+                  if (entered > remaining) {
+                    nextFields[line.id] =
+                      `Enter no more than the remaining ${line.remaining_quantity}.`;
+                    continue;
+                  }
+                  chosen.push({ line_id: line.id, quantity });
+                }
+                if (Object.keys(nextFields).length > 0) {
+                  setFields(nextFields);
+                  return;
+                }
+                if (chosen.length < 1) {
+                  setFormError(
+                    "Enter a quantity for at least one remaining line.",
+                  );
+                  return;
+                }
+                const body: ReturnRetailSaleRequest = {
+                  reason: text(form, "reason"),
+                  lines: chosen,
+                };
+                const date = text(form, "business_date");
+                if (date) body.business_date = date;
+                if (sale.payment_method === "CASH") {
+                  const sessionId = text(form, "cash_session_id");
+                  if (sessionId) body.cash_session_id = sessionId;
+                }
+                setPending(true);
+                void returnRetailSale(sale.id, body)
+                  .then((result) => {
+                    setReturnResult(result);
+                    setSale(result.retail_sale);
+                    setAction(null);
+                    sales.reload();
+                  })
+                  .catch((caught: unknown) =>
+                    fail(caught, "The return could not be recorded."),
+                  )
+                  .finally(() => setPending(false));
+              }}
+              pending={pending}
+              title="Return part of the sale"
+            >
+              <p>
+                Enter a quantity for each line you are returning. Leave a line
+                blank to keep it. The server calculates the refund.
+              </p>
+              {sale.lines.map((line) => {
+                const remaining = quantityScale(line.remaining_quantity);
+                const descriptionId = `return-line-${line.id}`;
+                const inputId = `return-quantity-${line.id}`;
+                const errorId = `return-error-${line.id}`;
+                const error = fields[line.id];
+                return (
+                  <div key={line.id}>
+                    <p id={descriptionId}>
+                      Sold {line.quantity}, returned {line.returned_quantity},
+                      remaining {line.remaining_quantity}
+                    </p>
+                    <label className="field" htmlFor={inputId}>
+                      Return quantity for {line.product_name}
+                    </label>
+                    <TextInput
+                      aria-describedby={
+                        error ? `${descriptionId} ${errorId}` : descriptionId
+                      }
+                      aria-invalid={error ? true : undefined}
+                      disabled={remaining === 0n}
+                      id={inputId}
+                      inputMode="decimal"
+                      name={`quantity_${line.id}`}
+                    />
+                    {error && (
+                      <span
+                        className="text-sm text-red-700"
+                        id={errorId}
+                        role="alert"
+                      >
+                        {error}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+              <ReasonField error={fields.reason} label="Return reason" />
+              <Field error={fields.business_date} label="Business date">
+                <TextInput
+                  defaultValue={defaultDate}
+                  name="business_date"
+                  onChange={(event) => setCorrectionDate(event.target.value)}
+                  type="date"
+                />
+              </Field>
+              {sale.payment_method === "CASH" && (
+                <CashSessionSelect
+                  currency={sale.currency}
+                  error={fields.cash_session_id}
+                  label="Destination open session"
+                  required={false}
+                  sessions={sessions.sessions}
+                />
+              )}
+              {sale.payment_method === "CASH" && (
+                <p>
+                  Choose an open session only when this return refunds cash.
+                  Leave it blank when the server refund is zero.
+                </p>
+              )}
+              {pending && <Loading label="Returning the sale" />}
+            </CommandForm>
+          )}
           {approval && (
             <ServerFacts
               rows={[
@@ -775,6 +932,33 @@ export function RetailSalesManager({
                 {
                   label: "Stock returns",
                   value: String(voidResult.stock_movements.length),
+                },
+              ]}
+            />
+          )}
+          {returnResult && (
+            <ServerFacts
+              rows={[
+                {
+                  label: "Refund amount",
+                  value: returnResult.retail_return.refund_amount,
+                },
+                {
+                  label: "Refund payment",
+                  value: returnResult.refund_payment?.id ?? "None",
+                },
+                {
+                  label: "Correction receipt",
+                  value:
+                    returnResult.correction_receipt?.receipt_number ?? "None",
+                },
+                {
+                  label: "Cash movement",
+                  value: returnResult.cash_transaction?.id ?? "None",
+                },
+                {
+                  label: "Stock returns",
+                  value: String(returnResult.stock_movements.length),
                 },
               ]}
             />

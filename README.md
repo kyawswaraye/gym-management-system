@@ -103,18 +103,18 @@ local `make check` contract step still reports those files because this
 increment is not committed.
 Phase 4 increment 6 publishes product-category list and create, product list,
 create, detail, and update, low-stock, stock-movement list, and manual stock
-adjustment. Category update, returns, inventory UI, and every void/refund
-route stay unpublished. Quantity on hand is the sum of append-only movements.
+adjustment. Category update stayed unpublished in that increment. Returns, the
+inventory page, and void/refund routes were published later. Quantity on hand is the sum of append-only movements.
 Adjustment snapshots current unit cost and does not compute a weighted
 average. Catalog and stock commands use the finance entitlement.
 The inventory staff page is delivered in increment 9.
 Phase 4 increment 7 publishes retail-sale list, create, detail, update,
-submit, approve, reject, and cancel. Partial returns stay unpublished. The retail staff page, including full void, is delivered in increment 9. Approval posts one sale movement per line, one product
+submit, approve, reject, and cancel. Increment 8C later publishes partial returns. The retail staff page, including full void, is delivered in increment 9 and exposes that return. Approval posts one sale movement per line, one product
 payment, one receipt, and one cash-in movement when the method is cash.
 Quantity times money rounds half up to minor units. Daily product metrics
-come from posted retail lines. Phase 4 remains open.
+come from posted retail lines.
 Phase 4 increment 8B publishes salary-period void and full retail-sale void.
-Partial retail returns stay unpublished. A cash correction names an open
+Increment 8C publishes partial retail returns. A cash correction names an open
 destination session and does not reopen the original till. Product payment
 corrections are rejected so posted retail stock and receipts stay aligned.
 A legacy unlinked cash void does not invent a movement. Closed sessions are
@@ -122,7 +122,8 @@ not reopened. A correction requires the exact live permission, the finance
 entitlement, and an active same-gym membership. The creator, submitter, or
 receipt issuer may correct, including through a custom role that holds that
 permission. Approval and rejection still require a different protected Manager
-or Owner. Phase 4 increment 9 delivers the tenant staff pages for the published cash-book, payment, receipt, expense, salary, inventory, and full retail-void workflows. Navigation requires the matching view permission and the finance entitlement. Cash approval and cash correction select an open session the server returns for that caller. Product payment corrections stay on the retail full void. Partial retail returns are not in the UI. Phase 4 remains open. Production email and object-storage gates remain. Increment 9 web checks: format, lint, strict typecheck, and the production build passed. Vitest passed 51 files and 286 tests. Playwright finance smoke passed twice in a row with `E2E_RESET` unset (1 spec each: navigation plus an OTHER payment draft submit). `make e2e` then passed 5 specs. Each API start drops and recreates only `gym_platform_e2e`. Generated types were not regenerated. Backend business APIs were not changed.
+or Owner. Phase 4 increment 9 delivers the tenant staff pages for the published cash-book, payment, receipt, expense, salary, inventory, and full retail-void workflows. Navigation requires the matching view permission and the finance entitlement. Cash approval and cash correction select an open session the server returns for that caller. Product payment corrections stay on the retail return or full void. The retail page exposes a partial return for a posted sale. Phase 4 implementation is complete as of 2026-10-18 against the code and test gates. Manager finance and security evidence review is complete. Production deployment is not complete. Production email and object-storage gates remain open.
+Increment 8C gate evidence: backend ruff, format, and mypy passed and migrations stayed in sync. 293 non-PostgreSQL backend tests passed and 252 were deselected. The PostgreSQL suite passed 252 tests and 293 were deselected, with zero failures. Web format, lint, typecheck, and build passed. Vitest passed 51 files and 288 tests. OpenAPI export and TypeScript generation were each run twice, and the second run matched the first. `git diff --exit-code` on the contract files still fails because this increment is not committed. `make e2e` passed 6 specs twice in a row, including the finance smoke and the manager partial-return journey. Each API start drops and recreates only `gym_platform_e2e`.
 Increment 6 gate evidence: backend ruff, format, and mypy passed and
 migrations stayed in sync; 273 non-PostgreSQL backend tests passed; the
 PostgreSQL suite passed 234 tests; web format, lint, typecheck, and build

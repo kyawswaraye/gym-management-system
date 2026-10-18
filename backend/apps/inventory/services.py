@@ -337,12 +337,15 @@ def post_sale_return(
     original: StockMovement,
     business_date: Any,
     reason: str,
+    quantity: Decimal | None = None,
 ) -> StockMovement:
     """Append one positive ``SALE_RETURN`` for a locked original sale movement.
 
     The public adjustment command still rejects ``SALE`` and ``SALE_RETURN``.
     The caller locks the product and the original movement before this insert.
-    The original movement is not updated.
+    The original movement is not updated. Omit ``quantity`` to restore the
+    whole sold quantity. A smaller quantity is one partial return. The original
+    movement stays the full negative sale quantity.
     """
 
     if not connection.in_atomic_block:
@@ -358,16 +361,17 @@ def post_sale_return(
         or original.reverses_movement_id is not None
     ):
         raise ValidationError({"lines": ["The sale movement does not match this line."]})
-    quantity = parse_quantity(line.quantity)
-    if quantity <= 0 or parse_quantity(original.quantity) != -quantity:
-        raise ValidationError({"quantity": ["A sale return must restore the sold quantity."]})
+    sold = parse_quantity(line.quantity)
+    returned = sold if quantity is None else parse_quantity(quantity)
+    if sold <= 0 or returned <= 0 or returned > sold or parse_quantity(original.quantity) != -sold:
+        raise ValidationError({"quantity": ["A sale return must restore sold quantity."]})
     snapshot = parse_money(line.unit_cost_snapshot)
     if snapshot != parse_money(original.unit_cost_snapshot):
         raise ValidationError({"lines": ["The sale return must keep the sold unit cost."]})
     return StockMovement.objects.create(
         gym=gym,
         product=product,
-        quantity=quantity,
+        quantity=returned,
         movement_type=StockMovement.Type.SALE_RETURN,
         unit_cost_snapshot=snapshot,
         reason=reason,

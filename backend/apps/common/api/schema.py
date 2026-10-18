@@ -130,6 +130,7 @@ def phase_1a_endpoints(endpoints: list[Endpoint]) -> list[Endpoint]:
             "/api/v1/retail-sales/{sale_id}/reject/",
             "/api/v1/retail-sales/{sale_id}/cancel/",
             "/api/v1/retail-sales/{sale_id}/void/",
+            "/api/v1/retail-sales/{sale_id}/return/",
         }
     ]
 
