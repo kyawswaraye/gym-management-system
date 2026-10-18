@@ -166,6 +166,38 @@ class FileAsset(TenantModel):
             ),
             models.CheckConstraint(
                 condition=(
+                    ~models.Q(purpose="EXPENSE_RECEIPT")
+                    | (
+                        models.Q(owner_type="GYM", owner_id=models.F("gym_id"))
+                        & models.Q(
+                            upload_sha256__isnull=False,
+                            upload_byte_size__isnull=False,
+                            upload_content_type__isnull=False,
+                        )
+                        & models.Q(
+                            upload_content_type__in=["image/jpeg", "image/png", "image/webp"],
+                            content_type__in=["image/jpeg", "image/png", "image/webp"],
+                        )
+                        & models.Q(upload_byte_size__gte=1, upload_byte_size__lte=5242880)
+                        & models.Q(byte_size__gte=1, byte_size__lte=5242880)
+                        & (~models.Q(retention_status="ACTIVE") | models.Q(scan_status="CLEAN"))
+                        & (
+                            models.Q(scan_status="REJECTED", rejection_code__isnull=False)
+                            | (
+                                ~models.Q(scan_status="REJECTED")
+                                & models.Q(rejection_code__isnull=True)
+                            )
+                        )
+                        & (
+                            ~models.Q(scan_status="CLEAN")
+                            | models.Q(content_type=models.F("upload_content_type"))
+                        )
+                    )
+                ),
+                name="fileasset_expense_receipt_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
                     models.Q(owner_type__isnull=True, owner_id__isnull=True)
                     | (
                         models.Q(owner_type__isnull=False, owner_id__isnull=False)

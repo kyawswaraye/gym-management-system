@@ -11,12 +11,17 @@ from django.db import connection, transaction
 from django.db.models import Exists, OuterRef, Q
 from django.http import Http404
 from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
 
 from apps.audit.services import write_tenant_audit
+from apps.cashbook.selectors import holds_protected_role, membership_has_permission
 from apps.common.db.tenant_context import set_gym_context
 from apps.files.constants import (
     ATTACHMENT_NAMES,
     CLAIM_STALE_SECONDS,
+    EXPENSE_RECEIPT_NAMES,
+    EXPENSE_RECEIPT_PURPOSE,
+    GYM_OWNER,
     MEMBER_OWNER,
     PROFILE_PHOTO_PURPOSE,
     QUARANTINE_HOURS,
@@ -93,13 +98,46 @@ def create_upload_intent(
     content_type: str,
     byte_size: int,
     sha256: str,
+    purpose: str = PROFILE_PHOTO_PURPOSE,
+    owner_type: str = MEMBER_OWNER,
     moment: datetime | None = None,
 ) -> FileCommand:
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
-        member = _locked_member(gym, owner_id)
-        _require_scope(gym, actor, member)
-        _require_members_entitlement(gym)
+        stored_owner_id = owner_id
+        stored_owner_type = owner_type
+        stored_purpose = purpose
+        if purpose == PROFILE_PHOTO_PURPOSE:
+            locked_member = _locked_member(gym, owner_id)
+            _require_scope(gym, actor, locked_member)
+            _require_members_entitlement(gym)
+            stored_owner_id = locked_member.id
+            stored_owner_type = MEMBER_OWNER
+            stored_purpose = PROFILE_PHOTO_PURPOSE
+        elif purpose == EXPENSE_RECEIPT_PURPOSE:
+            _require_finance_entitlement(gym)
+            if owner_type != GYM_OWNER or owner_id != gym.id:
+                raise FileRequestError(
+                    code="UNSUPPORTED_FILE_OWNER",
+                    message="This file owner is not supported.",
+                    status_code=422,
+                    fields={"owner_id": ["This file owner is not supported."]},
+                )
+            if not (
+                membership_has_permission(membership=actor, code="expenses.create")
+                or membership_has_permission(membership=actor, code="expenses.update")
+            ):
+                raise PermissionDenied()
+            stored_owner_id = gym.id
+            stored_owner_type = GYM_OWNER
+            stored_purpose = EXPENSE_RECEIPT_PURPOSE
+        else:
+            raise FileRequestError(
+                code="UNSUPPORTED_FILE_PURPOSE",
+                message="This file purpose is not supported.",
+                status_code=422,
+                fields={"purpose": ["This file purpose is not supported."]},
+            )
         asset = FileAsset.objects.create(
             gym=gym,
             object_key=f"{gym.id}/{uuid4()}",
@@ -110,10 +148,10 @@ def create_upload_intent(
             upload_content_type=content_type,
             upload_byte_size=byte_size,
             upload_sha256=sha256,
-            purpose=PROFILE_PHOTO_PURPOSE,
+            purpose=stored_purpose,
             scan_status=FileAsset.ScanStatus.PENDING,
-            owner_type=MEMBER_OWNER,
-            owner_id=member.id,
+            owner_type=stored_owner_type,
+            owner_id=stored_owner_id,
             uploaded_by_membership_id=actor.id,
             retention_status=FileAsset.RetentionStatus.QUARANTINED,
             rejection_code=None,
@@ -128,7 +166,7 @@ def create_upload_intent(
             asset=asset,
             values={
                 "purpose": asset.purpose,
-                "owner_id": str(member.id),
+                "owner_id": str(stored_owner_id),
                 "content_type": content_type,
                 "byte_size": byte_size,
                 "sha256": sha256,
@@ -224,8 +262,7 @@ def issue_download_url(
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         member, asset = _lock_owned_asset(gym, asset_id)
-        _require_scope(gym, actor, member)
-        _require_members_entitlement(gym)
+        _require_asset_access(gym, actor, member, asset)
         if not _downloadable(asset):
             raise _not_downloadable()
         snapshot = (asset.content_type, asset.byte_size, asset.sha256, asset.object_key)
@@ -247,7 +284,7 @@ def issue_download_url(
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         member, asset = _lock_owned_asset(gym, asset_id)
-        _require_scope(gym, actor, member)
+        _require_asset_access(gym, actor, member, asset)
         if (
             not _downloadable(asset)
             or asset.content_type != content_type
@@ -262,13 +299,17 @@ def issue_download_url(
             asset=asset,
             values={
                 "purpose": asset.purpose,
-                "owner_id": str(member.id),
+                "owner_id": str(asset.owner_id),
                 "content_type": content_type,
                 "byte_size": byte_size,
                 "sha256": digest,
             },
         )
-    filename = ATTACHMENT_NAMES[content_type]
+    filename = (
+        EXPENSE_RECEIPT_NAMES[content_type]
+        if asset.purpose == EXPENSE_RECEIPT_PURPOSE
+        else ATTACHMENT_NAMES[content_type]
+    )
     signed_at = moment or utc_now()
     try:
         download = store.presign_get(
@@ -305,8 +346,9 @@ def delete_upload(
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         member, asset = _lock_owned_asset(gym, asset_id)
-        _require_scope(gym, actor, member)
-        _require_members_entitlement(gym)
+        _require_asset_access(gym, actor, member, asset)
+        if asset.purpose == EXPENSE_RECEIPT_PURPOSE and _expense_receipt_referenced(gym, asset.id):
+            raise _state_conflict()
         if asset.retention_status == FileAsset.RetentionStatus.DELETED:
             _detach_photo(member, asset.id)
             return _delete_result(asset)
@@ -362,7 +404,7 @@ def expire_quarantined_uploads(
     limit: int = 100,
     before_claim: Callable[[UUID], None] | None = None,
 ) -> int:
-    """Retire abandoned profile photos and retry object removal. One row at a time.
+    """Retire abandoned uploads and retry object removal. One row at a time.
 
     ``before_claim`` runs after a row is selected and before its claim transaction.
     Tests use it to attach that photo before the locked recheck.
@@ -372,20 +414,27 @@ def expire_quarantined_uploads(
         set_gym_context(gym_id=gym.id)
         cutoff = timezone.now() - timedelta(hours=QUARANTINE_HOURS)
         referenced = Member.objects.filter(gym=gym, profile_photo_asset_id=OuterRef("id"))
+        private_purpose = Q(purpose__in=[PROFILE_PHOTO_PURPOSE, EXPENSE_RECEIPT_PURPOSE])
         cutoff_ids = list(
-            FileAsset.objects.filter(gym=gym, purpose=PROFILE_PHOTO_PURPOSE)
+            FileAsset.objects.filter(gym=gym)
             .filter(
-                Q(retention_status=FileAsset.RetentionStatus.DELETE_PENDING)
-                | Q(
-                    retention_status=FileAsset.RetentionStatus.QUARANTINED,
-                    scan_status=FileAsset.ScanStatus.REJECTED,
-                )
-                | Q(
-                    retention_status=FileAsset.RetentionStatus.QUARANTINED,
-                    created_at__lte=cutoff,
+                (
+                    private_purpose
+                    & (
+                        Q(retention_status=FileAsset.RetentionStatus.DELETE_PENDING)
+                        | Q(
+                            retention_status=FileAsset.RetentionStatus.QUARANTINED,
+                            scan_status=FileAsset.ScanStatus.REJECTED,
+                        )
+                        | Q(
+                            retention_status=FileAsset.RetentionStatus.QUARANTINED,
+                            created_at__lte=cutoff,
+                        )
+                    )
                 )
                 | (
                     Q(
+                        purpose=PROFILE_PHOTO_PURPOSE,
                         retention_status=FileAsset.RetentionStatus.ACTIVE,
                         scan_status=FileAsset.ScanStatus.CLEAN,
                         created_at__lte=cutoff,
@@ -461,8 +510,7 @@ def _claim_upload(
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         member, asset = _lock_owned_asset(gym, asset_id)
-        _require_scope(gym, actor, member)
-        _require_members_entitlement(gym)
+        _require_asset_access(gym, actor, member, asset)
         if asset.scan_status == FileAsset.ScanStatus.REJECTED:
             raise _rejected(asset)
         if asset.retention_status in {
@@ -532,7 +580,7 @@ def _finalize_upload(
         with transaction.atomic():
             set_gym_context(gym_id=gym.id)
             member, asset = _lock_owned_asset(gym, claim.asset_id)
-            _require_scope(gym, actor, member)
+            _require_held_asset(gym, actor, member, asset)
             return _command_from_locked(gym, audit, asset, sha256, byte_size)
     if verdict.outcome is VerifyOutcome.MISSING:
         return _release_missing_upload(
@@ -548,7 +596,7 @@ def _finalize_upload(
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         member, asset = _lock_owned_asset(gym, claim.asset_id)
-        _require_scope(gym, actor, member)
+        _require_held_asset(gym, actor, member, asset)
         if asset.scan_attempt_id != claim.attempt_id or (
             asset.retention_status != FileAsset.RetentionStatus.QUARANTINED
         ):
@@ -655,7 +703,7 @@ def _attempt_still_held(gym: Gym, actor: GymMembership, claim: _Claim) -> bool:
         with transaction.atomic():
             set_gym_context(gym_id=gym.id)
             member, asset = _lock_owned_asset(gym, claim.asset_id)
-            _require_scope(gym, actor, member)
+            _require_held_asset(gym, actor, member, asset)
             return (
                 asset.scan_attempt_id == claim.attempt_id
                 and asset.retention_status == FileAsset.RetentionStatus.QUARANTINED
@@ -677,7 +725,7 @@ def _release_missing_upload(
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         member, asset = _lock_owned_asset(gym, claim.asset_id)
-        _require_scope(gym, actor, member)
+        _require_held_asset(gym, actor, member, asset)
         if (
             asset.scan_attempt_id == claim.attempt_id
             and asset.retention_status == FileAsset.RetentionStatus.QUARANTINED
@@ -821,6 +869,12 @@ def _profile_photo_referenced(gym: Gym, asset_id: UUID) -> bool:
     return Member.objects.filter(gym=gym, profile_photo_asset_id=asset_id).exists()
 
 
+def _expense_receipt_referenced(gym: Gym, asset_id: UUID) -> bool:
+    from apps.expenses.models import Expense
+
+    return Expense.objects.filter(gym=gym, receipt_file_asset_id=asset_id).exists()
+
+
 def _reject_expired(gym: Gym, asset: FileAsset, *, attempt_id: UUID | None) -> bool:
     updated = FileAsset.objects.filter(
         pk=asset.pk,
@@ -951,17 +1005,33 @@ def _delete_object(store: Any, object_key: str) -> bool:
     return True
 
 
-def _lock_owned_asset(gym: Gym, asset_id: UUID) -> tuple[Member, FileAsset]:
+def _lock_owned_asset(gym: Gym, asset_id: UUID) -> tuple[Member | None, FileAsset]:
     preview = (
-        FileAsset.objects.filter(gym=gym, id=asset_id).only("id", "owner_type", "owner_id").first()
+        FileAsset.objects.filter(gym=gym, id=asset_id)
+        .only("id", "owner_type", "owner_id", "purpose")
+        .first()
     )
-    if preview is None or preview.owner_type != MEMBER_OWNER or preview.owner_id is None:
+    if preview is None:
         raise Http404
-    member = _locked_member(gym, preview.owner_id)
-    asset = FileAsset.objects.select_for_update().filter(gym=gym, id=asset_id).first()
-    if asset is None or asset.owner_type != MEMBER_OWNER or asset.owner_id != member.id:
-        raise Http404
-    return member, asset
+    if preview.purpose == PROFILE_PHOTO_PURPOSE:
+        if preview.owner_type != MEMBER_OWNER or preview.owner_id is None:
+            raise Http404
+        member = _locked_member(gym, preview.owner_id)
+        asset = FileAsset.objects.select_for_update().filter(gym=gym, id=asset_id).first()
+        if asset is None or asset.owner_type != MEMBER_OWNER or asset.owner_id != member.id:
+            raise Http404
+        return member, asset
+    if preview.purpose == EXPENSE_RECEIPT_PURPOSE:
+        asset = FileAsset.objects.select_for_update().filter(gym=gym, id=asset_id).first()
+        if (
+            asset is None
+            or asset.owner_type != GYM_OWNER
+            or asset.owner_id != gym.id
+            or asset.purpose != EXPENSE_RECEIPT_PURPOSE
+        ):
+            raise Http404
+        return None, asset
+    raise Http404
 
 
 def _locked_member(gym: Gym, member_id: UUID) -> Member:
@@ -971,7 +1041,9 @@ def _locked_member(gym: Gym, member_id: UUID) -> Member:
     return member
 
 
-def _require_scope(gym: Gym, actor: GymMembership, member: Member) -> None:
+def _require_scope(gym: Gym, actor: GymMembership, member: Member | None) -> None:
+    if member is None:
+        return
     if member.gym_id != gym.id:
         raise Http404
     keys = set(
@@ -985,6 +1057,98 @@ def _require_scope(gym: Gym, actor: GymMembership, member: Member) -> None:
     # is denied for every member, including one that would later be assigned.
     if keys and keys <= {"TRAINER"}:
         raise Http404
+
+
+def _require_finance_entitlement(gym: Gym) -> None:
+    now = timezone.now()
+    entitled = GymFeatureEntitlement.objects.filter(
+        Q(effective_from__isnull=True) | Q(effective_from__lte=now),
+        Q(effective_until__isnull=True) | Q(effective_until__gt=now),
+        gym=gym,
+        feature__code="finance",
+        enabled=True,
+    ).exists()
+    if not entitled:
+        raise FileRequestError(
+            code="FEATURE_NOT_ENTITLED",
+            message="The finance feature is not enabled.",
+            status_code=403,
+        )
+
+
+def _require_held_asset(
+    gym: Gym, actor: GymMembership, member: Member | None, asset: FileAsset
+) -> None:
+    """Recheck the caller while a scan claim is finalized.
+
+    Profile photos keep the original scope check. Expense receipts recheck the
+    finance entitlement, an expense create or update permission, and receipt
+    visibility.
+    """
+
+    if asset.purpose == PROFILE_PHOTO_PURPOSE:
+        _require_scope(gym, actor, member)
+        return
+    if asset.purpose == EXPENSE_RECEIPT_PURPOSE:
+        _require_expense_receipt_access(gym, actor, asset)
+        return
+    raise Http404
+
+
+def _require_asset_access(
+    gym: Gym, actor: GymMembership, member: Member | None, asset: FileAsset
+) -> None:
+    if asset.purpose == PROFILE_PHOTO_PURPOSE:
+        if member is None:
+            raise Http404
+        _require_scope(gym, actor, member)
+        _require_members_entitlement(gym)
+        return
+    if asset.purpose == EXPENSE_RECEIPT_PURPOSE:
+        _require_expense_receipt_access(gym, actor, asset)
+        return
+    raise Http404
+
+
+def _require_expense_capability(actor: GymMembership) -> None:
+    if not (
+        membership_has_permission(membership=actor, code="expenses.create")
+        or membership_has_permission(membership=actor, code="expenses.update")
+    ):
+        raise PermissionDenied()
+
+
+def _require_expense_receipt_access(gym: Gym, actor: GymMembership, asset: FileAsset) -> None:
+    _require_finance_entitlement(gym)
+    _require_expense_capability(actor)
+    _require_expense_receipt_object_scope(gym, actor, asset)
+
+
+def _require_expense_receipt_object_scope(gym: Gym, actor: GymMembership, asset: FileAsset) -> None:
+    """Apply expense visibility to a receipt.
+
+    An attached receipt follows the caller's expense object scope. A protected
+    Reception membership may use it only when that membership created or
+    submitted the expense. An unattached receipt is limited to its uploader,
+    or to a same-gym actor who holds ``expenses.create`` or ``expenses.update``
+    and does not hold the protected Reception role. That non-Reception grant is
+    the finance scope already used for same-gym expense drafts.
+    """
+
+    from apps.expenses.models import Expense
+
+    reception = holds_protected_role(gym_id=gym.id, membership_id=actor.id, role_key="RECEPTIONIST")
+    linked = Expense.objects.filter(gym_id=gym.id, receipt_file_asset_id=asset.id)
+    if reception:
+        visible = linked.filter(
+            Q(created_by_membership_id=actor.id) | Q(submitted_by_membership_id=actor.id)
+        )
+        if visible.exists():
+            return
+        if not linked.exists() and asset.uploaded_by_membership_id == actor.id:
+            return
+        raise Http404
+    _require_expense_capability(actor)
 
 
 def _require_members_entitlement(gym: Gym) -> None:
@@ -1004,7 +1168,9 @@ def _require_members_entitlement(gym: Gym) -> None:
         )
 
 
-def _detach_photo(member: Member, asset_id: UUID) -> None:
+def _detach_photo(member: Member | None, asset_id: UUID) -> None:
+    if member is None:
+        return
     if member.profile_photo_asset_id != asset_id:
         return
     member.profile_photo_asset_id = None

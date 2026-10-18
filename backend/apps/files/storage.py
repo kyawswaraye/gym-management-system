@@ -14,6 +14,7 @@ from django.conf import settings
 
 from apps.files.constants import (
     ATTACHMENT_NAMES,
+    EXPENSE_RECEIPT_NAMES,
     GET_TTL_SECONDS,
     MAX_UPLOAD_BYTES,
     POST_TTL_SECONDS,
@@ -38,7 +39,9 @@ from apps.files.signing import (
 logger = logging.getLogger(__name__)
 
 _EMPTY_PAYLOAD = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-_PROFILE_PHOTO_FILENAMES = frozenset(ATTACHMENT_NAMES.values())
+_PROFILE_PHOTO_FILENAMES = frozenset(ATTACHMENT_NAMES.values()) | frozenset(
+    EXPENSE_RECEIPT_NAMES.values()
+)
 _META_SHA = "x-amz-meta-gms-sha256"
 _META_TYPE = "x-amz-meta-gms-content-type"
 _META_SIZE = "x-amz-meta-gms-byte-size"

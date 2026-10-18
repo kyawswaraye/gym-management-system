@@ -41,6 +41,7 @@ module = [
   "apps.files.exceptions",
   "apps.members.exceptions",
   "apps.cashbook.exceptions",
+  "apps.expenses.exceptions",
   "apps.tenants.exceptions",
 ]
 disable_error_code = ["assignment"]
@@ -64,6 +65,7 @@ module = [
   "apps.members.device_serializers",
   "apps.members.payment_serializers",
   "apps.cashbook.serializers",
+  "apps.expenses.serializers",
 ]
 disable_error_code = ["assignment", "type-arg"]
 
@@ -80,6 +82,7 @@ module = [
   "apps.users.views",
   "apps.files.views",
   "apps.cashbook.views",
+  "apps.expenses.views",
   "apps.members.payment_views",
   "apps.files.authentication",
 ]

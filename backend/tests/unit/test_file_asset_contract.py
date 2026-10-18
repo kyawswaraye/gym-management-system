@@ -27,6 +27,7 @@ EXPECTED_CONSTRAINTS = {
     "fileasset_rejection_code_ck",
     "fileasset_scan_claim_ck",
     "fileasset_profile_photo_ck",
+    "fileasset_expense_receipt_ck",
 }
 EXPECTED_INDEXES = {
     "fileasset_gym_purpose_idx": ("gym", "purpose"),
@@ -111,12 +112,14 @@ def test_file_migrations_are_linear_and_follow_the_tenants_leaf() -> None:
     initial = nodes[("files", "0001_initial")]
     security = nodes[("files", "0002_rls_integrity_and_grants")]
     profile = nodes[("files", "0003_profile_photo_contract")]
+    receipt = nodes[("files", "0004_expense_receipt_and_expense")]
 
     assert initial == [("tenants", "0020_retire_platform_settings_manage")]
     assert security == [("files", "0001_initial")]
     assert ("files", "0002_rls_integrity_and_grants") in profile
     assert ("tenants", "0021_security_definer_least_privilege") in profile
-    assert _leaves(nodes)["files"] == [("files", "0003_profile_photo_contract")]
+    assert ("files", "0003_profile_photo_contract") in receipt
+    assert _leaves(nodes)["files"] == [("files", "0004_expense_receipt_and_expense")]
     assert _leaves(nodes)["tenants"] == [("tenants", "0025_finance_permission_catalog")]
     assert nodes[("tenants", "0022_check_in_challenge_permission")] == [
         ("tenants", "0021_security_definer_least_privilege")

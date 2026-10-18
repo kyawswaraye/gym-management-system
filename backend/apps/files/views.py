@@ -15,6 +15,7 @@ from apps.common.api.responses import success_response
 from apps.common.api.schema import ErrorEnvelopeSerializer
 from apps.files.authentication import StaffFileAuthentication
 from apps.files.exceptions import FileRequestError, RateLimited
+from apps.files.permissions import PurposeAwareFilePermission
 from apps.files.runtime import image_processor, object_store, virus_scanner
 from apps.files.serializers import (
     _COMPLETE_FIELDS,
@@ -41,7 +42,6 @@ from apps.files.throttling import (
     FileDownloadThrottle,
     UploadIntentThrottle,
 )
-from apps.users.permissions import RequiresPermissions
 
 
 def _json_ready(value: Any) -> Any:
@@ -87,7 +87,7 @@ def _command_response(result: FileCommand) -> Response:
 
 class FileAPIView(APIView):
     authentication_classes = [StaffFileAuthentication]
-    permission_classes = [IsAuthenticated, RequiresPermissions]
+    permission_classes = [IsAuthenticated, PurposeAwareFilePermission]
 
     def throttled(self, request: Request, wait: float | None) -> NoReturn:
         raise RateLimited()
@@ -118,6 +118,7 @@ class CommittedFileView(FileAPIView):
 
 
 class UploadIntentView(CommittedFileView):
+    file_operation = "upload"
     required_permissions = ("files.upload", "members.update")
     throttle_classes = [UploadIntentThrottle]
 
@@ -147,11 +148,14 @@ class UploadIntentView(CommittedFileView):
             content_type=str(payload["content_type"]),
             byte_size=int(payload["byte_size"]),
             sha256=str(payload["sha256"]),
+            purpose=str(payload["purpose"]),
+            owner_type=str(payload["owner_type"]),
         )
         return _command_response(result)
 
 
 class CompleteUploadView(CommittedFileView):
+    file_operation = "complete"
     required_permissions = ("files.upload", "members.update")
     throttle_classes = [FileCompleteThrottle]
 
@@ -201,6 +205,7 @@ class CompleteUploadView(CommittedFileView):
 
 
 class DownloadUrlView(CommittedFileView):
+    file_operation = "download"
     required_permissions = ("files.view", "members.view")
     throttle_classes = [FileDownloadThrottle]
 
@@ -230,6 +235,7 @@ class DownloadUrlView(CommittedFileView):
 
 
 class DeleteUploadView(CommittedFileView):
+    file_operation = "delete"
     required_permissions = ("files.delete", "members.update")
     throttle_classes = [FileDeleteThrottle]
 

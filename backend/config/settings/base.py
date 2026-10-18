@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.files",
     "apps.cashbook",
+    "apps.expenses",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -96,6 +97,7 @@ REST_FRAMEWORK = {
         "file_delete": "10/300",
         "cashbook_command": "120/60",
         "payments_command": "120/60",
+        "expenses_command": "120/60",
     },
 }
 

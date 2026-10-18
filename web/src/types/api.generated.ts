@@ -648,6 +648,134 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/expense-categories/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["expense_categories_list"];
+    put?: never;
+    post: operations["expense_categories_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/expense-categories/{category_id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["expense_categories_update"];
+    trace?: never;
+  };
+  "/api/v1/expenses/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["expenses_list"];
+    put?: never;
+    post: operations["expenses_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/expenses/{expense_id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["expenses_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["expenses_update"];
+    trace?: never;
+  };
+  "/api/v1/expenses/{expense_id}/approve/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["expenses_approve"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/expenses/{expense_id}/cancel/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["expenses_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/expenses/{expense_id}/reject/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["expenses_reject"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/expenses/{expense_id}/submit/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["expenses_submit"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/files/{id}/": {
     parameters: {
       query?: never;
@@ -1756,9 +1884,16 @@ export interface components {
       data: components["schemas"]["AdminSubscription"][];
       message: string;
     };
+    ApproveExpenseRequest: {
+      /** Format: uuid */
+      cash_session_id?: string | null;
+    };
     ApprovePaymentRequest: {
       /** Format: uuid */
       cash_session_id?: string | null;
+    };
+    CancelExpenseRequest: {
+      reason: string;
     };
     CancelPaymentRequest: {
       reason: string;
@@ -2194,6 +2329,135 @@ export interface components {
       success: boolean;
       error: components["schemas"]["ErrorDetail"];
       request_id: string;
+    };
+    Expense: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      category_id: string;
+      /** Format: date */
+      business_date: string;
+      description: string;
+      /** Format: decimal */
+      readonly amount: string;
+      currency: string;
+      payment_method: string;
+      /** Format: uuid */
+      receipt_file_asset_id: string | null;
+      policy_note: string;
+      status: string;
+      /** Format: uuid */
+      reversal_expense_id: string | null;
+      /** Format: date-time */
+      submitted_at: string | null;
+      /** Format: uuid */
+      submitted_by_membership_id: string | null;
+      /** Format: date-time */
+      approved_at: string | null;
+      /** Format: uuid */
+      approved_by_membership_id: string | null;
+      /** Format: date-time */
+      rejected_at: string | null;
+      /** Format: uuid */
+      rejected_by_membership_id: string | null;
+      rejection_reason: string;
+      /** Format: date-time */
+      posted_at: string | null;
+      /** Format: uuid */
+      posted_by_membership_id: string | null;
+      /** Format: date-time */
+      voided_at: string | null;
+      /** Format: date-time */
+      cancelled_at: string | null;
+      /** Format: uuid */
+      cancelled_by_membership_id: string | null;
+      reason: string;
+      /** Format: uuid */
+      cash_session_id: string | null;
+      /** Format: uuid */
+      cash_transaction_id: string | null;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: uuid */
+      updated_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    ExpenseApproval: {
+      expense: components["schemas"]["Expense"];
+      cash_session: components["schemas"]["CashSession"] | null;
+      cash_transaction: components["schemas"]["CashTransaction"] | null;
+    };
+    ExpenseApprovalEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ExpenseApproval"];
+      message: string;
+    };
+    ExpenseCategory: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      name: string;
+      system_key: string | null;
+      display_order: number;
+      is_active: boolean;
+      /** Format: date-time */
+      archived_at: string | null;
+      /** Format: uuid */
+      created_by_membership_id: string | null;
+      /** Format: uuid */
+      updated_by_membership_id: string | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    ExpenseCategoryEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ExpenseCategory"];
+      message: string;
+    };
+    ExpenseCategoryListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ExpenseCategory"][];
+      meta: components["schemas"]["ExpenseListMeta"];
+      message: string;
+    };
+    ExpenseCategoryWriteRequest: {
+      code: string;
+      name: string;
+      display_order?: number;
+    };
+    ExpenseEnvelope: {
+      success: boolean;
+      data: components["schemas"]["Expense"];
+      message: string;
+    };
+    ExpenseListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["Expense"][];
+      meta: components["schemas"]["ExpenseListMeta"];
+      message: string;
+    };
+    ExpenseListMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    ExpenseWriteRequest: {
+      /** Format: uuid */
+      category_id: string;
+      /** Format: date */
+      business_date: string;
+      description: string;
+      /** Format: decimal */
+      amount: string;
+      currency: string;
+      payment_method: components["schemas"]["PaymentMethodEnum"];
+      /** Format: uuid */
+      receipt_file_asset_id?: string | null;
+      policy_note?: string;
     };
     FeatureEntitlement: {
       feature__code: string;
@@ -2866,6 +3130,25 @@ export interface components {
       price?: string;
       billing_interval?: string;
     };
+    PatchedExpenseCategoryUpdateRequest: {
+      name?: string;
+      display_order?: number;
+      is_active?: boolean;
+    };
+    PatchedExpenseUpdateRequest: {
+      /** Format: uuid */
+      category_id?: string;
+      /** Format: date */
+      business_date?: string;
+      description?: string;
+      /** Format: decimal */
+      amount?: string;
+      currency?: string;
+      payment_method?: components["schemas"]["PaymentMethodEnum"];
+      /** Format: uuid */
+      receipt_file_asset_id?: string | null;
+      policy_note?: string;
+    };
     PatchedGymProfileUpdateRequest: {
       name?: string;
       legal_name?: string;
@@ -3222,6 +3505,9 @@ export interface components {
     };
     RefreshInputRequest: {
       refresh_token: string;
+    };
+    RejectExpenseRequest: {
+      rejection_reason: string;
     };
     RejectPaymentRequest: {
       rejection_reason: string;
@@ -5985,6 +6271,812 @@ export interface operations {
         };
       };
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  expense_categories_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        /**
+         * @description * `true` - true
+         *     * `false` - false
+         */
+        is_active?: "true" | "false";
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExpenseCategoryListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  expense_categories_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this expense command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ExpenseCategoryWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ExpenseCategoryWriteRequest"];
+        "multipart/form-data": components["schemas"]["ExpenseCategoryWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExpenseCategoryEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  expense_categories_update: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this expense command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        category_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedExpenseCategoryUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedExpenseCategoryUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedExpenseCategoryUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExpenseCategoryEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  expenses_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        business_date?: string;
+        category?: string;
+        limit?: number;
+        /**
+         * @description * `CASH` - Cash
+         *     * `BANK_TRANSFER` - Bank Transfer
+         *     * `CARD` - Card
+         *     * `MOBILE_PAYMENT` - Mobile Payment
+         *     * `OTHER` - Other
+         */
+        payment_method?:
+          "CASH" | "BANK_TRANSFER" | "CARD" | "MOBILE_PAYMENT" | "OTHER";
+        /**
+         * @description * `DRAFT` - Draft
+         *     * `PENDING_APPROVAL` - Pending Approval
+         *     * `POSTED` - Posted
+         *     * `REJECTED` - Rejected
+         *     * `VOID` - Void
+         *     * `CANCELLED` - Cancelled
+         */
+        status?:
+          | "DRAFT"
+          | "PENDING_APPROVAL"
+          | "POSTED"
+          | "REJECTED"
+          | "VOID"
+          | "CANCELLED";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExpenseListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  expenses_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this expense command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ExpenseWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ExpenseWriteRequest"];
+        "multipart/form-data": components["schemas"]["ExpenseWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExpenseEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  expenses_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        expense_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExpenseEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  expenses_update: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this expense command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        expense_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedExpenseUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedExpenseUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedExpenseUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExpenseEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  expenses_approve: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this expense command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        expense_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ApproveExpenseRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ApproveExpenseRequest"];
+        "multipart/form-data": components["schemas"]["ApproveExpenseRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExpenseApprovalEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  expenses_cancel: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this expense command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        expense_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CancelExpenseRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CancelExpenseRequest"];
+        "multipart/form-data": components["schemas"]["CancelExpenseRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExpenseEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  expenses_reject: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this expense command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        expense_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RejectExpenseRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["RejectExpenseRequest"];
+        "multipart/form-data": components["schemas"]["RejectExpenseRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExpenseEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  expenses_submit: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this expense command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        expense_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExpenseEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
         headers: {
           [name: string]: unknown;
         };

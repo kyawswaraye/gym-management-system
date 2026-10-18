@@ -226,7 +226,7 @@ def test_profile_photo_permissions_validation_and_scope() -> None:
             "aud": settings.JWT_MEMBER_AUDIENCE,
             "iss": settings.JWT_ISSUER,
             "sub": str(uuid4()),
-            "exp": int(datetime(2026, 10, 18, tzinfo=UTC).timestamp()),
+            "exp": int(datetime(2026, 12, 31, tzinfo=UTC).timestamp()),
         },
         settings.JWT_PRIVATE_KEY,
         algorithm="RS256",

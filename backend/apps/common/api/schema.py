@@ -97,6 +97,14 @@ def phase_1a_endpoints(endpoints: list[Endpoint]) -> list[Endpoint]:
             "/api/v1/receipts/{receipt_id}/",
             "/api/v1/receipts/{receipt_id}/download/",
             "/api/v1/sales/daily/",
+            "/api/v1/expense-categories/",
+            "/api/v1/expense-categories/{category_id}/",
+            "/api/v1/expenses/",
+            "/api/v1/expenses/{expense_id}/",
+            "/api/v1/expenses/{expense_id}/submit/",
+            "/api/v1/expenses/{expense_id}/approve/",
+            "/api/v1/expenses/{expense_id}/reject/",
+            "/api/v1/expenses/{expense_id}/cancel/",
         }
     ]
 

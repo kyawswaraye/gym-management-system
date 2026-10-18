@@ -4,9 +4,12 @@ import re
 from typing import Any, cast
 
 from rest_framework import serializers
+from rest_framework.exceptions import ErrorDetail
 
 from apps.files.constants import (
     ALLOWED_CONTENT_TYPES,
+    EXPENSE_RECEIPT_PURPOSE,
+    GYM_OWNER,
     MAX_UPLOAD_BYTES,
     MEMBER_OWNER,
     PROFILE_PHOTO_PURPOSE,
@@ -82,18 +85,45 @@ class UploadIntentSerializer(StrictSerializer):
         return value
 
     def validate_purpose(self, value: str) -> str:
-        if value != PROFILE_PHOTO_PURPOSE:
+        if value not in {PROFILE_PHOTO_PURPOSE, EXPENSE_RECEIPT_PURPOSE}:
             raise serializers.ValidationError(
                 "This file purpose is not supported.", code="UNSUPPORTED_FILE_PURPOSE"
             )
         return value
 
     def validate_owner_type(self, value: str) -> str:
-        if value != MEMBER_OWNER:
+        if value not in {MEMBER_OWNER, GYM_OWNER}:
             raise serializers.ValidationError(
                 "This file owner is not supported.", code="UNSUPPORTED_FILE_OWNER"
             )
         return value
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        purpose = attrs.get("purpose")
+        owner_type = attrs.get("owner_type")
+        if purpose == PROFILE_PHOTO_PURPOSE and owner_type != MEMBER_OWNER:
+            raise serializers.ValidationError(
+                {
+                    "owner_type": [
+                        ErrorDetail(
+                            "This file owner is not supported.",
+                            code="UNSUPPORTED_FILE_OWNER",
+                        )
+                    ]
+                }
+            )
+        if purpose == EXPENSE_RECEIPT_PURPOSE and owner_type != GYM_OWNER:
+            raise serializers.ValidationError(
+                {
+                    "owner_type": [
+                        ErrorDetail(
+                            "This file owner is not supported.",
+                            code="UNSUPPORTED_FILE_OWNER",
+                        )
+                    ]
+                }
+            )
+        return attrs
 
 
 class CompleteUploadSerializer(StrictSerializer):
