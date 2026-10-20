@@ -545,6 +545,13 @@ def reset_password(
     except InvitedIdentityError as exc:
         raise AuthenticationFailed() from exc
     revoke_all_user_sessions(user.id, reason="PASSWORD_RESET")
+    from apps.members.member_device_services import revoke_devices_for_user
+    from apps.members.models import MemberDevice
+
+    revoke_devices_for_user(
+        user_id=user.id,
+        reason=MemberDevice.RevocationReason.SESSION_REVOKED,
+    )
     GymSelectionTicket.objects.filter(
         user=user, consumed_at__isnull=True, revoked_at__isnull=True
     ).update(revoked_at=now, revocation_reason="PASSWORD_RESET")

@@ -11,6 +11,24 @@ from .base import *  # noqa: F403
 
 DEBUG = False
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+PUSH_BACKEND = "locmem"
+PUSH_TOKEN_ENCRYPTION_KEY = str(
+    globals().get("PUSH_TOKEN_ENCRYPTION_KEY") or "e2e-push-token-encryption-key"
+)
+PUSH_TOKEN_FINGERPRINT_PEPPER = str(
+    globals().get("PUSH_TOKEN_FINGERPRINT_PEPPER") or "e2e-push-token-fingerprint-pepper"
+)
+_push_secrets = {
+    MFA_ENCRYPTION_KEY,  # noqa: F405
+    FINANCE_IDEMPOTENCY_ENCRYPTION_KEY,  # noqa: F405
+    PASSWORD_RESET_TOKEN_PEPPER,  # noqa: F405
+}
+if (
+    PUSH_TOKEN_ENCRYPTION_KEY in _push_secrets
+    or PUSH_TOKEN_FINGERPRINT_PEPPER in _push_secrets
+    or PUSH_TOKEN_ENCRYPTION_KEY == PUSH_TOKEN_FINGERPRINT_PEPPER
+):
+    raise ImproperlyConfigured("Push token secrets must be dedicated")
 
 
 def _present(value: object, minimum: int) -> bool:

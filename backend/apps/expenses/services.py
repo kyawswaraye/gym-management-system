@@ -439,6 +439,236 @@ def post_staff_salary_expense(
     return expense, movement
 
 
+def post_pt_commission_expense(
+    *,
+    gym: Gym,
+    approver: GymMembership,
+    created_by_membership_id: UUID,
+    submitted_by_membership_id: UUID,
+    business_date: date,
+    description: str,
+    amount: Decimal,
+    currency: str,
+    payment_method: str,
+    cash_session_id: UUID | None,
+    policy_note: str,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> tuple[Expense, CashTransaction | None]:
+    """Post one protected PT commission expense inside the caller's transaction.
+
+    Public expense commands still reject ``PT_COMMISSION``. This path is the
+    only application writer for that category. It inserts a draft, then submits
+    and posts, so the expense guards and cash rules stay in force.
+    """
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("PT commission expense posting requires an active transaction.")
+    category = (
+        ExpenseCategory.objects.select_for_update()
+        .filter(gym_id=gym.id, system_key="PT_COMMISSION", is_active=True)
+        .first()
+    )
+    if category is None:
+        raise ProtectedExpenseCategory()
+    if currency != gym.currency:
+        raise ValidationError({"currency": ["Currency must match the selected gym."]})
+    _assert_pt_commission_approver(
+        gym_id=gym.id,
+        approver=approver,
+        created_by_membership_id=created_by_membership_id,
+        submitted_by_membership_id=submitted_by_membership_id,
+    )
+    if payment_method != Payment.Method.CASH and cash_session_id is not None:
+        raise ValidationError(
+            {"cash_session_id": ["Only a cash commission payout can use a cash session."]}
+        )
+    if payment_method == Payment.Method.CASH and cash_session_id is None:
+        raise ValidationError(
+            {"cash_session_id": ["A cash commission payout requires an open session."]}
+        )
+    now = timezone.now()
+    expense = Expense.objects.create(
+        gym=gym,
+        category=category,
+        business_date=business_date,
+        description=description,
+        amount=amount,
+        currency=currency,
+        payment_method=payment_method,
+        policy_note=policy_note,
+        status=Expense.Status.DRAFT,
+        created_with_reception_scope=_holds_reception(
+            gym_id=gym.id, membership_id=created_by_membership_id
+        ),
+        created_by_membership_id=created_by_membership_id,
+        updated_by_membership_id=approver.id,
+    )
+    expense.status = Expense.Status.PENDING_APPROVAL
+    expense.submitted_at = now
+    expense.submitted_by_membership_id = submitted_by_membership_id
+    expense.submitted_with_reception_scope = _holds_reception(
+        gym_id=gym.id, membership_id=submitted_by_membership_id
+    )
+    expense.updated_by_membership_id = approver.id
+    expense.save()
+    movement: CashTransaction | None = None
+    if payment_method == Payment.Method.CASH:
+        assert cash_session_id is not None
+        movement = record_cash_movement(
+            gym=gym,
+            actor=approver,
+            session_id=cash_session_id,
+            direction=CashTransaction.Direction.OUT,
+            source_type=CashTransaction.SourceType.EXPENSE,
+            source_id=expense.id,
+            amount=expense.amount,
+            currency=expense.currency,
+            business_date=expense.business_date,
+            description=expense.description,
+            reason="",
+            reversal_of_id=None,
+        )
+        _assert_reception_till(expense=expense, session=movement.cash_session)
+    posted_at = timezone.now()
+    expense.status = Expense.Status.POSTED
+    expense.approved_at = posted_at
+    expense.approved_by_membership_id = approver.id
+    expense.posted_at = posted_at
+    expense.posted_by_membership_id = approver.id
+    expense.updated_by_membership_id = approver.id
+    if movement is not None:
+        expense.cash_session = movement.cash_session
+        expense.cash_transaction = movement
+    expense.save()
+    _audit(
+        gym=gym,
+        actor=approver,
+        action="EXPENSE_APPROVED_POSTED",
+        expense=expense,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    return expense, movement
+
+
+def void_pt_commission_expense(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    original: Expense,
+    reason: str,
+    business_date: date,
+    cash_session_id: UUID | None,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> tuple[Expense, Expense, CashTransaction | None]:
+    """Void one locked posted commission expense and post its equal reversal.
+
+    The public expense void route still rejects ``PT_COMMISSION``. The internal
+    payout reversal helper is the only caller. The original expense row must
+    already be locked, and the caller must already be inside a transaction.
+    """
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("PT commission expense void requires an active transaction.")
+    if original.gym_id != gym.id:
+        raise Http404
+    category = ExpenseCategory.objects.filter(gym_id=gym.id, id=original.category_id).first()
+    if category is None or category.system_key != "PT_COMMISSION":
+        raise ProtectedExpenseCategory()
+    if original.status != Expense.Status.POSTED or original.original_expense_id is not None:
+        raise ExpensePostingConflict()
+    if original.reversal_expense_id is not None:
+        raise ExpensePostingConflict()
+    reversal_id = uuid4()
+    movement: CashTransaction | None = None
+    if original.payment_method == Payment.Method.CASH:
+        if cash_session_id is None:
+            raise ValidationError(
+                {
+                    "cash_session_id": [
+                        "A cash commission payout requires an open destination session."
+                    ]
+                }
+            )
+        movement = record_cash_movement(
+            gym=gym,
+            actor=actor,
+            session_id=cash_session_id,
+            direction=CashTransaction.Direction.IN,
+            source_type=CashTransaction.SourceType.EXPENSE,
+            source_id=reversal_id,
+            amount=Decimal(original.amount),
+            currency=original.currency,
+            business_date=business_date,
+            description=f"Reversal: {original.description}"[:255],
+            reason=reason[:255],
+            reversal_of_id=original.cash_transaction_id,
+        )
+    elif cash_session_id is not None:
+        raise ValidationError(
+            {"cash_session_id": ["Do not map a cash session for a non-cash commission payout."]}
+        )
+    now = timezone.now()
+    reception = _holds_reception(gym_id=gym.id, membership_id=actor.id)
+    reversal = Expense.objects.create(
+        id=reversal_id,
+        gym=gym,
+        category_id=original.category_id,
+        business_date=business_date,
+        description=f"Reversal: {original.description}"[:255],
+        amount=original.amount,
+        currency=original.currency,
+        payment_method=original.payment_method,
+        policy_note=original.policy_note,
+        status=Expense.Status.POSTED,
+        original_expense=original,
+        submitted_at=now,
+        submitted_by_membership_id=actor.id,
+        approved_at=now,
+        approved_by_membership_id=actor.id,
+        posted_at=now,
+        posted_by_membership_id=actor.id,
+        reason=reason,
+        cash_session=None if movement is None else movement.cash_session,
+        cash_transaction=movement,
+        created_with_reception_scope=reception,
+        submitted_with_reception_scope=reception,
+        created_by_membership_id=actor.id,
+        updated_by_membership_id=actor.id,
+    )
+    original.status = Expense.Status.VOID
+    original.voided_at = now
+    original.voided_by_membership_id = actor.id
+    original.reason = reason
+    original.reversal_expense = reversal
+    original.updated_by_membership_id = actor.id
+    original.save()
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="EXPENSE_VOIDED",
+        expense=original,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="EXPENSE_REVERSAL_POSTED",
+        expense=reversal,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    return original, reversal, movement
+
+
 def reject_expense(
     *,
     gym: Gym,
@@ -766,6 +996,27 @@ def _reload(
         membership_id=membership_id,
         permission_code=permission_code,
     )
+
+
+def _assert_pt_commission_approver(
+    *,
+    gym_id: UUID,
+    approver: GymMembership,
+    created_by_membership_id: UUID,
+    submitted_by_membership_id: UUID,
+) -> None:
+    """Require a different protected manager or owner to post the payout expense."""
+
+    if approver.id in {created_by_membership_id, submitted_by_membership_id}:
+        raise PermissionDenied()
+    if holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="RECEPTIONIST"):
+        raise PermissionDenied()
+    if holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="TRAINER"):
+        raise PermissionDenied()
+    manager = holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="MANAGER")
+    owner = holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="OWNER")
+    if not manager and not owner:
+        raise PermissionDenied()
 
 
 def _assert_approver(*, gym_id: UUID, actor: GymMembership) -> None:

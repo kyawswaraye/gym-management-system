@@ -258,8 +258,9 @@ def member_summary(*, gym: Gym, member: Member) -> dict[str, object]:
     the current-membership lookup (LIMIT 1), the 21-row history fetch, the
     finalized payment aggregate, the outstanding-balance aggregate, the latest
     check-in, and the open check-in. Both check-in reads stay at one row.
-    ``is_pt_client`` is not stored here. The summary serializer derives it with
-    the same helper as the member serializer.
+    ``is_pt_client`` is not stored here. The caller annotates the member from
+    the active assignment that covers the gym-local as-of date, and both
+    summary fields read that badge.
     """
 
     today = gym_today(gym)
@@ -522,9 +523,12 @@ def page_members(
     joined_from: date | None,
     joined_to: date | None,
     is_pt_client: bool | None,
+    as_of: date,
     limit: int,
     after: str,
 ) -> tuple[list[Member], dict[str, Any]]:
+    from apps.trainers.selectors import annotate_member_pt_client
+
     scope = member_list_cursor_scope(
         gym_id=gym_id,
         status=status,
@@ -535,8 +539,9 @@ def page_members(
     )
     if after:
         decode_member_cursor(after, scope=scope)
-    if is_pt_client is True:
-        return [], {"has_more": False, "next_after": None}
+    queryset = annotate_member_pt_client(queryset, gym_id=gym_id, as_of=as_of)
+    if is_pt_client is not None:
+        queryset = queryset.filter(pt_client_badge=is_pt_client)  # type: ignore[misc]
     queryset = queryset.order_by("normalized_full_name", "id")
     if status:
         queryset = queryset.filter(status=status)
@@ -573,6 +578,15 @@ def _locked_member(*, gym: Gym, member_id: UUID) -> Member:
         raise Http404 from exc
 
 
+def _deny_trainer_member_command(*, gym_id: UUID, actor: GymMembership) -> None:
+    """Fail closed when no trainer create, edit, or archive contract exists."""
+
+    from apps.trainers.selectors import trainer_member_scope
+
+    if trainer_member_scope(gym_id=gym_id, actor=actor).restricted:
+        raise Http404
+
+
 @transaction.atomic
 def create_member(
     *,
@@ -593,6 +607,7 @@ def create_member(
     profile_photo_asset_id: UUID | None,
 ) -> Member:
     set_gym_context(gym_id=gym.id)
+    _deny_trainer_member_command(gym_id=gym.id, actor=actor)
     _validate_member_dates(date_of_birth, join_date)
     settings = GymSettings.objects.select_for_update().get(gym=gym)
     requested_number = member_number.strip()
@@ -662,6 +677,7 @@ def update_member(
     changes: dict[str, Any],
 ) -> Member:
     set_gym_context(gym_id=gym.id)
+    _deny_trainer_member_command(gym_id=gym.id, actor=actor)
     member = _locked_member(gym=gym, member_id=member_id)
     prepared = _prepare_member_changes(changes)
     if "profile_photo_asset_id" in prepared:
@@ -692,6 +708,7 @@ def update_member(
 @transaction.atomic
 def archive_member(*, gym: Gym, actor: GymMembership, member_id: UUID) -> Member:
     set_gym_context(gym_id=gym.id)
+    _deny_trainer_member_command(gym_id=gym.id, actor=actor)
     member = _locked_member(gym=gym, member_id=member_id)
     if member.status == Member.Status.ARCHIVED and member.archived_at is not None:
         return member
@@ -1096,6 +1113,15 @@ def create_membership(
     discount_amount: Decimal,
     note: str = "",
 ) -> Membership:
+    set_gym_context(gym_id=gym.id)
+    from apps.trainers.selectors import require_assigned_member
+
+    require_assigned_member(
+        gym_id=gym.id,
+        actor=actor,
+        member_id=member.id,
+        as_of=gym_today(gym),
+    )
     try:
         member = Member.objects.select_for_update().get(gym=gym, id=member.id)
     except Member.DoesNotExist as exc:

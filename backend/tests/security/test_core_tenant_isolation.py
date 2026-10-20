@@ -106,6 +106,7 @@ def _ensure_owner_permission_catalog() -> None:
         "payments.view",
         "payments.void",
         "reports.view",
+        "reports.financial",
     ]
     permissions = [
         Permission.objects.get_or_create(
@@ -271,8 +272,11 @@ def test_tenant_a_api_cannot_access_tenant_b_core_operations() -> None:
     dashboard_a = _auth_get(api, "/api/v1/dashboard/?range=today", token_a)
     dashboard_b = _auth_get(api, "/api/v1/dashboard/?range=today", token_b)
     assert dashboard_a.status_code == dashboard_b.status_code == 200
-    assert Decimal(str(dashboard_a.json()["data"]["income"])) == Decimal("0")
-    assert Decimal(str(dashboard_b.json()["data"]["income"])) == payment_b.amount
+    financial_a = dashboard_a.json()["data"]["financial"]
+    financial_b = dashboard_b.json()["data"]["financial"]
+    assert financial_a["total_revenue"] == "0.00"
+    assert financial_b["total_revenue"] == "1000.00"
+    assert financial_b["new_member_revenue"] == "1000.00"
 
     # Guessed Tenant B identifiers are hidden from Tenant A for reads and all
     # mutation/deletion-equivalent lifecycle actions.

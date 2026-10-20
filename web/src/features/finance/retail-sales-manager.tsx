@@ -579,7 +579,10 @@ export function RetailSalesManager({
             {sale.status === "POSTED" && canVoid && sale.return_count === 0 && (
               <button
                 className="underline"
-                onClick={() => setAction("void")}
+                onClick={() => {
+                  setCorrectionDate(defaultDate);
+                  setAction("void");
+                }}
                 type="button"
               >
                 Void sale
@@ -588,7 +591,10 @@ export function RetailSalesManager({
             {sale.status === "POSTED" && canVoid && (
               <button
                 className="underline"
-                onClick={() => setAction("return")}
+                onClick={() => {
+                  setCorrectionDate(defaultDate);
+                  setAction("return");
+                }}
                 type="button"
               >
                 Partial return
@@ -651,9 +657,11 @@ export function RetailSalesManager({
             >
               {sale.payment_method === "CASH" ? (
                 <CashSessionSelect
+                  collectionError={sessions.error}
                   currency={sale.currency}
                   error={fields.cash_session_id}
                   label="Open cash session"
+                  pending={sessions.pending}
                   sessions={sessions.sessions}
                 />
               ) : (
@@ -759,9 +767,11 @@ export function RetailSalesManager({
               </Field>
               {sale.payment_method === "CASH" && (
                 <CashSessionSelect
+                  collectionError={sessions.error}
                   currency={sale.currency}
                   error={fields.cash_session_id}
                   label="Destination open session"
+                  pending={sessions.pending}
                   sessions={sessions.sessions}
                 />
               )}
@@ -883,9 +893,11 @@ export function RetailSalesManager({
               </Field>
               {sale.payment_method === "CASH" && (
                 <CashSessionSelect
+                  collectionError={sessions.error}
                   currency={sale.currency}
                   error={fields.cash_session_id}
                   label="Destination open session"
+                  pending={sessions.pending}
                   required={false}
                   sessions={sessions.sessions}
                 />

@@ -83,6 +83,16 @@ TENANT_TABLES = {
     "sales_retail_sale_line",
     "sales_retail_return",
     "sales_retail_return_line",
+    "trainers_trainer_assignment",
+    "trainers_service_package",
+    "trainers_pt_sale",
+    "trainers_pt_commission",
+    "trainers_pt_commission_payment",
+    "trainers_member_service_package",
+    "trainers_service_session_ledger",
+    "announcements_announcement",
+    "members_member_device",
+    "notifications_push_attempt",
 }
 POLICY_COMMANDS = {"r", "a", "w", "d"}
 

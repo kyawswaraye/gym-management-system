@@ -5,6 +5,7 @@ import {
   canIssueCheckInChallenge,
   canOpenCheckIns,
   canOpenGymSettings,
+  canOpenTrainerDashboard,
   gymSettingsAccess,
   hasFeature,
   hasTenantCapability,
@@ -322,5 +323,75 @@ describe("tenant authorization helpers", () => {
     expect(platformHomePath(platform(["platform.gyms.update"]))).not.toBe(
       "/super-admin/dashboard",
     );
+  });
+
+  it("sends a restricted trainer to the trainer dashboard before the owner dashboard", () => {
+    const trainer = (
+      permissions: string[],
+      features: string[],
+      roles: string[],
+    ) =>
+      ({
+        ...session(permissions, features),
+        gym: { id: "gym-1" },
+        gym_membership: {
+          id: "membership-1",
+          is_owner: roles.includes("OWNER"),
+          roles,
+        },
+      }) as CurrentUser;
+
+    const capable = trainer(
+      ["reports.view", "members.view"],
+      ["reports", "pt", "members"],
+      ["TRAINER"],
+    );
+    expect(canOpenTrainerDashboard(capable)).toBe(true);
+    expect(tenantHomePath(capable)).toBe("/pt/dashboard");
+
+    const ownerTrainer = trainer(
+      ["reports.view"],
+      ["reports", "pt"],
+      ["OWNER", "TRAINER"],
+    );
+    expect(canOpenTrainerDashboard(ownerTrainer)).toBe(true);
+    expect(tenantHomePath(ownerTrainer)).toBe("/dashboard");
+
+    const managerTrainer = trainer(
+      ["reports.view"],
+      ["reports", "pt"],
+      ["MANAGER", "TRAINER"],
+    );
+    expect(tenantHomePath(managerTrainer)).toBe("/dashboard");
+
+    const missingPt = trainer(
+      ["reports.view", "members.view"],
+      ["reports", "members"],
+      ["TRAINER"],
+    );
+    expect(canOpenTrainerDashboard(missingPt)).toBe(false);
+    expect(tenantHomePath(missingPt)).toBe("/members");
+
+    const missingReportsFeature = trainer(
+      ["reports.view"],
+      ["pt"],
+      ["TRAINER"],
+    );
+    expect(canOpenTrainerDashboard(missingReportsFeature)).toBe(false);
+    expect(tenantHomePath(missingReportsFeature)).toBe("/dashboard");
+
+    const receptionist = trainer(
+      ["reports.view"],
+      ["reports", "pt"],
+      ["RECEPTIONIST"],
+    );
+    expect(canOpenTrainerDashboard(receptionist)).toBe(false);
+    expect(tenantHomePath(receptionist)).toBe("/dashboard");
+
+    expect(
+      canOpenTrainerDashboard(
+        trainer(["reports.financial"], ["reports", "pt"], ["TRAINER"]),
+      ),
+    ).toBe(false);
   });
 });

@@ -1345,6 +1345,7 @@ def provision_gym(*, code: str, name: str, owner_email: str) -> ProvisionedGym:
         ("memberships", "Memberships"),
         ("finance", "Finance"),
         ("reports", "Reports"),
+        ("pt", "Personal training"),
     ):
         feature, _ = Feature.objects.get_or_create(
             code=code_value,

@@ -27,6 +27,18 @@ class AccessTokenExpired(AuthenticationFailed):
     default_detail = "The access token has expired."
 
 
+class RequestRejected(CodedAPIException):
+    """Stable 400 for a serializer or query allowlist failure."""
+
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_code = "INVALID_REQUEST"
+    default_detail = "The request could not be processed."
+
+    def __init__(self, fields: dict[str, list[str]] | None = None) -> None:
+        self.error_fields = fields or {}
+        super().__init__()
+
+
 def _flatten_fields(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
         return {}

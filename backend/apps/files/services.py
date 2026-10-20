@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_CEILING, Decimal
-from typing import Any
+from typing import Any, NoReturn
 from uuid import UUID, uuid4
 
 from django.db import connection, transaction
@@ -37,7 +37,7 @@ from apps.files.images import CanonicalImage
 from apps.files.models import FileAsset
 from apps.files.verification import Verdict, VerifyOutcome, verify_upload
 from apps.members.models import Member
-from apps.tenants.models import Gym, GymFeatureEntitlement, GymMembership, GymMembershipRole
+from apps.tenants.models import Gym, GymFeatureEntitlement, GymMembership
 
 _SAFE_AUDIT_KEYS = frozenset(
     {
@@ -56,7 +56,7 @@ _SAFE_AUDIT_KEYS = frozenset(
 @dataclass(frozen=True)
 class RequestAudit:
     actor_user: Any
-    actor_membership_id: UUID
+    actor_membership_id: UUID | None
     request_id: str
     ip_address: str | None
     user_agent: str
@@ -200,10 +200,101 @@ def create_upload_intent(
     )
 
 
+def create_member_profile_photo_intent(
+    *,
+    gym: Gym,
+    member: Member,
+    audit: RequestAudit,
+    store: Any,
+    original_name: str,
+    content_type: str,
+    byte_size: int,
+    sha256: str,
+    moment: datetime | None = None,
+) -> FileCommand:
+    """Create a profile-photo intent owned by the authenticated member.
+
+    The     server chooses the purpose, owner, and member uploader. A staff
+    membership is never invented for this row.
+    """
+
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        locked_member = _locked_member(gym, member.id)
+        if locked_member.status != Member.Status.ACTIVE:
+            raise FileRequestError(
+                code="AUTHENTICATION_FAILED",
+                message="Authentication failed.",
+                status_code=401,
+            )
+        _require_members_entitlement(gym)
+        asset = FileAsset.objects.create(
+            gym=gym,
+            object_key=f"{gym.id}/{uuid4()}",
+            original_name=original_name,
+            content_type=content_type,
+            byte_size=byte_size,
+            sha256=sha256,
+            upload_content_type=content_type,
+            upload_byte_size=byte_size,
+            upload_sha256=sha256,
+            purpose=PROFILE_PHOTO_PURPOSE,
+            scan_status=FileAsset.ScanStatus.PENDING,
+            owner_type=MEMBER_OWNER,
+            owner_id=locked_member.id,
+            uploaded_by_membership_id=None,
+            uploaded_by_member_id=locked_member.id,
+            retention_status=FileAsset.RetentionStatus.QUARANTINED,
+            rejection_code=None,
+            scan_attempt_id=None,
+            scan_started_at=None,
+            deleted_at=None,
+        )
+        _audit(
+            gym=gym,
+            audit=audit,
+            action="FILE_UPLOAD_INTENT",
+            asset=asset,
+            values={
+                "purpose": asset.purpose,
+                "owner_id": str(locked_member.id),
+                "content_type": content_type,
+                "byte_size": byte_size,
+                "sha256": sha256,
+            },
+        )
+        signed_at = moment or utc_now()
+        try:
+            upload = store.presign_post(
+                object_key=asset.object_key,
+                content_type=content_type,
+                moment=signed_at,
+            )
+        except ObjectStoreUnavailable:
+            raise _store_failed() from None
+    return FileCommand(
+        status_code=201,
+        message="Upload intent created",
+        data={
+            "file_id": asset.id,
+            "purpose": asset.purpose,
+            "owner_type": asset.owner_type,
+            "owner_id": asset.owner_id,
+            "upload": {
+                "method": "POST",
+                "url": upload.url,
+                "file_field": "file",
+                "expires_at": format_utc(upload.expires_at),
+                "fields": upload.fields,
+            },
+        },
+    )
+
+
 def complete_upload(
     *,
     gym: Gym,
-    actor: GymMembership,
+    actor: GymMembership | None = None,
     audit: RequestAudit,
     store: Any,
     scanner: Any,
@@ -211,6 +302,7 @@ def complete_upload(
     asset_id: UUID,
     sha256: str,
     byte_size: int,
+    member_self: Member | None = None,
 ) -> FileCommand:
     claim = _claim_upload(
         gym=gym,
@@ -219,6 +311,7 @@ def complete_upload(
         asset_id=asset_id,
         sha256=sha256,
         byte_size=byte_size,
+        member_self=member_self,
     )
     if isinstance(claim, FileCommand):
         return claim
@@ -230,12 +323,13 @@ def complete_upload(
         upload_sha256=claim.upload_sha256,
         upload_byte_size=claim.upload_byte_size,
         upload_content_type=claim.upload_content_type,
-        allow_overwrite=lambda: _attempt_still_held(gym, actor, claim),
+        allow_overwrite=lambda: _attempt_still_held(gym, actor, claim, member_self=member_self),
         release_unclaimed_object=lambda: _drop_orphaned_canonical(
             gym=gym,
             actor=actor,
             store=store,
             claim=claim,
+            member_self=member_self,
         ),
     )
     return _finalize_upload(
@@ -247,22 +341,24 @@ def complete_upload(
         verdict=verdict,
         sha256=sha256,
         byte_size=byte_size,
+        member_self=member_self,
     )
 
 
 def issue_download_url(
     *,
     gym: Gym,
-    actor: GymMembership,
+    actor: GymMembership | None = None,
     audit: RequestAudit,
     store: Any,
     asset_id: UUID,
     moment: datetime | None = None,
+    member_self: Member | None = None,
 ) -> FileCommand:
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         member, asset = _lock_owned_asset(gym, asset_id)
-        _require_asset_access(gym, actor, member, asset)
+        _require_caller_asset(gym, actor, member, asset, member_self=member_self, held=False)
         if not _downloadable(asset):
             raise _not_downloadable()
         snapshot = (asset.content_type, asset.byte_size, asset.sha256, asset.object_key)
@@ -284,7 +380,7 @@ def issue_download_url(
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         member, asset = _lock_owned_asset(gym, asset_id)
-        _require_asset_access(gym, actor, member, asset)
+        _require_caller_asset(gym, actor, member, asset, member_self=member_self, held=False)
         if (
             not _downloadable(asset)
             or asset.content_type != content_type
@@ -338,22 +434,23 @@ def issue_download_url(
 def delete_upload(
     *,
     gym: Gym,
-    actor: GymMembership,
+    actor: GymMembership | None = None,
     audit: RequestAudit,
     store: Any,
     asset_id: UUID,
+    member_self: Member | None = None,
 ) -> FileCommand:
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         member, asset = _lock_owned_asset(gym, asset_id)
-        _require_asset_access(gym, actor, member, asset)
+        _require_caller_asset(gym, actor, member, asset, member_self=member_self, held=False)
         if asset.purpose == EXPENSE_RECEIPT_PURPOSE and _expense_receipt_referenced(gym, asset.id):
             raise _state_conflict()
         if asset.retention_status == FileAsset.RetentionStatus.DELETED:
-            _detach_photo(member, asset.id)
+            _detach_photo(member, asset.id, gym=gym, audit=audit, member_self=member_self)
             return _delete_result(asset)
         if asset.retention_status != FileAsset.RetentionStatus.DELETE_PENDING:
-            _detach_photo(member, asset.id)
+            _detach_photo(member, asset.id, gym=gym, audit=audit, member_self=member_self)
             if asset.scan_status == FileAsset.ScanStatus.SCANNING:
                 asset.scan_status = FileAsset.ScanStatus.ERROR
                 asset.scan_attempt_id = None
@@ -501,16 +598,17 @@ def _expire_one(*, gym: Gym, store: Any, asset_id: UUID) -> bool:
 def _claim_upload(
     *,
     gym: Gym,
-    actor: GymMembership,
+    actor: GymMembership | None,
     audit: RequestAudit,
     asset_id: UUID,
     sha256: str,
     byte_size: int,
+    member_self: Member | None = None,
 ) -> _Claim | FileCommand:
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         member, asset = _lock_owned_asset(gym, asset_id)
-        _require_asset_access(gym, actor, member, asset)
+        _require_caller_asset(gym, actor, member, asset, member_self=member_self, held=False)
         if asset.scan_status == FileAsset.ScanStatus.REJECTED:
             raise _rejected(asset)
         if asset.retention_status in {
@@ -521,6 +619,8 @@ def _claim_upload(
         if _is_clean(asset):
             if not _confirmation_matches(asset, sha256, byte_size):
                 raise _confirmation_mismatch()
+            if member_self is not None:
+                _attach_member_photo(gym, audit, member, asset)
             _audit_completed(gym, audit, asset)
             return _clean_result(asset)
         if asset.scan_status == FileAsset.ScanStatus.SCANNING:
@@ -566,22 +666,27 @@ def _claim_upload(
 def _finalize_upload(
     *,
     gym: Gym,
-    actor: GymMembership,
+    actor: GymMembership | None,
     audit: RequestAudit,
     store: Any,
     claim: _Claim,
     verdict: Verdict,
     sha256: str,
     byte_size: int,
+    member_self: Member | None = None,
 ) -> FileCommand:
     if verdict.wrote_canonical:
-        _drop_orphaned_canonical(gym=gym, actor=actor, store=store, claim=claim)
+        _drop_orphaned_canonical(
+            gym=gym, actor=actor, store=store, claim=claim, member_self=member_self
+        )
     if verdict.outcome is VerifyOutcome.ABORTED:
         with transaction.atomic():
             set_gym_context(gym_id=gym.id)
             member, asset = _lock_owned_asset(gym, claim.asset_id)
-            _require_held_asset(gym, actor, member, asset)
-            return _command_from_locked(gym, audit, asset, sha256, byte_size)
+            _require_caller_asset(gym, actor, member, asset, member_self=member_self, held=True)
+            return _command_from_locked(
+                gym, audit, asset, sha256, byte_size, member=member, member_self=member_self
+            )
     if verdict.outcome is VerifyOutcome.MISSING:
         return _release_missing_upload(
             gym=gym,
@@ -590,17 +695,20 @@ def _finalize_upload(
             claim=claim,
             sha256=sha256,
             byte_size=byte_size,
+            member_self=member_self,
         )
     result: FileCommand | None = None
     error_code = ""
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         member, asset = _lock_owned_asset(gym, claim.asset_id)
-        _require_held_asset(gym, actor, member, asset)
+        _require_caller_asset(gym, actor, member, asset, member_self=member_self, held=True)
         if asset.scan_attempt_id != claim.attempt_id or (
             asset.retention_status != FileAsset.RetentionStatus.QUARANTINED
         ):
-            return _command_from_locked(gym, audit, asset, sha256, byte_size)
+            return _command_from_locked(
+                gym, audit, asset, sha256, byte_size, member=member, member_self=member_self
+            )
         if verdict.outcome is VerifyOutcome.CLEAN:
             asset.content_type = verdict.content_type
             asset.byte_size = verdict.byte_size
@@ -624,6 +732,8 @@ def _finalize_upload(
                 ]
             )
             _audit_completed(gym, audit, asset)
+            if member_self is not None:
+                _attach_member_photo(gym, audit, member, asset)
             result = _clean_result(asset)
         elif verdict.outcome is VerifyOutcome.REJECTED:
             asset.scan_status = FileAsset.ScanStatus.REJECTED
@@ -698,12 +808,18 @@ def _finalize_upload(
     raise _error_code(error_code)
 
 
-def _attempt_still_held(gym: Gym, actor: GymMembership, claim: _Claim) -> bool:
+def _attempt_still_held(
+    gym: Gym,
+    actor: GymMembership | None,
+    claim: _Claim,
+    *,
+    member_self: Member | None = None,
+) -> bool:
     try:
         with transaction.atomic():
             set_gym_context(gym_id=gym.id)
             member, asset = _lock_owned_asset(gym, claim.asset_id)
-            _require_held_asset(gym, actor, member, asset)
+            _require_caller_asset(gym, actor, member, asset, member_self=member_self, held=True)
             return (
                 asset.scan_attempt_id == claim.attempt_id
                 and asset.retention_status == FileAsset.RetentionStatus.QUARANTINED
@@ -715,17 +831,18 @@ def _attempt_still_held(gym: Gym, actor: GymMembership, claim: _Claim) -> bool:
 def _release_missing_upload(
     *,
     gym: Gym,
-    actor: GymMembership,
+    actor: GymMembership | None,
     audit: RequestAudit,
     claim: _Claim,
     sha256: str,
     byte_size: int,
+    member_self: Member | None = None,
 ) -> FileCommand:
     released = False
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         member, asset = _lock_owned_asset(gym, claim.asset_id)
-        _require_held_asset(gym, actor, member, asset)
+        _require_caller_asset(gym, actor, member, asset, member_self=member_self, held=True)
         if (
             asset.scan_attempt_id == claim.attempt_id
             and asset.retention_status == FileAsset.RetentionStatus.QUARANTINED
@@ -743,7 +860,9 @@ def _release_missing_upload(
             )
             released = True
         else:
-            return _command_from_locked(gym, audit, asset, sha256, byte_size)
+            return _command_from_locked(
+                gym, audit, asset, sha256, byte_size, member=member, member_self=member_self
+            )
     if released:
         raise _incomplete()
     raise _state_conflict()
@@ -755,6 +874,9 @@ def _command_from_locked(
     asset: FileAsset,
     sha256: str,
     byte_size: int,
+    *,
+    member: Member | None = None,
+    member_self: Member | None = None,
 ) -> FileCommand:
     if asset.scan_status == FileAsset.ScanStatus.REJECTED:
         raise _rejected(asset)
@@ -766,6 +888,8 @@ def _command_from_locked(
     if _is_clean(asset):
         if not _confirmation_matches(asset, sha256, byte_size):
             raise _confirmation_mismatch()
+        if member_self is not None:
+            _attach_member_photo(gym, audit, member, asset)
         _audit_completed(gym, audit, asset)
         return _clean_result(asset)
     if asset.scan_status == FileAsset.ScanStatus.SCANNING:
@@ -914,9 +1038,10 @@ def _reject_expired(gym: Gym, asset: FileAsset, *, attempt_id: UUID | None) -> b
 def _drop_orphaned_canonical(
     *,
     gym: Gym,
-    actor: GymMembership,
+    actor: GymMembership | None,
     store: Any,
     claim: _Claim,
+    member_self: Member | None = None,
 ) -> None:
     """Delete a canonical object after delete won, then record the storage result.
 
@@ -935,7 +1060,7 @@ def _drop_orphaned_canonical(
         with transaction.atomic():
             set_gym_context(gym_id=gym.id)
             member, asset = _lock_owned_asset(gym, claim.asset_id)
-            _require_scope(gym, actor, member)
+            _require_caller_scope(gym, actor, member, asset, member_self=member_self)
             if (
                 asset.scan_attempt_id == claim.attempt_id
                 and asset.retention_status == FileAsset.RetentionStatus.QUARANTINED
@@ -947,21 +1072,28 @@ def _drop_orphaned_canonical(
     except Http404:
         return
     removed = _delete_object(store, object_key)
-    _settle_orphaned_canonical(gym=gym, actor=actor, asset_id=claim.asset_id, removed=removed)
+    _settle_orphaned_canonical(
+        gym=gym,
+        actor=actor,
+        asset_id=claim.asset_id,
+        removed=removed,
+        member_self=member_self,
+    )
 
 
 def _settle_orphaned_canonical(
     *,
     gym: Gym,
-    actor: GymMembership,
+    actor: GymMembership | None,
     asset_id: UUID,
     removed: bool,
+    member_self: Member | None = None,
 ) -> None:
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         try:
             member, asset = _lock_owned_asset(gym, asset_id)
-            _require_scope(gym, actor, member)
+            _require_caller_scope(gym, actor, member, asset, member_self=member_self)
         except Http404:
             return
         if not _deleted_without_claim(asset):
@@ -1041,22 +1173,111 @@ def _locked_member(gym: Gym, member_id: UUID) -> Member:
     return member
 
 
+def _require_member_owned_photo(asset: FileAsset, member: Member) -> None:
+    if (
+        asset.purpose != PROFILE_PHOTO_PURPOSE
+        or asset.owner_type != MEMBER_OWNER
+        or asset.owner_id != member.id
+    ):
+        raise Http404
+
+
+def _reject_mixed_file_principal() -> NoReturn:
+    raise FileRequestError(
+        code="INVALID_REQUEST",
+        message="The request could not be processed.",
+        status_code=400,
+    )
+
+
+def _require_caller_asset(
+    gym: Gym,
+    actor: GymMembership | None,
+    member: Member | None,
+    asset: FileAsset,
+    *,
+    member_self: Member | None,
+    held: bool,
+) -> None:
+    if (actor is None) == (member_self is None):
+        _reject_mixed_file_principal()
+    if member_self is not None:
+        _require_member_owned_photo(asset, member_self)
+        _require_members_entitlement(gym)
+        return
+    if actor is None:
+        _reject_mixed_file_principal()
+    if held:
+        _require_held_asset(gym, actor, member, asset)
+        return
+    _require_asset_access(gym, actor, member, asset)
+
+
+def _require_caller_scope(
+    gym: Gym,
+    actor: GymMembership | None,
+    member: Member | None,
+    asset: FileAsset,
+    *,
+    member_self: Member | None,
+) -> None:
+    if (actor is None) == (member_self is None):
+        _reject_mixed_file_principal()
+    if member_self is not None:
+        _require_member_owned_photo(asset, member_self)
+        _require_members_entitlement(gym)
+        return
+    if actor is None:
+        _reject_mixed_file_principal()
+    _require_scope(gym, actor, member)
+
+
+def _attach_member_photo(
+    gym: Gym,
+    audit: RequestAudit,
+    member: Member | None,
+    asset: FileAsset,
+) -> None:
+    if member is None or not _is_clean(asset):
+        return
+    if asset.owner_id != member.id or asset.purpose != PROFILE_PHOTO_PURPOSE:
+        return
+    if member.profile_photo_asset_id == asset.id:
+        return
+    previous = member.profile_photo_asset_id
+    member.profile_photo_asset_id = asset.id
+    member.save(update_fields=["profile_photo_asset_id", "updated_at"])
+    write_tenant_audit(
+        gym=gym,
+        actor_user=audit.actor_user,
+        actor_membership_id=None,
+        action="MEMBER_PROFILE_UPDATED",
+        module="members",
+        target_type="Member",
+        target_id=member.id,
+        request_id=audit.request_id,
+        old_values={
+            "profile_photo_asset_id": None if previous is None else str(previous),
+        },
+        new_values={"profile_photo_asset_id": str(asset.id)},
+        ip_address=audit.ip_address,
+        user_agent=audit.user_agent,
+    )
+
+
 def _require_scope(gym: Gym, actor: GymMembership, member: Member | None) -> None:
     if member is None:
         return
     if member.gym_id != gym.id:
         raise Http404
-    keys = set(
-        GymMembershipRole.objects.filter(
-            gym=gym,
-            gym_membership=actor,
-            role__is_active=True,
-        ).values_list("role__key", flat=True)
+    from apps.trainers.selectors import gym_local_date, require_assigned_member
+
+    require_assigned_member(
+        gym_id=gym.id,
+        actor=actor,
+        member_id=member.id,
+        as_of=gym_local_date(gym),
     )
-    # TrainerAssignment arrives in Phase 5. Until then a trainer-only membership
-    # is denied for every member, including one that would later be assigned.
-    if keys and keys <= {"TRAINER"}:
-        raise Http404
 
 
 def _require_finance_entitlement(gym: Gym) -> None:
@@ -1168,13 +1389,36 @@ def _require_members_entitlement(gym: Gym) -> None:
         )
 
 
-def _detach_photo(member: Member | None, asset_id: UUID) -> None:
+def _detach_photo(
+    member: Member | None,
+    asset_id: UUID,
+    *,
+    gym: Gym | None = None,
+    audit: RequestAudit | None = None,
+    member_self: Member | None = None,
+) -> None:
     if member is None:
         return
     if member.profile_photo_asset_id != asset_id:
         return
     member.profile_photo_asset_id = None
     member.save(update_fields=["profile_photo_asset_id", "updated_at"])
+    if member_self is None or gym is None or audit is None:
+        return
+    write_tenant_audit(
+        gym=gym,
+        actor_user=audit.actor_user,
+        actor_membership_id=None,
+        action="MEMBER_PROFILE_UPDATED",
+        module="members",
+        target_type="Member",
+        target_id=member.id,
+        request_id=audit.request_id,
+        old_values={"profile_photo_asset_id": str(asset_id)},
+        new_values={"profile_photo_asset_id": None},
+        ip_address=audit.ip_address,
+        user_agent=audit.user_agent,
+    )
 
 
 def _confirmation_matches(asset: FileAsset, sha256: str, byte_size: int) -> bool:

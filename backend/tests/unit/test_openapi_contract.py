@@ -11,6 +11,29 @@ PUBLISHED_PATHS = {
     "/api/v1/admin/audit-logs/",
     "/api/v1/audit-logs/",
     "/api/v1/admin/dashboard/",
+    "/api/v1/dashboard/",
+    "/api/v1/reports/daily/",
+    "/api/v1/reports/daily/export/",
+    "/api/v1/reports/monthly/",
+    "/api/v1/reports/monthly/export/",
+    "/api/v1/reports/cash-book/",
+    "/api/v1/reports/cash-book/export/",
+    "/api/v1/reports/profit-loss/",
+    "/api/v1/reports/profit-loss/export/",
+    "/api/v1/reports/membership-expiry/",
+    "/api/v1/reports/membership-expiry/export/",
+    "/api/v1/reports/check-ins/",
+    "/api/v1/reports/check-ins/export/",
+    "/api/v1/reports/pt-sessions/",
+    "/api/v1/reports/pt-sessions/export/",
+    "/api/v1/reports/classes/",
+    "/api/v1/reports/classes/export/",
+    "/api/v1/reports/product-sales/",
+    "/api/v1/reports/product-sales/export/",
+    "/api/v1/reports/stock-movements/",
+    "/api/v1/reports/stock-movements/export/",
+    "/api/v1/reports/inventory/",
+    "/api/v1/reports/inventory/export/",
     "/api/v1/admin/gyms/",
     "/api/v1/admin/gyms/{gym_id}/",
     "/api/v1/admin/gyms/{gym_id}/activate/",
@@ -36,6 +59,21 @@ PUBLISHED_PATHS = {
     "/api/v1/member-auth/logout/",
     "/api/v1/member-auth/refresh/",
     "/api/v1/member/check-ins/scan/",
+    "/api/v1/member/me/",
+    "/api/v1/member/dashboard/",
+    "/api/v1/member/membership/",
+    "/api/v1/member/payments/",
+    "/api/v1/member/check-ins/",
+    "/api/v1/member/service-packages/",
+    "/api/v1/member/schedule/",
+    "/api/v1/member/class-bookings/",
+    "/api/v1/member/files/upload-intents/",
+    "/api/v1/member/files/{id}/complete/",
+    "/api/v1/member/files/{id}/download-url/",
+    "/api/v1/member/files/{id}/",
+    "/api/v1/trainer/check-ins/scan/",
+    "/api/v1/trainer/dashboard/",
+    "/api/v1/trainer/reports/sessions/",
     "/api/v1/members/",
     "/api/v1/members/{id}/",
     "/api/v1/members/{id}/archive/",
@@ -135,6 +173,50 @@ PUBLISHED_PATHS = {
     "/api/v1/retail-sales/{sale_id}/cancel/",
     "/api/v1/retail-sales/{sale_id}/void/",
     "/api/v1/retail-sales/{sale_id}/return/",
+    "/api/v1/trainers/",
+    "/api/v1/trainers/{id}/assigned-members/",
+    "/api/v1/trainer-assignments/",
+    "/api/v1/trainer-assignments/{id}/",
+    "/api/v1/trainer-assignments/{id}/end/",
+    "/api/v1/trainer-assignments/{id}/cancel/",
+    "/api/v1/service-packages/",
+    "/api/v1/pt-sales/",
+    "/api/v1/pt-sales/{id}/",
+    "/api/v1/pt-sales/{id}/cancel/",
+    "/api/v1/pt-sales/{id}/submit/",
+    "/api/v1/pt-sales/{id}/approve/",
+    "/api/v1/pt-sales/{id}/reject/",
+    "/api/v1/pt-sales/{id}/void/",
+    "/api/v1/pt-commissions/",
+    "/api/v1/pt-commissions/{id}/",
+    "/api/v1/pt-commissions/{id}/record-payment/",
+    "/api/v1/member-service-packages/",
+    "/api/v1/member-service-packages/{id}/",
+    "/api/v1/member-service-packages/{id}/ledger/",
+    "/api/v1/member-service-packages/{id}/ledger/adjust/",
+    "/api/v1/class-types/",
+    "/api/v1/class-types/{id}/",
+    "/api/v1/class-schedules/",
+    "/api/v1/class-schedules/{id}/",
+    "/api/v1/class-occurrences/",
+    "/api/v1/class-occurrences/{id}/cancel/",
+    "/api/v1/class-bookings/",
+    "/api/v1/class-bookings/{id}/attend/",
+    "/api/v1/class-bookings/{id}/no-show/",
+    "/api/v1/class-bookings/{id}/cancel/",
+    "/api/v1/pt-bookings/",
+    "/api/v1/pt-bookings/{id}/",
+    "/api/v1/pt-bookings/{id}/attend/",
+    "/api/v1/pt-bookings/{id}/no-show/",
+    "/api/v1/pt-bookings/{id}/cancel/",
+    "/api/v1/announcements/",
+    "/api/v1/announcements/{id}/",
+    "/api/v1/announcements/{id}/publish/",
+    "/api/v1/announcements/{id}/cancel/",
+    "/api/v1/member/notifications/",
+    "/api/v1/member/notifications/{id}/read/",
+    "/api/v1/member/devices/",
+    "/api/v1/member/devices/{id}/",
 }
 CONTRACT_PATH = Path(__file__).resolve().parents[3] / "contracts" / "openapi.v1.json"
 
@@ -169,7 +251,6 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
     assert "/api/v1/members/{id}/archive/" in schema["paths"]
     unpublished = (
         "/api/v1/check-ins/scan/",
-        "/api/v1/member/me/",
         "/api/v1/notifications/",
         "/api/v1/product-categories/{id}/",
         "/api/v1/stock-movements/{id}/",
@@ -186,7 +267,538 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
     assert "/api/v1/expense-categories/" in schema["paths"]
     assert "/api/v1/expenses/" in schema["paths"]
     assert "/api/v1/expenses/{expense_id}/approve/" in schema["paths"]
-    assert "/api/v1/dashboard/" not in schema["paths"]
+    assert "/api/v1/dashboard/" in schema["paths"]
+
+
+def test_openapi_documents_tenant_dashboard() -> None:
+    document = generated_schema()
+    operation = document["paths"]["/api/v1/dashboard/"]["get"]
+    parameters = {parameter["name"]: parameter for parameter in operation["parameters"]}
+    assert set(parameters) == {"range", "date_from", "date_to"}
+    envelope = _resolve_schema(
+        document,
+        operation["responses"]["200"]["content"]["application/json"]["schema"],
+    )
+    data = _resolve_schema(document, envelope["properties"]["data"])
+    assert set(data["properties"]) == {
+        "range",
+        "timezone",
+        "currency",
+        "operational",
+        "financial",
+    }
+    operational = _resolve_schema(document, data["properties"]["operational"])
+    financial_schema = data["properties"]["financial"]
+    assert financial_schema.get("nullable") is True or any(
+        item.get("type") == "null" for item in financial_schema.get("anyOf", [])
+    )
+    financial_ref = financial_schema
+    if "allOf" in financial_schema:
+        financial_ref = next(item for item in financial_schema["allOf"] if "$ref" in item)
+    elif "anyOf" in financial_schema:
+        financial_ref = next(item for item in financial_schema["anyOf"] if "$ref" in item)
+    financial = _resolve_schema(document, financial_ref)
+    assert set(operational["properties"]) == {
+        "active_members",
+        "new_members",
+        "expired_memberships",
+        "check_ins",
+        "unique_attendees",
+        "currently_checked_in",
+        "expiring_within_3_days",
+        "expiring_within_7_days",
+        "expiring_within_30_days",
+        "pending_approvals",
+    }
+    assert set(financial["properties"]) == {
+        "total_revenue",
+        "new_member_revenue",
+        "renewal_revenue",
+        "pt_revenue",
+        "class_revenue",
+        "product_revenue",
+        "other_revenue",
+        "pending_payment_member_count",
+        "pending_payment_amount",
+        "revenue_sources_ranked",
+        "top_product_items",
+        "total_expenses",
+        "expenses_by_category",
+        "staff_salary_expense",
+        "pt_commission_expense",
+        "net_profit",
+    }
+
+
+def test_openapi_documents_period_reports() -> None:
+    document = generated_schema()
+    daily = document["paths"]["/api/v1/reports/daily/"]["get"]
+    monthly = document["paths"]["/api/v1/reports/monthly/"]["get"]
+    daily_parameters = {parameter["name"]: parameter for parameter in daily["parameters"]}
+    monthly_parameters = {parameter["name"]: parameter for parameter in monthly["parameters"]}
+    assert set(daily_parameters) == {"date"}
+    assert daily_parameters["date"]["required"] is True
+    assert set(monthly_parameters) == {"year", "month"}
+    assert monthly_parameters["year"]["required"] is True
+    assert monthly_parameters["month"]["required"] is True
+    for operation in (daily, monthly):
+        envelope = _resolve_schema(
+            document,
+            operation["responses"]["200"]["content"]["application/json"]["schema"],
+        )
+        data = _resolve_schema(document, envelope["properties"]["data"])
+        assert set(data["properties"]) == {
+            "gym",
+            "timezone",
+            "currency",
+            "range",
+            "generated_at",
+            "source_status_policy",
+            "rows",
+            "totals",
+        }
+        policy = _resolve_schema(document, data["properties"]["source_status_policy"])
+        assert set(policy["properties"]) == {"revenue", "expenses", "operations"}
+        row_schema = data["properties"]["rows"]
+        row = _resolve_schema(document, row_schema["items"])
+        totals = _resolve_schema(document, data["properties"]["totals"])
+        assert "product_quantity" in row["properties"]
+        assert "net_profit" in row["properties"]
+        assert "unique_attendees" in totals["properties"]
+        assert "staff_salary_expense" in totals["properties"]
+        assert "pt_commission_expense" in totals["properties"]
+        assert "expenses_by_category" in totals["properties"]
+        assert "date" not in totals["properties"]
+
+
+def test_openapi_documents_cash_book_and_profit_loss() -> None:
+    document = generated_schema()
+    cash = document["paths"]["/api/v1/reports/cash-book/"]["get"]
+    profit = document["paths"]["/api/v1/reports/profit-loss/"]["get"]
+    for operation in (cash, profit):
+        parameters = {parameter["name"]: parameter for parameter in operation["parameters"]}
+        assert set(parameters) == {"date_from", "date_to"}
+        assert parameters["date_from"]["required"] is True
+        assert parameters["date_to"]["required"] is True
+        envelope = _resolve_schema(
+            document,
+            operation["responses"]["200"]["content"]["application/json"]["schema"],
+        )
+        data = _resolve_schema(document, envelope["properties"]["data"])
+        assert set(data["properties"]) == {
+            "gym",
+            "timezone",
+            "currency",
+            "range",
+            "generated_at",
+            "source_status_policy",
+            "rows",
+            "totals",
+        }
+    cash_data = _resolve_schema(
+        document,
+        _resolve_schema(
+            document,
+            cash["responses"]["200"]["content"]["application/json"]["schema"],
+        )["properties"]["data"],
+    )
+    cash_row = _resolve_schema(document, cash_data["properties"]["rows"]["items"])
+    cash_totals = _resolve_schema(document, cash_data["properties"]["totals"])
+    assert "void_session_count" in cash_row["properties"]
+    assert "net_cash_flow" in cash_row["properties"]
+    assert "reversal_out" in cash_totals["properties"]
+    assert "date" not in cash_totals["properties"]
+    profit_data = _resolve_schema(
+        document,
+        _resolve_schema(
+            document,
+            profit["responses"]["200"]["content"]["application/json"]["schema"],
+        )["properties"]["data"],
+    )
+    profit_row = _resolve_schema(document, profit_data["properties"]["rows"]["items"])
+    profit_totals = _resolve_schema(document, profit_data["properties"]["totals"])
+    assert "class_revenue" in profit_row["properties"]
+    assert "product_quantity" not in profit_row["properties"]
+    assert "net_profit" in profit_row["properties"]
+    assert "staff_salary_expense" in profit_totals["properties"]
+    assert "expenses_by_category" in profit_totals["properties"]
+    assert "date" not in profit_totals["properties"]
+
+
+def test_openapi_documents_operational_reports() -> None:
+    document = generated_schema()
+    expiry = document["paths"]["/api/v1/reports/membership-expiry/"]["get"]
+    visits = document["paths"]["/api/v1/reports/check-ins/"]["get"]
+    for operation in (expiry, visits):
+        parameters = {parameter["name"]: parameter for parameter in operation["parameters"]}
+        assert set(parameters) == {"date_from", "date_to"}
+        assert parameters["date_from"]["required"] is True
+        assert parameters["date_to"]["required"] is True
+        envelope = _resolve_schema(
+            document,
+            operation["responses"]["200"]["content"]["application/json"]["schema"],
+        )
+        data = _resolve_schema(document, envelope["properties"]["data"])
+        assert set(data["properties"]) == {
+            "gym",
+            "timezone",
+            "range",
+            "generated_at",
+            "source_status_policy",
+            "rows",
+            "totals",
+        }
+        assert "currency" not in data["properties"]
+    expiry_data = _resolve_schema(
+        document,
+        _resolve_schema(
+            document,
+            expiry["responses"]["200"]["content"]["application/json"]["schema"],
+        )["properties"]["data"],
+    )
+    expiry_row = _resolve_schema(document, expiry_data["properties"]["rows"]["items"])
+    expiry_totals = _resolve_schema(document, expiry_data["properties"]["totals"])
+    assert set(expiry_row["properties"]) == {
+        "date",
+        "expiring_memberships",
+        "unique_members",
+        "active_memberships",
+        "suspended_memberships",
+        "expired_memberships",
+    }
+    assert set(expiry_totals["properties"]) == set(expiry_row["properties"]) - {"date"}
+    visit_data = _resolve_schema(
+        document,
+        _resolve_schema(
+            document,
+            visits["responses"]["200"]["content"]["application/json"]["schema"],
+        )["properties"]["data"],
+    )
+    visit_row = _resolve_schema(document, visit_data["properties"]["rows"]["items"])
+    visit_totals = _resolve_schema(document, visit_data["properties"]["totals"])
+    assert set(visit_row["properties"]) == {
+        "date",
+        "check_ins",
+        "unique_attendees",
+        "manual_check_ins",
+        "qr_check_ins",
+        "nfc_check_ins",
+        "biometric_check_ins",
+        "check_outs",
+        "open_visits_from_day",
+    }
+    assert set(visit_totals["properties"]) == set(visit_row["properties"]) - {"date"} | {
+        "currently_checked_in",
+    }
+
+
+def test_openapi_documents_session_reports() -> None:
+    document = generated_schema()
+    sessions = document["paths"]["/api/v1/reports/pt-sessions/"]["get"]
+    classes = document["paths"]["/api/v1/reports/classes/"]["get"]
+    for operation in (sessions, classes):
+        parameters = {parameter["name"]: parameter for parameter in operation["parameters"]}
+        assert set(parameters) == {"date_from", "date_to"}
+        assert parameters["date_from"]["required"] is True
+        assert parameters["date_to"]["required"] is True
+        envelope = _resolve_schema(
+            document,
+            operation["responses"]["200"]["content"]["application/json"]["schema"],
+        )
+        data = _resolve_schema(document, envelope["properties"]["data"])
+        assert set(data["properties"]) == {
+            "gym",
+            "timezone",
+            "range",
+            "generated_at",
+            "source_status_policy",
+            "rows",
+            "totals",
+        }
+        assert "currency" not in data["properties"]
+    session_data = _resolve_schema(
+        document,
+        _resolve_schema(
+            document,
+            sessions["responses"]["200"]["content"]["application/json"]["schema"],
+        )["properties"]["data"],
+    )
+    session_row = _resolve_schema(document, session_data["properties"]["rows"]["items"])
+    session_totals = _resolve_schema(document, session_data["properties"]["totals"])
+    assert set(session_row["properties"]) == {
+        "date",
+        "bookings",
+        "unique_members",
+        "unique_trainers",
+        "booked_sessions",
+        "attended_sessions",
+        "no_show_sessions",
+        "cancelled_sessions",
+        "metered_sessions",
+        "unmetered_sessions",
+    }
+    assert set(session_totals["properties"]) == set(session_row["properties"]) - {"date"}
+    class_data = _resolve_schema(
+        document,
+        _resolve_schema(
+            document,
+            classes["responses"]["200"]["content"]["application/json"]["schema"],
+        )["properties"]["data"],
+    )
+    class_row = _resolve_schema(document, class_data["properties"]["rows"]["items"])
+    class_totals = _resolve_schema(document, class_data["properties"]["totals"])
+    assert set(class_row["properties"]) == {
+        "date",
+        "occurrences",
+        "scheduled_occurrences",
+        "completed_occurrences",
+        "cancelled_occurrences",
+        "available_capacity",
+        "bookings",
+        "unique_members",
+        "booked_slots",
+        "attended_slots",
+        "no_show_slots",
+        "cancelled_slots",
+        "reserved_slots",
+        "remaining_capacity",
+    }
+    assert "unique_trainers" not in class_row["properties"]
+    assert set(class_totals["properties"]) == set(class_row["properties"]) - {"date"} | {
+        "unique_trainers",
+    }
+    for schema in (session_row, session_totals, class_row, class_totals):
+        assert "currency" not in schema["properties"]
+        assert "member_id" not in schema["properties"]
+        assert "email" not in schema["properties"]
+
+
+def test_openapi_documents_trainer_reports() -> None:
+    document = generated_schema()
+    dashboard = document["paths"]["/api/v1/trainer/dashboard/"]["get"]
+    sessions = document["paths"]["/api/v1/trainer/reports/sessions/"]["get"]
+    assert dashboard["operationId"] == "trainer_dashboard_retrieve"
+    assert sessions["operationId"] == "trainer_session_report_retrieve"
+    dashboard_parameters = {item["name"]: item for item in dashboard["parameters"]}
+    session_parameters = {item["name"]: item for item in sessions["parameters"]}
+    assert set(dashboard_parameters) == {"range", "date_from", "date_to"}
+    assert dashboard_parameters["range"].get("required", False) is False
+    assert dashboard_parameters["date_from"].get("required", False) is False
+    assert dashboard_parameters["date_to"].get("required", False) is False
+    assert set(session_parameters) == {"date_from", "date_to"}
+    assert session_parameters["date_from"]["required"] is True
+    assert session_parameters["date_to"]["required"] is True
+    for operation in (dashboard, sessions):
+        assert set(operation["responses"]) >= {"200", "400", "401", "403", "404"}
+    dashboard_data = _report_data(document, dashboard)
+    session_data = _report_data(document, sessions)
+    assert set(dashboard_data["properties"]) == {
+        "timezone",
+        "today",
+        "range",
+        "generated_at",
+        "trainer_staff_profile_id",
+        "active_assigned_members",
+        "sessions",
+        "upcoming_bookings",
+    }
+    assert set(session_data["properties"]) == {
+        "gym",
+        "timezone",
+        "range",
+        "generated_at",
+        "source_status_policy",
+        "rows",
+        "totals",
+    }
+    counts = _resolve_schema(document, dashboard_data["properties"]["sessions"])
+    upcoming = _resolve_schema(document, dashboard_data["properties"]["upcoming_bookings"]["items"])
+    session_row = _resolve_schema(document, session_data["properties"]["rows"]["items"])
+    session_totals = _resolve_schema(document, session_data["properties"]["totals"])
+    assert set(counts["properties"]) == {
+        "bookings",
+        "unique_members",
+        "booked_sessions",
+        "attended_sessions",
+        "no_show_sessions",
+        "cancelled_sessions",
+    }
+    assert set(upcoming["properties"]) == {
+        "id",
+        "member_id",
+        "member_number",
+        "full_name",
+        "starts_at",
+        "ends_at",
+    }
+    assert set(session_row["properties"]) == set(counts["properties"]) | {"date"}
+    assert set(session_totals["properties"]) == set(counts["properties"])
+    for schema in (dashboard_data, counts, upcoming, session_data, session_row, session_totals):
+        assert "currency" not in schema["properties"]
+        assert "email" not in schema["properties"]
+        assert "phone" not in schema["properties"]
+        assert "price" not in schema["properties"]
+        assert "amount" not in schema["properties"]
+    generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
+    assert '"/api/v1/trainer/dashboard/"' in generated
+    assert '"/api/v1/trainer/reports/sessions/"' in generated
+    assert "active_assigned_members" in generated
+    assert "upcoming_bookings" in generated
+    assert "trainer_staff_profile_id" in generated
+
+
+def test_openapi_documents_inventory_reports() -> None:
+    document = generated_schema()
+    sales = document["paths"]["/api/v1/reports/product-sales/"]["get"]
+    stock = document["paths"]["/api/v1/reports/stock-movements/"]["get"]
+    inventory = document["paths"]["/api/v1/reports/inventory/"]["get"]
+    sales_parameters = {item["name"]: item for item in sales["parameters"]}
+    stock_parameters = {item["name"]: item for item in stock["parameters"]}
+    inventory_parameters = {item["name"]: item for item in inventory["parameters"]}
+    assert set(sales_parameters) == {"date_from", "date_to", "limit", "after"}
+    assert sales_parameters["date_from"]["required"] is True
+    assert sales_parameters["date_to"]["required"] is True
+    assert sales_parameters["limit"].get("required", False) is False
+    assert sales_parameters["after"].get("required", False) is False
+    assert set(stock_parameters) == {"date_from", "date_to"}
+    assert set(inventory_parameters) == {"limit", "after"}
+    assert inventory_parameters["limit"].get("required", False) is False
+    assert inventory_parameters["after"].get("required", False) is False
+    sales_data = _report_data(document, sales)
+    stock_data = _report_data(document, stock)
+    inventory_data = _report_data(document, inventory)
+    assert set(sales_data["properties"]) == {
+        "gym",
+        "timezone",
+        "currency",
+        "range",
+        "generated_at",
+        "source_status_policy",
+        "rows",
+        "totals",
+        "meta",
+    }
+    assert set(stock_data["properties"]) == {
+        "gym",
+        "timezone",
+        "range",
+        "generated_at",
+        "source_status_policy",
+        "rows",
+        "totals",
+    }
+    assert "currency" not in stock_data["properties"]
+    assert "meta" not in stock_data["properties"]
+    assert set(inventory_data["properties"]) == {
+        "gym",
+        "timezone",
+        "generated_at",
+        "source_status_policy",
+        "rows",
+        "totals",
+        "meta",
+    }
+    assert "currency" not in inventory_data["properties"]
+    assert "range" not in inventory_data["properties"]
+    sales_row = _resolve_schema(document, sales_data["properties"]["rows"]["items"])
+    sales_totals = _resolve_schema(document, sales_data["properties"]["totals"])
+    assert set(sales_row["properties"]) == {
+        "product_id",
+        "sku",
+        "name",
+        "is_active",
+        "quantity_sold",
+        "revenue",
+        "cogs",
+        "gross_profit",
+    }
+    assert set(sales_totals["properties"]) == {
+        "quantity_sold",
+        "revenue",
+        "cogs",
+        "gross_profit",
+        "product_count",
+        "active_product_count",
+    }
+    stock_row = _resolve_schema(document, stock_data["properties"]["rows"]["items"])
+    stock_totals = _resolve_schema(document, stock_data["properties"]["totals"])
+    assert set(stock_row["properties"]) == {
+        "date",
+        "opening_quantity",
+        "purchase_quantity",
+        "sale_quantity",
+        "sale_return_quantity",
+        "damage_quantity",
+        "loss_quantity",
+        "adjustment_quantity",
+        "correction_quantity",
+        "net_quantity",
+    }
+    assert set(stock_totals["properties"]) == set(stock_row["properties"]) - {"date"}
+    inventory_row = _resolve_schema(document, inventory_data["properties"]["rows"]["items"])
+    inventory_totals = _resolve_schema(document, inventory_data["properties"]["totals"])
+    assert set(inventory_row["properties"]) == {
+        "product_id",
+        "category_code",
+        "category_name",
+        "sku",
+        "name",
+        "unit",
+        "is_active",
+        "stock_quantity",
+        "low_stock_threshold",
+        "is_low_stock",
+    }
+    assert set(inventory_totals["properties"]) == {
+        "product_count",
+        "active_product_count",
+        "low_stock_product_count",
+        "total_stock_quantity",
+    }
+    for schema in (sales_row, sales_totals, stock_row, inventory_row, inventory_totals):
+        assert "email" not in schema["properties"]
+        assert "member_id" not in schema["properties"]
+        assert "current_unit_cost" not in schema["properties"]
+
+
+def test_openapi_documents_synchronous_report_exports() -> None:
+    document = generated_schema()
+    assert "/api/v1/reports/exports/" not in document["paths"]
+    assert "/api/v1/trainer/dashboard/export/" not in document["paths"]
+    assert "/api/v1/trainer/reports/sessions/export/" not in document["paths"]
+    expected = {
+        "daily": {"date"},
+        "monthly": {"year", "month"},
+        "cash-book": {"date_from", "date_to"},
+        "profit-loss": {"date_from", "date_to"},
+        "membership-expiry": {"date_from", "date_to"},
+        "check-ins": {"date_from", "date_to"},
+        "pt-sessions": {"date_from", "date_to"},
+        "classes": {"date_from", "date_to"},
+        "product-sales": {"date_from", "date_to"},
+        "stock-movements": {"date_from", "date_to"},
+        "inventory": set(),
+    }
+    for kind, names in expected.items():
+        path = f"/api/v1/reports/{kind}/export/"
+        operation = document["paths"][path]["get"]
+        assert set(document["paths"][path]) == {"get"}
+        parameters = {item["name"] for item in operation.get("parameters", [])}
+        assert parameters == names
+        assert "text/csv" in operation["responses"]["200"]["content"]
+        assert "application/json" not in operation["responses"]["200"]["content"]
+    generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
+    assert '"/api/v1/reports/daily/export/"' in generated
+    assert '"/api/v1/reports/inventory/export/"' in generated
+    assert '"/api/v1/reports/exports/"' not in generated
+
+
+def _report_data(document: dict[str, Any], operation: dict[str, Any]) -> dict[str, Any]:
+    envelope = _resolve_schema(
+        document,
+        operation["responses"]["200"]["content"]["application/json"]["schema"],
+    )
+    return _resolve_schema(document, envelope["properties"]["data"])
 
 
 def test_openapi_documents_membership_plans() -> None:
@@ -636,7 +1248,14 @@ def test_openapi_documents_member_auth_without_a_selector_or_bff_gate() -> None:
     assert "200" in login["responses"]
     assert "200" in refresh["responses"]
     assert "204" in logout["responses"]
-    assert "/api/v1/member/me/" not in document["paths"]
+    assert "/api/v1/member/me/" in document["paths"]
+    me = document["paths"]["/api/v1/member/me/"]["get"]
+    assert {"memberBearerAuth": []} in me["security"]
+    parameters = me.get("parameters", [])
+    assert not any(parameter["name"] == "X-Gym-BFF-Secret" for parameter in parameters)
+    assert "/api/v1/member/notifications/" in document["paths"]
+    assert "/api/v1/member/devices/" in document["paths"]
+    assert "/api/v1/notifications/" not in document["paths"]
     assert "/api/v1/check-ins/scan/" not in document["paths"]
 
 
@@ -746,6 +1365,40 @@ def test_openapi_documents_member_scan_payload_only() -> None:
         "scheme": "bearer",
         "bearerFormat": "JWT",
     }
+
+
+def test_openapi_documents_trainer_scan_without_idempotency_or_generic_route() -> None:
+    document = generated_schema()
+    assert "/api/v1/check-ins/scan/" not in document["paths"]
+    operation = document["paths"]["/api/v1/trainer/check-ins/scan/"]["post"]
+    parameters = operation.get("parameters", [])
+    assert not any(parameter["name"] == "Idempotency-Key" for parameter in parameters)
+    assert {"staffBearerAuth": []} in operation["security"]
+    assert "memberBearerAuth" not in {next(iter(item)) for item in operation["security"]}
+    body = operation["requestBody"]["content"]["application/json"]["schema"]
+    if "$ref" in body:
+        body = document["components"]["schemas"][body["$ref"].rsplit("/", 1)[-1]]
+    assert set(body["properties"]) == {"payload", "member_id"}
+    assert body.get("additionalProperties") is not True
+    for rejected in (
+        "gym_id",
+        "membership_id",
+        "method",
+        "occurred_at",
+        "device_id",
+        "source_metadata",
+        "status",
+        "recorded_by_membership_id",
+        "created_by_membership_id",
+        "idempotency_key",
+    ):
+        assert rejected not in body["properties"]
+    assert "201" in operation["responses"]
+    assert "400" in operation["responses"]
+    assert "403" in operation["responses"]
+    assert "404" in operation["responses"]
+    assert "409" in operation["responses"]
+    assert "429" in operation["responses"]
 
 
 def test_openapi_documents_platform_provisioning_idempotency() -> None:
@@ -1276,3 +1929,44 @@ def test_openapi_documents_retail_commands() -> None:
     generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
     assert '"/api/v1/retail-sales/{sale_id}/approve/"' in generated
     assert '"/api/v1/retail-sales/{sale_id}/void/"' in generated
+
+
+def test_openapi_documents_class_schedule_idempotency() -> None:
+    document = generated_schema()
+    paths = document["paths"]
+    writes = (
+        (paths["/api/v1/class-schedules/"]["post"], "201"),
+        (paths["/api/v1/class-schedules/{id}/"]["patch"], "200"),
+        (paths["/api/v1/class-occurrences/{id}/cancel/"]["post"], "200"),
+        (paths["/api/v1/class-bookings/"]["post"], "201"),
+        (paths["/api/v1/class-bookings/{id}/attend/"]["post"], "200"),
+        (paths["/api/v1/class-bookings/{id}/no-show/"]["post"], "200"),
+        (paths["/api/v1/class-bookings/{id}/cancel/"]["post"], "200"),
+        (paths["/api/v1/pt-bookings/"]["post"], "201"),
+        (paths["/api/v1/pt-bookings/{id}/attend/"]["post"], "200"),
+        (paths["/api/v1/pt-bookings/{id}/no-show/"]["post"], "200"),
+        (paths["/api/v1/pt-bookings/{id}/cancel/"]["post"], "200"),
+    )
+    for operation, success in writes:
+        header = next(
+            parameter
+            for parameter in operation["parameters"]
+            if parameter["name"] == "Idempotency-Key"
+        )
+        assert header["required"] is True
+        assert success in operation["responses"]
+        assert "400" in operation["responses"]
+        assert "409" in operation["responses"]
+    for path, method in (
+        ("/api/v1/class-schedules/", "get"),
+        ("/api/v1/class-types/", "get"),
+        ("/api/v1/class-types/", "post"),
+        ("/api/v1/class-types/{id}/", "patch"),
+        ("/api/v1/class-occurrences/", "get"),
+    ):
+        assert "Idempotency-Key" not in {
+            parameter["name"] for parameter in paths[path][method].get("parameters", [])
+        }
+    generated = (CONTRACT_PATH.parents[1] / "web/src/types/api.generated.ts").read_text()
+    assert '"/api/v1/class-schedules/"' in generated
+    assert '"/api/v1/class-schedules/{id}/"' in generated

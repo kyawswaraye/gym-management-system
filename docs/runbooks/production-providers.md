@@ -47,6 +47,20 @@ Live sockets after credentials exist:
 LIVE_PROVIDER_SMOKE=1 bash scripts/preflight-production-providers.sh
 ```
 
+## Push
+
+[ADR 0012](../adr/0012-fcm-push-delivery.md) selects Firebase Cloud Messaging
+HTTP v1 for Android and for iOS through the Firebase APNs bridge. Django does
+not call APNs itself. `schedule_membership_expiry_pushes`,
+`deliver_push_notifications`, `publish_scheduled_announcements`, and
+`expire_announcements` are implemented. Tests use
+`PUSH_BACKEND=locmem`. Production `PUSH_BACKEND=fcm` requires a Firebase project
+id and a service-account secret outside this repository. `google-services.json`,
+`GoogleService-Info.plist`, and the APNs `.p8` key stay out of git. Do not send
+live push until an Android message and an iOS message to consenting devices
+are proven. Redis and Celery are not part of this delivery path.
+
 Remaining external gates: Resend domain and API key with a live idempotent
 send; AWS bucket, IAM, CORS, and a live upload and download; ClamAV production
-host proof; legal retention and residency approval.
+host proof; FCM project, service account, and live Android and iOS device
+proofs; legal retention and residency approval.

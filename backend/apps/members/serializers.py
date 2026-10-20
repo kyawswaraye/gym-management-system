@@ -31,10 +31,27 @@ def _member_name(value: str) -> str:
     return cleaned
 
 
-def member_is_pt_client(_member: object) -> bool:
-    """False until Phase 5 derives the badge from an active trainer assignment."""
+def member_is_pt_client(member: object) -> bool:
+    """True when a same-gym active assignment covers the gym-local as-of date.
 
-    return False
+    List and detail reads annotate ``pt_client_badge`` so a page does not query
+    once per member. A saved member without that annotation is checked once.
+    """
+
+    annotated = getattr(member, "pt_client_badge", None)
+    if isinstance(annotated, bool):
+        return annotated
+    cached = getattr(member, "_pt_client_cached", None)
+    if isinstance(cached, bool):
+        return cached
+    if not isinstance(member, Member) or member._state.adding or member.gym_id is None:
+        return False
+    from apps.members.services import gym_today
+    from apps.trainers.selectors import member_has_active_assignment
+
+    value = member_has_active_assignment(member, as_of=gym_today(member.gym))
+    cast(Any, member)._pt_client_cached = value
+    return value
 
 
 def _optional_phone(value: str | None) -> str | None:
@@ -699,6 +716,11 @@ class CheckInListEnvelopeSerializer(serializers.Serializer):
 
 class MemberCheckInScanSerializer(StrictSerializer):
     payload = serializers.CharField(trim_whitespace=False, max_length=128)
+
+
+class TrainerCheckInScanSerializer(StrictSerializer):
+    payload = serializers.CharField(trim_whitespace=False, max_length=128)
+    member_id = serializers.UUIDField()
 
 
 class CheckInChallengeCreateSerializer(StrictSerializer):

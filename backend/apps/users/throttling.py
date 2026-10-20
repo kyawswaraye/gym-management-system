@@ -128,6 +128,61 @@ class MemberCheckInScanThrottle(_ConfiguredRateThrottle):
         return self._cache_key(fingerprint=fingerprint, request=request)
 
 
+class TrainerCheckInScanThrottle(_ConfiguredRateThrottle):
+    """Limit trainer QR scans by gym membership and address, never by the payload."""
+
+    scope = "trainer_check_in_scan"
+
+    def get_cache_key(self, request: Request, view: Any) -> str | None:
+        membership = getattr(request, "gym_membership", None)
+        membership_id = getattr(membership, "id", None)
+        if not membership_id:
+            return None
+        fingerprint = hash_refresh_token(f"trainer-scan:{membership_id}")
+        return self._cache_key(fingerprint=fingerprint, request=request)
+
+
+class TrainerCheckInScanIPThrottle(_AddressBoundaryThrottle):
+    """Bound trainer scan attempts from one address, including malformed ones."""
+
+    scope = "trainer_check_in_scan_ip"
+    boundary = "trainer-scan-ip"
+
+
+class _MemberUserThrottle(_ConfiguredRateThrottle):
+    """Limit a member route by the authenticated user, never by a selected member."""
+
+    prefix = ""
+
+    def get_cache_key(self, request: Request, view: Any) -> str | None:
+        user = getattr(request, "user", None)
+        user_id = getattr(user, "pk", None)
+        if not user_id:
+            return None
+        fingerprint = hash_refresh_token(f"{self.prefix}:{user_id}")
+        return self._cache_key(fingerprint=fingerprint, request=request)
+
+
+class MemberSelfReadThrottle(_MemberUserThrottle):
+    scope = "member_self_read"
+    prefix = "member-self-read"
+
+
+class MemberSelfWriteThrottle(_MemberUserThrottle):
+    scope = "member_self_write"
+    prefix = "member-self-write"
+
+
+class MemberFileWriteThrottle(_MemberUserThrottle):
+    scope = "member_file_write"
+    prefix = "member-file-write"
+
+
+class MemberFileDownloadThrottle(_MemberUserThrottle):
+    scope = "member_file_download"
+    prefix = "member-file-download"
+
+
 class MemberLoginIPThrottle(_AddressBoundaryThrottle):
     """Bound member login attempts from one address, including malformed ones."""
 

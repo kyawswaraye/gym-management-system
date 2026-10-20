@@ -280,6 +280,7 @@ def test_schema_allowlist_publishes_nested_member_history() -> None:
         ("/api/v1/check-in-challenges/", "", "POST", lambda: None),
         ("/api/v1/check-ins/scan/", "", "POST", lambda: None),
         ("/api/v1/member/check-ins/scan/", "", "POST", lambda: None),
+        ("/api/v1/trainer/check-ins/scan/", "", "POST", lambda: None),
     ]
     published = {path for path, *_rest in phase_1a_endpoints(endpoints)}
 
@@ -290,6 +291,7 @@ def test_schema_allowlist_publishes_nested_member_history() -> None:
         "/api/v1/receipts/",
         "/api/v1/check-in-challenges/",
         "/api/v1/member/check-ins/scan/",
+        "/api/v1/trainer/check-ins/scan/",
     }
     assert "/api/v1/payments/{id}/refund/" not in published
     payments = resolve(f"/api/v1/members/{MEMBER_ID}/payments/")

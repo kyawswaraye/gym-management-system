@@ -531,7 +531,10 @@ export function PaymentsManager({
               !productCorrection(payment) && (
                 <button
                   className="underline"
-                  onClick={() => setAction("void")}
+                  onClick={() => {
+                    setCorrectionDate(defaultDate);
+                    setAction("void");
+                  }}
                   type="button"
                 >
                   Void
@@ -542,7 +545,10 @@ export function PaymentsManager({
               !productCorrection(payment) && (
                 <button
                   className="underline"
-                  onClick={() => setAction("refund")}
+                  onClick={() => {
+                    setCorrectionDate(defaultDate);
+                    setAction("refund");
+                  }}
                   type="button"
                 >
                   Refund
@@ -629,9 +635,11 @@ export function PaymentsManager({
             >
               {payment.method === "CASH" ? (
                 <CashSessionSelect
+                  collectionError={sessions.error}
                   currency={payment.currency}
                   error={fields.cash_session_id}
                   label="Open cash session"
+                  pending={sessions.pending}
                   sessions={sessions.sessions}
                 />
               ) : (
@@ -639,7 +647,6 @@ export function PaymentsManager({
                   This is not a cash payment, so no cash session is sent.
                 </p>
               )}
-              <Alert message={sessions.error} />
             </CommandForm>
           )}
           {action === "reject" && (
@@ -741,9 +748,11 @@ export function PaymentsManager({
                 </p>
               ) : payment.method === "CASH" ? (
                 <CashSessionSelect
+                  collectionError={sessions.error}
                   currency={payment.currency}
                   error={fields.cash_session_id}
                   label="Destination open session"
+                  pending={sessions.pending}
                   sessions={sessions.sessions}
                 />
               ) : null}
@@ -837,9 +846,11 @@ export function PaymentsManager({
               </Field>
               {refundMethod === "CASH" && (
                 <CashSessionSelect
+                  collectionError={sessions.error}
                   currency={payment.currency}
                   error={fields.cash_session_id}
                   label="Destination open session"
+                  pending={sessions.pending}
                   sessions={sessions.sessions}
                 />
               )}

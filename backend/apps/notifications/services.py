@@ -18,6 +18,8 @@ from apps.tenants.models import Gym, GymFeatureEntitlement, GymSettings
 
 EXPIRY_TEMPLATE_KEY = "membership_expiry"
 EXPIRY_TEMPLATE_VERSION = 1
+ANNOUNCEMENT_TEMPLATE_KEY = "announcement"
+ANNOUNCEMENT_TEMPLATE_VERSION = 1
 SCHEDULE_BATCH_MAX = 5000
 DELIVERY_BATCH_DEFAULT = 100
 DELIVERY_BATCH_MAX = 500
@@ -85,6 +87,28 @@ def membership_expiry_deduplication_key(
         f"membership-expiry:{membership.id}:{membership.expiry_date.isoformat()}:"
         f"{warning_day}:v{EXPIRY_TEMPLATE_VERSION}"
     )
+
+
+def in_app_expiry_deduplication_key(*, membership: Membership, warning_day: int) -> str:
+    return (
+        f"in_app:membership_expiry:{membership.id}:{membership.expiry_date.isoformat()}:"
+        f"{warning_day}:v{EXPIRY_TEMPLATE_VERSION}"
+    )
+
+
+def push_expiry_deduplication_key(*, membership: Membership, warning_day: int) -> str:
+    return (
+        f"push:membership_expiry:{membership.id}:{membership.expiry_date.isoformat()}:"
+        f"{warning_day}:v{EXPIRY_TEMPLATE_VERSION}"
+    )
+
+
+def in_app_announcement_deduplication_key(*, announcement_id: object, member_id: object) -> str:
+    return f"in_app:announcement:{announcement_id}:{member_id}"
+
+
+def push_announcement_deduplication_key(*, announcement_id: object, member_id: object) -> str:
+    return f"push:announcement:{announcement_id}:{member_id}"
 
 
 def validate_expiry_payload(payload: object) -> None:
@@ -431,14 +455,18 @@ def deliver_next_membership_expiry_email(
         return DeliveryOutcome.CANCELLED
 
     member = notification.recipient_member
+    membership = notification.membership
+    if membership is None:
+        _mark_cancelled(notification)
+        return DeliveryOutcome.CANCELLED
     destination = current_member_email(member)
     if destination is None:
         _mark_cancelled(notification)
         return DeliveryOutcome.CANCELLED
     subject, body = render_expiry_message(
         member_name=member.display_name,
-        plan_name=notification.membership.plan_name,
-        expiry_date=notification.membership.expiry_date,
+        plan_name=membership.plan_name,
+        expiry_date=membership.expiry_date,
         gym_name=gym.name,
         gym_email=gym.email,
         gym_phone=gym.phone,
@@ -510,7 +538,7 @@ def _cancellation_reason(
         return "entitlement"
     membership = notification.membership
     member = notification.recipient_member
-    if (
+    if membership is None or (
         membership.gym_id != gym.id
         or member.gym_id != gym.id
         or membership.member_id != member.id

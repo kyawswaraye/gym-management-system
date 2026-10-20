@@ -213,15 +213,177 @@ export type ReturnRetailSaleRequest =
   components["schemas"]["ReturnRetailSaleRequest"];
 export type Direction = components["schemas"]["DirectionEnum"];
 
+export type TrainerIdentity = components["schemas"]["TrainerIdentity"];
+export type AssignedMember = components["schemas"]["AssignedMember"];
+export type TrainerAssignment = components["schemas"]["TrainerAssignment"];
+export type AssignmentCreateRequest =
+  components["schemas"]["AssignmentCreateRequest"];
+export type AssignmentEndRequest =
+  components["schemas"]["AssignmentEndRequest"];
+export type AssignmentCancelRequest =
+  components["schemas"]["AssignmentCancelRequest"];
+export type ServicePackage = components["schemas"]["ServicePackage"];
+export type ServicePackageWriteRequest =
+  components["schemas"]["ServicePackageWriteRequest"];
+export type MemberServicePackage =
+  components["schemas"]["MemberServicePackage"];
+export type MemberPackageGrantRequest =
+  components["schemas"]["MemberPackageGrantRequest"];
+export type MemberPackageGrantResult =
+  components["schemas"]["MemberPackageGrantResult"];
+export type ServiceSessionLedger =
+  components["schemas"]["ServiceSessionLedger"];
+export type LedgerAdjustRequest = components["schemas"]["LedgerAdjustRequest"];
+export type PTSale = components["schemas"]["PTSale"];
+export type PTSaleWriteRequest = components["schemas"]["PTSaleWriteRequest"];
+export type PTSalePaymentDraftRequest =
+  components["schemas"]["PTSalePaymentDraftRequest"];
+export type PTSaleUpdateRequest =
+  components["schemas"]["PatchedPTSaleUpdateRequest"];
+export type PTSaleApproval = components["schemas"]["PTSaleApproval"];
+export type PTSaleApproveRequest =
+  components["schemas"]["PTSaleApproveRequest"];
+export type PTSaleRejectRequest = components["schemas"]["PTSaleRejectRequest"];
+export type PTSaleCancelRequest = components["schemas"]["PTSaleCancelRequest"];
+export type PTSaleVoidRequest = components["schemas"]["PTSaleVoidRequest"];
+export type PTSaleVoidResult =
+  components["schemas"]["PTSaleVoidSerializerResult"];
+export type PTCommission = components["schemas"]["PTCommission"];
+export type PTCommissionDetail = components["schemas"]["PTCommissionDetail"];
+export type PTCommissionPaymentWriteRequest =
+  components["schemas"]["PTCommissionPaymentWriteRequest"];
+export type PTCommissionPaymentResult =
+  components["schemas"]["PTCommissionPaymentResult"];
+export type PTBooking = components["schemas"]["PTBooking"];
+export type PTBookingWriteRequest =
+  components["schemas"]["PTBookingWriteRequest"];
+export type PTBookingCancelRequest =
+  components["schemas"]["PTBookingCancelRequest"];
+export type ClassType = components["schemas"]["ClassType"];
+export type ClassTypeWriteRequest =
+  components["schemas"]["ClassTypeWriteRequest"];
+export type ClassTypePatchRequest =
+  components["schemas"]["PatchedClassTypePatchRequest"];
+export type ClassSchedule = components["schemas"]["ClassSchedule"];
+export type ClassScheduleWriteRequest =
+  components["schemas"]["ClassScheduleWriteRequest"];
+export type ClassSchedulePatchRequest =
+  components["schemas"]["PatchedClassSchedulePatchRequest"];
+export type ClassOccurrence = components["schemas"]["ClassOccurrence"];
+export type ClassOccurrenceCancelRequest =
+  components["schemas"]["ClassOccurrenceCancelRequest"];
+export type ClassBooking = components["schemas"]["ClassBooking"];
+export type ClassBookingWriteRequest =
+  components["schemas"]["ClassBookingWriteRequest"];
+export type ClassBookingCancelRequest =
+  components["schemas"]["ClassBookingCancelRequest"];
+export type PackageType = components["schemas"]["ServicePackageWriteTypeEnum"];
+export type ValidityUnit = components["schemas"]["ValidityUnitEnum"];
+
+export type DashboardRangePreset =
+  "today" | "this_week" | "this_month" | "last_month" | "this_year";
+
 export type DashboardData = {
-  range: "today" | "month";
-  income: string;
-  revenue_sources: { source: string; amount: string }[];
-  pending_payments: { member_count: number; amount: string };
-  pending_approvals: number;
-  expiring_members: number;
-  attendance: { available: boolean; today: number | null };
+  range: { date_from: string; date_to: string };
+  timezone: string;
   currency: string;
+  operational: {
+    active_members: number;
+    new_members: number;
+    expired_memberships: number;
+    check_ins: number;
+    unique_attendees: number;
+    currently_checked_in: number;
+    expiring_within_3_days: number;
+    expiring_within_7_days: number;
+    expiring_within_30_days: number;
+    pending_approvals: number;
+  };
+  financial: {
+    total_revenue: string;
+    new_member_revenue: string;
+    renewal_revenue: string;
+    pt_revenue: string;
+    class_revenue: string;
+    product_revenue: string;
+    other_revenue: string;
+    pending_payment_member_count: number;
+    pending_payment_amount: string;
+    revenue_sources_ranked: { source: string; amount: string }[];
+    top_product_items: {
+      product_id: string;
+      name: string;
+      quantity_sold: string;
+      revenue: string;
+      gross_profit: string;
+    }[];
+    total_expenses: string;
+    expenses_by_category: { system_key: string; amount: string }[];
+    staff_salary_expense: string;
+    pt_commission_expense: string;
+    net_profit: string;
+  } | null;
+};
+
+export type PeriodReport = components["schemas"]["PeriodReport"];
+export type ReportRow = components["schemas"]["ReportDay"];
+export type ReportTotals = components["schemas"]["ReportTotals"];
+export type CashBookReport = components["schemas"]["CashBookReport"];
+export type ProfitLossReport = components["schemas"]["ProfitLossReport"];
+export type MembershipExpiryReport =
+  components["schemas"]["MembershipExpiryReport"];
+export type CheckInReport = components["schemas"]["CheckInReport"];
+export type PTSessionReport = components["schemas"]["PTSessionReport"];
+export type ClassReport = components["schemas"]["ClassReport"];
+export type ProductSalesReport = components["schemas"]["ProductSalesReport"];
+export type StockMovementReport = components["schemas"]["StockMovementReport"];
+export type InventoryReport = components["schemas"]["InventoryReport"];
+
+/** Temporary until the trainer dashboard contract is generated from OpenAPI. */
+export type TrainerSessionCounts = {
+  bookings: number;
+  unique_members: number;
+  booked_sessions: number;
+  attended_sessions: number;
+  no_show_sessions: number;
+  cancelled_sessions: number;
+};
+
+export type TrainerUpcomingBooking = {
+  id: string;
+  member_id: string;
+  member_number: string;
+  full_name: string;
+  starts_at: string;
+  ends_at: string;
+};
+
+export type TrainerDashboardQuery =
+  { range: DashboardRangePreset } | { date_from: string; date_to: string };
+
+export type TrainerDashboard = {
+  timezone: string;
+  today: string;
+  range: components["schemas"]["ReportRange"];
+  generated_at: string;
+  trainer_staff_profile_id: string;
+  active_assigned_members: number;
+  sessions: TrainerSessionCounts;
+  upcoming_bookings: TrainerUpcomingBooking[];
+};
+
+export type TrainerSessionReportDay = TrainerSessionCounts & {
+  date: string;
+};
+
+export type TrainerSessionReport = {
+  gym: components["schemas"]["ReportGym"];
+  timezone: string;
+  range: components["schemas"]["ReportRange"];
+  generated_at: string;
+  source_status_policy: string;
+  rows: TrainerSessionReportDay[];
+  totals: TrainerSessionCounts;
 };
 
 export type ApiEnvelope<T> = {

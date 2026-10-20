@@ -52,7 +52,7 @@ from apps.common.api.schema import ErrorEnvelopeSerializer
 from apps.common.db.tenant_context import set_gym_context
 from apps.common.finance.idempotency import IdempotentResponse, IdempotentResult, run_idempotent
 from apps.files.throttling import MembershipWindowThrottle
-from apps.users.permissions import RequiresEntitlement, RequiresPermission
+from apps.users.permissions import RequiresEntitlement, RequiresPermission, TrainerFinanceClosed
 
 _IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9._:-]{16,128}$")
 IDEMPOTENCY_HEADER = OpenApiParameter(
@@ -108,7 +108,12 @@ def _stored_response(result: IdempotentResult) -> HttpResponse:
 
 
 class CashbookAPIView(APIView):
-    permission_classes = [IsAuthenticated, RequiresPermission, RequiresEntitlement]
+    permission_classes = [
+        IsAuthenticated,
+        RequiresPermission,
+        RequiresEntitlement,
+        TrainerFinanceClosed,
+    ]
     required_feature = "finance"
     required_permission = "cashbook.view"
 

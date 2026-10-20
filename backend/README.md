@@ -19,9 +19,10 @@ bucket at a time. Manual check-in list, detail, create, check-out, nested
 member check-in history, and staff check-in challenge issuance are published.
 Member login, refresh, and logout are published for one already linked member.
 Member-self QR redemption is published at `POST /api/v1/member/check-ins/scan/`.
+Trainer scan is published at `POST /api/v1/trainer/check-ins/scan/`.
+The generic staff scan path and notification HTTP routes stay unpublished.
 Display-device list, enroll, rotate, and revoke are published, as is
 `POST /api/v1/device/check-in-challenges/`. NFC and biometric ingestion is published at `POST /api/v1/device/check-ins/`.
-The generic staff scan path, trainer scan, notification HTTP routes, and
 Payment draft, submit, approve, reject, cancel, void, refund, receipt list, detail, download, receipt void, and daily sales are published. Salary-period void and full retail-sale void are published in Increment 8B. Increment 8C publishes partial retail returns. Cash-session
 list, detail, open, adjustment, and reconcile, plus the cash-transaction
 list, are published. The cash-book, payment, expense, salary, inventory, and retail staff pages are delivered in increment 9. Increment 8C publishes partial retail returns. Expense-category and expense
@@ -30,11 +31,139 @@ list, detail, create, update, line replacement, submit, approve, reject, and
 cancel, and void are published. Increment 8C publishes partial retail returns. Product-category
 list and create, product list, detail, create, and update, low-stock, and
 stock-movement list and adjustment are published; category update remains
-unpublished. Full retail-sale void is published in Increment 8B. Trainer scan
-waits for Phase 5 assignments. Profile-photo
+unpublished. Full retail-sale void is published in Increment 8B. Trainer scan is published
+in Phase 5. Phase 5 Increment 1 publishes the trainer
+directory and trainer-assignment list, create, detail, end, and cancel routes.
+The member PT badge and protected-Trainer access to member, membership,
+check-in, and profile-photo data are derived from effective active
+assignments. Increment 2 publishes PT service-package list and create. Package
+currency and actors are server-owned, definitions are immutable, and Class
+packages remain closed until the ClassType catalog exists. Increment 3
+publishes PT-sale draft list, create, detail, update, and cancellation with
+assignment scope, commission previews, and no economic side effects. Increment
+4 publishes an optional sale-owned PT payment draft, submit, and Manager/Owner
+separate-actor approve and reject. Approval atomically posts the optional
+payment, receipt, and cash movement and exactly one immutable ACCRUED
+commission. Approval with no linked payment remains valid and creates no
+receipt or cash movement. Generic payment commands cannot mutate a sale-owned
+payment. Increment 5 publishes commission list, detail, and record-payment, including
+partial payout, the protected commission expense, and optional cash out.
+Payout reversal is an internal helper for a future sale void and has no public
+route. Sale void, member package grants, the session ledger, bookings, classes,
+and schedules were unpublished in Increment 5. Later increments publish those
+routes, class types, schedules, occurrences, class and PT bookings, and
+trainer scan. The staff and trainer pages and browser E2E are published.
+Increments 1–5 did not by themselves close Phase 5. Production deployment is not
+complete. Increments 1–3 historical gate evidence is in the repository README.
+Increments 1–4 historical Increment 4 gate evidence: backend Ruff and format
+passed; mypy passed on 179 source files; migration drift was clean;
+non-PostgreSQL 321 passed and 269 were deselected; real PostgreSQL 269 passed
+and 321 were deselected; web format, lint, typecheck, and build passed using
+Node 24.20.0; Vitest passed 53 files and 296 tests; OpenAPI spectacular
+validation with `--fail-on-warn` passed and the fresh output matched the
+committed `contracts/openapi.v1.json`; IDE lints and `git diff --check` were
+clean. No E2E was run because Increment 4 is backend/API only and no new web
+workflow was published. Phase 5 remained open after Increment 4.
+Phase 5 code and test gate is complete as of 2026-10-19. Full code scope is
+complete: backend PT, classes, and trainer scan; staff and trainer web; and
+browser E2E. Linked-member self-service remains Phase 7. This is code and test
+gate closure, not production deployment. [ADR 0010](../docs/adr/0010-production-provider-readiness.md)
+live Resend, AWS, and ClamAV provider proofs remain open. The numbers below are
+the Phase 5 gate, not a Phase 6 or Phase 7 claim. Mobile implementation,
+production readiness, and provider closure are not part of the Phase 5 claim.
+Phase 7 now adds the member, announcement, device, and FCM routes and tables,
+plus the separate Android/iOS app. The 2026-10-21 local code and test gate is
+recorded in the repository README. Live Firebase and APNs credentials, release
+signing, store submission, and a production device proof remain open. That
+closure is not production deployment.
+`make backend-check`: Ruff passed; format 312 files; mypy 199 source files;
+migration drift none. `make backend-test`: 334 passed, 298 deselected. Final
+serial `make backend-test-pg`: 298 passed, 334 deselected, 398.50s. Node
+24.20.0 web format, lint, typecheck, and build passed; the build has 29
+routes; Vitest 61 files / 326 tests. A fresh `spectacular --validate
+--fail-on-warn` temporary export byte-matched `contracts/openapi.v1.json`;
+generated types are current. A clean full `make e2e` passed 16 tests in 5.2m,
+including 10 Phase 5 browser tests (assignments/catalogs; Reception submit +
+separate Owner approval cash sale; grant+commission; two payouts; consumed
+void rollback + untouched refund/reconciliation; class
+schedule/book/attendance/no-show/cutoff; trainer commission scope and QR scan
+assigned/unassigned/generic-route absence). A formal security review reported
+no medium-or-higher finding in its reviewed slice but was partial, and that
+partial review is not full Phase 5 coverage. A targeted GPT-5.6 Phase 5 audit
+found and fixed trainer finance bypasses, premature attendance and no-show,
+payout date bounds, and trainer scan throttling. Final targeted verification
+found no remaining medium-or-higher issue in the audited Phase 5 scope. IDE
+lints and `git diff --check` were clean.
+Phase 6 Increment 1 publishes canonical `GET /api/v1/dashboard/` from
+`apps/reports/` with no models or migrations. `reports.view` returns the
+operational block. `reports.financial` adds the full financial block; otherwise
+`financial` is null. Trainer finance closure remains. Presets are `today`,
+`this_week`, `this_month`, `last_month`, and `this_year`, plus a custom
+inclusive range of at most 366 days, with the gym timezone and currency on the
+response. Posted ledger correction-date semantics, six mutually exclusive
+revenue buckets including `CLASS`, pending approvals, ten zero-filled protected
+categories, total expenses, and net profit are included. Overdue balance is
+membership-only. Product snapshots are net of a full void and partial returns,
+and top products are bounded to 10. Phase 6 Increment 2 publishes
+`GET /api/v1/reports/daily/?date=YYYY-MM-DD` and
+`GET /api/v1/reports/monthly/?year=YYYY&month=M` from `apps/reports/urls.py`,
+and the tenant `/reports` page. Both require `reports.financial` and the
+`reports` entitlement. Trainer finance closure remains. Daily is one row.
+Monthly zero-fills every calendar date. Totals include range-distinct
+attendees, salary and PT subtotals, and the ten protected categories. Six
+revenue buckets include `CLASS`. A 1-day report and a 31-day report each use
+10 queries. There are still no models, migrations, report tables, caches,
+Redis, or Celery. Phase 6 Increment 3 publishes `GET /api/v1/reports/cash-book/` and
+`GET /api/v1/reports/profit-loss/` with the same permission and entitlement.
+Ranges are ordered, inclusive, and at most 366 days. Cash book uses two grouped
+queries. Profit/loss reuses the Increment 2 formulas in six queries. Net profit
+stays total revenue minus total expenses. Increment 3 is
+gate-clean as of 2026-10-19. Gate evidence is in
+`docs/DEVELOPMENT_PLAN.md`. Phase 6 Increment 4 publishes
+`GET /api/v1/reports/membership-expiry/` and `GET /api/v1/reports/check-ins/`
+for `reports.view` and the `reports` entitlement. `reports.financial` is not
+required, and the responses do not include money. Trainer-only callers stay
+closed. Membership expiry uses the current ACTIVE, SUSPENDED, or EXPIRED
+status in 2 queries. Check-ins use gym-local windows in 4 queries.
+Increment 4 is gate-clean as of 2026-10-20. Phase 6 Increment 5 publishes
+`GET /api/v1/reports/pt-sessions/` and `GET /api/v1/reports/classes/` for
+`reports.view` and the `reports` entitlement. `reports.financial` and the `pt`
+entitlement are not required, and the responses do not include money. PT
+sessions use the gym-local start date and current status in 2 queries. Class
+rows use the occurrence local date, current statuses, and capacity summed on
+scheduled and completed occurrences in 4 queries. At the Increment 5 close,
+product, stock, and inventory reports, trainer-scoped dashboards and reports,
+and exports remained unpublished.
+At the Increment 5 close, Phase 6 was not complete. Increment 5 is gate-clean as of 2026-10-20. Gate evidence is in
+`docs/DEVELOPMENT_PLAN.md`. Phase 6 Increment 6 is gate-clean as of 2026-10-20. It publishes
+`GET /api/v1/reports/product-sales/`, `GET /api/v1/reports/stock-movements/`,
+and `GET /api/v1/reports/inventory/`. Product sales requires `reports.financial`
+and uses 8 queries over immutable line snapshots. Stock movements require
+`reports.view` and use 1 grouped query. Inventory requires `reports.view` and
+uses 3 queries for the current movement sum. At the Increment 6 close,
+trainer-scoped dashboards and reports, and exports, remained unpublished.
+Phase 6 Increment 7 is independently verified and gate-clean as of 2026-10-20.
+It publishes `GET /api/v1/trainer/dashboard/` and
+`GET /api/v1/trainer/reports/sessions/`, and `/pt/dashboard`, for protected
+TRAINER callers with `reports.view` plus the `reports` and `pt` entitlements.
+Both reads are own-profile only and include no money. The dashboard selector
+uses 3 queries and the session-report selector uses 2. After authorization,
+the dashboard handler uses 4 queries and the session handler uses 2. At that
+close, report exports remained unpublished. Phase 6 Increment 8 is
+independently verified and gate-clean as of 2026-10-20. It publishes
+`GET /api/v1/reports/{kind}/export/` as an immediate CSV download for the
+eleven gym reports, reuses the existing selector query counts, and does not
+add export jobs, migrations, caches, Redis, or Celery. Trainer dashboard and
+session reports are not exportable. Phase 6 implementation is complete and its
+local CI-equivalent gate is closed. Final gate evidence—including the clean backend,
+web, OpenAPI/types, full E2E, and `git diff --check` results—is in
+`docs/DEVELOPMENT_PLAN.md`. Production deployment is not complete, and the
+[ADR 0010](../docs/adr/0010-production-provider-readiness.md)
+live Resend, AWS, and ClamAV proofs remain open.
+Profile-photo
 upload, complete, download-url, and delete are published. Phase 2
 implementation is complete. `docs/DEVELOPMENT_PLAN.md` was not edited for that
-closure. [ADR 0010](../docs/adr/0010-production-provider-readiness.md) selects AWS S3 in `ap-southeast-1` and Resend. Neither client is implemented. AWS and ClamAV credentials stay outside the repository. Local and end-to-end Compose
+closure. [ADR 0010](../docs/adr/0010-production-provider-readiness.md) selects AWS S3 in `ap-southeast-1` and Resend. The Resend client, password recovery, AWS virtual-hosted addressing, and ClamAV production fragment are implemented. Live credentials and provider proofs stay outside the repository. Local and end-to-end Compose
 use digest-pinned `docker.io/pgsty/silo`, a test-only MinIO-compatible fork,
 not official MinIO and not the production store. Production MinIO is no longer planned.
 Live Resend, AWS, and ClamAV proofs remain open. Legal retention stays draft-only.
@@ -153,12 +282,12 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   check-in challenge issuance, display and integration device credentials,
   device challenge issuance, device ingestion, and member QR redemption are
   published. The approved QR path is authenticated member-self scan. Trainer
-  scan remains a Phase 5 assignment-scoped extension and is not implemented.
+  scan is published at `POST /api/v1/trainer/check-ins/scan/`.
   No vendor-specific adapter is implemented, and no biometric template, raw
   capture, or vendor secret is stored. Vendor-specific integration remains
-  optional. Public linking, multi-member selection, the React Native app, and
-  broader Phase 7 mobile APIs remain deferred and are not prerequisites for
-  the already-linked member QR path. Phase 3 implementation is complete as of
+  optional. Public linking, multi-member selection, and member MFA remain
+  deferred. The broader member-self APIs and React Native app are implemented
+  in Phase 7. Phase 3 implementation is complete as of
   2026-10-18 under ADRs 0004–0008. The closure evidence is in the repository
   README. The generic staff scan path and notification routes stay unpublished.
   Payment and receipt routes are published in Increment 3.
@@ -228,8 +357,9 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   payment void, payment refund, receipt void, and expense void, and Increment
   8B salary-period void and full retail-sale void, and the Increment 8C
   `POST /api/v1/retail-sales/{id}/return/` route. The retail staff page exposes
-  that return. It leaves the generic staff scan path, trainer scan,
+  that return. It leaves the generic staff scan path,
   notification, member profile, and category update unpublished.
+  Trainer scan is published at `POST /api/v1/trainer/check-ins/scan/`.
   `profile_photo_asset_id` remains a nullable identifier with no foreign key to
   `FileAsset`. The staff API does not accept or return it. Attaching it later
   requires a same-gym asset whose scan status is CLEAN.

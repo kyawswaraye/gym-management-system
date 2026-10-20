@@ -148,6 +148,70 @@ export interface paths {
     patch: operations["admin_subscriptions_update"];
     trace?: never;
   };
+  "/api/v1/announcements/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["announcements_list"];
+    put?: never;
+    post: operations["announcements_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/announcements/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["announcements_read"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["announcements_update"];
+    trace?: never;
+  };
+  "/api/v1/announcements/{id}/cancel/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["announcements_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/announcements/{id}/publish/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["announcements_publish"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/audit-logs/": {
     parameters: {
       query?: never;
@@ -618,6 +682,182 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/class-bookings/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["class_bookings_list"];
+    put?: never;
+    post: operations["class_bookings_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/class-bookings/{id}/attend/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["class_bookings_attend"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/class-bookings/{id}/cancel/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["class_bookings_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/class-bookings/{id}/no-show/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["class_bookings_no_show"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/class-occurrences/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["class_occurrences_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/class-occurrences/{id}/cancel/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["class_occurrences_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/class-schedules/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["class_schedules_list"];
+    put?: never;
+    post: operations["class_schedules_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/class-schedules/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["class_schedules_update"];
+    trace?: never;
+  };
+  "/api/v1/class-types/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["class_types_list"];
+    put?: never;
+    post: operations["class_types_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/class-types/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["class_types_update"];
+    trace?: never;
+  };
+  "/api/v1/dashboard/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_dashboard_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/device/check-in-challenges/": {
     parameters: {
       query?: never;
@@ -958,6 +1198,86 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/member-service-packages/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["member_service_packages_list"];
+    put?: never;
+    post: operations["member_service_packages_grant"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member-service-packages/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["member_service_packages_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member-service-packages/{id}/ledger/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["member_service_packages_ledger_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member-service-packages/{id}/ledger/adjust/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["member_service_packages_ledger_adjust"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/check-ins/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["member_check_ins"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/member/check-ins/scan/": {
     parameters: {
       query?: never;
@@ -968,6 +1288,246 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["member_check_in_scan"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/class-bookings/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["member_class_bookings_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/dashboard/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["member_dashboard"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/devices/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["member_devices_register"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/devices/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["member_devices_delete"];
+    options?: never;
+    head?: never;
+    patch: operations["member_devices_update"];
+    trace?: never;
+  };
+  "/api/v1/member/files/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["member_files_delete_upload"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/files/{id}/complete/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["member_files_complete_upload"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/files/{id}/download-url/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["member_files_download_url"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/files/upload-intents/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["member_files_upload_intent"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/me/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["member_me_read"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["member_me_update"];
+    trace?: never;
+  };
+  "/api/v1/member/membership/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["member_membership"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/notifications/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["member_notifications_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/notifications/{id}/read/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["member_notifications_read"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/payments/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["member_payments"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/schedule/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["member_schedule"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/member/service-packages/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["member_service_packages"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1486,6 +2046,246 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/pt-bookings/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["pt_bookings_list"];
+    put?: never;
+    post: operations["pt_bookings_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-bookings/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["pt_bookings_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-bookings/{id}/attend/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["pt_bookings_attend"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-bookings/{id}/cancel/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["pt_bookings_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-bookings/{id}/no-show/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["pt_bookings_no_show"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-commissions/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["pt_commissions_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-commissions/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["pt_commissions_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-commissions/{id}/record-payment/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["pt_commissions_record_payment"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-sales/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["pt_sales_list"];
+    put?: never;
+    post: operations["pt_sales_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-sales/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["pt_sales_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["pt_sales_update"];
+    trace?: never;
+  };
+  "/api/v1/pt-sales/{id}/approve/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["pt_sales_approve"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-sales/{id}/cancel/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["pt_sales_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-sales/{id}/reject/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["pt_sales_reject"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-sales/{id}/submit/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["pt_sales_submit"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/pt-sales/{id}/void/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["pt_sales_void"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/readiness/": {
     parameters: {
       query?: never;
@@ -1560,6 +2360,358 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["receipts_void"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/cash-book/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_cash_book_report_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/cash-book/export/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_cash_book_report_export"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/check-ins/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_check_in_report_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/check-ins/export/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_check_in_report_export"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/classes/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_class_report_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/classes/export/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_class_report_export"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/daily/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_daily_report_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/daily/export/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_daily_report_export"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/inventory/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_inventory_report_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/inventory/export/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_inventory_report_export"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/membership-expiry/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_membership_expiry_report_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/membership-expiry/export/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_membership_expiry_report_export"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/monthly/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_monthly_report_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/monthly/export/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_monthly_report_export"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/product-sales/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_product_sales_report_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/product-sales/export/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_product_sales_report_export"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/profit-loss/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_profit_loss_report_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/profit-loss/export/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_profit_loss_report_export"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/pt-sessions/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_pt_session_report_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/pt-sessions/export/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_pt_session_report_export"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/stock-movements/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_stock_movement_report_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/reports/stock-movements/export/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["tenant_stock_movement_report_export"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1902,6 +3054,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/service-packages/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["service_packages_list"];
+    put?: never;
+    post: operations["service_packages_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/settings/": {
     parameters: {
       query?: never;
@@ -2040,6 +3208,150 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["stock_movements_adjust"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/trainer-assignments/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["trainer_assignments_list"];
+    put?: never;
+    post: operations["trainer_assignments_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/trainer-assignments/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["trainer_assignments_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/trainer-assignments/{id}/cancel/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["trainer_assignments_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/trainer-assignments/{id}/end/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["trainer_assignments_end"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/trainer/check-ins/scan/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["trainer_check_in_scan"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/trainer/dashboard/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["trainer_dashboard_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/trainer/reports/sessions/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["trainer_session_report_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/trainers/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["trainers_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/trainers/{id}/assigned-members/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["trainers_assigned_members"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2302,6 +3614,71 @@ export interface components {
       data: components["schemas"]["AdminSubscription"][];
       message: string;
     };
+    Announcement: {
+      /** Format: uuid */
+      id: string;
+      type: components["schemas"]["AnnouncementTypeEnum"];
+      title: string;
+      body: string;
+      audience: components["schemas"]["AudienceEnum"];
+      /** Format: date-time */
+      starts_at: string | null;
+      /** Format: date-time */
+      ends_at: string | null;
+      status: components["schemas"]["AnnouncementStatusEnum"];
+      /** Format: date-time */
+      published_at: string | null;
+      /** Format: date-time */
+      cancelled_at: string | null;
+      /** Format: date-time */
+      expired_at: string | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    AnnouncementCollectionMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    AnnouncementEnvelope: {
+      success: boolean;
+      data: components["schemas"]["Announcement"];
+      message: string;
+    };
+    AnnouncementListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["Announcement"][];
+      meta: components["schemas"]["AnnouncementCollectionMeta"];
+      message: string;
+    };
+    /**
+     * @description * `DRAFT` - DRAFT
+     *     * `SCHEDULED` - SCHEDULED
+     *     * `PUBLISHED` - PUBLISHED
+     *     * `CANCELLED` - CANCELLED
+     *     * `EXPIRED` - EXPIRED
+     * @enum {string}
+     */
+    AnnouncementStatusEnum:
+      "DRAFT" | "SCHEDULED" | "PUBLISHED" | "CANCELLED" | "EXPIRED";
+    /**
+     * @description * `EVENT` - EVENT
+     *     * `PROMOTION` - PROMOTION
+     *     * `GENERAL` - GENERAL
+     * @enum {string}
+     */
+    AnnouncementTypeEnum: "EVENT" | "PROMOTION" | "GENERAL";
+    AnnouncementWriteRequest: {
+      type: components["schemas"]["AnnouncementTypeEnum"];
+      title: string;
+      body: string;
+      audience: components["schemas"]["AudienceEnum"];
+      /** Format: date-time */
+      starts_at?: string | null;
+      /** Format: date-time */
+      ends_at?: string | null;
+    };
     ApproveExpenseRequest: {
       /** Format: uuid */
       cash_session_id?: string | null;
@@ -2317,6 +3694,64 @@ export interface components {
     ApproveSalaryRequest: {
       cash_sessions?: components["schemas"]["SalaryCashMappingRequest"][];
     };
+    AssignedMember: {
+      /** Format: uuid */
+      id: string;
+      member_number: string;
+      first_name: string;
+      last_name: string;
+      /** Format: uuid */
+      assignment_id: string;
+      /** Format: date */
+      effective_from: string;
+      /** Format: date */
+      effective_until: string | null;
+    };
+    AssignedMemberListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["AssignedMember"][];
+      meta: components["schemas"]["TrainerListMeta"];
+      message: string;
+    };
+    AssignmentCancelRequest: {
+      reason: string;
+    };
+    AssignmentCreateRequest: {
+      /** Format: uuid */
+      trainer_staff_profile_id: string;
+      /** Format: uuid */
+      member_id: string;
+      /** Format: date */
+      effective_from: string;
+      /** Format: date */
+      effective_until?: string | null;
+      /** @default  */
+      reason: string;
+    };
+    AssignmentEndRequest: {
+      /** Format: date */
+      effective_until: string;
+      reason: string;
+    };
+    AssignmentMember: {
+      /** Format: uuid */
+      id: string;
+      member_number: string;
+      first_name: string;
+      last_name: string;
+    };
+    /**
+     * @description * `ALL_ACTIVE_MEMBERS` - ALL_ACTIVE_MEMBERS
+     *     * `PT_CLIENTS` - PT_CLIENTS
+     *     * `EXPIRING_WITHIN_7_DAYS` - EXPIRING_WITHIN_7_DAYS
+     *     * `EXPIRING_WITHIN_30_DAYS` - EXPIRING_WITHIN_30_DAYS
+     * @enum {string}
+     */
+    AudienceEnum:
+      | "ALL_ACTIVE_MEMBERS"
+      | "PT_CLIENTS"
+      | "EXPIRING_WITHIN_7_DAYS"
+      | "EXPIRING_WITHIN_30_DAYS";
     CancelExpenseRequest: {
       reason: string;
     };
@@ -2328,6 +3763,74 @@ export interface components {
     };
     CancelSalaryRequest: {
       reason: string;
+    };
+    CashBookDay: {
+      /** Format: date */
+      date: string;
+      session_count: number;
+      open_session_count: number;
+      closed_session_count: number;
+      void_session_count: number;
+      opening_cash: string;
+      cash_in: string;
+      cash_out: string;
+      net_cash_flow: string;
+      payment_in: string;
+      payment_out: string;
+      expense_in: string;
+      expense_out: string;
+      commission_in: string;
+      commission_out: string;
+      manual_in: string;
+      manual_out: string;
+      reversal_in: string;
+      reversal_out: string;
+      expected_closing: string;
+      actual_closing: string;
+      difference: string;
+    };
+    CashBookReport: {
+      gym: components["schemas"]["ReportGym"];
+      timezone: string;
+      currency: string;
+      range: components["schemas"]["ReportRange"];
+      /** Format: date-time */
+      generated_at: string;
+      source_status_policy: components["schemas"]["CashBookSourceStatusPolicy"];
+      rows: components["schemas"]["CashBookDay"][];
+      totals: components["schemas"]["CashBookTotals"];
+    };
+    CashBookReportEnvelope: {
+      success: boolean;
+      data: components["schemas"]["CashBookReport"];
+      message: string;
+    };
+    CashBookSourceStatusPolicy: {
+      sessions: string;
+      transactions: string;
+    };
+    CashBookTotals: {
+      session_count: number;
+      open_session_count: number;
+      closed_session_count: number;
+      void_session_count: number;
+      opening_cash: string;
+      cash_in: string;
+      cash_out: string;
+      net_cash_flow: string;
+      payment_in: string;
+      payment_out: string;
+      expense_in: string;
+      expense_out: string;
+      commission_in: string;
+      commission_out: string;
+      manual_in: string;
+      manual_out: string;
+      reversal_in: string;
+      reversal_out: string;
+      expected_closing: string;
+      actual_closing: string;
+      difference: string;
     };
     CashCollectionMeta: {
       has_more: boolean;
@@ -2510,6 +4013,44 @@ export interface components {
      * @enum {string}
      */
     CheckInMethodEnum: "MANUAL" | "QR" | "NFC" | "BIOMETRIC";
+    CheckInReport: {
+      gym: components["schemas"]["ReportGym"];
+      timezone: string;
+      range: components["schemas"]["ReportRange"];
+      /** Format: date-time */
+      generated_at: string;
+      source_status_policy: string;
+      rows: components["schemas"]["CheckInReportDay"][];
+      totals: components["schemas"]["CheckInReportTotals"];
+    };
+    CheckInReportDay: {
+      /** Format: date */
+      date: string;
+      check_ins: number;
+      unique_attendees: number;
+      manual_check_ins: number;
+      qr_check_ins: number;
+      nfc_check_ins: number;
+      biometric_check_ins: number;
+      check_outs: number;
+      open_visits_from_day: number;
+    };
+    CheckInReportEnvelope: {
+      success: boolean;
+      data: components["schemas"]["CheckInReport"];
+      message: string;
+    };
+    CheckInReportTotals: {
+      check_ins: number;
+      unique_attendees: number;
+      manual_check_ins: number;
+      qr_check_ins: number;
+      nfc_check_ins: number;
+      biometric_check_ins: number;
+      check_outs: number;
+      open_visits_from_day: number;
+      currently_checked_in: number;
+    };
     CheckInSummary: {
       available: boolean;
       currently_checked_in: boolean;
@@ -2519,6 +4060,255 @@ export interface components {
       last_check_in_at: string | null;
       /** Format: date-time */
       last_check_out_at: string | null;
+    };
+    ClassBooking: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      class_occurrence_id: string;
+      /** Format: uuid */
+      member_id: string;
+      /** Format: uuid */
+      member_service_package_id: string | null;
+      unmetered: boolean;
+      unmetered_reason: string;
+      status: string;
+      /** Format: date-time */
+      starts_at: string;
+      /** Format: date-time */
+      ends_at: string;
+      /** Format: date-time */
+      attended_at: string | null;
+      /** Format: uuid */
+      attended_by_membership_id: string | null;
+      /** Format: date-time */
+      no_show_at: string | null;
+      /** Format: uuid */
+      no_show_by_membership_id: string | null;
+      /** Format: date-time */
+      cancelled_at: string | null;
+      /** Format: uuid */
+      cancelled_by_membership_id: string | null;
+      reason: string;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: uuid */
+      updated_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    ClassBookingCancelRequest: {
+      /** @default  */
+      reason: string;
+    };
+    ClassBookingEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ClassBooking"];
+      message: string;
+    };
+    ClassBookingListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ClassBooking"][];
+      meta: components["schemas"]["ClassListMeta"];
+      message: string;
+    };
+    ClassBookingWriteRequest: {
+      /** Format: uuid */
+      class_occurrence_id: string;
+      /** Format: uuid */
+      member_id: string;
+      /** Format: uuid */
+      member_service_package_id?: string | null;
+      /** @default false */
+      unmetered: boolean;
+      /** @default  */
+      unmetered_reason: string;
+    };
+    ClassListMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    ClassOccurrence: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      class_schedule_id: string;
+      /** Format: uuid */
+      class_type_id: string;
+      /** Format: uuid */
+      trainer_staff_profile_id: string;
+      location: string;
+      location_is_exclusive: boolean;
+      capacity: number;
+      /** Format: date-time */
+      starts_at: string;
+      /** Format: date-time */
+      ends_at: string;
+      /** Format: date */
+      local_date: string;
+      status: string;
+      /** Format: date-time */
+      cancelled_at: string | null;
+      /** Format: uuid */
+      cancelled_by_membership_id: string | null;
+      reason: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    ClassOccurrenceCancelRequest: {
+      reason: string;
+    };
+    ClassOccurrenceEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ClassOccurrence"];
+      message: string;
+    };
+    ClassOccurrenceListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ClassOccurrence"][];
+      meta: components["schemas"]["ClassListMeta"];
+      message: string;
+    };
+    ClassReport: {
+      gym: components["schemas"]["ReportGym"];
+      timezone: string;
+      range: components["schemas"]["ReportRange"];
+      /** Format: date-time */
+      generated_at: string;
+      source_status_policy: string;
+      rows: components["schemas"]["ClassReportDay"][];
+      totals: components["schemas"]["ClassReportTotals"];
+    };
+    ClassReportDay: {
+      /** Format: date */
+      date: string;
+      occurrences: number;
+      scheduled_occurrences: number;
+      completed_occurrences: number;
+      cancelled_occurrences: number;
+      available_capacity: number;
+      bookings: number;
+      unique_members: number;
+      booked_slots: number;
+      attended_slots: number;
+      no_show_slots: number;
+      cancelled_slots: number;
+      reserved_slots: number;
+      remaining_capacity: number;
+    };
+    ClassReportEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ClassReport"];
+      message: string;
+    };
+    ClassReportTotals: {
+      occurrences: number;
+      scheduled_occurrences: number;
+      completed_occurrences: number;
+      cancelled_occurrences: number;
+      available_capacity: number;
+      bookings: number;
+      unique_members: number;
+      unique_trainers: number;
+      booked_slots: number;
+      attended_slots: number;
+      no_show_slots: number;
+      cancelled_slots: number;
+      reserved_slots: number;
+      remaining_capacity: number;
+    };
+    ClassSchedule: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      class_type_id: string;
+      /** Format: uuid */
+      trainer_staff_profile_id: string;
+      weekdays: number[];
+      /** Format: time */
+      local_start_time: string;
+      /** Format: time */
+      local_end_time: string;
+      /** Format: date */
+      effective_from: string;
+      /** Format: date */
+      effective_until: string;
+      timezone: string;
+      location: string;
+      location_is_exclusive: boolean;
+      capacity: number;
+      status: string;
+      skipped_local_dates: string[];
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    ClassScheduleEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ClassSchedule"];
+      message: string;
+    };
+    ClassScheduleListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ClassSchedule"][];
+      meta: components["schemas"]["ClassListMeta"];
+      message: string;
+    };
+    ClassScheduleWriteRequest: {
+      /** Format: uuid */
+      class_type_id: string;
+      /** Format: uuid */
+      trainer_staff_profile_id: string;
+      weekdays: number[];
+      /** Format: time */
+      local_start_time: string;
+      /** Format: time */
+      local_end_time: string;
+      /** Format: date */
+      effective_from: string;
+      /** Format: date */
+      effective_until: string;
+      location: string;
+      location_is_exclusive: boolean;
+      capacity: number;
+    };
+    ClassType: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      name: string;
+      description: string;
+      default_duration_minutes: number;
+      default_capacity: number;
+      is_active: boolean;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    ClassTypeEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ClassType"];
+      message: string;
+    };
+    ClassTypeListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ClassType"][];
+      meta: components["schemas"]["ClassListMeta"];
+      message: string;
+    };
+    ClassTypeWriteRequest: {
+      code: string;
+      name: string;
+      /** @default  */
+      description: string;
+      default_duration_minutes: number;
+      default_capacity: number;
     };
     CollectionMeta: {
       has_more: boolean;
@@ -2733,14 +4523,6 @@ export interface components {
       data: components["schemas"]["DownloadUrl"];
       message: string;
     };
-    /**
-     * @description * `DAY` - Day
-     *     * `WEEK` - Week
-     *     * `MONTH` - Month
-     *     * `YEAR` - Year
-     * @enum {string}
-     */
-    DurationUnitEnum: "DAY" | "WEEK" | "MONTH" | "YEAR";
     /**
      * @description * `CHARGE` - Charge
      *     * `REFUND` - Refund
@@ -3040,12 +4822,57 @@ export interface components {
       location: string;
       kind: components["schemas"]["KindEnum"];
     };
+    InventoryReport: {
+      gym: components["schemas"]["ReportGym"];
+      timezone: string;
+      /** Format: date-time */
+      generated_at: string;
+      source_status_policy: string;
+      rows: components["schemas"]["InventoryReportRow"][];
+      totals: components["schemas"]["InventoryReportTotals"];
+      meta: components["schemas"]["ReportCursorMeta"];
+    };
+    InventoryReportEnvelope: {
+      success: boolean;
+      data: components["schemas"]["InventoryReport"];
+      message: string;
+    };
+    InventoryReportRow: {
+      /** Format: uuid */
+      product_id: string;
+      category_code: string;
+      category_name: string;
+      sku: string;
+      name: string;
+      unit: string;
+      is_active: boolean;
+      stock_quantity: string;
+      low_stock_threshold: string;
+      is_low_stock: boolean;
+    };
+    InventoryReportTotals: {
+      product_count: number;
+      active_product_count: number;
+      low_stock_product_count: number;
+      total_stock_quantity: string;
+    };
     /**
      * @description * `NFC` - NFC
      *     * `BIOMETRIC` - BIOMETRIC
      * @enum {string}
      */
     KindEnum: "NFC" | "BIOMETRIC";
+    LedgerAdjustRequest: {
+      /** Format: uuid */
+      reverses_entry_id: string;
+      reason: string;
+    };
+    LedgerListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ServiceSessionLedger"][];
+      meta: components["schemas"]["PTSaleListMeta"];
+      message: string;
+    };
     ListMeta: {
       has_more: boolean;
       next_after: string | null;
@@ -3183,6 +5010,18 @@ export interface components {
     MemberCheckInScanRequest: {
       payload: string;
     };
+    MemberClassBookingEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MemberScheduleBooking"];
+      message: string;
+    };
+    MemberClassBookingWriteRequest: {
+      /** Format: uuid */
+      occurrence_id: string;
+      /** Format: uuid */
+      member_service_package_id: string;
+    };
     MemberCollectionMeta: {
       has_more: boolean;
       next_after: string | null;
@@ -3214,6 +5053,37 @@ export interface components {
       /** Format: uuid */
       profile_photo_asset_id?: string | null;
     };
+    MemberDevice: {
+      /** Format: uuid */
+      id: string;
+      platform: components["schemas"]["PlatformEnum"];
+      /** Format: uuid */
+      installation_id: string;
+      push_consent: boolean;
+      push_token_present: boolean;
+      app_version: string;
+      os_version: string;
+      device_name: string | null;
+      /** Format: date-time */
+      last_seen_at: string;
+      /** Format: date-time */
+      revoked_at: string | null;
+    };
+    MemberDeviceEnvelope: {
+      success: boolean;
+      data: components["schemas"]["MemberDevice"];
+      message: string;
+    };
+    MemberDeviceWriteRequest: {
+      platform: components["schemas"]["PlatformEnum"];
+      /** Format: uuid */
+      installation_id: string;
+      push_consent: boolean;
+      push_token?: string | null;
+      app_version: string;
+      os_version: string;
+      device_name?: string | null;
+    };
     MemberEnvelope: {
       /** @default true */
       success: boolean;
@@ -3232,6 +5102,70 @@ export interface components {
       email: string;
       password: string;
       device_name?: string;
+    };
+    MemberNotification: {
+      /** Format: uuid */
+      id: string;
+      type: components["schemas"]["MemberNotificationTypeEnum"];
+      title: string;
+      body: string;
+      announcement_type:
+        | (
+            | components["schemas"]["AnnouncementTypeEnum"]
+            | components["schemas"]["NullEnum"]
+          )
+        | null;
+      /** Format: date-time */
+      read_at: string | null;
+      /** Format: date-time */
+      created_at: string;
+    };
+    MemberNotificationEnvelope: {
+      success: boolean;
+      data: components["schemas"]["MemberNotification"];
+      message: string;
+    };
+    MemberNotificationListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["MemberNotification"][];
+      meta: components["schemas"]["AnnouncementCollectionMeta"];
+      message: string;
+    };
+    /**
+     * @description * `MEMBERSHIP_EXPIRY` - MEMBERSHIP_EXPIRY
+     *     * `ANNOUNCEMENT` - ANNOUNCEMENT
+     * @enum {string}
+     */
+    MemberNotificationTypeEnum: "MEMBERSHIP_EXPIRY" | "ANNOUNCEMENT";
+    MemberPackageEnvelope: {
+      success: boolean;
+      data: components["schemas"]["MemberServicePackage"];
+      message: string;
+    };
+    MemberPackageGrantEnvelope: {
+      success: boolean;
+      data: components["schemas"]["MemberPackageGrantResult"];
+      message: string;
+    };
+    MemberPackageGrantRequest: {
+      /** Format: uuid */
+      member_id: string;
+      /** Format: uuid */
+      service_package_id: string;
+      /** Format: date */
+      business_date: string;
+      complimentary: boolean;
+      reason: string;
+    };
+    MemberPackageGrantResult: {
+      member_service_package: components["schemas"]["MemberServicePackage"];
+      ledger_entry: components["schemas"]["ServiceSessionLedger"];
+    };
+    MemberPackageListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["MemberServicePackage"][];
+      meta: components["schemas"]["PTSaleListMeta"];
+      message: string;
     };
     MemberPaymentHistoryEnvelope: {
       /** @default true */
@@ -3280,6 +5214,238 @@ export interface components {
     MemberPaymentHistoryMeta: {
       has_more: boolean;
       next_after: string | null;
+    };
+    MemberProfilePhotoIntentRequest: {
+      original_name: string;
+      content_type: string;
+      byte_size: number;
+      sha256: string;
+    };
+    MemberSchedule: {
+      bookings: components["schemas"]["MemberScheduleBooking"][];
+      occurrences: components["schemas"]["MemberScheduleOccurrence"][];
+    };
+    MemberScheduleBooking: {
+      /** Format: uuid */
+      id: string;
+      kind: components["schemas"]["MemberScheduleBookingKindEnum"];
+      status: string;
+      /** Format: date-time */
+      starts_at: string;
+      /** Format: date-time */
+      ends_at: string;
+      trainer_display_name: string;
+      class_name: string | null;
+      location: string | null;
+      /** Format: uuid */
+      member_service_package_id: string | null;
+      unmetered: boolean;
+    };
+    /**
+     * @description * `PT` - PT
+     *     * `CLASS` - CLASS
+     * @enum {string}
+     */
+    MemberScheduleBookingKindEnum: "PT" | "CLASS";
+    MemberScheduleEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MemberSchedule"];
+      message: string;
+    };
+    MemberScheduleOccurrence: {
+      /** Format: uuid */
+      id: string;
+      class_name: string;
+      trainer_display_name: string;
+      location: string | null;
+      /** Format: date-time */
+      starts_at: string;
+      /** Format: date-time */
+      ends_at: string;
+      capacity: number;
+      booked_count: number;
+      /** Format: uuid */
+      member_booking_id: string | null;
+    };
+    MemberSelfCheckInEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["CheckIn"][];
+      meta: components["schemas"]["CheckInCollectionMeta"];
+      message: string;
+    };
+    MemberSelfDashboard: {
+      member: components["schemas"]["MemberSelfProfile"];
+      current_membership: components["schemas"]["MemberSelfMembership"] | null;
+      days_remaining: number | null;
+      readonly is_pt_client: boolean;
+      membership_history: components["schemas"]["MemberSelfMembership"][];
+      membership_history_has_more: boolean;
+      payment_summary: components["schemas"]["MemberSelfPaymentSummary"];
+      check_in_summary: components["schemas"]["CheckInSummary"];
+    };
+    MemberSelfDashboardEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MemberSelfDashboard"];
+      message: string;
+    };
+    MemberSelfEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MemberSelfProfile"];
+      message: string;
+    };
+    MemberSelfMembership: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      member_id: string;
+      /** Format: uuid */
+      plan_id: string;
+      plan_code: string;
+      plan_name: string;
+      duration_value: number;
+      duration_unit: components["schemas"]["ValidityUnitEnum"];
+      /** Format: date */
+      start_date: string;
+      /** Format: date */
+      expiry_date: string;
+      /** Format: decimal */
+      list_price: string;
+      /** Format: decimal */
+      discount_amount: string;
+      /** Format: decimal */
+      final_amount: string;
+      currency: string;
+      payment_status: components["schemas"]["PaymentStatusEnum"];
+      status: components["schemas"]["MembershipStatusEnum"];
+      note: string;
+      /** Format: date-time */
+      cancelled_at: string | null;
+      cancellation_reason: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    MemberSelfMembershipEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MemberSelfMembership"] | null;
+      message: string;
+    };
+    MemberSelfPackage: {
+      /** Format: uuid */
+      id: string;
+      package_type: string;
+      package_code: string;
+      package_name: string;
+      status: string;
+      granted_sessions: number;
+      remaining_sessions: number;
+      /** Format: date */
+      valid_from: string;
+      /** Format: date */
+      valid_until: string;
+      complimentary: boolean;
+    };
+    MemberSelfPackageEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MemberSelfPackage"][];
+      meta: components["schemas"]["MemberPaymentHistoryMeta"];
+      message: string;
+    };
+    MemberSelfPaymentEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["MemberPaymentHistoryItem"][];
+      meta: components["schemas"]["MemberPaymentHistoryMeta"];
+      message: string;
+    };
+    MemberSelfPaymentSummary: {
+      available: boolean;
+      currency: string;
+      /** Format: decimal */
+      total_charged: string | null;
+      /** Format: decimal */
+      total_refunded: string | null;
+      /** Format: decimal */
+      net_paid: string | null;
+      /** Format: decimal */
+      outstanding_membership_balance: string | null;
+    };
+    MemberSelfProfile: {
+      /** Format: uuid */
+      id: string;
+      member_number: string;
+      first_name: string;
+      last_name: string;
+      phone: string | null;
+      /** Format: email */
+      email: string | null;
+      gender:
+        | (
+            | components["schemas"]["GenderEnum"]
+            | components["schemas"]["NullEnum"]
+          )
+        | null;
+      /** Format: date */
+      date_of_birth: string | null;
+      address: components["schemas"]["MemberAddress"];
+      /** Format: date */
+      join_date: string;
+      emergency_contact_name: string;
+      emergency_contact_phone: string;
+      /** Format: uuid */
+      profile_photo_asset_id: string | null;
+      readonly is_pt_client: boolean;
+      status: components["schemas"]["MemberStatusEnum"];
+      /** Format: date-time */
+      archived_at: string | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    MemberServicePackage: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      member_id: string;
+      /** Format: uuid */
+      service_package_id: string;
+      source: string;
+      /** Format: uuid */
+      pt_sale_id: string | null;
+      /** Format: uuid */
+      payment_id: string | null;
+      package_type: string;
+      package_code: string;
+      package_name: string;
+      granted_sessions: number;
+      used_sessions: number;
+      remaining_sessions: number;
+      amount_snapshot: string;
+      currency: string;
+      validity_value: number;
+      validity_unit: string;
+      /** Format: date */
+      valid_from: string;
+      /** Format: date */
+      valid_until: string;
+      complimentary: boolean;
+      status: string;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: uuid */
+      updated_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
     };
     /**
      * @description * `ACTIVE` - Active
@@ -3335,7 +5501,7 @@ export interface components {
       plan_code: string;
       plan_name: string;
       duration_value: number;
-      duration_unit: components["schemas"]["DurationUnitEnum"];
+      duration_unit: components["schemas"]["ValidityUnitEnum"];
       /** Format: date */
       start_date: string;
       /** Format: date */
@@ -3390,6 +5556,37 @@ export interface components {
       data: components["schemas"]["Membership"];
       message: string;
     };
+    MembershipExpiryDay: {
+      /** Format: date */
+      date: string;
+      expiring_memberships: number;
+      unique_members: number;
+      active_memberships: number;
+      suspended_memberships: number;
+      expired_memberships: number;
+    };
+    MembershipExpiryReport: {
+      gym: components["schemas"]["ReportGym"];
+      timezone: string;
+      range: components["schemas"]["ReportRange"];
+      /** Format: date-time */
+      generated_at: string;
+      source_status_policy: string;
+      rows: components["schemas"]["MembershipExpiryDay"][];
+      totals: components["schemas"]["MembershipExpiryTotals"];
+    };
+    MembershipExpiryReportEnvelope: {
+      success: boolean;
+      data: components["schemas"]["MembershipExpiryReport"];
+      message: string;
+    };
+    MembershipExpiryTotals: {
+      expiring_memberships: number;
+      unique_members: number;
+      active_memberships: number;
+      suspended_memberships: number;
+      expired_memberships: number;
+    };
     MembershipListEnvelope: {
       /** @default true */
       success: boolean;
@@ -3404,7 +5601,7 @@ export interface components {
       name: string;
       description: string;
       duration_value: number;
-      duration_unit: components["schemas"]["DurationUnitEnum"];
+      duration_unit: components["schemas"]["ValidityUnitEnum"];
       /** Format: decimal */
       price: string;
       currency: string;
@@ -3426,7 +5623,7 @@ export interface components {
       /** @default  */
       description: string;
       duration_value: number;
-      duration_unit: components["schemas"]["DurationUnitEnum"];
+      duration_unit: components["schemas"]["ValidityUnitEnum"];
       /** Format: decimal */
       price: string;
     };
@@ -3563,6 +5760,408 @@ export interface components {
     OwnerRevokeInputRequest: {
       reason: string;
     };
+    PTBooking: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      trainer_staff_profile_id: string;
+      /** Format: uuid */
+      member_id: string;
+      /** Format: uuid */
+      member_service_package_id: string | null;
+      /** Format: date-time */
+      starts_at: string;
+      /** Format: date-time */
+      ends_at: string;
+      unmetered: boolean;
+      unmetered_reason: string;
+      status: string;
+      /** Format: date-time */
+      attended_at: string | null;
+      /** Format: uuid */
+      attended_by_membership_id: string | null;
+      /** Format: date-time */
+      no_show_at: string | null;
+      /** Format: uuid */
+      no_show_by_membership_id: string | null;
+      /** Format: date-time */
+      cancelled_at: string | null;
+      /** Format: uuid */
+      cancelled_by_membership_id: string | null;
+      reason: string;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: uuid */
+      updated_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    PTBookingCancelRequest: {
+      /** @default  */
+      reason: string;
+    };
+    PTBookingEnvelope: {
+      success: boolean;
+      data: components["schemas"]["PTBooking"];
+      message: string;
+    };
+    PTBookingListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["PTBooking"][];
+      meta: components["schemas"]["PTBookingListMeta"];
+      message: string;
+    };
+    PTBookingListMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    PTBookingWriteRequest: {
+      /** Format: uuid */
+      trainer_staff_profile_id: string;
+      /** Format: uuid */
+      member_id: string;
+      /** Format: date-time */
+      starts_at: string;
+      /** Format: date-time */
+      ends_at: string;
+      /** Format: uuid */
+      member_service_package_id?: string | null;
+      /** @default false */
+      unmetered: boolean;
+      /** @default  */
+      unmetered_reason: string;
+    };
+    PTCommission: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      pt_sale_id: string;
+      /** Format: uuid */
+      trainer_staff_profile_id: string;
+      gross_fee_snapshot: string;
+      commission_percent_snapshot: string;
+      commission_amount: string;
+      gym_share: string;
+      paid_amount: string;
+      outstanding_amount: string;
+      currency: string;
+      status: string;
+      /** Format: date-time */
+      paid_at: string | null;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+    };
+    PTCommissionDetail: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      pt_sale_id: string;
+      /** Format: uuid */
+      trainer_staff_profile_id: string;
+      gross_fee_snapshot: string;
+      commission_percent_snapshot: string;
+      commission_amount: string;
+      gym_share: string;
+      paid_amount: string;
+      outstanding_amount: string;
+      currency: string;
+      status: string;
+      /** Format: date-time */
+      paid_at: string | null;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      payments: components["schemas"]["PTCommissionPayment"][];
+    };
+    PTCommissionDetailEnvelope: {
+      success: boolean;
+      data: components["schemas"]["PTCommissionDetail"];
+      message: string;
+    };
+    PTCommissionListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["PTCommission"][];
+      meta: components["schemas"]["TrainerListMeta"];
+      message: string;
+    };
+    PTCommissionPayment: {
+      /** Format: uuid */
+      id: string;
+      amount: string;
+      /** Format: date */
+      business_date: string;
+      payment_method: string;
+      reference_number: string;
+      policy_note: string;
+      status: string;
+      /** Format: uuid */
+      expense_id: string;
+      /** Format: uuid */
+      cash_session_id: string | null;
+      /** Format: uuid */
+      cash_transaction_id: string | null;
+      /** Format: uuid */
+      reversal_expense_id: string | null;
+      /** Format: uuid */
+      reversal_cash_transaction_id: string | null;
+      /** Format: date-time */
+      voided_at: string | null;
+      /** Format: uuid */
+      voided_by_membership_id: string | null;
+      void_reason: string;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+    };
+    PTCommissionPaymentEnvelope: {
+      success: boolean;
+      data: components["schemas"]["PTCommissionPaymentResult"];
+      message: string;
+    };
+    PTCommissionPaymentResult: {
+      commission_before: components["schemas"]["PTCommission"];
+      commission_after: components["schemas"]["PTCommission"];
+      payment: components["schemas"]["PTCommissionPayment"];
+      expense: components["schemas"]["Expense"];
+      cash_session: components["schemas"]["CashSession"] | null;
+      cash_transaction: components["schemas"]["CashTransaction"] | null;
+    };
+    PTCommissionPaymentWriteRequest: {
+      /** Format: decimal */
+      amount: string;
+      /** Format: date */
+      business_date: string;
+      payment_method: components["schemas"]["PaymentMethodEnum"];
+      /** Format: uuid */
+      cash_session_id?: string | null;
+      /** @default  */
+      reference_number: string;
+      /** @default  */
+      policy_note: string;
+    };
+    PTSale: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      member_id: string;
+      /** Format: uuid */
+      trainer_staff_profile_id: string;
+      /** Format: date */
+      service_date: string;
+      description: string;
+      gross_fee: string;
+      currency: string;
+      commission_percent_snapshot: string;
+      commission_amount: string;
+      gym_share: string;
+      paid_amount: string;
+      outstanding_amount: string;
+      status: string;
+      /** Format: uuid */
+      payment_id: string | null;
+      payment: components["schemas"]["Payment"] | null;
+      /** Format: uuid */
+      service_package_id: string | null;
+      package_price_snapshot: string | null;
+      /** Format: uuid */
+      member_service_package_id: string | null;
+      /** Format: date-time */
+      submitted_at: string | null;
+      /** Format: uuid */
+      submitted_by_membership_id: string | null;
+      /** Format: date-time */
+      approved_at: string | null;
+      /** Format: uuid */
+      approved_by_membership_id: string | null;
+      /** Format: date-time */
+      rejected_at: string | null;
+      /** Format: uuid */
+      rejected_by_membership_id: string | null;
+      rejection_reason: string;
+      /** Format: date-time */
+      posted_at: string | null;
+      /** Format: date-time */
+      cancelled_at: string | null;
+      /** Format: uuid */
+      cancelled_by_membership_id: string | null;
+      /** Format: date-time */
+      voided_at: string | null;
+      /** Format: uuid */
+      voided_by_membership_id: string | null;
+      /** Format: uuid */
+      reversal_pt_sale_id: string | null;
+      reason: string;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: uuid */
+      updated_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    PTSaleApproval: {
+      sale: components["schemas"]["PTSale"];
+      payment: components["schemas"]["Payment"] | null;
+      receipt: components["schemas"]["Receipt"] | null;
+      cash_session: components["schemas"]["CashSession"] | null;
+      cash_transaction: components["schemas"]["CashTransaction"] | null;
+      commission: components["schemas"]["PTCommission"];
+      member_service_package:
+        components["schemas"]["MemberServicePackage"] | null;
+    };
+    PTSaleApprovalEnvelope: {
+      success: boolean;
+      data: components["schemas"]["PTSaleApproval"];
+      message: string;
+    };
+    PTSaleApproveRequest: {
+      /** Format: uuid */
+      cash_session_id?: string | null;
+    };
+    PTSaleCancelRequest: {
+      reason: string;
+    };
+    PTSaleEnvelope: {
+      success: boolean;
+      data: components["schemas"]["PTSale"];
+      message: string;
+    };
+    PTSaleListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["PTSale"][];
+      meta: components["schemas"]["PTSaleListMeta"];
+      message: string;
+    };
+    PTSaleListMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    /**
+     * @description * `CASH` - CASH
+     *     * `BANK_TRANSFER` - BANK_TRANSFER
+     *     * `CARD` - CARD
+     *     * `MOBILE_PAYMENT` - MOBILE_PAYMENT
+     *     * `OTHER` - OTHER
+     * @enum {string}
+     */
+    PTSalePaymentDraftMethodEnum:
+      "CASH" | "BANK_TRANSFER" | "CARD" | "MOBILE_PAYMENT" | "OTHER";
+    /**
+     * @description Client fields for the optional charge owned by a draft sale.
+     *
+     *     Purpose, member, membership, currency, source, status, and actors are not
+     *     accepted. The sale supplies them.
+     */
+    PTSalePaymentDraftRequest: {
+      description: string;
+      /** Format: decimal */
+      amount: string;
+      method: components["schemas"]["PTSalePaymentDraftMethodEnum"];
+      /** Format: date */
+      business_date: string;
+      /** Format: date-time */
+      received_at?: string;
+      reference_number?: string;
+    };
+    PTSalePayoutReversalRequest: {
+      /** Format: uuid */
+      commission_payment_id: string;
+      /** Format: uuid */
+      cash_session_id: string | null;
+    };
+    PTSaleRejectRequest: {
+      rejection_reason: string;
+    };
+    PTSaleVoidEnvelope: {
+      success: boolean;
+      data: components["schemas"]["PTSaleVoidSerializerResult"];
+      message: string;
+    };
+    PTSaleVoidPayment: {
+      original: components["schemas"]["Payment"];
+      correction: components["schemas"]["Payment"];
+      original_receipt: components["schemas"]["Receipt"] | null;
+      correction_receipt: components["schemas"]["Receipt"];
+      cash_transaction: components["schemas"]["CashTransaction"] | null;
+    };
+    PTSaleVoidRequest: {
+      reason: string;
+      /** Format: date */
+      business_date: string;
+      /** Format: uuid */
+      cash_session_id?: string | null;
+      payout_reversals: components["schemas"]["PTSalePayoutReversalRequest"][];
+    };
+    PTSaleVoidSerializerResult: {
+      sale: components["schemas"]["PTSale"];
+      commission: components["schemas"]["PTCommission"];
+      payouts: components["schemas"]["PTCommissionPayment"][];
+      payment: components["schemas"]["PTSaleVoidPayment"] | null;
+      member_service_package:
+        components["schemas"]["MemberServicePackage"] | null;
+      ledger_entry: components["schemas"]["ServiceSessionLedger"] | null;
+    };
+    PTSaleWriteRequest: {
+      /** Format: uuid */
+      member_id: string;
+      /** Format: uuid */
+      trainer_staff_profile_id: string;
+      /** Format: date */
+      service_date: string;
+      description: string;
+      /** Format: decimal */
+      gross_fee: string;
+      currency: string;
+      payment?: components["schemas"]["PTSalePaymentDraftRequest"] | null;
+      /** Format: uuid */
+      service_package_id?: string | null;
+    };
+    PTSessionReport: {
+      gym: components["schemas"]["ReportGym"];
+      timezone: string;
+      range: components["schemas"]["ReportRange"];
+      /** Format: date-time */
+      generated_at: string;
+      source_status_policy: string;
+      rows: components["schemas"]["PTSessionReportDay"][];
+      totals: components["schemas"]["PTSessionReportTotals"];
+    };
+    PTSessionReportDay: {
+      /** Format: date */
+      date: string;
+      bookings: number;
+      unique_members: number;
+      unique_trainers: number;
+      booked_sessions: number;
+      attended_sessions: number;
+      no_show_sessions: number;
+      cancelled_sessions: number;
+      metered_sessions: number;
+      unmetered_sessions: number;
+    };
+    PTSessionReportEnvelope: {
+      success: boolean;
+      data: components["schemas"]["PTSessionReport"];
+      message: string;
+    };
+    PTSessionReportTotals: {
+      bookings: number;
+      unique_members: number;
+      unique_trainers: number;
+      booked_sessions: number;
+      attended_sessions: number;
+      no_show_sessions: number;
+      cancelled_sessions: number;
+      metered_sessions: number;
+      unmetered_sessions: number;
+    };
     PasswordForgotEnvelope: {
       /** @default true */
       success: boolean;
@@ -3605,6 +6204,41 @@ export interface components {
       /** Format: decimal */
       price?: string;
       billing_interval?: string;
+    };
+    PatchedAnnouncementPatchRequest: {
+      type?: components["schemas"]["AnnouncementTypeEnum"];
+      title?: string;
+      body?: string;
+      audience?: components["schemas"]["AudienceEnum"];
+      /** Format: date-time */
+      starts_at?: string | null;
+      /** Format: date-time */
+      ends_at?: string | null;
+    };
+    PatchedClassSchedulePatchRequest: {
+      /** Format: uuid */
+      class_type_id?: string;
+      /** Format: uuid */
+      trainer_staff_profile_id?: string;
+      weekdays?: number[];
+      /** Format: time */
+      local_start_time?: string;
+      /** Format: time */
+      local_end_time?: string;
+      /** Format: date */
+      effective_from?: string;
+      /** Format: date */
+      effective_until?: string;
+      location?: string;
+      location_is_exclusive?: boolean;
+      capacity?: number;
+    };
+    PatchedClassTypePatchRequest: {
+      name?: string;
+      description?: string;
+      default_duration_minutes?: number;
+      default_capacity?: number;
+      is_active?: boolean;
     };
     PatchedExpenseCategoryUpdateRequest: {
       name?: string;
@@ -3654,6 +6288,28 @@ export interface components {
       class_no_show_consumes_session?: boolean;
       require_separate_finance_approval?: boolean;
     };
+    PatchedMemberDevicePatchRequest: {
+      push_consent?: boolean;
+      push_token?: string | null;
+      app_version?: string;
+      os_version?: string;
+      device_name?: string | null;
+    };
+    PatchedMemberSelfUpdateRequest: {
+      phone?: string | null;
+      email?: string | null;
+      gender?:
+        | (
+            | components["schemas"]["GenderEnum"]
+            | components["schemas"]["NullEnum"]
+          )
+        | null;
+      /** Format: date */
+      date_of_birth?: string | null;
+      address?: components["schemas"]["MemberAddressRequest"] | null;
+      emergency_contact_name?: string;
+      emergency_contact_phone?: string | null;
+    };
     PatchedMemberUpdateRequest: {
       first_name?: string;
       last_name?: string;
@@ -3681,12 +6337,27 @@ export interface components {
       name?: string;
       description?: string;
       duration_value?: number;
-      duration_unit?: components["schemas"]["DurationUnitEnum"];
+      duration_unit?: components["schemas"]["ValidityUnitEnum"];
       /** Format: decimal */
       price?: string;
     };
     PatchedMembershipUpdateRequest: {
       note?: string;
+    };
+    PatchedPTSaleUpdateRequest: {
+      /** Format: uuid */
+      member_id?: string;
+      /** Format: uuid */
+      trainer_staff_profile_id?: string;
+      /** Format: date */
+      service_date?: string;
+      description?: string;
+      /** Format: decimal */
+      gross_fee?: string;
+      currency?: string;
+      payment?: components["schemas"]["PTSalePaymentDraftRequest"] | null;
+      /** Format: uuid */
+      service_package_id?: string | null;
     };
     PatchedPaymentUpdateRequest: {
       /** Format: uuid */
@@ -3814,6 +6485,8 @@ export interface components {
       /** Format: uuid */
       retail_sale_id: string | null;
       /** Format: uuid */
+      pt_sale_id: string | null;
+      /** Format: uuid */
       created_by_membership_id: string;
       /** Format: uuid */
       updated_by_membership_id: string;
@@ -3914,6 +6587,22 @@ export interface components {
       received_at?: string;
       reference_number?: string;
     };
+    PeriodReport: {
+      gym: components["schemas"]["ReportGym"];
+      timezone: string;
+      currency: string;
+      range: components["schemas"]["ReportRange"];
+      /** Format: date-time */
+      generated_at: string;
+      source_status_policy: components["schemas"]["ReportSourceStatusPolicy"];
+      rows: components["schemas"]["ReportDay"][];
+      totals: components["schemas"]["ReportTotals"];
+    };
+    PeriodReportEnvelope: {
+      success: boolean;
+      data: components["schemas"]["PeriodReport"];
+      message: string;
+    };
     Permission: {
       /** Format: uuid */
       id: string;
@@ -3963,6 +6652,12 @@ export interface components {
       has_more: boolean;
       next_after: string | null;
     };
+    /**
+     * @description * `ANDROID` - ANDROID
+     *     * `IOS` - IOS
+     * @enum {string}
+     */
+    PlatformEnum: "ANDROID" | "IOS";
     /**
      * @description * `PLATFORM` - PLATFORM
      *     * `STAFF` - STAFF
@@ -4044,6 +6739,42 @@ export interface components {
       meta: components["schemas"]["ListMeta"];
       message: string;
     };
+    ProductSalesReport: {
+      gym: components["schemas"]["ReportGym"];
+      timezone: string;
+      currency: string;
+      range: components["schemas"]["ReportRange"];
+      /** Format: date-time */
+      generated_at: string;
+      source_status_policy: string;
+      rows: components["schemas"]["ProductSalesReportRow"][];
+      totals: components["schemas"]["ProductSalesReportTotals"];
+      meta: components["schemas"]["ReportCursorMeta"];
+    };
+    ProductSalesReportEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ProductSalesReport"];
+      message: string;
+    };
+    ProductSalesReportRow: {
+      /** Format: uuid */
+      product_id: string;
+      sku: string;
+      name: string;
+      is_active: boolean;
+      quantity_sold: string;
+      revenue: string;
+      cogs: string;
+      gross_profit: string;
+    };
+    ProductSalesReportTotals: {
+      quantity_sold: string;
+      revenue: string;
+      cogs: string;
+      gross_profit: string;
+      product_count: number;
+      active_product_count: number;
+    };
     ProductWriteRequest: {
       sku: string;
       barcode?: string | null;
@@ -4061,6 +6792,53 @@ export interface components {
       low_stock_threshold: string;
       /** @default true */
       is_active: boolean;
+    };
+    ProfitLossDay: {
+      /** Format: date */
+      date: string;
+      new_member_revenue: string;
+      renewal_revenue: string;
+      pt_revenue: string;
+      class_revenue: string;
+      product_revenue: string;
+      other_revenue: string;
+      total_revenue: string;
+      product_cogs: string;
+      product_gross_profit: string;
+      total_expenses: string;
+      net_profit: string;
+    };
+    ProfitLossReport: {
+      gym: components["schemas"]["ReportGym"];
+      timezone: string;
+      currency: string;
+      range: components["schemas"]["ReportRange"];
+      /** Format: date-time */
+      generated_at: string;
+      source_status_policy: components["schemas"]["ReportSourceStatusPolicy"];
+      rows: components["schemas"]["ProfitLossDay"][];
+      totals: components["schemas"]["ProfitLossTotals"];
+    };
+    ProfitLossReportEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ProfitLossReport"];
+      message: string;
+    };
+    ProfitLossTotals: {
+      new_member_revenue: string;
+      renewal_revenue: string;
+      pt_revenue: string;
+      class_revenue: string;
+      product_revenue: string;
+      other_revenue: string;
+      total_revenue: string;
+      product_cogs: string;
+      product_gross_profit: string;
+      total_expenses: string;
+      net_profit: string;
+      staff_salary_expense: string;
+      pt_commission_expense: string;
+      expenses_by_category: components["schemas"]["TenantDashboardExpenseCategory"][];
     };
     /**
      * @description * `MEMBERSHIP` - Membership
@@ -4149,6 +6927,68 @@ export interface components {
     };
     RejectSalaryRequest: {
       rejection_reason: string;
+    };
+    ReportCursorMeta: {
+      next_after: string | null;
+      has_more: boolean;
+    };
+    ReportDay: {
+      /** Format: date */
+      date: string;
+      new_members: number;
+      expired_memberships: number;
+      check_ins: number;
+      unique_attendees: number;
+      new_member_revenue: string;
+      renewal_revenue: string;
+      pt_revenue: string;
+      class_revenue: string;
+      product_revenue: string;
+      other_revenue: string;
+      total_revenue: string;
+      product_quantity: string;
+      product_cogs: string;
+      product_gross_profit: string;
+      total_expenses: string;
+      net_profit: string;
+    };
+    ReportGym: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      name: string;
+    };
+    ReportRange: {
+      /** Format: date */
+      date_from: string;
+      /** Format: date */
+      date_to: string;
+    };
+    ReportSourceStatusPolicy: {
+      revenue: string;
+      expenses: string;
+      operations: string;
+    };
+    ReportTotals: {
+      new_members: number;
+      expired_memberships: number;
+      check_ins: number;
+      unique_attendees: number;
+      new_member_revenue: string;
+      renewal_revenue: string;
+      pt_revenue: string;
+      class_revenue: string;
+      product_revenue: string;
+      other_revenue: string;
+      total_revenue: string;
+      product_quantity: string;
+      product_cogs: string;
+      product_gross_profit: string;
+      total_expenses: string;
+      net_profit: string;
+      staff_salary_expense: string;
+      pt_commission_expense: string;
+      expenses_by_category: components["schemas"]["TenantDashboardExpenseCategory"][];
     };
     RetailReturn: {
       /** Format: uuid */
@@ -4567,6 +7407,78 @@ export interface components {
       data: components["schemas"]["SelectionLoginData"];
       message: string;
     };
+    ServicePackage: {
+      /** Format: uuid */
+      id: string;
+      type: string;
+      code: string;
+      name: string;
+      session_count: number;
+      validity_value: number;
+      validity_unit: string;
+      price: string;
+      currency: string;
+      /** Format: uuid */
+      class_type_id: string | null;
+      is_active: boolean;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    ServicePackageEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ServicePackage"];
+      message: string;
+    };
+    ServicePackageListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ServicePackage"][];
+      meta: components["schemas"]["ServicePackageListMeta"];
+      message: string;
+    };
+    ServicePackageListMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    ServicePackageWriteRequest: {
+      type: components["schemas"]["ServicePackageWriteTypeEnum"];
+      code: string;
+      name: string;
+      session_count: number;
+      validity_value: number;
+      validity_unit: components["schemas"]["ValidityUnitEnum"];
+      /** Format: decimal */
+      price: string;
+      /** Format: uuid */
+      class_type_id?: string | null;
+    };
+    /**
+     * @description * `PT` - Pt
+     *     * `CLASS` - Class
+     * @enum {string}
+     */
+    ServicePackageWriteTypeEnum: "PT" | "CLASS";
+    ServiceSessionLedger: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      member_service_package_id: string;
+      session_delta: number;
+      reason: string;
+      /** Format: uuid */
+      pt_booking_id: string | null;
+      /** Format: uuid */
+      class_booking_id: string | null;
+      /** Format: uuid */
+      reverses_entry_id: string | null;
+      /** Format: date-time */
+      occurred_at: string;
+      /** Format: uuid */
+      created_by_membership_id: string;
+      /** Format: date-time */
+      created_at: string;
+    };
     Staff: {
       /** Format: uuid */
       id: string;
@@ -4761,6 +7673,45 @@ export interface components {
       meta: components["schemas"]["ListMeta"];
       message: string;
     };
+    StockMovementReport: {
+      gym: components["schemas"]["ReportGym"];
+      timezone: string;
+      range: components["schemas"]["ReportRange"];
+      /** Format: date-time */
+      generated_at: string;
+      source_status_policy: string;
+      rows: components["schemas"]["StockMovementReportRow"][];
+      totals: components["schemas"]["StockMovementReportTotals"];
+    };
+    StockMovementReportEnvelope: {
+      success: boolean;
+      data: components["schemas"]["StockMovementReport"];
+      message: string;
+    };
+    StockMovementReportRow: {
+      /** Format: date */
+      date: string;
+      opening_quantity: string;
+      purchase_quantity: string;
+      sale_quantity: string;
+      sale_return_quantity: string;
+      damage_quantity: string;
+      loss_quantity: string;
+      adjustment_quantity: string;
+      correction_quantity: string;
+      net_quantity: string;
+    };
+    StockMovementReportTotals: {
+      opening_quantity: string;
+      purchase_quantity: string;
+      sale_quantity: string;
+      sale_return_quantity: string;
+      damage_quantity: string;
+      loss_quantity: string;
+      adjustment_quantity: string;
+      correction_quantity: string;
+      net_quantity: string;
+    };
     SubscriptionPlanStatusCounts: {
       ACTIVE: number;
       RETIRED: number;
@@ -4802,6 +7753,70 @@ export interface components {
       next_after: string | null;
       scope: components["schemas"]["ScopeEnum"];
     };
+    TenantDashboard: {
+      range: components["schemas"]["TenantDashboardRange"];
+      timezone: string;
+      currency: string;
+      operational: components["schemas"]["TenantDashboardOperational"];
+      financial: components["schemas"]["TenantDashboardFinancial"] | null;
+    };
+    TenantDashboardEnvelope: {
+      success: boolean;
+      data: components["schemas"]["TenantDashboard"];
+      message: string;
+    };
+    TenantDashboardExpenseCategory: {
+      system_key: string;
+      amount: string;
+    };
+    TenantDashboardFinancial: {
+      total_revenue: string;
+      new_member_revenue: string;
+      renewal_revenue: string;
+      pt_revenue: string;
+      class_revenue: string;
+      product_revenue: string;
+      other_revenue: string;
+      pending_payment_member_count: number;
+      pending_payment_amount: string;
+      revenue_sources_ranked: components["schemas"]["TenantDashboardRevenueSource"][];
+      top_product_items: components["schemas"]["TenantDashboardProduct"][];
+      total_expenses: string;
+      expenses_by_category: components["schemas"]["TenantDashboardExpenseCategory"][];
+      staff_salary_expense: string;
+      pt_commission_expense: string;
+      net_profit: string;
+    };
+    TenantDashboardOperational: {
+      active_members: number;
+      new_members: number;
+      expired_memberships: number;
+      check_ins: number;
+      unique_attendees: number;
+      currently_checked_in: number;
+      expiring_within_3_days: number;
+      expiring_within_7_days: number;
+      expiring_within_30_days: number;
+      pending_approvals: number;
+    };
+    TenantDashboardProduct: {
+      /** Format: uuid */
+      product_id: string;
+      name: string;
+      quantity_sold: string;
+      revenue: string;
+      gross_profit: string;
+    };
+    TenantDashboardRange: {
+      /** Format: date */
+      date_from: string;
+      /** Format: date */
+      date_to: string;
+    };
+    TenantDashboardRevenueSource: {
+      source: string;
+      amount: string;
+    };
     TokenEnvelope: {
       /** @default true */
       success: boolean;
@@ -4815,6 +7830,130 @@ export interface components {
       refresh_token: string;
       /** Format: date-time */
       refresh_expires_at: string;
+    };
+    TrainerAssignment: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      trainer_staff_profile_id: string;
+      /** Format: uuid */
+      member_id: string;
+      /** Format: date */
+      effective_from: string;
+      /** Format: date */
+      effective_until: string | null;
+      status: components["schemas"]["TrainerAssignmentStatusEnum"];
+      /** Format: date-time */
+      ended_at: string | null;
+      reason: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+      trainer: components["schemas"]["TrainerIdentity"];
+      member: components["schemas"]["AssignmentMember"];
+    };
+    TrainerAssignmentEnvelope: {
+      success: boolean;
+      data: components["schemas"]["TrainerAssignment"];
+      message: string;
+    };
+    TrainerAssignmentListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["TrainerAssignment"][];
+      meta: components["schemas"]["TrainerListMeta"];
+      message: string;
+    };
+    /**
+     * @description * `ACTIVE` - Active
+     *     * `ENDED` - Ended
+     *     * `CANCELLED` - Cancelled
+     * @enum {string}
+     */
+    TrainerAssignmentStatusEnum: "ACTIVE" | "ENDED" | "CANCELLED";
+    TrainerCheckInScanRequest: {
+      payload: string;
+      /** Format: uuid */
+      member_id: string;
+    };
+    TrainerDashboard: {
+      timezone: string;
+      /** Format: date */
+      today: string;
+      range: components["schemas"]["ReportRange"];
+      /** Format: date-time */
+      generated_at: string;
+      /** Format: uuid */
+      trainer_staff_profile_id: string;
+      active_assigned_members: number;
+      sessions: components["schemas"]["TrainerSessionCounts"];
+      upcoming_bookings: components["schemas"]["TrainerUpcomingSession"][];
+    };
+    TrainerDashboardEnvelope: {
+      success: boolean;
+      data: components["schemas"]["TrainerDashboard"];
+      message: string;
+    };
+    TrainerIdentity: {
+      /** Format: uuid */
+      id: string;
+      staff_code: string;
+      display_name: string;
+    };
+    TrainerListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["TrainerIdentity"][];
+      meta: components["schemas"]["TrainerListMeta"];
+      message: string;
+    };
+    TrainerListMeta: {
+      has_more: boolean;
+      next_after: string | null;
+    };
+    TrainerSessionCounts: {
+      bookings: number;
+      unique_members: number;
+      booked_sessions: number;
+      attended_sessions: number;
+      no_show_sessions: number;
+      cancelled_sessions: number;
+    };
+    TrainerSessionReport: {
+      gym: components["schemas"]["ReportGym"];
+      timezone: string;
+      range: components["schemas"]["ReportRange"];
+      /** Format: date-time */
+      generated_at: string;
+      source_status_policy: string;
+      rows: components["schemas"]["TrainerSessionReportDay"][];
+      totals: components["schemas"]["TrainerSessionCounts"];
+    };
+    TrainerSessionReportDay: {
+      /** Format: date */
+      date: string;
+      bookings: number;
+      unique_members: number;
+      booked_sessions: number;
+      attended_sessions: number;
+      no_show_sessions: number;
+      cancelled_sessions: number;
+    };
+    TrainerSessionReportEnvelope: {
+      success: boolean;
+      data: components["schemas"]["TrainerSessionReport"];
+      message: string;
+    };
+    TrainerUpcomingSession: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      member_id: string;
+      member_number: string;
+      full_name: string;
+      /** Format: date-time */
+      starts_at: string;
+      /** Format: date-time */
+      ends_at: string;
     };
     UploadIntentData: {
       /** Format: uuid */
@@ -4849,6 +7988,14 @@ export interface components {
         [key: string]: string;
       };
     };
+    /**
+     * @description * `DAY` - Day
+     *     * `WEEK` - Week
+     *     * `MONTH` - Month
+     *     * `YEAR` - Year
+     * @enum {string}
+     */
+    ValidityUnitEnum: "DAY" | "WEEK" | "MONTH" | "YEAR";
     VoidExpenseRequest: {
       reason: string;
       /** Format: date */
@@ -5485,6 +8632,360 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["AdminSubscriptionDetailEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  announcements_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        /**
+         * @description * `ALL_ACTIVE_MEMBERS` - ALL_ACTIVE_MEMBERS
+         *     * `PT_CLIENTS` - PT_CLIENTS
+         *     * `EXPIRING_WITHIN_7_DAYS` - EXPIRING_WITHIN_7_DAYS
+         *     * `EXPIRING_WITHIN_30_DAYS` - EXPIRING_WITHIN_30_DAYS
+         */
+        audience?:
+          | "ALL_ACTIVE_MEMBERS"
+          | "PT_CLIENTS"
+          | "EXPIRING_WITHIN_7_DAYS"
+          | "EXPIRING_WITHIN_30_DAYS";
+        limit?: number;
+        /**
+         * @description * `DRAFT` - DRAFT
+         *     * `SCHEDULED` - SCHEDULED
+         *     * `PUBLISHED` - PUBLISHED
+         *     * `CANCELLED` - CANCELLED
+         *     * `EXPIRED` - EXPIRED
+         */
+        status?: "DRAFT" | "SCHEDULED" | "PUBLISHED" | "CANCELLED" | "EXPIRED";
+        /**
+         * @description * `EVENT` - EVENT
+         *     * `PROMOTION` - PROMOTION
+         *     * `GENERAL` - GENERAL
+         */
+        type?: "EVENT" | "PROMOTION" | "GENERAL";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AnnouncementListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  announcements_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AnnouncementWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["AnnouncementWriteRequest"];
+        "multipart/form-data": components["schemas"]["AnnouncementWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AnnouncementEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  announcements_read: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AnnouncementEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  announcements_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedAnnouncementPatchRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedAnnouncementPatchRequest"];
+        "multipart/form-data": components["schemas"]["PatchedAnnouncementPatchRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AnnouncementEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  announcements_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AnnouncementEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  announcements_publish: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AnnouncementEnvelope"];
         };
       };
       400: {
@@ -7282,6 +10783,819 @@ export interface operations {
       };
     };
   };
+  class_bookings_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        date_from?: string;
+        date_to?: string;
+        limit?: number;
+        member_id?: string;
+        /**
+         * @description * `BOOKED` - Booked
+         *     * `ATTENDED` - Attended
+         *     * `NO_SHOW` - No Show
+         *     * `CANCELLED` - Cancelled
+         */
+        status?: "BOOKED" | "ATTENDED" | "NO_SHOW" | "CANCELLED";
+        trainer_staff_profile_id?: string;
+        /**
+         * @description * `list` - list
+         *     * `calendar` - calendar
+         */
+        view?: "list" | "calendar";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassBookingListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  class_bookings_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this class command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ClassBookingWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ClassBookingWriteRequest"];
+        "multipart/form-data": components["schemas"]["ClassBookingWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassBookingEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  class_bookings_attend: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this class command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassBookingEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  class_bookings_cancel: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this class command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ClassBookingCancelRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ClassBookingCancelRequest"];
+        "multipart/form-data": components["schemas"]["ClassBookingCancelRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassBookingEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  class_bookings_no_show: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this class command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassBookingEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  class_occurrences_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        date_from?: string;
+        date_to?: string;
+        limit?: number;
+        /**
+         * @description * `SCHEDULED` - Scheduled
+         *     * `CANCELLED` - Cancelled
+         *     * `COMPLETED` - Completed
+         */
+        status?: "SCHEDULED" | "CANCELLED" | "COMPLETED";
+        trainer_staff_profile_id?: string;
+        /** @description * `calendar` - calendar */
+        view?: "calendar";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassOccurrenceListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  class_occurrences_cancel: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this class command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ClassOccurrenceCancelRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ClassOccurrenceCancelRequest"];
+        "multipart/form-data": components["schemas"]["ClassOccurrenceCancelRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassOccurrenceEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  class_schedules_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        class_type_id?: string;
+        limit?: number;
+        /**
+         * @description * `ACTIVE` - Active
+         *     * `ENDED` - Ended
+         *     * `CANCELLED` - Cancelled
+         */
+        status?: "ACTIVE" | "ENDED" | "CANCELLED";
+        trainer_staff_profile_id?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassScheduleListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  class_schedules_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this class command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ClassScheduleWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ClassScheduleWriteRequest"];
+        "multipart/form-data": components["schemas"]["ClassScheduleWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassScheduleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  class_schedules_update: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this class command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedClassSchedulePatchRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedClassSchedulePatchRequest"];
+        "multipart/form-data": components["schemas"]["PatchedClassSchedulePatchRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassScheduleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  class_types_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        /**
+         * @description * `true` - true
+         *     * `false` - false
+         */
+        is_active?: "true" | "false";
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassTypeListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  class_types_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ClassTypeWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ClassTypeWriteRequest"];
+        "multipart/form-data": components["schemas"]["ClassTypeWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassTypeEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  class_types_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedClassTypePatchRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedClassTypePatchRequest"];
+        "multipart/form-data": components["schemas"]["PatchedClassTypePatchRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassTypeEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_dashboard_retrieve: {
+    parameters: {
+      query?: {
+        date_from?: string;
+        date_to?: string;
+        /**
+         * @description * `today` - today
+         *     * `this_week` - this_week
+         *     * `this_month` - this_month
+         *     * `last_month` - last_month
+         *     * `this_year` - this_year
+         */
+        range?:
+          "today" | "this_week" | "this_month" | "last_month" | "this_year";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TenantDashboardEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   device_check_in_challenges_create: {
     parameters: {
       query?: never;
@@ -8969,6 +13283,382 @@ export interface operations {
       };
     };
   };
+  member_service_packages_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+        member_id?: string;
+        /**
+         * @description * `PT` - Pt
+         *     * `CLASS` - Class
+         */
+        package_type?: "PT" | "CLASS";
+        /**
+         * @description * `ACTIVE` - Active
+         *     * `EXHAUSTED` - Exhausted
+         *     * `EXPIRED` - Expired
+         *     * `VOID` - Void
+         */
+        status?: "ACTIVE" | "EXHAUSTED" | "EXPIRED" | "VOID";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberPackageListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_service_packages_grant: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this package command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MemberPackageGrantRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MemberPackageGrantRequest"];
+        "multipart/form-data": components["schemas"]["MemberPackageGrantRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberPackageGrantEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_service_packages_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberPackageEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_service_packages_ledger_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LedgerListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_service_packages_ledger_adjust: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this package command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LedgerAdjustRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["LedgerAdjustRequest"];
+        "multipart/form-data": components["schemas"]["LedgerAdjustRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberPackageGrantEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_check_ins: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberSelfCheckInEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   member_check_in_scan: {
     parameters: {
       query?: never;
@@ -9017,6 +13707,995 @@ export interface operations {
         };
       };
       429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_class_bookings_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this class command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MemberClassBookingWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MemberClassBookingWriteRequest"];
+        "multipart/form-data": components["schemas"]["MemberClassBookingWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberClassBookingEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_dashboard: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberSelfDashboardEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_devices_register: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MemberDeviceWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MemberDeviceWriteRequest"];
+        "multipart/form-data": components["schemas"]["MemberDeviceWriteRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberDeviceEnvelope"];
+        };
+      };
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberDeviceEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_devices_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_devices_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedMemberDevicePatchRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedMemberDevicePatchRequest"];
+        "multipart/form-data": components["schemas"]["PatchedMemberDevicePatchRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberDeviceEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_files_delete_upload: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DeletedFileEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_files_complete_upload: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CompleteUploadRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CompleteUploadRequest"];
+        "multipart/form-data": components["schemas"]["CompleteUploadRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CompletedFileEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_files_download_url: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DownloadUrlEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_files_upload_intent: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MemberProfilePhotoIntentRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MemberProfilePhotoIntentRequest"];
+        "multipart/form-data": components["schemas"]["MemberProfilePhotoIntentRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UploadIntentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_me_read: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberSelfEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_me_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedMemberSelfUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedMemberSelfUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedMemberSelfUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberSelfEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_membership: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberSelfMembershipEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_notifications_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberNotificationListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_notifications_read: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberNotificationEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_payments: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberSelfPaymentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_schedule: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberScheduleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  member_service_packages: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+        /**
+         * @description * `PT` - PT
+         *     * `CLASS` - CLASS
+         */
+        package_type?: "PT" | "CLASS";
+        /**
+         * @description * `ACTIVE` - Active
+         *     * `EXHAUSTED` - Exhausted
+         *     * `EXPIRED` - Expired
+         *     * `VOID` - Void
+         */
+        status?: "ACTIVE" | "EXHAUSTED" | "EXPIRED" | "VOID";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberSelfPackageEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
         headers: {
           [name: string]: unknown;
         };
@@ -11668,6 +17347,1134 @@ export interface operations {
       };
     };
   };
+  pt_bookings_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        date_from?: string;
+        date_to?: string;
+        limit?: number;
+        member_id?: string;
+        /**
+         * @description * `BOOKED` - Booked
+         *     * `ATTENDED` - Attended
+         *     * `NO_SHOW` - No Show
+         *     * `CANCELLED` - Cancelled
+         */
+        status?: "BOOKED" | "ATTENDED" | "NO_SHOW" | "CANCELLED";
+        trainer_staff_profile_id?: string;
+        /**
+         * @description * `list` - list
+         *     * `calendar` - calendar
+         */
+        view?: "list" | "calendar";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTBookingListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_bookings_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this class command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PTBookingWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PTBookingWriteRequest"];
+        "multipart/form-data": components["schemas"]["PTBookingWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTBookingEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_bookings_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTBookingEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_bookings_attend: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this class command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTBookingEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_bookings_cancel: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this class command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PTBookingCancelRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PTBookingCancelRequest"];
+        "multipart/form-data": components["schemas"]["PTBookingCancelRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTBookingEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_bookings_no_show: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this class command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTBookingEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_commissions_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+        service_date_from?: string;
+        service_date_to?: string;
+        /**
+         * @description * `ACCRUED` - Accrued
+         *     * `PARTIALLY_PAID` - Partially Paid
+         *     * `PAID` - Paid
+         *     * `VOID` - Void
+         */
+        status?: "ACCRUED" | "PARTIALLY_PAID" | "PAID" | "VOID";
+        trainer_staff_profile_id?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTCommissionListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_commissions_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTCommissionDetailEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_commissions_record_payment: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this commission payout. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PTCommissionPaymentWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PTCommissionPaymentWriteRequest"];
+        "multipart/form-data": components["schemas"]["PTCommissionPaymentWriteRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTCommissionPaymentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_sales_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+        member_id?: string;
+        service_date_from?: string;
+        service_date_to?: string;
+        /**
+         * @description * `DRAFT` - Draft
+         *     * `PENDING_APPROVAL` - Pending Approval
+         *     * `POSTED` - Posted
+         *     * `REJECTED` - Rejected
+         *     * `CANCELLED` - Cancelled
+         *     * `VOID` - Void
+         */
+        status?:
+          | "DRAFT"
+          | "PENDING_APPROVAL"
+          | "POSTED"
+          | "REJECTED"
+          | "CANCELLED"
+          | "VOID";
+        trainer_staff_profile_id?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTSaleListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_sales_create: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this PT sale command. */
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PTSaleWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PTSaleWriteRequest"];
+        "multipart/form-data": components["schemas"]["PTSaleWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTSaleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_sales_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTSaleEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_sales_update: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this PT sale command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedPTSaleUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedPTSaleUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedPTSaleUpdateRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTSaleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_sales_approve: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this PT sale command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PTSaleApproveRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PTSaleApproveRequest"];
+        "multipart/form-data": components["schemas"]["PTSaleApproveRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTSaleApprovalEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_sales_cancel: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this PT sale command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PTSaleCancelRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PTSaleCancelRequest"];
+        "multipart/form-data": components["schemas"]["PTSaleCancelRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTSaleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_sales_reject: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this PT sale command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PTSaleRejectRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PTSaleRejectRequest"];
+        "multipart/form-data": components["schemas"]["PTSaleRejectRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTSaleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_sales_submit: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this PT sale command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTSaleEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  pt_sales_void: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description High-entropy key reused only for retries of this PT sale command. */
+        "Idempotency-Key": string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PTSaleVoidRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PTSaleVoidRequest"];
+        "multipart/form-data": components["schemas"]["PTSaleVoidRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTSaleVoidEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   readiness: {
     parameters: {
       query?: never;
@@ -11917,6 +18724,1103 @@ export interface operations {
         };
       };
       429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_cash_book_report_retrieve: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CashBookReportEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_cash_book_report_export: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_check_in_report_retrieve: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckInReportEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_check_in_report_export: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_class_report_retrieve: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ClassReportEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_class_report_export: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_daily_report_retrieve: {
+    parameters: {
+      query: {
+        date: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PeriodReportEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_daily_report_export: {
+    parameters: {
+      query: {
+        date: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_inventory_report_retrieve: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["InventoryReportEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_inventory_report_export: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_membership_expiry_report_retrieve: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MembershipExpiryReportEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_membership_expiry_report_export: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_monthly_report_retrieve: {
+    parameters: {
+      query: {
+        month: number;
+        year: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PeriodReportEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_monthly_report_export: {
+    parameters: {
+      query: {
+        month: number;
+        year: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_product_sales_report_retrieve: {
+    parameters: {
+      query: {
+        after?: string;
+        date_from: string;
+        date_to: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProductSalesReportEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_product_sales_report_export: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_profit_loss_report_retrieve: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProfitLossReportEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_profit_loss_report_export: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_pt_session_report_retrieve: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PTSessionReportEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_pt_session_report_export: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_stock_movement_report_retrieve: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StockMovementReportEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  tenant_stock_movement_report_export: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -13785,6 +21689,135 @@ export interface operations {
       };
     };
   };
+  service_packages_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        /**
+         * @description * `true` - true
+         *     * `false` - false
+         */
+        is_active?: "true" | "false";
+        limit?: number;
+        /**
+         * @description * `PT` - Pt
+         *     * `CLASS` - Class
+         */
+        type?: "PT" | "CLASS";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ServicePackageListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  service_packages_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ServicePackageWriteRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ServicePackageWriteRequest"];
+        "multipart/form-data": components["schemas"]["ServicePackageWriteRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ServicePackageEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   gym_settings_retrieve: {
     parameters: {
       query?: never;
@@ -14459,6 +22492,628 @@ export interface operations {
         };
       };
       429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  trainer_assignments_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+        member_id?: string;
+        /**
+         * @description * `ACTIVE` - Active
+         *     * `ENDED` - Ended
+         *     * `CANCELLED` - Cancelled
+         */
+        status?: "ACTIVE" | "ENDED" | "CANCELLED";
+        trainer_staff_profile_id?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TrainerAssignmentListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  trainer_assignments_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AssignmentCreateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["AssignmentCreateRequest"];
+        "multipart/form-data": components["schemas"]["AssignmentCreateRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TrainerAssignmentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  trainer_assignments_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TrainerAssignmentEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  trainer_assignments_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AssignmentCancelRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["AssignmentCancelRequest"];
+        "multipart/form-data": components["schemas"]["AssignmentCancelRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TrainerAssignmentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  trainer_assignments_end: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AssignmentEndRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["AssignmentEndRequest"];
+        "multipart/form-data": components["schemas"]["AssignmentEndRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TrainerAssignmentEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  trainer_check_in_scan: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TrainerCheckInScanRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["TrainerCheckInScanRequest"];
+        "multipart/form-data": components["schemas"]["TrainerCheckInScanRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckInEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  trainer_dashboard_retrieve: {
+    parameters: {
+      query?: {
+        date_from?: string;
+        date_to?: string;
+        /**
+         * @description * `today` - today
+         *     * `this_week` - this_week
+         *     * `this_month` - this_month
+         *     * `last_month` - last_month
+         *     * `this_year` - this_year
+         */
+        range?:
+          "today" | "this_week" | "this_month" | "last_month" | "this_year";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TrainerDashboardEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  trainer_session_report_retrieve: {
+    parameters: {
+      query: {
+        date_from: string;
+        date_to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TrainerSessionReportEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  trainers_list: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TrainerListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  trainers_assigned_members: {
+    parameters: {
+      query?: {
+        after?: string;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AssignedMemberListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
         headers: {
           [name: string]: unknown;
         };

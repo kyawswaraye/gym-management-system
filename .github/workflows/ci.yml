@@ -97,7 +97,8 @@ jobs:
           python manage.py spectacular \
             --file /tmp/openapi.v1.json \
             --format openapi-json \
-            --validate
+            --validate \
+            --fail-on-warn
           diff -u ../contracts/openapi.v1.json /tmp/openapi.v1.json
       - name: Test
         working-directory: backend
@@ -135,6 +136,63 @@ jobs:
       - run: npm run typecheck
       - run: npm test -- --run
       - run: npm run build
+
+  mobile:
+    name: Mobile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.20.0"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install \
+            "platforms;android-37.0" \
+            "platforms;android-36" \
+            "build-tools;37.0.0" \
+            "ndk;27.1.12297006" \
+            "cmake;3.22.1"
+      - run: make mobile-install
+      - name: Audit mobile dependencies
+        working-directory: mobile
+        run: npm audit --audit-level=critical
+      - name: Check generated API types
+        run: |
+          npm --prefix contracts/generator ci
+          npm --prefix contracts/generator audit --audit-level=high
+          npm --prefix contracts/generator run generate
+          git diff --exit-code -- mobile/src/types/api.generated.ts
+      - run: make mobile-check
+      - run: make mobile-test
+      - run: make mobile-android
+
+  mobile-ios:
+    name: Mobile iOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.20.0"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0.1"
+          bundler-cache: true
+          working-directory: mobile
+      - run: make mobile-install
+      - run: make mobile-ios
 
   e2e:
     name: Browser E2E

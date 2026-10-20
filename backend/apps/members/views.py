@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
-from datetime import timedelta
-from decimal import Decimal
 from uuid import UUID
 
 from django.shortcuts import get_object_or_404
@@ -25,7 +22,7 @@ from apps.members.checkin_services import (
     page_member_check_ins,
     parse_idempotency_key,
 )
-from apps.members.models import Member, Membership, MembershipPlan, Payment
+from apps.members.models import Member, Membership, MembershipPlan
 from apps.members.serializers import (
     CheckInChallengeCreateSerializer,
     CheckInChallengeEnvelopeSerializer,
@@ -86,6 +83,12 @@ from apps.members.services import (
     update_membership_note,
     update_plan,
 )
+from apps.trainers.selectors import (
+    deny_trainer_only,
+    require_assigned_member,
+    require_visible_membership,
+    scope_to_assigned_members,
+)
 from apps.users.permissions import (
     RequiresEntitlement,
     RequiresEntitlements,
@@ -108,10 +111,6 @@ class MembershipFeatureAPIView(TenantAPIView):
 
 class FinanceFeatureAPIView(TenantAPIView):
     required_feature = "finance"
-
-
-class ReportsFeatureAPIView(TenantAPIView):
-    required_feature = "reports"
 
 
 class MemberListCreateView(MemberFeatureAPIView):
@@ -138,13 +137,20 @@ class MemberListCreateView(MemberFeatureAPIView):
         query.is_valid(raise_exception=True)
         filters = query.validated_data
         members, meta = page_members(
-            Member.objects.filter(gym=request.gym),
+            scope_to_assigned_members(
+                Member.objects.filter(gym=request.gym),
+                gym_id=request.gym.id,
+                actor=request.gym_membership,
+                as_of=gym_today(request.gym),
+                member_ref="pk",
+            ),
             gym_id=request.gym.id,
             status=str(filters.get("status", "")),
             search=str(filters.get("search", "")),
             joined_from=filters.get("joined_from"),
             joined_to=filters.get("joined_to"),
             is_pt_client=filters.get("is_pt_client"),
+            as_of=gym_today(request.gym),
             limit=int(filters["limit"]),
             after=str(filters.get("after", "")),
         )
@@ -198,7 +204,21 @@ class MemberDetailView(MemberFeatureAPIView):
         return super().get_permissions()
 
     def get_object(self) -> Member:
-        return get_object_or_404(Member, gym=self.request.gym, id=self.kwargs["id"])
+        from apps.trainers.selectors import annotate_member_pt_client
+
+        as_of = gym_today(self.request.gym)
+        queryset = scope_to_assigned_members(
+            annotate_member_pt_client(
+                Member.objects.filter(gym=self.request.gym),
+                gym_id=self.request.gym.id,
+                as_of=as_of,
+            ),
+            gym_id=self.request.gym.id,
+            actor=self.request.gym_membership,
+            as_of=as_of,
+            member_ref="pk",
+        )
+        return get_object_or_404(queryset, id=self.kwargs["id"])
 
     @extend_schema(
         operation_id="members_retrieve",
@@ -271,7 +291,23 @@ class MemberSummaryView(MemberFeatureAPIView):
     )
     def get(self, request: Request, id: UUID) -> Response:
         MemberSummaryQuerySerializer(data=request.query_params).is_valid(raise_exception=True)
-        member = get_object_or_404(Member, gym=request.gym, id=id)
+        from apps.trainers.selectors import annotate_member_pt_client
+
+        as_of = gym_today(request.gym)
+        member = get_object_or_404(
+            scope_to_assigned_members(
+                annotate_member_pt_client(
+                    Member.objects.filter(gym=request.gym),
+                    gym_id=request.gym.id,
+                    as_of=as_of,
+                ),
+                gym_id=request.gym.id,
+                actor=request.gym_membership,
+                as_of=as_of,
+                member_ref="pk",
+            ),
+            id=id,
+        )
         payload = member_summary(gym=request.gym, member=member)
         return success_response(MemberSummarySerializer(payload).data)
 
@@ -293,6 +329,7 @@ class MemberPaymentHistoryView(APIView):
         },
     )
     def get(self, request: Request, id: UUID) -> Response:
+        deny_trainer_only(gym_id=request.gym.id, actor=request.gym_membership)
         query = MemberPaymentHistoryQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         filters = query.validated_data
@@ -468,10 +505,23 @@ class MembershipListCreateView(MembershipFeatureAPIView):
         query.is_valid(raise_exception=True)
         filters = query.validated_data
         member_id = filters.get("member_id")
+        as_of = gym_today(request.gym)
         if member_id is not None:
+            require_assigned_member(
+                gym_id=request.gym.id,
+                actor=request.gym_membership,
+                member_id=member_id,
+                as_of=as_of,
+            )
             get_object_or_404(Member, gym=request.gym, id=member_id)
         memberships, meta = page_memberships(
-            Membership.objects.filter(gym=request.gym),
+            scope_to_assigned_members(
+                Membership.objects.filter(gym=request.gym),
+                gym_id=request.gym.id,
+                actor=request.gym_membership,
+                as_of=as_of,
+                member_ref="member_id",
+            ),
             gym_id=request.gym.id,
             status=str(filters.get("status", "")),
             member_id=member_id,
@@ -497,6 +547,12 @@ class MembershipListCreateView(MembershipFeatureAPIView):
         serializer = MembershipCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payload = serializer.validated_data
+        require_assigned_member(
+            gym_id=request.gym.id,
+            actor=request.gym_membership,
+            member_id=payload["member_id"],
+            as_of=gym_today(request.gym),
+        )
         member = get_object_or_404(Member, gym=request.gym, id=payload["member_id"])
         plan = get_object_or_404(MembershipPlan, gym=request.gym, id=payload["plan_id"])
         membership = create_membership(
@@ -524,6 +580,11 @@ class MembershipDetailView(MembershipFeatureAPIView):
         return super().get_permissions()
 
     def get_object(self) -> Membership:
+        require_visible_membership(
+            gym=self.request.gym,
+            actor=self.request.gym_membership,
+            membership_id=self.kwargs["id"],
+        )
         return get_object_or_404(Membership, gym=self.request.gym, id=self.kwargs["id"])
 
     @extend_schema(
@@ -552,6 +613,11 @@ class MembershipDetailView(MembershipFeatureAPIView):
     def patch(self, request: Request, id: UUID) -> Response:
         serializer = MembershipUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        require_visible_membership(
+            gym=request.gym,
+            actor=request.gym_membership,
+            membership_id=id,
+        )
         membership = update_membership_note(
             gym=request.gym,
             membership_id=id,
@@ -578,7 +644,11 @@ class MembershipCancelView(MembershipFeatureAPIView):
     def post(self, request: Request, id: UUID) -> Response:
         serializer = MembershipCancelSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        get_object_or_404(Membership, gym=request.gym, id=id)
+        require_visible_membership(
+            gym=request.gym,
+            actor=request.gym_membership,
+            membership_id=id,
+        )
         membership = cancel_membership(
             gym=request.gym,
             actor=request.gym_membership,
@@ -607,7 +677,11 @@ class MembershipSuspendView(MembershipFeatureAPIView):
     )
     def post(self, request: Request, id: UUID) -> Response:
         MembershipCommandSerializer(data=request.data).is_valid(raise_exception=True)
-        get_object_or_404(Membership, gym=request.gym, id=id)
+        require_visible_membership(
+            gym=request.gym,
+            actor=request.gym_membership,
+            membership_id=id,
+        )
         membership = suspend_membership(gym=request.gym, membership_id=id)
         return success_response(
             MembershipSerializer(membership).data, message="Membership suspended"
@@ -631,7 +705,11 @@ class MembershipResumeView(MembershipFeatureAPIView):
     )
     def post(self, request: Request, id: UUID) -> Response:
         MembershipCommandSerializer(data=request.data).is_valid(raise_exception=True)
-        get_object_or_404(Membership, gym=request.gym, id=id)
+        require_visible_membership(
+            gym=request.gym,
+            actor=request.gym_membership,
+            membership_id=id,
+        )
         membership = resume_membership(gym=request.gym, membership_id=id)
         return success_response(MembershipSerializer(membership).data, message="Membership resumed")
 
@@ -654,7 +732,13 @@ class MembershipExpiryView(MembershipFeatureAPIView):
         query.is_valid(raise_exception=True)
         filters = query.validated_data
         memberships, meta = page_membership_expiry(
-            Membership.objects.filter(gym=request.gym),
+            scope_to_assigned_members(
+                Membership.objects.filter(gym=request.gym),
+                gym_id=request.gym.id,
+                actor=request.gym_membership,
+                as_of=gym_today(request.gym),
+                member_ref="member_id",
+            ),
             gym_id=request.gym.id,
             bucket=str(filters["bucket"]),
             today=gym_today(request.gym),
@@ -662,81 +746,6 @@ class MembershipExpiryView(MembershipFeatureAPIView):
             after=str(filters.get("after", "")),
         )
         return success_response(MembershipSerializer(memberships, many=True).data, meta=meta)
-
-
-class DashboardView(ReportsFeatureAPIView):
-    required_permission = "reports.view"
-
-    def get(self, request):
-        today = gym_today(request.gym)
-        range_name = request.query_params.get("range", "today")
-        start = today.replace(day=1) if range_name == "month" else today
-        payments = Payment.objects.filter(
-            gym=request.gym,
-            status__in=[Payment.Status.POSTED, Payment.Status.VOID],
-            business_date__range=(start, today),
-        ).select_related("membership")
-        sources: dict[str, Decimal] = defaultdict(Decimal)
-        for payment in payments:
-            if payment.purpose == Payment.Purpose.MEMBERSHIP and payment.membership:
-                source = payment.membership.revenue_source
-            else:
-                source = payment.purpose
-            direction = (
-                Decimal("-1")
-                if payment.entry_type in [Payment.EntryType.REFUND, Payment.EntryType.REVERSAL]
-                else Decimal("1")
-            )
-            sources[source] += direction * payment.amount
-        ranked = [
-            {"source": source, "amount": amount}
-            for source, amount in sorted(sources.items(), key=lambda item: item[1], reverse=True)
-        ]
-
-        overdue_count = 0
-        overdue_amount = Decimal("0")
-        expired = Membership.objects.filter(
-            gym=request.gym,
-            expiry_date__lt=today,
-            payment_status__in=[Membership.PaymentStatus.UNPAID, Membership.PaymentStatus.PARTIAL],
-        ).prefetch_related("payments")
-        for membership in expired:
-            paid = sum(
-                (
-                    (
-                        -payment.amount
-                        if payment.entry_type
-                        in [Payment.EntryType.REFUND, Payment.EntryType.REVERSAL]
-                        else payment.amount
-                    )
-                    for payment in membership.payments.all()
-                    if payment.status in [Payment.Status.POSTED, Payment.Status.VOID]
-                ),
-                Decimal("0"),
-            )
-            balance = max(Decimal("0"), membership.final_amount - paid)
-            if balance:
-                overdue_count += 1
-                overdue_amount += balance
-        expiring_count = Membership.objects.filter(
-            gym=request.gym,
-            status=Membership.Status.ACTIVE,
-            expiry_date__range=(today, today + timedelta(days=30)),
-        ).count()
-        return success_response(
-            {
-                "range": range_name,
-                "income": sum(sources.values(), Decimal("0")),
-                "revenue_sources": ranked,
-                "pending_payments": {"member_count": overdue_count, "amount": overdue_amount},
-                "pending_approvals": Payment.objects.filter(
-                    gym=request.gym, status=Payment.Status.PENDING_APPROVAL
-                ).count(),
-                "expiring_members": expiring_count,
-                "attendance": {"available": False, "today": None},
-                "currency": request.gym.currency,
-            }
-        )
 
 
 _CHECK_IN_IDEMPOTENCY = OpenApiParameter(

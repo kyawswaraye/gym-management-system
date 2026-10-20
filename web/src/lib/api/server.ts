@@ -9,6 +9,15 @@ import {
   FINANCE_PATH_PATTERNS,
 } from "@/lib/api/finance-routes";
 import {
+  allowsPhase5Route,
+  PHASE5_PATH_PATTERNS,
+  phase5Idempotency,
+} from "@/lib/api/phase5-routes";
+import {
+  allowsReportRoute,
+  REPORT_PATH_PATTERNS,
+} from "@/lib/api/reports-routes";
+import {
   AUTH_COOKIES,
   SELECTION_COOKIE_MAX_AGE,
   authCookieOptions,
@@ -83,7 +92,9 @@ const ALLOWED_TENANT_PATHS = [
   /^\/api\/v1\/membership-plans\/(?:[0-9a-f-]+\/(?:archive\/)?)?$/,
   /^\/api\/v1\/memberships\/(?:expiry\/|[0-9a-f-]+\/(?:cancel\/|suspend\/|resume\/)?)?$/,
   ...FINANCE_PATH_PATTERNS,
+  ...PHASE5_PATH_PATTERNS,
   /^\/api\/v1\/dashboard\/$/,
+  ...REPORT_PATH_PATTERNS,
   /^\/api\/v1\/audit-logs\/$/,
   FILE_UPLOAD_INTENT_PATTERN,
   FILE_COMPLETE_PATH,
@@ -522,6 +533,10 @@ function allowsForwardedQuery(
   search: string,
   method: string | undefined,
 ): boolean {
+  const phase5 = allowsPhase5Route(pathname, search, method);
+  if (phase5 !== null) return phase5;
+  const reports = allowsReportRoute(pathname, search, method);
+  if (reports !== null) return reports;
   const finance = allowsFinanceRoute(pathname, search, method);
   if (finance !== null) return finance;
   if (pathname === TENANT_AUDIT_LIST_PATH) {
@@ -971,6 +986,32 @@ function receiptFileName(header: string | null): string {
   return match?.[1] ?? "receipt.html";
 }
 
+const CSV_FILENAME =
+  /^(?:report|(?:daily|monthly|cash-book|profit-loss|product-sales|membership-expiry|check-ins|pt-sessions|classes|stock-movements|inventory)-[A-Z0-9][A-Z0-9-]{1,31}(?:-\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2})?)\.csv$/;
+
+function csvFileName(header: string | null): string {
+  const match = /^attachment;\s*filename="([^"]+)"$/.exec(header ?? "");
+  const name = match?.[1] ?? "";
+  return CSV_FILENAME.test(name) ? name : "report.csv";
+}
+
+function csvDocumentResponse(
+  status: number,
+  body: string,
+  disposition: string | null,
+): NextResponse {
+  return new NextResponse(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, private",
+      "Content-Disposition": `attachment; filename="${csvFileName(disposition)}"`,
+      "Content-Type": "text/csv; charset=utf-8",
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
 function receiptHtmlResponse(
   status: number,
   html: string,
@@ -1000,6 +1041,13 @@ function receiptHtmlResponse(
 
 async function responseForDocument(upstream: Response): Promise<NextResponse> {
   const type = upstream.headers.get("content-type") ?? "";
+  if (upstream.ok && type.includes("text/csv")) {
+    return csvDocumentResponse(
+      upstream.status,
+      await upstream.text(),
+      upstream.headers.get("content-disposition"),
+    );
+  }
   if (upstream.ok && type.includes("text/html")) {
     return receiptHtmlResponse(
       upstream.status,
@@ -1013,6 +1061,7 @@ async function responseForDocument(upstream: Response): Promise<NextResponse> {
 export async function authenticatedDocumentGet(
   request: NextRequest,
   path: string,
+  documentKind: "html" | "csv" = "html",
 ): Promise<NextResponse> {
   const access = request.cookies.get(AUTH_COOKIES.access)?.value;
   if (!access) {
@@ -1021,11 +1070,15 @@ export async function authenticatedDocumentGet(
       error: { code: "AUTHENTICATION_REQUIRED", message: "Please sign in." },
     });
   }
+  const accept =
+    documentKind === "csv"
+      ? "text/csv, application/json"
+      : "text/html, application/json";
   const perform = (accessToken: string) =>
     callDjango(path, {
       method: "GET",
       headers: {
-        Accept: "text/html, application/json",
+        Accept: accept,
         Authorization: `Bearer ${accessToken}`,
       },
     });
@@ -1084,12 +1137,16 @@ function idempotencyKeyForMutation(
   path: string,
   method: "POST" | "PATCH" | "PUT" | "DELETE",
   suppliedKey: string | null,
-): string | null {
-  if (suppliedKey) return suppliedKey;
-  if (method === "DELETE") return null;
+): string | null | "rejected" {
+  if (method === "DELETE") return suppliedKey;
   const queryIndex = path.indexOf("?");
   const pathname = queryIndex === -1 ? path : path.slice(0, queryIndex);
   const search = queryIndex === -1 ? "" : path.slice(queryIndex);
+  const phase5 = phase5Idempotency(pathname, method);
+  if (phase5 === "rejected") return suppliedKey ? "rejected" : null;
+  if (suppliedKey) return suppliedKey;
+  if (phase5 === "required") return crypto.randomUUID();
+  if (phase5 === "none") return null;
   // Finance commands require a key. Other published commands, including
   // check-in challenges, reject a key the caller did not send.
   if (allowsFinanceRoute(pathname, search, method) !== true) return null;
@@ -1134,6 +1191,15 @@ export async function authenticatedMutation(
   }
   const suppliedKey = request.headers.get("Idempotency-Key");
   const idempotencyKey = idempotencyKeyForMutation(path, method, suppliedKey);
+  if (idempotencyKey === "rejected") {
+    return responseFromUpstream(400, {
+      success: false,
+      error: {
+        code: "INVALID_REQUEST",
+        message: "Idempotency-Key is not accepted for a trainer check-in scan.",
+      },
+    });
+  }
   if (idempotencyKey && !IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
     return responseFromUpstream(400, {
       success: false,

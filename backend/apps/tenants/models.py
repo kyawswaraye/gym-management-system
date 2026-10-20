@@ -566,6 +566,7 @@ class IdempotencyRecord(TenantModel):
         FAILED = "FAILED"
 
     actor_membership_id = models.UUIDField(null=True, blank=True)
+    actor_member_id = models.UUIDField(null=True, blank=True)
     http_method = models.CharField(max_length=8)
     route = models.CharField(max_length=200)
     idempotency_key = models.CharField(max_length=128)
@@ -588,12 +589,20 @@ class IdempotencyRecord(TenantModel):
                 fields=[
                     "gym",
                     "actor_membership_id",
+                    "actor_member_id",
                     "http_method",
                     "route",
                     "idempotency_key",
                 ],
                 name="idem_scope_key_uniq",
                 nulls_distinct=False,
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(
+                    actor_membership_id__isnull=False,
+                    actor_member_id__isnull=False,
+                ),
+                name="idem_one_actor_ck",
             ),
             models.CheckConstraint(
                 condition=models.Q(idempotency_key__regex=r"^[A-Za-z0-9._:-]{16,128}$"),

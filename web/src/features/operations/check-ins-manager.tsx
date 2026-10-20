@@ -10,6 +10,7 @@ import {
   listMemberCheckIns,
   listMembers,
 } from "@/features/operations/client";
+import { TrainerScan } from "@/features/operations/trainer-scan";
 import { formatInstant, zonedLocalToIso } from "@/lib/date";
 import type { CheckInRecord, Member } from "@/types/api";
 
@@ -76,10 +77,14 @@ function VisitList({
 export function CheckInsManager({
   canCreate,
   canUpdate,
+  canScan = false,
+  membershipId = "",
   timeZone,
 }: {
   canCreate: boolean;
   canUpdate: boolean;
+  canScan?: boolean;
+  membershipId?: string;
   timeZone: string;
 }) {
   const [search, setSearch] = useState("");
@@ -227,6 +232,7 @@ export function CheckInsManager({
 
   return (
     <div className="grid gap-4">
+      {canScan ? <TrainerScan membershipId={membershipId} /> : null}
       {error ? (
         <p className="error" role="alert">
           {error}

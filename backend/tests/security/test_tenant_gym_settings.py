@@ -76,10 +76,19 @@ def ensure_authorization_catalog() -> SubscriptionPlan:
     the historical catalog. ``retail.approve`` is applied only by the 0016
     backfill. ``platform.settings.manage`` is then marked inactive by the 0020
     retirement. ``checkins.challenge.issue`` is applied only by the 0022
-    backfill, for OWNER and MANAGER templates and copied roles. Phase 4
+    backfill, for OWNER and MANAGER templates and copied roles.     Phase 4
     inventory, retail, and ``expense_categories.manage`` grants are applied
-    only by the 0025 backfill. A clean install runs those operations after the
-    historical seed, and provisioning copies the restored template permissions.
+    only by the 0025 backfill. Phase 5 ``pt.schedule.view``,
+    ``pt.schedule.manage``, and     ``pt.sessions.adjust`` grants are applied only
+    by the 0026 backfill. The 0027 reservation then removes ``pt.commissions.pay``
+    from every template and copied role that is not protected OWNER or MANAGER.
+    Class ``classes.view``, ``classes.manage``, ``classes.book``, and
+    ``classes.attendance`` grants are applied only by the 0028 backfill.
+    Announcement ``announcements.view`` and ``announcements.manage`` grants are
+    applied only by the 0030 backfill. The personal-training feature is
+    attached to the trial plan by the trainer-assignment migration. A clean
+    install runs those operations after the historical seed, and provisioning
+    copies the restored template permissions and plan features.
     """
 
     seed = importlib.import_module("apps.tenants.migrations.0003_seed_authorization")
@@ -122,6 +131,20 @@ def ensure_authorization_catalog() -> SubscriptionPlan:
     challenge.grant_check_in_challenge_issue(django_apps, None)
     finance = importlib.import_module("apps.tenants.migrations.0025_finance_permission_catalog")
     finance.grant_finance_foundation_permissions(django_apps, None)
+    schedule = importlib.import_module(
+        "apps.tenants.migrations.0026_pt_schedule_permission_catalog"
+    )
+    schedule.grant_pt_schedule_permissions(django_apps, None)
+    reservation = importlib.import_module(
+        "apps.tenants.migrations.0027_pt_commission_pay_reservation"
+    )
+    reservation.strip_unsafe_pt_commission_pay(django_apps, None)
+    classes = importlib.import_module("apps.tenants.migrations.0028_class_permission_catalog")
+    classes.grant_class_permissions(django_apps, None)
+    announcements = importlib.import_module(
+        "apps.tenants.migrations.0030_announcement_permission_catalog"
+    )
+    announcements.grant_announcement_permissions(django_apps, None)
     feature, _ = Feature.objects.get_or_create(
         code="members",
         defaults={"name": "Members", "description": "Members module"},
@@ -139,6 +162,18 @@ def ensure_authorization_catalog() -> SubscriptionPlan:
     SubscriptionPlanFeature.objects.get_or_create(
         subscription_plan=plan,
         feature=feature,
+        defaults={"enabled": True},
+    )
+    pt_feature, _ = Feature.objects.get_or_create(
+        code="pt",
+        defaults={
+            "name": "Personal training",
+            "description": "Personal training module",
+        },
+    )
+    SubscriptionPlanFeature.objects.get_or_create(
+        subscription_plan=plan,
+        feature=pt_feature,
         defaults={"enabled": True},
     )
     return plan

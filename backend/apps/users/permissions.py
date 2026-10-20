@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework.permissions import BasePermission
@@ -108,6 +110,27 @@ class RequiresEntitlements(BasePermission):
             ).values_list("feature__code", flat=True)
         )
         return all(code in entitled for code in codes)
+
+
+class TrainerFinanceClosed(BasePermission):
+    """Close non-PT finance routes for a protected trainer-only membership.
+
+    Place this after the ordinary permission and entitlement checks. A missing
+    grant or feature stays 403. Protected OWNER or MANAGER composition, and a
+    non-trainer custom role, continue through the granted permission. Phase 5
+    PT sale, commission, package, and booking views do not use this class.
+    """
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        actor = getattr(request, "gym_membership", None)
+        gym = getattr(request, "gym", None)
+        gym_id = getattr(gym, "id", None)
+        if actor is None or not isinstance(gym_id, UUID):
+            return False
+        from apps.trainers.selectors import deny_trainer_only
+
+        deny_trainer_only(gym_id=gym_id, actor=actor)
+        return True
 
 
 class IsActiveOwner(BasePermission):

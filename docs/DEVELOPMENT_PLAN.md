@@ -19,7 +19,313 @@ Work proceeds one approved phase at a time. Phase 1 has two ordered subphases, 1
 
 ### Current phase status
 
-Phase 0, Phase 1A, and Phase 1B are complete. The Phase 1B gate closed on 2026-10-17. Phase 2 and Phase 3 implementation is complete. Phase 4 Increments 1–7, Increment 8A, and Increment 8B are published (finance foundation, cash book, payments/receipts/daily sales, expense categories/approval, salary periods/lines, product catalog/stock movements, retail-sale drafts through approval, payment void/refund, receipt void, manual expense void, salary-period void, and full retail-sale void). Increment 8C publishes partial retail returns. Cash corrections name an explicit destination open session and do not reopen a closed original till. Phase 4 implementation is complete as of 2026-10-18 for Increments 1–9, including Increment 8C partial retail returns. The code and test gates passed. Manager finance and security evidence review is complete. Production deployment is not complete. Increment 9 delivers the tenant staff pages, and the retail page exposes the partial return. Increment evidence lives in the repository README. [ADR 0010](./adr/0010-production-provider-readiness.md) selects Resend as the production transactional email provider and AWS S3 in `ap-southeast-1` as the primary object store. Production MinIO is no longer planned. The password-recovery contract is recorded there. This status does not implement that code: password recovery still returns `501 PROVIDER_NOT_CONFIGURED`, mail still uses Django's `EMAIL_BACKEND`, and local and end-to-end object storage remains the test-only MinIO-compatible fork. Live production stays open until a Resend domain, API key, and idempotency proof, an AWS bucket, IAM, CORS, and live upload and download, and a ClamAV deployed-host proof exist. Block Public Access, SSE-S3, and versioning are planned only. Current-object retention, noncurrent expiry, backup and replication, and jurisdiction or legal approval stay open. Phase 5 waits when those live gates must be closed before it starts.
+Phase 0, Phase 1A, and Phase 1B are complete. The Phase 1B gate closed on 2026-10-17. Phase 2 and Phase 3 implementation is complete. Phase 4 Increments 1–7, Increment 8A, and Increment 8B are published (finance foundation, cash book, payments/receipts/daily sales, expense categories/approval, salary periods/lines, product catalog/stock movements, retail-sale drafts through approval, payment void/refund, receipt void, manual expense void, salary-period void, and full retail-sale void). Increment 8C publishes partial retail returns. Cash corrections name an explicit destination open session and do not reopen a closed original till. Phase 4 implementation is complete as of 2026-10-18 for Increments 1–9, including Increment 8C partial retail returns. The code and test gates passed. Manager finance and security evidence review is complete. Production deployment is not complete. Increment 9 delivers the tenant staff pages, and the retail page exposes the partial return. Increment evidence lives in the repository README. [ADR 0010](./adr/0010-production-provider-readiness.md) selects Resend as the production transactional email provider and AWS S3 in `ap-southeast-1` as the primary object store. Production MinIO is no longer planned. Password recovery, the Resend client, AWS virtual-hosted addressing, and the ClamAV production fragment are implemented. Local and end-to-end object storage remains the test-only MinIO-compatible fork. Live production stays open until a Resend domain, API key, and idempotency proof, an AWS bucket, IAM, CORS, and live upload and download, and a ClamAV deployed-host proof exist. Block Public Access, SSE-S3, and versioning are planned only. Current-object retention, noncurrent expiry, backup and replication, and jurisdiction or legal approval stay open.
+
+Phase 5 code development started on 2026-10-19 without representing the open
+production-provider proofs as complete. Increment 1 publishes trainer and
+trainer-assignment reads plus assignment create, end, and cancel. It derives
+the member PT badge from effective active assignments and applies
+assignment-scoped member, membership, check-in, and profile-photo access for
+protected Trainers. Increment 2 publishes PT service-package list and create.
+Class packages remained closed in that increment until ClassType existed.
+A CLASS package requires an active same-gym class type.
+Increment 3 publishes PT-sale draft list, create, detail, update, and
+cancellation. Increment 4 publishes the optional sale-owned PT payment draft,
+submit, and Manager/Owner separate-actor approve and reject. Approval
+atomically posts the optional payment, receipt, and cash movement and exactly
+one immutable ACCRUED commission. Approval with no linked payment remains
+valid and creates no receipt or cash movement. Generic payment commands cannot
+mutate a sale-owned payment. Increment 5 publishes commission list, detail,
+and record-payment, including partial payout, the protected commission expense,
+and optional cash out. Payout reversal is an internal helper for a future sale
+void and has no public route. Sale void, member package grants, the session
+ledger, bookings, classes, and schedules were unpublished in Increment 5.
+Later increments publish those routes, class types, schedules, occurrences,
+class and PT bookings, and trainer scan. The staff and trainer pages and
+browser E2E are published. Increments 1–5 did not by themselves close Phase 5.
+The Increment 1–3 historical backend, full PostgreSQL, web, and contract gates
+passed; evidence is in the repository README. Increments 1–4 historical
+Increment 4 gate evidence: backend Ruff and format passed; mypy passed on 179
+source files; migration drift was clean; non-PostgreSQL 321 passed and 269
+were deselected; real PostgreSQL 269 passed and 321 were deselected; web
+format, lint, typecheck, and build passed using Node 24.20.0; Vitest passed
+53 files and 296 tests; OpenAPI spectacular validation with `--fail-on-warn`
+passed and the fresh output matched the committed `contracts/openapi.v1.json`;
+IDE lints and `git diff --check` were clean. No E2E was run because Increment
+4 is backend/API only and no new web workflow was published. Phase 5 remained
+open after Increment 4.
+Phase 5 code and test gate is complete as of 2026-10-19. Full code scope is
+complete: backend PT, classes, and trainer scan; staff and trainer web; and
+browser E2E. Linked-member self-service remains Phase 7. This is code and test
+gate closure, not production deployment. [ADR 0010](./adr/0010-production-provider-readiness.md)
+live Resend, AWS, and ClamAV provider proofs remain open. Phase 6, mobile,
+production readiness, and provider closure are not claimed. Production
+deployment is not complete.
+`make backend-check`: Ruff passed; format 312 files; mypy 199 source files;
+migration drift none. `make backend-test`: 334 passed, 298 deselected. Final
+serial `make backend-test-pg`: 298 passed, 334 deselected, 398.50s. Node
+24.20.0 web format, lint, typecheck, and build passed; the build has 29
+routes; Vitest 61 files / 326 tests. A fresh `spectacular --validate
+--fail-on-warn` temporary export byte-matched `contracts/openapi.v1.json`;
+generated types are current. A clean full `make e2e` passed 16 tests in 5.2m,
+including 10 Phase 5 browser tests (assignments/catalogs; Reception submit +
+separate Owner approval cash sale; grant+commission; two payouts; consumed
+void rollback + untouched refund/reconciliation; class
+schedule/book/attendance/no-show/cutoff; trainer commission scope and QR scan
+assigned/unassigned/generic-route absence). A formal security review reported
+no medium-or-higher finding in its reviewed slice but was partial, and that
+partial review is not full Phase 5 coverage. A targeted GPT-5.6 Phase 5 audit
+found and fixed trainer finance bypasses, premature attendance and no-show,
+payout date bounds, and trainer scan throttling. Final targeted verification
+found no remaining medium-or-higher issue in the audited Phase 5 scope. IDE
+lints and `git diff --check` were clean.
+
+Phase 6 Increment 1 is gate-clean as of 2026-10-19. It publishes canonical
+`GET /api/v1/dashboard/` and the tenant dashboard page. `reports.view` returns
+the operational block. `reports.financial` adds the full financial block;
+otherwise `financial` is null. Trainer finance closure remains. Presets are
+`today`, `this_week`, `this_month`, `last_month`, and `this_year`, plus a
+custom range of at most 366 inclusive days. The response states the gym
+timezone and currency. Financial totals follow posted ledger correction-date
+semantics. Six mutually exclusive revenue buckets include `CLASS`. Pending
+approvals are included. Overdue balance is the membership-only authoritative
+unpaid or partial amount; this increment does not invent PT or class debt. Ten
+protected expense categories are zero-filled in canonical order, with total
+expenses and net profit. Product rows use immutable snapshots net of a full
+void and partial returns. Top products are the first 10 after ranking. There
+are no migrations or report tables. Browser E2E is `web/e2e/phase6.spec.ts`.
+Cash-book, profit/loss, membership/expiry, check-in/occupancy, PT/class,
+product/stock, inventory, and trainer-scoped dashboards, plus exports, remain.
+At that increment close, Phase 6 was not complete. Production deployment is not complete, and the
+[ADR 0010](./adr/0010-production-provider-readiness.md) live Resend, AWS, and
+ClamAV proofs remain open.
+`make backend-check`: Ruff passed; format 321 files; mypy 205 source files;
+migration drift none. Non-PostgreSQL: 340 passed, 301 deselected. PostgreSQL:
+301 passed, 340 deselected, 391.23s. Targeted dashboard and two-gym tests also
+passed. Node 24.20.0 web format, lint, typecheck, and build passed. Vitest 62
+files / 330 tests. A fresh `spectacular --validate --fail-on-warn` export
+byte-matched `contracts/openapi.v1.json`; the regenerated TypeScript hash
+stayed unchanged. A clean full `make e2e` passed 17 tests in 5.8m, including
+the owner dashboard BFF and server-total test.
+
+Phase 6 Increment 2 is gate-clean as of 2026-10-19. It publishes
+`GET /api/v1/reports/daily/?date=YYYY-MM-DD` and
+`GET /api/v1/reports/monthly/?year=YYYY&month=M`, and the tenant `/reports`
+page and navigation. Both require `reports.financial` and the `reports`
+entitlement. `reports.view` alone is denied. Trainer finance closure remains.
+The response includes gym display identity, timezone, currency, the normalized
+range, `generated_at`, and a read-only source-status policy. Daily returns one
+row. Monthly zero-fills every gym-local calendar date. Rows include operational
+counts, six revenue buckets including `CLASS`, product quantity, COGS, and
+gross profit, total expenses, and net profit. Totals include range-distinct
+attendees, staff-salary and PT-commission subtotals, and the ten protected
+expense categories. Dates stay inside the supported reporting window. A one-day
+report and a 31-day report each run 10 selector queries. There are no
+migrations, report tables, caches, Redis, or Celery. Tests cover backend
+security and unit checks, web component and route checks, and
+`web/e2e/phase6.spec.ts`. Cash-book, profit/loss, membership/expiry,
+occupancy/check-in, PT/class, product/stock/inventory, and trainer-scoped
+dashboards and reports, plus exports, remain. At that increment close, Phase 6 was not complete.
+Production deployment is not complete, and the
+[ADR 0010](./adr/0010-production-provider-readiness.md) live Resend, AWS, and
+ClamAV proofs remain open. `make backend-check`: Ruff and format passed; mypy
+206 source files; migration drift none. Non-PostgreSQL: 344 passed, 303
+deselected. Final serial PostgreSQL: 303 passed, 344 deselected, 388.23s.
+There was no transient failure; a clock-dependent Phase 5 fixture was fixed by
+setting a deterministic non-overlapping future PT slot. Node 24.20.0 web
+format, lint, typecheck, and build passed. Vitest 65 files / 336 tests. A fresh
+validated OpenAPI export and generated TypeScript are stable (SHA-256 contract
+`99f0df02137a4fc0276196d3b80fceb5f35b450ea4dc4426ad5b73dff79c6198`, types
+`aabcd406a897bc45dc233be80634904674b1ea4d8aebdf5107c23b8a171bc009`). A clean
+full `make e2e` passed 18 tests in 6.6m. IDE lints and `git diff --check` were
+clean.
+
+Phase 6 Increment 3 is gate-clean as of 2026-10-19. It publishes
+`GET /api/v1/reports/cash-book/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
+and `GET /api/v1/reports/profit-loss/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
+on the tenant `/reports` page. Both require `reports.financial` and the
+`reports` entitlement. Trainer finance closure remains. Ranges are ordered,
+inclusive, and 1 through 366 days inside the supported window. Cash book is
+gym-wide, groups sessions and append-only transactions by business date, keeps
+amounts positive, and counts void sessions separately. Actual closing and
+difference sum terminal snapshots. Profit/loss reuses the Increment 2
+correction-date formulas, including six revenue buckets and net profit as total
+revenue minus total expenses. Cash book uses 2 queries and profit/loss uses 6,
+for 1 or 366 days. There are no migrations, report tables, caches, Redis, or
+Celery. Membership/expiry, occupancy/check-in, PT/class, product/stock/inventory,
+and trainer-scoped dashboards and reports, plus exports, remain. Phase 6 is not
+complete. Production deployment is not complete, and the
+[ADR 0010](./adr/0010-production-provider-readiness.md) live Resend, AWS, and
+ClamAV proofs remain open. `make backend-check`: Ruff passed; format 326 files;
+mypy 206 source files; migration drift none. Non-PostgreSQL: 348 passed, 306
+deselected, 43.70s. Final serial PostgreSQL: 306 passed, 348 deselected,
+398.29s. Targeted range reports and Increment 2 reports: 5 passed. Unit and
+OpenAPI targeted tests: 33 passed. Node 24.20.0 web format, lint, typecheck,
+and build passed. Vitest 65 files / 337 tests. Focused report tests: 7 passed.
+A fresh validated OpenAPI export and generated TypeScript are stable (SHA-256
+contract `4aa85c7a2f02e3dd14393f3fed7ffea1994b0a146de944f591a014dd4ef5d56e`,
+types `a573b85d4df74315cb1214497d67e9fb730fdbccb2574aca768aaa52ba7e2990`).
+Focused Phase 6 Playwright passed 2 tests after the daily Date label was made
+exact. A clean full `make e2e` passed 18 tests in 6.5m. IDE lints and
+`git diff --check` were clean.
+
+Phase 6 Increment 4 is gate-clean as of 2026-10-20. It publishes
+`GET /api/v1/reports/membership-expiry/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
+and `GET /api/v1/reports/check-ins/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
+on the tenant `/reports` page. Both require `reports.view` and the `reports`
+entitlement. They do not require `reports.financial` and do not expose money.
+Trainer-only callers stay closed. Ranges are strict, ordered, and inclusive,
+from 1 through 366 days. Membership expiry counts current ACTIVE, SUSPENDED,
+and EXPIRED rows by expiry date. Pending and cancelled rows are excluded.
+Range unique members are distinct across the range. Check-ins use gym-local
+windows, method counts, check-outs, open visits from that local check-in date,
+and a range-independent currently checked-in total. Membership expiry uses 2
+queries and check-ins use 4, for 1 or 366 days. There are no migrations,
+report tables, caches, Redis, or Celery. PT/class, product/stock/inventory,
+and trainer-scoped dashboards and reports, plus exports, remain. Phase 6 is
+not complete. Production deployment is not complete, and the
+[ADR 0010](./adr/0010-production-provider-readiness.md) live Resend, AWS, and
+ClamAV proofs remain open. `make backend-check`: Ruff passed; format 327 files;
+mypy 206 source files; migration drift none. Targeted unit and OpenAPI tests:
+35 passed. Targeted PostgreSQL reports: 7 passed. Non-PostgreSQL: 350 passed,
+308 deselected, 43.04s. Final serial PostgreSQL: 308 passed, 350 deselected,
+394.57s. Node 24.20.0 web format, lint, typecheck, and build passed. Vitest 65
+files / 338 tests. A fresh validated OpenAPI export and generated TypeScript
+are stable (SHA-256 contract
+`16b01111ab2378fb9fbe7a94851c886045e1c9977fe458622e4cc73087c647fb`, types
+`1a879ca9cb961b9aaec1fd06340dd13f69f1cf63da63170e4fc659ca3f469c2d`). Focused
+Phase 6 Playwright passed 2 tests in 1.0m after fixing only the
+accessibility-aware test assertion. A clean full `make e2e` passed 18 tests in
+6.6m. IDE lints and `git diff --check` were clean.
+
+Phase 6 Increment 5 is gate-clean as of 2026-10-20. It publishes
+`GET /api/v1/reports/pt-sessions/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
+and `GET /api/v1/reports/classes/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
+on the tenant `/reports` page. Both require `reports.view`, the `reports`
+entitlement, and trainer finance closure. They do not require
+`reports.financial` or the `pt` entitlement, and they do not expose money or
+member or staff PII. They are gym-wide operational reports. Ranges reuse the
+strict ordered inclusive 1 through 366 day query. PT sessions group the current
+`PTBooking` status by the gym-local `starts_at` date. Booked, attended,
+no-show, and cancelled are mutually exhaustive, and metered and unmetered
+include every status. Range unique members and unique trainers are each
+distinct across the range. That selector uses 2 queries for 1 or 366 days.
+Class rows use `ClassOccurrence.local_date` and the current occurrence and
+booking status. Available capacity sums scheduled and completed occurrence
+capacity. Reserved slots exclude cancelled bookings. Remaining capacity is
+available minus reserved, clamped at zero, and totals sum those daily values.
+Range unique members are distinct across bookings, and unique trainers are
+distinct across occurrences. That selector uses 4 queries for 1 or 366 days.
+There are no migrations, report tables, caches, Redis, or Celery. Product,
+stock, and inventory reports, trainer-scoped dashboards and reports, and
+exports remain. At that increment close, Phase 6 was not complete. Production deployment is not complete,
+and the
+[ADR 0010](./adr/0010-production-provider-readiness.md) live Resend, AWS, and
+ClamAV proofs remain open. `make backend-check`: Ruff passed; format 328 files;
+mypy 206 source files; migration drift none. Targeted unit and OpenAPI tests:
+37 passed. Targeted PostgreSQL reports: 10 passed. Non-PostgreSQL: 352 passed,
+311 deselected, 42.24s. Final serial PostgreSQL: 311 passed, 352 deselected,
+384.05s. Node 24.20.0 web format, lint, typecheck, and build passed. Vitest 65
+files / 338 tests. A fresh validated OpenAPI export and generated TypeScript
+are stable (SHA-256 contract
+`9a6cbf3e812ee98509bce6de706cedc9ee4905198493f5b3225572d2a34acf1c`, types
+`dbb6a4eff4eb5b9705ad04ddf98b1df0e98d44034dd54cce109dc5728b4a6606`). A clean
+full `make e2e` passed 18 tests in 5.9m. IDE lints and `git diff --check`
+were clean.
+
+Phase 6 Increment 6 is gate-clean as of 2026-10-20. It publishes
+`GET /api/v1/reports/product-sales/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`,
+`GET /api/v1/reports/stock-movements/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`,
+and `GET /api/v1/reports/inventory/` on the tenant `/reports` page. Product
+sales requires `reports.financial`, includes currency, and pages the same-gym
+catalog, including archived and zero-activity products. Posted and void sale
+lines add on the sale business date, a full void subtracts on the void
+business date, and a partial return subtracts on the return business date.
+COGS, revenue, and gross profit use the immutable line snapshots. That
+selector uses 8 queries. Stock movements and inventory require `reports.view`
+and do not include money. Stock movements zero-fill every date, keep the
+stored signed quantity, and use 1 grouped query. Inventory pages the current
+catalog and sums current same-gym movements in 3 queries. A product is low
+stock when that sum is less than or equal to its threshold. Optional `limit`
+defaults to 25 and stops at 100. `after` is an opaque signed cursor, valid for
+24 hours, ordered by `sku ASC, id ASC`, and bound to the gym, actor, route,
+filters, and limit. These routes do not require the finance or inventory
+source entitlements. Trainer-only callers stay closed. There are no
+migrations, report tables, caches, Redis, or Celery. Trainer-scoped dashboards
+and reports, and exports, remain. At that increment close, Phase 6 was not complete. Production
+deployment is not complete. `make backend-check`: Ruff passed; format 330
+files; mypy 206 source files; migration drift none. Targeted unit and OpenAPI
+tests: 40 passed in 4.30s. Targeted PostgreSQL reports: 14 passed in 38.07s.
+Non-PostgreSQL: 355 passed, 315 deselected, 43.13s. Final serial PostgreSQL:
+315 passed, 355 deselected, 394.18s. Web format, lint, typecheck, and build
+passed. A full web rerun passed 65 files / 338 tests in 8.40s. An earlier web
+run had transient unrelated UI timing and contention failures; the rerun was
+clean. OpenAPI and generated type hashes were stable before and after
+generation. A clean full `make e2e` passed 18 tests in 6.2m. `git diff
+--check` and IDE lints had passed before the final gates.
+
+Phase 6 Increment 7 is independently verified and gate-clean as of 2026-10-20.
+It publishes `GET /api/v1/trainer/dashboard/` and
+`GET /api/v1/trainer/reports/sessions/`, and the tenant `/pt/dashboard` page.
+Both routes require a protected TRAINER caller, `reports.view`, and the
+`reports` and `pt` entitlements. They are own-profile only and include no
+money. Dashboard presets and a custom range of at most 366 inclusive days
+return `generated_at`, `trainer_staff_profile_id`, `active_assigned_members`,
+session counts, and at most 10 `upcoming_bookings`. The session report is the
+caller's own profile, zero-filled by day, for PT statuses. The dashboard
+selector uses 3 queries and the session-report selector uses 2. After
+authorization, the dashboard handler uses 4 queries and the session handler
+uses 2. Report exports remain unpublished. At that increment close, Phase 6 was not complete. Production
+deployment is not complete. Independent parent-run evidence: `make
+backend-check` Ruff passed, format 331 files, mypy 207 source files, no
+migration drift. Targeted unit and OpenAPI tests: 41 passed in 5.07s. Targeted
+trainer-report PostgreSQL: 1 passed in 16.56s after a fixture entitlement fix.
+Non-PostgreSQL: 356 passed, 316 deselected, 43.39s. Final serial PostgreSQL:
+316 passed, 356 deselected, 406.34s. Full web tests: 69 files / 352 tests.
+OpenAPI hashes stayed stable (SHA-256 contract
+`6ca490caec0d993a64154637ba8134fdb32f3f91c16179fd2504a4354c6bdb66`, types
+`6bc8301ac01dbb1a2e920baa6a3efd3a2edcc28297529e5482539f79ef3fece8`). A full
+`make e2e` passed 18 tests in 6.6m.
+
+Phase 6 Increment 8 is independently verified and gate-clean as of 2026-10-20. It
+publishes an immediate CSV download at `GET /api/v1/reports/{kind}/export/`
+for daily, monthly, cash-book, profit-loss, product-sales, membership-expiry,
+check-ins, pt-sessions, classes, stock-movements, and inventory. It does not
+publish `POST /api/v1/reports/exports/` or `GET /api/v1/reports/exports/{id}/`.
+There are no export jobs, stored export rows, migrations, caches, Redis, or
+Celery. Every export requires staff auth, `reports.export`, and the active
+`reports` entitlement. Daily, monthly, cash-book, profit-loss, and
+product-sales also require `reports.financial`. The other six require
+`reports.view`. Trainer-only memberships stay 404 even with `reports.export`.
+Trainer dashboard and session reports are not exportable. Query parameters
+match the JSON report. Product-sales and inventory exports reject `after` and
+`limit` and return the whole current filter or catalog. Date bounds stay 1
+through 366 inclusive days. Inventory has no date range. The CSV is
+`text/csv; charset=utf-8`, an attachment, `nosniff`, and `no-store, private`.
+The filename is `{kind}-{gym_code}-{from}-{to}.csv`, or
+`{kind}-{gym_code}.csv` for inventory. Cells that start with `=`, `+`, `-`,
+or `@` gain one leading single quote. Selector query counts stay 10, 2, 6, 2,
+4, 2, 4, 8, 1, and 3 for daily/monthly, cash-book, profit/loss,
+membership-expiry, check-ins, PT sessions, classes, product-sales,
+stock-movements, and inventory. Product-sales and inventory exports use one
+gym-bounded catalog read plus the existing aggregates. The tenant `/reports`
+page shows Export CSV only to a caller with `reports.export`, for the report
+that is loaded, through a BFF document GET. Phase 6 implementation is complete
+and its local CI-equivalent gate is closed. `make backend-check` passed Ruff,
+format for 335 files, mypy for 209 source files, and no migration drift. Targeted
+unit/OpenAPI tests passed 36 tests in 4.97s; targeted PostgreSQL export tests
+passed 2 tests in 14.69s. Non-PostgreSQL passed 358 tests with 318 deselected
+in 45.60s. The final serial PostgreSQL rerun passed 318 tests with 358
+deselected in 427.21s; an earlier run's two unrelated access-token clock
+failures passed in isolation before that clean rerun. Web format, lint,
+typecheck, build, and 70 Vitest files / 355 tests passed. OpenAPI and generated
+types were stable (SHA-256 contract
+`d8c15d388379fb69232ba04e2e376cbae0f835d1c9ac4158fd41e19002365ab8`,
+types `03eed6bfbc981e43837bf3f4ed4a7559e152474a653c61ef46728d9364671343`).
+The final full E2E rerun passed 18 tests in 6.2m. `git diff --check` was clean.
+Production deployment is not complete, and the
+[ADR 0010](./adr/0010-production-provider-readiness.md) live Resend, AWS, and
+ClamAV proofs remain open.
 
 The 2026-10-17 closure is local CI-equivalent gate evidence. CI still enforces these check classes on push and pull request.
 
@@ -344,16 +650,16 @@ The seven documents together with accepted ADRs must define and cross-reference 
 
 ### Scope
 
-- Implement `TrainerAssignment`, trainer views, assignment lifecycle, and assigned-member restrictions.
-- Implement `ServicePackage`, `MemberServicePackage`, append-only `ServiceSessionLedger`, `PTBooking`, `ClassType`, `ClassSchedule`, `ClassOccurrence`, and `ClassBooking`; expose gym-local trainer/class calendars and authoritative granted/used/remaining session counts.
-- Enforce trainer/member/location conflict prevention, class capacity, eligible package/balance checks, attendance/no-show consumption, cancellation policy, and reversal-based corrections under concurrency.
-- Implement PT-sale draft/submission with approval by a different Manager or Owner and optional atomic payment/receipt/cash effects through Phase 4 services.
-- Implement `PTCommission` accrual, exact trainer/gym split, partial/full payout, linked expense/cash effects, outstanding balance, reversal, and trainer-own views.
-- Deliver staff and trainer web workflows; do not duplicate finance posting logic.
+- Implement `TrainerAssignment`, trainer views, assignment lifecycle, and assigned-member restrictions. Full Phase 5 code scope is backend, staff and trainer web, browser E2E, and assignment-scoped trainer QR. Linked-member self-service stays Phase 7. The existing `pt` entitlement gates class routes as well as PT routes. RBAC stays separate.
+- Implement `ServicePackage`, `MemberServicePackage`, append-only `ServiceSessionLedger`, `PTBooking`, `ClassType`, `ClassSchedule`, `ClassOccurrence`, and `ClassBooking`; expose gym-local trainer/class calendars and authoritative granted/used/remaining session counts. A draft PT sale may name an active same-gym PT package. Approval then creates one grant and one `GRANT` ledger row. `POST /api/v1/member-service-packages/` is an audited manager or owner grant with exact `pt.sessions.adjust` and creates no payment. Ledger adjust appends only a `CORRECTION` that reverses one eligible entry and keeps the balance inside `0..granted_sessions`.
+- Enforce trainer/member/location conflict prevention, class capacity, eligible package/balance checks, attendance/no-show consumption, cancellation policy, and reversal-based corrections under concurrency. Weekly schedules store weekdays, gym-local start and end, a timezone snapshot, exclusive location, and a range of at most 366 days and 400 occurrences. Patch regenerates only future unbooked occurrences. PT no-show consumes one session. Class no-show follows `class_no_show_consumes_session`. An omitted package is allowed only as an unmetered booking by a protected manager or owner with a reason.
+- Implement PT-sale draft/submission with approval by a different Manager or Owner and optional atomic payment/receipt/cash effects through Phase 4 services. Void requires a reason, business date, a cash session when the payment is cash, and an explicit destination session for every posted cash payout. The command reverses payouts, then payment, receipt, and cash, then appends a package `REFUND` only while the full grant is unconsumed.
+- Implement `PTCommission` accrual, exact trainer/gym split, partial/full payout through immutable `PTCommissionPayment` children, linked expense/cash effects, outstanding balance, and trainer-own views. Increment 4's nullable `commission_expense_id` and `reversal_commission_id` are dropped by a later migration after a null check. Public manual expense correction stays blocked. Sale void is the only payout reversal.
+- Deliver the specified staff and trainer pages and the trainer scan route `POST /api/v1/trainer/check-ins/scan/`. Do not publish `POST /api/v1/check-ins/scan/`. Do not duplicate finance posting logic.
 
 ### Migrations and data
 
-- Add assignment, service-package/balance-ledger, PT/class scheduling/booking, PT sale, and commission models with snapshots, capacity/balance constraints, exclusions, exact checks, same-gym composite FKs, tenant-leading indexes, forced RLS, immutable states, and restricted grants.
+- Add assignment, service-package/balance-ledger, PT/class scheduling/booking, PT sale, and commission models with snapshots, capacity/balance constraints, exclusions, exact checks, same-gym composite FKs, tenant-leading indexes, forced RLS, immutable states, and restricted grants. A forward migration adds `PTCommissionPayment` and drops unused Increment 4 `commission_expense_id` and `reversal_commission_id` after proving those columns are null. Applied Increment 4 migrations stay unchanged.
 - Existing trainer data migration requires explicit staff-profile mapping and reconciliation of all opening commission balances.
 
 ### Required tests

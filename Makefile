@@ -1,4 +1,4 @@
-.PHONY: check-python check-node db-up db-down db-logs migrate backend-install backend-check backend-test backend-test-pg web-install web-check web-test e2e openapi-export openapi-generate openapi-check check
+.PHONY: check-python check-node db-up db-down db-logs migrate backend-install backend-check backend-test backend-test-pg web-install web-check web-test mobile-install mobile-check mobile-test mobile-android mobile-ios e2e openapi-export openapi-generate openapi-check check
 
 ifneq ($(wildcard .env),)
 include .env
@@ -64,6 +64,35 @@ web-check: check-node
 web-test: check-node
 	npm --prefix web test -- --run
 
+mobile-install: check-node
+	npm --prefix mobile ci
+
+mobile-check: check-node
+	npm --prefix mobile run format:check
+	npm --prefix mobile run lint
+	npm --prefix mobile run typecheck
+
+mobile-test: check-node
+	npm --prefix mobile test -- --runInBand
+	npm --prefix mobile run test:e2e
+
+mobile-android: check-node
+	cd mobile/android && ./gradlew assembleDebug
+
+mobile-ios: check-node
+	cd mobile && bundle install
+	cd mobile/ios && bundle exec pod install
+	cd mobile/ios && xcodebuild \
+		-workspace GymMember.xcworkspace \
+		-scheme GymMember \
+		-configuration Debug \
+		-sdk iphonesimulator \
+		-destination 'generic/platform=iOS Simulator' \
+		ARCHS=arm64 \
+		ONLY_ACTIVE_ARCH=YES \
+		CODE_SIGNING_ALLOWED=NO \
+		build
+
 e2e: check-node check-python
 	bash scripts/e2e.sh
 
@@ -71,13 +100,14 @@ openapi-export: check-python
 	cd backend && .venv/bin/python manage.py spectacular \
 		--file ../contracts/openapi.v1.json \
 		--format openapi-json \
-		--validate
+		--validate \
+		--fail-on-warn
 
 openapi-generate: openapi-export check-node
 	npm --prefix contracts/generator ci
 	npm --prefix contracts/generator run generate
 
 openapi-check: openapi-generate
-	git diff --exit-code -- contracts/openapi.v1.json web/src/types/api.generated.ts
+	git diff --exit-code -- contracts/openapi.v1.json web/src/types/api.generated.ts mobile/src/types/api.generated.ts
 
-check: backend-check backend-test web-check web-test openapi-check
+check: backend-check backend-test web-check web-test mobile-check mobile-test openapi-check

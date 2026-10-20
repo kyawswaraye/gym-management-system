@@ -9,6 +9,10 @@ RESEND_BACKEND = "apps.common.mail.resend.EmailBackend"
 PRODUCTION_SCHEDULER_COMMANDS = (
     "schedule_membership_expiry_emails",
     "deliver_membership_expiry_emails",
+    "schedule_membership_expiry_pushes",
+    "deliver_push_notifications",
+    "publish_scheduled_announcements",
+    "expire_announcements",
 )
 AWS_PRODUCTION_REGION = "ap-southeast-1"
 
@@ -57,9 +61,37 @@ def require_reset_ttl_seconds(ttl_seconds: int) -> None:
         raise ImproperlyConfigured("Password reset tokens must expire after 30 minutes")
 
 
+def require_push_backend(
+    *,
+    backend: str,
+    project_id: str,
+    service_account_json: str,
+    encryption_key: str,
+    fingerprint_pepper: str,
+    other_secrets: Mapping[str, str],
+) -> None:
+    if backend != "fcm":
+        raise ImproperlyConfigured("Production push must use the FCM HTTP v1 backend")
+    if not project_id or project_id == "unsafe-local-only":
+        raise ImproperlyConfigured("FCM_PROJECT_ID is required")
+    if not service_account_json or service_account_json == "unsafe-local-only":
+        raise ImproperlyConfigured("FCM_SERVICE_ACCOUNT_JSON is required")
+    if not encryption_key or encryption_key == "unsafe-local-only" or len(encryption_key) < 16:
+        raise ImproperlyConfigured("PUSH_TOKEN_ENCRYPTION_KEY is required")
+    if (
+        not fingerprint_pepper
+        or fingerprint_pepper == "unsafe-local-only"
+        or len(fingerprint_pepper) < 16
+    ):
+        raise ImproperlyConfigured("PUSH_TOKEN_FINGERPRINT_PEPPER is required")
+    values = [encryption_key, fingerprint_pepper, *other_secrets.values()]
+    if len(set(values)) != len(values):
+        raise ImproperlyConfigured("Push token secrets must be dedicated")
+
+
 def require_scheduler_commands(commands: tuple[str, ...]) -> None:
     if commands != PRODUCTION_SCHEDULER_COMMANDS:
-        raise ImproperlyConfigured("Production scheduler commands must stay the documented pair")
+        raise ImproperlyConfigured("Production scheduler commands must stay the documented set")
 
 
 def require_https_endpoint(url: str, *, name: str) -> None:

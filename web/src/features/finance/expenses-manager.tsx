@@ -579,7 +579,10 @@ export function ExpensesManager({
                 !salaryCategory(selectedCategory) && (
                   <button
                     className="underline"
-                    onClick={() => setAction("void")}
+                    onClick={() => {
+                      setCorrectionDate(defaultDate);
+                      setAction("void");
+                    }}
                     type="button"
                   >
                     Void
@@ -644,9 +647,11 @@ export function ExpensesManager({
               >
                 {expense.payment_method === "CASH" ? (
                   <CashSessionSelect
+                    collectionError={sessions.error}
                     currency={expense.currency}
                     error={fields.cash_session_id}
                     label="Open cash session"
+                    pending={sessions.pending}
                     sessions={sessions.sessions}
                   />
                 ) : (
@@ -753,9 +758,11 @@ export function ExpensesManager({
                 </Field>
                 {expense.payment_method === "CASH" && (
                   <CashSessionSelect
+                    collectionError={sessions.error}
                     currency={expense.currency}
                     error={fields.cash_session_id}
                     label="Destination open session"
+                    pending={sessions.pending}
                     sessions={sessions.sessions}
                   />
                 )}

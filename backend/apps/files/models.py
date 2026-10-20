@@ -42,7 +42,8 @@ class FileAsset(TenantModel):
     )
     owner_type = models.CharField(max_length=64, null=True, blank=True)
     owner_id = models.UUIDField(null=True, blank=True)
-    uploaded_by_membership_id = models.UUIDField()
+    uploaded_by_membership_id = models.UUIDField(null=True, blank=True)
+    uploaded_by_member_id = models.UUIDField(null=True, blank=True)
     upload_sha256 = models.CharField(max_length=64, null=True, blank=True)
     upload_byte_size = models.BigIntegerField(null=True, blank=True)
     upload_content_type = models.CharField(max_length=255, null=True, blank=True)
@@ -224,6 +225,19 @@ class FileAsset(TenantModel):
                 ),
                 name="fileasset_retention_deleted_ck",
             ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        uploaded_by_membership_id__isnull=False,
+                        uploaded_by_member_id__isnull=True,
+                    )
+                    | models.Q(
+                        uploaded_by_membership_id__isnull=True,
+                        uploaded_by_member_id__isnull=False,
+                    )
+                ),
+                name="fileasset_uploader_ck",
+            ),
         ]
         indexes = [
             models.Index(fields=["gym", "purpose"], name="fileasset_gym_purpose_idx"),
@@ -239,5 +253,9 @@ class FileAsset(TenantModel):
             models.Index(
                 fields=["gym", "uploaded_by_membership_id"],
                 name="fileasset_gym_uploader_idx",
+            ),
+            models.Index(
+                fields=["gym", "uploaded_by_member_id"],
+                name="fileasset_muploader_idx",
             ),
         ]

@@ -41,11 +41,11 @@ Staff issuance locks settings and then unbound challenges ordered by id. It does
 
 ## Security consequences
 
-A copied screen credential works until an owner rotates or revokes it. Rotation invalidates the old secret before the next request can use it. Revocation also kills the code on that screen. A failed authentication does not reveal whether the selector exists. The plaintext credential and the challenge payload stay out of audits, OpenAPI examples, errors, and logs. The selector may appear on the staff list because it is not secret. NFC and biometric ingestion is specified in [ADR 0008](0008-device-ingestion.md). No vendor-specific adapter is implemented, and no biometric template, raw capture, or vendor secret is stored. Trainer scan remains a Phase 5 assignment extension and is not implemented.
+A copied screen credential works until an owner rotates or revokes it. Rotation invalidates the old secret before the next request can use it. Revocation also kills the code on that screen. A failed authentication does not reveal whether the selector exists. The plaintext credential and the challenge payload stay out of audits, OpenAPI examples, errors, and logs. The selector may appear on the staff list because it is not secret. NFC and biometric ingestion is specified in [ADR 0008](0008-device-ingestion.md). No vendor-specific adapter is implemented, and no biometric template, raw capture, or vendor secret is stored. Trainer scan was later published at `POST /api/v1/trainer/check-ins/scan/`. This record does not define that route.
 
 ## Compatibility consequences
 
-`docs/DEVELOPMENT_PLAN.md` stays the historical baseline and is not edited. Phase 3 implementation is complete as of 2026-10-18. Trainer scan remains a Phase 5 assignment-scoped extension and is not implemented. [ADR 0004](0004-defer-check-in-scan.md) still forbids the generic staff scan route. [ADR 0006](0006-member-check-in-scan.md) still defines member redemption. No new permission code is added.
+`docs/DEVELOPMENT_PLAN.md` stays the historical baseline and is not edited. Phase 3 implementation is complete as of 2026-10-18. Trainer scan was later published at `POST /api/v1/trainer/check-ins/scan/`. This record does not define that route. [ADR 0004](0004-defer-check-in-scan.md) still forbids the generic staff scan route. [ADR 0006](0006-member-check-in-scan.md) still defines member redemption. No new permission code is added.
 
 ## Alternatives considered
 

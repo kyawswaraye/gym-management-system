@@ -1,5 +1,11 @@
 from django.urls import path
 
+from apps.files.member_views import (
+    MemberCompleteUploadView,
+    MemberDeleteUploadView,
+    MemberDownloadUrlView,
+    MemberUploadIntentView,
+)
 from apps.members.device_views import (
     DeviceCheckInChallengeView,
     DeviceCheckInIngestView,
@@ -10,6 +16,7 @@ from apps.members.device_views import (
     IntegrationDeviceRevokeView,
     IntegrationDeviceRotateView,
 )
+from apps.members.member_device_views import MemberDeviceDetailView, MemberDeviceListCreateView
 from apps.members.payment_views import (
     DailySalesView,
     PaymentApproveView,
@@ -25,13 +32,22 @@ from apps.members.payment_views import (
     ReceiptListView,
     ReceiptVoidView,
 )
-from apps.members.scan_views import MemberCheckInScanView
+from apps.members.scan_views import MemberCheckInScanView, TrainerCheckInScanView
+from apps.members.self_views import (
+    MemberCheckInsView,
+    MemberClassBookingView,
+    MemberDashboardView,
+    MemberMembershipView,
+    MemberMeView,
+    MemberPaymentsView,
+    MemberScheduleView,
+    MemberServicePackagesView,
+)
 from apps.members.views import (
     CheckInChallengeIssueView,
     CheckInCheckoutView,
     CheckInDetailView,
     CheckInListCreateView,
-    DashboardView,
     MemberArchiveView,
     MemberCheckInHistoryView,
     MemberDetailView,
@@ -48,6 +64,7 @@ from apps.members.views import (
     PlanDetailView,
     PlanListCreateView,
 )
+from apps.reports.views import DashboardView
 
 urlpatterns = [
     path("members/", MemberListCreateView.as_view(), name="member-list"),
@@ -80,6 +97,53 @@ urlpatterns = [
         "member/check-ins/scan/",
         MemberCheckInScanView.as_view(),
         name="member-check-in-scan",
+    ),
+    path("member/me/", MemberMeView.as_view(), name="member-me"),
+    path("member/dashboard/", MemberDashboardView.as_view(), name="member-dashboard"),
+    path("member/membership/", MemberMembershipView.as_view(), name="member-membership"),
+    path("member/payments/", MemberPaymentsView.as_view(), name="member-payments"),
+    path("member/check-ins/", MemberCheckInsView.as_view(), name="member-check-ins"),
+    path(
+        "member/service-packages/",
+        MemberServicePackagesView.as_view(),
+        name="member-service-packages",
+    ),
+    path("member/schedule/", MemberScheduleView.as_view(), name="member-schedule"),
+    path("member/devices/", MemberDeviceListCreateView.as_view(), name="member-device-list"),
+    path(
+        "member/devices/<uuid:id>/",
+        MemberDeviceDetailView.as_view(),
+        name="member-device-detail",
+    ),
+    path(
+        "member/class-bookings/",
+        MemberClassBookingView.as_view(),
+        name="member-class-bookings",
+    ),
+    path(
+        "member/files/upload-intents/",
+        MemberUploadIntentView.as_view(),
+        name="member-file-upload-intent",
+    ),
+    path(
+        "member/files/<uuid:id>/complete/",
+        MemberCompleteUploadView.as_view(),
+        name="member-file-complete",
+    ),
+    path(
+        "member/files/<uuid:id>/download-url/",
+        MemberDownloadUrlView.as_view(),
+        name="member-file-download-url",
+    ),
+    path(
+        "member/files/<uuid:id>/",
+        MemberDeleteUploadView.as_view(),
+        name="member-file-delete",
+    ),
+    path(
+        "trainer/check-ins/scan/",
+        TrainerCheckInScanView.as_view(),
+        name="trainer-check-in-scan",
     ),
     path(
         "check-in-display-devices/",

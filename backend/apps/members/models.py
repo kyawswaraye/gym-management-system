@@ -452,6 +452,13 @@ class Payment(TenantModel):
         blank=True,
         related_name="source_payments",
     )
+    pt_sale = models.ForeignKey(
+        "trainers.PTSale",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="linked_payments",
+    )
     legacy_unlinked_cash = models.BooleanField(default=False)
     created_with_reception_scope = models.BooleanField(default=False)
     submitted_with_reception_scope = models.BooleanField(default=False)
@@ -469,6 +476,11 @@ class Payment(TenantModel):
                 fields=["gym", "retail_sale"],
                 condition=models.Q(entry_type="CHARGE"),
                 name="payment_one_retail_sale_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["gym", "pt_sale"],
+                condition=models.Q(entry_type="CHARGE"),
+                name="payment_one_pt_sale_uniq",
             ),
         ]
         indexes = [
@@ -488,6 +500,7 @@ class Payment(TenantModel):
             ),
             models.Index(fields=["gym", "original_payment"], name="payment_gym_original_idx"),
             models.Index(fields=["gym", "retail_sale"], name="payment_gym_retail_sale_idx"),
+            models.Index(fields=["gym", "pt_sale"], name="payment_gym_pt_sale_idx"),
         ]
 
 
@@ -843,4 +856,137 @@ class CheckInDevice(TenantModel):
         ]
         indexes = [
             models.Index(fields=["gym", "status"], name="checkin_dev_status_idx"),
+        ]
+
+
+class MemberDevice(TenantModel):
+    """One installation of the member app, with an encrypted FCM token.
+
+    The raw token is never stored. ``token_ciphertext`` is a Fernet token and
+    ``token_fingerprint`` is an HMAC used only for uniqueness. Revocation clears
+    the ciphertext and keeps the fingerprint as security state.
+    """
+
+    class Platform(models.TextChoices):
+        ANDROID = "ANDROID"
+        IOS = "IOS"
+
+    class RevocationReason(models.TextChoices):
+        CLIENT_DELETED = "CLIENT_DELETED"
+        INVALID_TOKEN = "INVALID_TOKEN"
+        MEMBER_UNLINKED = "MEMBER_UNLINKED"
+        MEMBER_ARCHIVED = "MEMBER_ARCHIVED"
+        MEMBER_SUSPENDED = "MEMBER_SUSPENDED"
+        MEMBER_CANCELLED = "MEMBER_CANCELLED"
+        SESSION_REVOKED = "SESSION_REVOKED"
+        SUPERSEDED = "SUPERSEDED"
+
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.RESTRICT,
+        related_name="devices",
+    )
+    installation_id = models.UUIDField()
+    platform = models.CharField(max_length=8, choices=Platform)
+    token_ciphertext = models.TextField(null=True, blank=True)
+    token_fingerprint = models.CharField(max_length=64, null=True, blank=True)
+    push_consent = models.BooleanField()
+    app_version = models.CharField(max_length=32)
+    os_version = models.CharField(max_length=32)
+    device_name = models.CharField(max_length=64, null=True, blank=True)
+    last_seen_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revocation_reason = models.CharField(
+        max_length=32,
+        choices=RevocationReason,
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = "members_member_device"
+        constraints = [
+            models.UniqueConstraint(fields=["gym", "id"], name="member_device_gym_id_uniq"),
+            models.UniqueConstraint(
+                fields=["gym", "member", "installation_id"],
+                name="member_device_installation_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["token_fingerprint"],
+                condition=models.Q(revoked_at__isnull=True, token_fingerprint__isnull=False),
+                name="member_device_fingerprint_uniq",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(platform__in=["ANDROID", "IOS"]),
+                name="member_device_platform_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(revoked_at__isnull=True, revocation_reason__isnull=True)
+                    | models.Q(
+                        revoked_at__isnull=False,
+                        revocation_reason__in=[
+                            "CLIENT_DELETED",
+                            "INVALID_TOKEN",
+                            "MEMBER_UNLINKED",
+                            "MEMBER_ARCHIVED",
+                            "MEMBER_SUSPENDED",
+                            "MEMBER_CANCELLED",
+                            "SESSION_REVOKED",
+                            "SUPERSEDED",
+                        ],
+                        token_ciphertext__isnull=True,
+                    )
+                ),
+                name="member_device_revocation_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        push_consent=False,
+                        token_ciphertext__isnull=True,
+                        token_fingerprint__isnull=True,
+                    )
+                    | models.Q(
+                        push_consent=True,
+                        revoked_at__isnull=True,
+                        token_ciphertext__isnull=False,
+                        token_fingerprint__isnull=False,
+                    )
+                    | models.Q(
+                        push_consent=True,
+                        revoked_at__isnull=False,
+                        token_ciphertext__isnull=True,
+                    )
+                ),
+                name="member_device_consent_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(token_fingerprint__isnull=True)
+                    | models.Q(token_fingerprint__regex=r"^[0-9a-f]{64}$")
+                ),
+                name="member_device_fingerprint_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(app_version__regex=r"^[^[:cntrl:]]{1,32}$"),
+                name="member_device_app_version_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(os_version__regex=r"^[^[:cntrl:]]{1,32}$"),
+                name="member_device_os_version_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(device_name__isnull=True)
+                    | models.Q(device_name__regex=r"^[^[:cntrl:]]{1,64}$")
+                ),
+                name="member_device_name_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["gym", "member", "revoked_at", "last_seen_at"],
+                name="member_device_access_idx",
+            ),
         ]

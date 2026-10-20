@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CheckInsManager } from "@/features/operations/check-ins-manager";
 import {
   canOpenCheckIns,
+  canScanTrainerCheckIn,
   hasPermission,
   tenantHomePath,
 } from "@/lib/auth/authorization";
@@ -24,7 +25,9 @@ export default async function CheckInsPage() {
       </p>
       <CheckInsManager
         canCreate={hasPermission(session, "checkins.create")}
+        canScan={canScanTrainerCheckIn(session)}
         canUpdate={hasPermission(session, "checkins.update")}
+        membershipId={session.gym_membership?.id ?? ""}
         timeZone={session.gym?.timezone ?? "Asia/Yangon"}
       />
     </section>

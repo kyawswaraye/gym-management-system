@@ -1,8 +1,8 @@
 """Manual check-in commands and history reads.
 
-Staff QR issuance lives in ``challenge_services``. Member-self QR redemption
-lives in ``scan_services``. This module does not store a device id or source
-metadata.
+Staff QR issuance lives in ``challenge_services``. Member-self and trainer QR
+redemption live in ``scan_services``. This module does not store a device id
+or source metadata.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from apps.members.exceptions import (
 )
 from apps.members.models import CheckIn, Member, Membership
 from apps.tenants.exceptions import IdempotencyKeyReused
-from apps.tenants.models import Gym, GymMembership, GymMembershipRole, GymSettings
+from apps.tenants.models import Gym, GymMembership, GymSettings
 
 CHECK_IN_BACKDATE_LIMIT = timedelta(hours=24)
 CHECK_IN_CLOCK_SKEW = timedelta(seconds=60)
@@ -121,11 +121,25 @@ def page_check_ins(
     limit: int,
     after: str,
 ) -> tuple[list[CheckIn], dict[str, Any]]:
-    _deny_trainer_only(gym, actor)
-    if member_id is not None and not Member.objects.filter(gym=gym, id=member_id).exists():
-        raise Http404
+    from apps.trainers.selectors import (
+        gym_local_date,
+        require_assigned_member,
+        scope_to_assigned_members,
+    )
+
+    as_of = gym_local_date(gym)
+    if member_id is not None:
+        require_assigned_member(gym_id=gym.id, actor=actor, member_id=member_id, as_of=as_of)
+        if not Member.objects.filter(gym=gym, id=member_id).exists():
+            raise Http404
     scope = _list_scope(gym_id=gym.id, member_id=member_id, open_state=open_state, limit=limit)
-    queryset = _history_queryset(gym_id=gym.id, member_id=member_id, open_state=open_state)
+    queryset = scope_to_assigned_members(
+        _history_queryset(gym_id=gym.id, member_id=member_id, open_state=open_state),
+        gym_id=gym.id,
+        actor=actor,
+        as_of=as_of,
+        member_ref="member_id",
+    )
     return _page(queryset, after=after, limit=limit, scope=scope, salt=CHECK_IN_LIST_CURSOR_SALT)
 
 
@@ -137,7 +151,14 @@ def page_member_check_ins(
     limit: int,
     after: str,
 ) -> tuple[list[CheckIn], dict[str, Any]]:
-    _deny_trainer_only(gym, actor)
+    from apps.trainers.selectors import gym_local_date, require_assigned_member
+
+    require_assigned_member(
+        gym_id=gym.id,
+        actor=actor,
+        member_id=member_id,
+        as_of=gym_local_date(gym),
+    )
     if not Member.objects.filter(gym=gym, id=member_id).exists():
         raise Http404
     scope = _history_scope(gym_id=gym.id, member_id=member_id, limit=limit)
@@ -151,11 +172,38 @@ def page_member_check_ins(
     )
 
 
+def page_self_check_ins(
+    *,
+    gym: Gym,
+    member_id: UUID,
+    limit: int,
+    after: str,
+) -> tuple[list[CheckIn], dict[str, Any]]:
+    """Page the token member's check-ins without a staff assignment gate."""
+
+    scope = _history_scope(gym_id=gym.id, member_id=member_id, limit=limit)
+    queryset = _history_queryset(gym_id=gym.id, member_id=member_id, open_state="")
+    return _page(
+        queryset,
+        after=after,
+        limit=limit,
+        scope=scope,
+        salt=MEMBER_CHECK_IN_HISTORY_CURSOR_SALT,
+    )
+
+
 def get_check_in(*, gym: Gym, actor: GymMembership, check_in_id: UUID) -> CheckIn:
-    _deny_trainer_only(gym, actor)
+    from apps.trainers.selectors import gym_local_date, require_assigned_member
+
     check_in = CheckIn.objects.select_related("member").filter(gym=gym, id=check_in_id).first()
     if check_in is None:
         raise Http404
+    require_assigned_member(
+        gym_id=gym.id,
+        actor=actor,
+        member_id=check_in.member_id,
+        as_of=gym_local_date(gym),
+    )
     return check_in
 
 
@@ -172,7 +220,14 @@ def create_manual_check_in(
     ip_address: str | None,
     user_agent: str,
 ) -> CheckInWrite:
-    _deny_trainer_only(gym, actor)
+    from apps.trainers.selectors import gym_local_date, require_assigned_member
+
+    require_assigned_member(
+        gym_id=gym.id,
+        actor=actor,
+        member_id=member_id,
+        as_of=gym_local_date(gym),
+    )
     cleaned_note = _clean_note(note)
     now = timezone.now()
     if occurred_at is not None:
@@ -312,17 +367,15 @@ def _clean_note(note: str) -> str:
 
 
 def _deny_trainer_only(gym: Gym, actor: GymMembership) -> None:
-    """Deny a trainer-only membership until Phase 5 assignments exist."""
+    """Deny display, challenge, and check-out access for trainer-only staff.
 
-    keys = set(
-        GymMembershipRole.objects.filter(
-            gym=gym,
-            gym_membership=actor,
-            role__is_active=True,
-        ).values_list("role__key", flat=True)
-    )
-    if keys and keys <= {"TRAINER"}:
-        raise Http404
+    Assignment scope does not open those routes. Member, membership, check-in
+    history, and profile-photo routes use the effective assignment instead.
+    """
+
+    from apps.trainers.selectors import deny_trainer_only
+
+    deny_trainer_only(gym_id=gym.id, actor=actor)
 
 
 def _locked_member(gym: Gym, member_id: UUID) -> Member:

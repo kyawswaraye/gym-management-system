@@ -98,8 +98,13 @@ def canonical_request_hash(
     http_method: str,
     route: str,
     body: Mapping[str, object],
+    actor_member_id: uuid.UUID | None = None,
 ) -> str:
-    """Hash the gym, actor, method, canonical route, and validated body."""
+    """Hash the gym, actor, method, canonical route, and validated body.
+
+    Staff hashes omit ``actor_member_id`` so an existing key still replays.
+    A member class booking adds that id and leaves the membership actor null.
+    """
 
     _validate_scope(http_method=http_method, route=route, idempotency_key=None)
     document = {
@@ -109,6 +114,8 @@ def canonical_request_hash(
         "http_method": http_method,
         "route": route,
     }
+    if actor_member_id is not None:
+        document["actor_member_id"] = str(actor_member_id)
     encoded = json.dumps(
         document,
         sort_keys=True,
@@ -130,6 +137,7 @@ def run_idempotent(
     mutate: Callable[[], IdempotentResponse],
     created_by_membership_id: uuid.UUID | None = None,
     request: object | None = None,
+    actor_member_id: uuid.UUID | None = None,
 ) -> IdempotentResult:
     """Claim the key, run ``mutate``, and commit the outcome with its effects.
 
@@ -149,10 +157,13 @@ def run_idempotent(
 
     if connection.in_atomic_block:
         raise RuntimeError("An idempotent finance command must start its own transaction.")
+    if actor_membership_id is not None and actor_member_id is not None:
+        raise IdempotencyRequestInvalid()
     _validate_scope(http_method=http_method, route=route, idempotency_key=idempotency_key)
     request_hash = canonical_request_hash(
         gym_id=gym_id,
         actor_membership_id=actor_membership_id,
+        actor_member_id=actor_member_id,
         http_method=http_method,
         route=route,
         body=body,
@@ -161,6 +172,7 @@ def run_idempotent(
     claim = _claim(
         gym_id=gym_id,
         actor_membership_id=actor_membership_id,
+        actor_member_id=actor_member_id,
         created_by_membership_id=creator,
         http_method=http_method,
         route=route,
@@ -260,6 +272,7 @@ def _claim(
     *,
     gym_id: uuid.UUID,
     actor_membership_id: uuid.UUID | None,
+    actor_member_id: uuid.UUID | None,
     created_by_membership_id: uuid.UUID | None,
     http_method: str,
     route: str,
@@ -277,6 +290,7 @@ def _claim(
                 record = IdempotencyRecord.objects.create(
                     gym_id=gym_id,
                     actor_membership_id=actor_membership_id,
+                    actor_member_id=actor_member_id,
                     http_method=http_method,
                     route=route,
                     idempotency_key=idempotency_key,
@@ -300,6 +314,7 @@ def _claim(
             .filter(
                 gym_id=gym_id,
                 actor_membership_id=actor_membership_id,
+                actor_member_id=actor_member_id,
                 http_method=http_method,
                 route=route,
                 idempotency_key=idempotency_key,

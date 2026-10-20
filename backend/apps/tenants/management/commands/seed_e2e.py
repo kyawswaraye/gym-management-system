@@ -40,14 +40,17 @@ from apps.sales.models import RetailReturn, RetailReturnLine, RetailSale, Retail
 from apps.sales.services import approve_sale, create_sale, submit_sale
 from apps.tenants import staff_services
 from apps.tenants.e2e import (
+    BEA_EMAIL,
     E2E_DATABASE_NAME,
     GYM_CODE_PREFIX,
     MANAGER_EMAIL,
     MEMBER_EMAIL,
     OWNER_EMAIL,
     PLATFORM_EMAIL,
+    RECEPTION_EMAIL,
     SEEDED_GYM_CODE,
     SEEDED_GYM_NAME,
+    TRAINER_EMAIL,
     USER_EMAIL_PREFIX,
     USER_EMAIL_SUFFIX,
     assert_e2e_seed_allowed,
@@ -349,7 +352,7 @@ def _invitation_token() -> str:
     marker = "token="
     token = message.split(marker, 1)[1].split()[0]
     if not token:
-        raise CommandError("The E2E manager invitation did not include a token.")
+        raise CommandError("The E2E staff invitation did not include a token.")
     return token
 
 
@@ -377,22 +380,31 @@ def _migration_staff_invitation_bootstrap(token_hash: str) -> tuple[uuid.UUID, u
     return uuid.UUID(str(row[0])), uuid.UUID(str(row[1]))
 
 
-def _seed_manager(
+def _seed_staff(
     gym: Gym,
     owner: GymMembership,
     *,
+    role_key: str,
+    email: str,
+    first_name: str,
+    last_name: str,
+    staff_code: str,
+    display_name: str,
+    employment_title: str,
+    commission_percent: Decimal,
     password: str,
-    secret: str,
+    secret: str | None,
+    request_prefix: str,
 ) -> GymMembership:
-    """Invite and accept one protected Manager through the staff workflow."""
+    """Invite and accept one template role through the staff workflow."""
 
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         role = Role.objects.get(
             gym=gym,
-            key="MANAGER",
+            key=role_key,
             is_active=True,
-            source_template__key="MANAGER",
+            source_template__key=role_key,
         )
     EmailBackend()
     mail.outbox.clear()
@@ -401,17 +413,17 @@ def _seed_manager(
         actor=owner.user,
         actor_membership_id=owner.id,
         staff_data={
-            "email": MANAGER_EMAIL,
-            "first_name": "E2E",
-            "last_name": "Manager",
-            "staff_code": "E2EMGR",
-            "display_name": "E2E Manager",
+            "email": email,
+            "first_name": first_name,
+            "last_name": last_name,
+            "staff_code": staff_code,
+            "display_name": display_name,
             "joined_date": gym_today(gym),
-            "employment_title": "Manager",
-            "default_commission_percent": Decimal("0"),
+            "employment_title": employment_title,
+            "default_commission_percent": commission_percent,
         },
         role_ids=[role.id],
-        request_id="e2e-manager-invite",
+        request_id=f"{request_prefix}-invite",
         user_agent="e2e-seed",
     )
     original_bootstrap = staff_services._staff_invitation_bootstrap
@@ -420,14 +432,66 @@ def _seed_manager(
         membership = staff_services.accept_staff_invitation(
             plaintext_token=_invitation_token(),
             password=password,
-            confirmation={"display_name": "E2E Manager"},
-            request_id="e2e-manager-accept",
+            confirmation={"display_name": display_name},
+            request_id=f"{request_prefix}-accept",
             user_agent="e2e-seed",
         )
     finally:
         staff_services._staff_invitation_bootstrap = original_bootstrap
-    _enable_mfa(membership.user, password=password, secret=secret)
+    if secret is not None:
+        _enable_mfa(membership.user, password=password, secret=secret)
     return membership
+
+
+def _seed_member_record(
+    gym: Gym,
+    actor: GymMembership,
+    *,
+    first_name: str,
+    last_name: str,
+    plan_code: str,
+    plan_name: str,
+    with_membership: bool,
+) -> None:
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        member = create_member(
+            gym=gym,
+            actor=actor,
+            member_number="",
+            first_name=first_name,
+            last_name=last_name,
+            phone=None,
+            email=None,
+            gender=None,
+            date_of_birth=None,
+            address={},
+            join_date=gym_today(gym),
+            emergency_contact_name="",
+            emergency_contact_phone="",
+            notes="",
+            profile_photo_asset_id=None,
+        )
+        if not with_membership:
+            return
+        plan = create_plan(
+            gym=gym,
+            actor=actor,
+            code=plan_code,
+            name=plan_name,
+            description=plan_name,
+            duration_value=30,
+            duration_unit="DAY",
+            price=Decimal("0.00"),
+        )
+        create_membership(
+            gym=gym,
+            actor=actor,
+            member=member,
+            plan=plan,
+            start_date=gym_today(gym),
+            discount_amount=Decimal("0.00"),
+        )
 
 
 def _seed_posted_retail_sale(
@@ -532,6 +596,11 @@ def _seed_owner_gym(
     member_password: str,
     manager_password: str,
     manager_secret: str,
+    reception_password: str,
+    reception_secret: str,
+    trainer_password: str,
+    trainer_secret: str,
+    bea_password: str,
 ) -> None:
     result = provision_gym(
         code=SEEDED_GYM_CODE,
@@ -583,7 +652,7 @@ def _seed_owner_gym(
         settings.member_number_prefix = "MEM"
         settings.receipt_number_prefix = SEEDED_GYM_CODE
         settings.check_in_duplicate_window_seconds = 300
-        settings.check_in_challenge_ttl_seconds = 120
+        settings.check_in_challenge_ttl_seconds = 300
         settings.check_in_challenge_max_uses = 1
         settings.membership_expiry_warning_days = [0, 3, 7, 30]
         settings.membership_expiry_email_enabled = True
@@ -593,11 +662,83 @@ def _seed_owner_gym(
         settings.require_separate_finance_approval = True
         settings.save()
     _seed_linked_member(gym, result.owner_membership, member_password)
-    manager = _seed_manager(
+    _seed_member_record(
         gym,
         result.owner_membership,
+        first_name="E2Eassigned",
+        last_name="Member",
+        plan_code="E2EASSIGN",
+        plan_name="E2E Assigned Plan",
+        with_membership=True,
+    )
+    _seed_member_record(
+        gym,
+        result.owner_membership,
+        first_name="E2Eother",
+        last_name="Guest",
+        plan_code="",
+        plan_name="",
+        with_membership=False,
+    )
+    manager = _seed_staff(
+        gym,
+        result.owner_membership,
+        role_key="MANAGER",
+        email=MANAGER_EMAIL,
+        first_name="E2E",
+        last_name="Manager",
+        staff_code="E2EMGR",
+        display_name="E2E Manager",
+        employment_title="Manager",
+        commission_percent=Decimal("0"),
         password=manager_password,
         secret=manager_secret,
+        request_prefix="e2e-manager",
+    )
+    _seed_staff(
+        gym,
+        result.owner_membership,
+        role_key="RECEPTIONIST",
+        email=RECEPTION_EMAIL,
+        first_name="E2E",
+        last_name="Reception",
+        staff_code="E2EREC",
+        display_name="E2E Reception",
+        employment_title="Reception",
+        commission_percent=Decimal("0"),
+        password=reception_password,
+        secret=reception_secret,
+        request_prefix="e2e-reception",
+    )
+    _seed_staff(
+        gym,
+        result.owner_membership,
+        role_key="TRAINER",
+        email=TRAINER_EMAIL,
+        first_name="E2E",
+        last_name="Trainer",
+        staff_code="E2ETRN",
+        display_name="E2E Trainer",
+        employment_title="Trainer",
+        commission_percent=Decimal("10.00"),
+        password=trainer_password,
+        secret=trainer_secret,
+        request_prefix="e2e-trainer",
+    )
+    _seed_staff(
+        gym,
+        result.owner_membership,
+        role_key="TRAINER",
+        email=BEA_EMAIL,
+        first_name="E2E",
+        last_name="Bea",
+        staff_code="E2EBEA",
+        display_name="E2E Bea",
+        employment_title="Trainer",
+        commission_percent=Decimal("25.00"),
+        password=bea_password,
+        secret=None,
+        request_prefix="e2e-bea",
     )
     _seed_posted_retail_sale(gym, manager=manager, owner=result.owner_membership)
 
@@ -622,9 +763,14 @@ class Command(BaseCommand):
         owner_password = _env_secret("E2E_OWNER_PASSWORD", minimum=12)
         member_password = _env_secret("E2E_MEMBER_PASSWORD", minimum=12)
         manager_password = _env_secret("E2E_MANAGER_PASSWORD", minimum=12)
+        reception_password = _env_secret("E2E_RECEPTION_PASSWORD", minimum=12)
+        trainer_password = _env_secret("E2E_TRAINER_PASSWORD", minimum=12)
+        bea_password = _env_secret("E2E_BEA_PASSWORD", minimum=12)
         platform_secret = _totp_secret("E2E_PLATFORM_TOTP_SECRET")
         owner_secret = _totp_secret("E2E_OWNER_TOTP_SECRET")
         manager_secret = _totp_secret("E2E_MANAGER_TOTP_SECRET")
+        reception_secret = _totp_secret("E2E_RECEPTION_TOTP_SECRET")
+        trainer_secret = _totp_secret("E2E_TRAINER_TOTP_SECRET")
         removed = _purge_e2e_rows()
         _seed_platform_admin(platform_password, platform_secret)
         _seed_owner_gym(
@@ -633,6 +779,11 @@ class Command(BaseCommand):
             member_password,
             manager_password,
             manager_secret,
+            reception_password,
+            reception_secret,
+            trainer_password,
+            trainer_secret,
+            bea_password,
         )
         self.stdout.write(
             self.style.SUCCESS(

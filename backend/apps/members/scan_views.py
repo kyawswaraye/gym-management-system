@@ -5,21 +5,30 @@ from __future__ import annotations
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.api.responses import success_response
 from apps.common.api.schema import ErrorEnvelopeSerializer
-from apps.members.scan_services import redeem_member_check_in_challenge
+from apps.members.scan_services import (
+    redeem_member_check_in_challenge,
+    redeem_trainer_check_in_challenge,
+)
 from apps.members.serializers import (
     CheckInEnvelopeSerializer,
     CheckInSerializer,
     MemberCheckInScanSerializer,
+    TrainerCheckInScanSerializer,
 )
 from apps.users.authentication import MemberJWTAuthentication
-from apps.users.throttling import MemberCheckInScanThrottle
+from apps.users.permissions import RequiresEntitlements, RequiresPermission
+from apps.users.throttling import (
+    MemberCheckInScanThrottle,
+    TrainerCheckInScanIPThrottle,
+    TrainerCheckInScanThrottle,
+)
 
 
 def _request_id(request: Request) -> str:
@@ -58,6 +67,75 @@ class MemberCheckInScanView(APIView):
             gym=request.gym,
             member_id=request.member.id,
             user_id=request.user.pk,
+            payload=str(serializer.validated_data["payload"]),
+            request_id=_request_id(request),
+            ip_address=_client_address(request),
+            user_agent=str(request.META.get("HTTP_USER_AGENT", "")),
+        )
+        return success_response(
+            CheckInSerializer(check_in).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class RequiresProtectedTrainer(BasePermission):
+    """Allow only an active membership that holds the protected TRAINER role.
+
+    A custom role with a similar name does not qualify. Owner or manager on
+    the same membership does not replace this requirement.
+    """
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        from apps.trainers.selectors import holds_protected_role
+
+        membership = getattr(request, "gym_membership", None)
+        gym = getattr(request, "gym", None)
+        if membership is None or gym is None or membership.status != membership.Status.ACTIVE:
+            return False
+        return bool(
+            holds_protected_role(gym_id=gym.id, membership_id=membership.id, role_key="TRAINER")
+        )
+
+
+class TrainerCheckInScanView(APIView):
+    permission_classes = [
+        IsAuthenticated,
+        RequiresPermission,
+        RequiresEntitlements,
+        RequiresProtectedTrainer,
+    ]
+    throttle_classes = [TrainerCheckInScanThrottle, TrainerCheckInScanIPThrottle]
+    required_permission = "checkins.create"
+    required_features = ("members", "memberships")
+
+    @extend_schema(
+        operation_id="trainer_check_in_scan",
+        request=TrainerCheckInScanSerializer,
+        responses={
+            201: CheckInEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+            409: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request) -> Response:
+        if request.headers.get("Idempotency-Key"):
+            raise ValidationError(
+                {
+                    "Idempotency-Key": [
+                        "Idempotency-Key is not accepted for a trainer check-in scan."
+                    ]
+                }
+            )
+        serializer = TrainerCheckInScanSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        check_in = redeem_trainer_check_in_challenge(
+            gym=request.gym,
+            actor=request.gym_membership,
+            member_id=serializer.validated_data["member_id"],
             payload=str(serializer.validated_data["payload"]),
             request_id=_request_id(request),
             ip_address=_client_address(request),

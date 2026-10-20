@@ -298,7 +298,9 @@ def test_delivery_backfill_precedes_new_constraints() -> None:
     assert added_fields == ["last_error_code", "next_attempt_at"]
 
 
-def test_notification_http_routes_stay_unpublished() -> None:
+def test_staff_notification_routes_stay_unpublished() -> None:
+    """Staff notification HTTP stays closed. The member inbox is published."""
+
     paths: list[str] = []
 
     def walk(patterns: list[URLPattern | URLResolver], prefix: str = "") -> None:
@@ -307,7 +309,14 @@ def test_notification_http_routes_stay_unpublished() -> None:
             if isinstance(pattern, URLResolver):
                 walk(list(pattern.url_patterns), route)
             else:
-                paths.append(route)
+                paths.append(route.lstrip("/"))
 
     walk(list(get_resolver().url_patterns))
-    assert not any("notification" in path for path in paths)
+    assert not any(
+        path == "api/v1/notifications/" or path.startswith("api/v1/notifications/")
+        for path in paths
+    )
+    assert "api/v1/member/notifications/" in paths
+    assert any(
+        path.startswith("api/v1/member/notifications/") and path.endswith("read/") for path in paths
+    )

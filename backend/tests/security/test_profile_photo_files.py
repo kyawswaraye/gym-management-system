@@ -360,8 +360,7 @@ def test_profile_photo_complete_download_and_delete() -> None:
     trainer_delete = api.delete(f"/api/v1/files/{asset.id}/", **trainer_headers)
     assert trainer_complete.status_code == 404
     assert trainer_download.status_code == 404
-    assert trainer_delete.status_code == 403
-    assert trainer_delete.json()["error"]["code"] == "PERMISSION_DENIED"
+    assert trainer_delete.status_code == 404
     attached = api.patch(
         f"/api/v1/members/{member_id}/",
         {"profile_photo_asset_id": str(asset.id)},

@@ -6,6 +6,47 @@ import { financeError } from "@/features/finance/errors";
 import type { CollectionPage } from "@/features/operations/client";
 
 const PAGE_CAP = 20;
+export const LOOKUP_PAGE_LIMIT = "100";
+export const LOOKUP_PAGE_CAP = 20;
+
+export type LookupCollection<T> = {
+  items: T[];
+  bounded: boolean;
+  error: string;
+};
+
+export async function collectLookupPages<T extends { id: string }>(
+  load: (after?: string) => Promise<CollectionPage<T>>,
+): Promise<LookupCollection<T>> {
+  const items: T[] = [];
+  const seenIds = new Set<string>();
+  const seenCursors = new Set<string>();
+  let after: string | undefined;
+  for (let page = 0; page < LOOKUP_PAGE_CAP; page += 1) {
+    const result = await load(after);
+    for (const item of result.data) {
+      if (seenIds.has(item.id)) continue;
+      seenIds.add(item.id);
+      items.push(item);
+    }
+    const next = result.meta.next_after;
+    if (!result.meta.has_more) return { items, bounded: false, error: "" };
+    if (!next || seenCursors.has(next)) {
+      return {
+        items: [],
+        bounded: false,
+        error: "This page cursor repeated. Refine the filters.",
+      };
+    }
+    seenCursors.add(next);
+    after = next;
+  }
+  return {
+    items,
+    bounded: true,
+    error: "This list is larger than 2,000 rows. Refine the filters.",
+  };
+}
 
 export function useCursorPages<T>(
   filterKey: string,
@@ -59,6 +100,11 @@ export function useCursorPages<T>(
 
   async function goNext() {
     if (!hasMore || !nextAfter || index + 1 >= PAGE_CAP) return;
+    if (cursors.includes(nextAfter)) {
+      setHasMore(false);
+      setError("This page cursor repeated. Refine the filters.");
+      return;
+    }
     setPending(true);
     try {
       const page = await loadRef.current(nextAfter);

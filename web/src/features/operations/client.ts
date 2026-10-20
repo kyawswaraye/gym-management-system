@@ -877,6 +877,27 @@ export async function createCheckIn(input: {
   return (body as ApiEnvelope<CheckInRecord>).data;
 }
 
+export async function scanTrainerCheckIn(input: {
+  memberId: string;
+  payload: string;
+}): Promise<CheckInRecord> {
+  const memberId = assertResourceId(input.memberId, "Member");
+  if (input.payload.length === 0 || input.payload.length > 128) {
+    throw new OperationError("The check-in code is not valid.");
+  }
+  const csrf = await getCsrfToken();
+  const response = await fetch("/api/operations/trainer/check-ins/scan/", {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: mutationHeaders(csrf),
+    body: JSON.stringify({ member_id: memberId, payload: input.payload }),
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) throw readOperationError(body);
+  return (body as ApiEnvelope<CheckInRecord>).data;
+}
+
 export async function checkOutCheckIn(
   checkInId: string,
   occurredAt?: string,

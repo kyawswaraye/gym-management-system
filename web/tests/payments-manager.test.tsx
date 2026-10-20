@@ -58,6 +58,7 @@ function payment(overrides: Partial<Payment> = {}): Payment {
     id: PAYMENT_ID,
     member_id: null,
     membership_id: null,
+    pt_sale_id: null,
     original_payment_id: null,
     reversal_payment_id: null,
     entry_type: "CHARGE",

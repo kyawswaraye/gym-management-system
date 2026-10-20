@@ -5,11 +5,18 @@ import { LogoutButton } from "@/features/auth/logout-button";
 import {
   canIssueCheckInChallenge,
   canOpenCheckIns,
+  canOpenClasses,
   canOpenGymSettings,
+  canOpenPtCommissions,
+  canOpenPtSales,
+  canOpenPtSchedule,
+  canOpenPtTrainers,
+  canOpenTrainerDashboard,
   hasPermission,
   hasTenantCapability,
   platformHomePath,
   tenantHomePath,
+  trainerAssignmentRestricted,
 } from "@/lib/auth/authorization";
 import type { CurrentUser } from "@/types/api";
 
@@ -38,11 +45,13 @@ export function AppShell({
     "platform.subscriptions.manage",
   );
   const canViewPlatformAudit = hasPermission(session, "platform.audit.view");
-  const canViewDashboard = hasTenantCapability(
-    session,
-    "reports.view",
-    "reports",
-  );
+  const canViewDashboard =
+    hasTenantCapability(session, "reports.view", "reports") &&
+    !trainerAssignmentRestricted(session);
+  const canViewTrainerDashboard = canOpenTrainerDashboard(session);
+  const canViewReports =
+    hasTenantCapability(session, "reports.view", "reports") &&
+    !trainerAssignmentRestricted(session);
   const canViewMembers = hasTenantCapability(
     session,
     "members.view",
@@ -79,6 +88,11 @@ export function AppShell({
   const canViewRetail = hasTenantCapability(session, "retail.view", "finance");
   const canViewCheckIns = canOpenCheckIns(session);
   const canIssueChallenge = canIssueCheckInChallenge(session);
+  const canViewPtTrainers = canOpenPtTrainers(session);
+  const canViewPtSchedule = canOpenPtSchedule(session);
+  const canViewPtSales = canOpenPtSales(session);
+  const canViewPtCommissions = canOpenPtCommissions(session);
+  const canViewClasses = canOpenClasses(session);
   const canViewStaff = hasPermission(session, "staff.view");
   const canViewRoles = hasPermission(session, "roles.view");
   const canViewTenantAudit = hasPermission(session, "audit.view");
@@ -99,6 +113,22 @@ export function AppShell({
               href="/dashboard"
             >
               Dashboard
+            </Link>
+          )}
+          {!platform && canViewTrainerDashboard && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/pt/dashboard"
+            >
+              Trainer dashboard
+            </Link>
+          )}
+          {!platform && canViewReports && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/reports"
+            >
+              Reports
             </Link>
           )}
           {platform && canViewPlatformDashboard && (
@@ -163,6 +193,62 @@ export function AppShell({
               href="/check-ins/display"
             >
               Check-in QR
+            </Link>
+          )}
+          {!platform && canViewPtTrainers && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/pt/trainers"
+            >
+              Trainers
+            </Link>
+          )}
+          {!platform && canViewPtSchedule && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/pt/packages"
+            >
+              Packages
+            </Link>
+          )}
+          {!platform && canViewPtSchedule && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/pt/member-packages"
+            >
+              Member packages
+            </Link>
+          )}
+          {!platform && canViewPtSales && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/pt/sales"
+            >
+              PT sales
+            </Link>
+          )}
+          {!platform && canViewPtCommissions && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/pt/commissions"
+            >
+              Commissions
+            </Link>
+          )}
+          {!platform && canViewPtSchedule && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/pt/bookings"
+            >
+              PT bookings
+            </Link>
+          )}
+          {!platform && canViewClasses && (
+            <Link
+              className="rounded-md px-3 py-2 hover:bg-slate-800"
+              href="/classes"
+            >
+              Classes
             </Link>
           )}
           {!platform && canViewPayments && (

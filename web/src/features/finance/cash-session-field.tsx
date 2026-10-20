@@ -4,34 +4,66 @@ import { useEffect, useState } from "react";
 
 import { listCashSessions } from "@/features/finance/client";
 import { financeError } from "@/features/finance/errors";
+import {
+  collectLookupPages,
+  LOOKUP_PAGE_LIMIT,
+} from "@/features/finance/paging";
 import { Field, SelectInput } from "@/features/finance/ui";
 import type { CashSession } from "@/types/api";
 
 export function useOpenCashSessions(businessDate: string) {
   const [sessions, setSessions] = useState<CashSession[]>([]);
   const [error, setError] = useState("");
-  const [hasMore, setHasMore] = useState(false);
+  const [bounded, setBounded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadedFor, setLoadedFor] = useState("");
 
   useEffect(() => {
-    if (!businessDate) return undefined;
+    if (!businessDate) {
+      const timer = window.setTimeout(() => {
+        setSessions([]);
+        setError("");
+        setBounded(false);
+        setLoading(false);
+        setLoadedFor("");
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+    const requested = businessDate;
     let active = true;
     const timer = window.setTimeout(() => {
-      void listCashSessions({
-        status: "OPEN",
-        business_date: businessDate,
-        limit: "100",
+      setLoading(true);
+      void collectLookupPages((after) => {
+        if (!active) {
+          return Promise.resolve({
+            data: [],
+            meta: { has_more: false, next_after: null },
+          });
+        }
+        return listCashSessions({
+          status: "OPEN",
+          business_date: requested,
+          limit: LOOKUP_PAGE_LIMIT,
+          ...(after ? { after } : {}),
+        });
       })
-        .then((page) => {
+        .then((result) => {
           if (!active) return;
-          setSessions(page.data);
-          setHasMore(page.meta.has_more);
-          setError("");
+          const failed = Boolean(result.error);
+          setSessions(failed ? [] : result.items);
+          setBounded(result.bounded);
+          setError(result.error);
+          setLoadedFor(requested);
         })
         .catch((caught: unknown) => {
           if (!active) return;
           setSessions([]);
-          setHasMore(false);
+          setBounded(false);
           setError(financeError(caught, "Open sessions could not be loaded."));
+          setLoadedFor(requested);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
         });
     }, 0);
     return () => {
@@ -40,7 +72,14 @@ export function useOpenCashSessions(businessDate: string) {
     };
   }, [businessDate]);
 
-  return { sessions, error, hasMore };
+  const current = loadedFor === businessDate;
+  return {
+    sessions: current ? sessions : [],
+    error: current ? error : "",
+    bounded: current && bounded,
+    hasMore: current && bounded,
+    pending: businessDate !== "" && (!current || loading),
+  };
 }
 
 export function CashSessionSelect({
@@ -49,22 +88,40 @@ export function CashSessionSelect({
   label,
   name = "cash_session_id",
   error,
+  collectionError,
+  pending = false,
   required = true,
+  resetKey,
 }: {
   sessions: readonly CashSession[];
   currency: string;
   label: string;
   name?: string;
   error?: string | undefined;
+  collectionError?: string | undefined;
+  pending?: boolean;
   required?: boolean;
+  resetKey?: string;
 }) {
-  const matches = sessions.filter(
-    (session) => session.status === "OPEN" && session.currency === currency,
-  );
+  const matches = collectionError
+    ? []
+    : sessions.filter(
+        (session) => session.status === "OPEN" && session.currency === currency,
+      );
   return (
     <div className="grid gap-1">
+      {pending ? (
+        <p className="muted" role="status">
+          Loading open sessions.
+        </p>
+      ) : null}
+      {collectionError ? (
+        <p className="error" role="alert">
+          {collectionError}
+        </p>
+      ) : null}
       <Field error={error} label={label}>
-        <SelectInput name={name} required={required}>
+        <SelectInput key={resetKey} name={name} required={required}>
           <option value="">Select an open session</option>
           {matches.map((session) => (
             <option key={session.id} value={session.id}>

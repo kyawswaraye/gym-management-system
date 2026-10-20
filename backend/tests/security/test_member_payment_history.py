@@ -75,9 +75,9 @@ OLDER_ID = UUID("22222222-2222-4222-8222-222222222222")
 def _restore_trial_features() -> None:
     """Reapply the trial-plan features after a transactional flush.
 
-    ``ensure_authorization_catalog`` restores only the members feature. A prior
-    PostgreSQL test flushes migration-seeded plan rows, so finance must be
-    present before this history read is provisioned.
+    ``ensure_authorization_catalog`` restores the members and personal-training
+    features. A prior PostgreSQL test flushes migration-seeded plan rows, so
+    finance must be present before this history read is provisioned.
     """
 
     seed = importlib.import_module(

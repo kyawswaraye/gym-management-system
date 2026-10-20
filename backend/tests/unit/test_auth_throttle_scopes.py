@@ -16,16 +16,22 @@ from apps.users.throttling import (
     DeviceIngestIPThrottle,
     DeviceIngestSelectorThrottle,
     MemberCheckInScanThrottle,
+    MemberFileDownloadThrottle,
+    MemberFileWriteThrottle,
     MemberLoginIPThrottle,
     MemberLoginThrottle,
     MemberLogoutIPThrottle,
     MemberLogoutTokenThrottle,
     MemberRefreshIPThrottle,
     MemberRefreshTokenThrottle,
+    MemberSelfReadThrottle,
+    MemberSelfWriteThrottle,
     PasswordForgotIPThrottle,
     PasswordForgotThrottle,
     PasswordResetIPThrottle,
     PasswordResetThrottle,
+    TrainerCheckInScanIPThrottle,
+    TrainerCheckInScanThrottle,
 )
 
 _BOUNDARY_THROTTLES = (
@@ -34,16 +40,21 @@ _BOUNDARY_THROTTLES = (
     DeviceIngestIPThrottle,
     DeviceIngestSelectorThrottle,
     MemberCheckInScanThrottle,
+    MemberFileDownloadThrottle,
+    MemberFileWriteThrottle,
     MemberLoginIPThrottle,
     MemberLoginThrottle,
     MemberLogoutIPThrottle,
     MemberLogoutTokenThrottle,
     MemberRefreshIPThrottle,
     MemberRefreshTokenThrottle,
+    MemberSelfReadThrottle,
+    MemberSelfWriteThrottle,
     PasswordForgotIPThrottle,
     PasswordForgotThrottle,
     PasswordResetIPThrottle,
     PasswordResetThrottle,
+    TrainerCheckInScanIPThrottle,
 )
 
 
@@ -89,9 +100,22 @@ def test_security_boundaries_do_not_share_throttle_scopes_or_keys() -> None:
     keys = {
         throttle.__name__: throttle().get_cache_key(request, None)
         for throttle in _BOUNDARY_THROTTLES
-        if throttle is not MemberCheckInScanThrottle
+        if throttle
+        not in {
+            MemberCheckInScanThrottle,
+            MemberSelfReadThrottle,
+            MemberSelfWriteThrottle,
+            MemberFileWriteThrottle,
+            MemberFileDownloadThrottle,
+        }
     }
     keys[MemberCheckInScanThrottle.__name__] = MemberCheckInScanThrottle().get_cache_key(scan, None)
+    keys[MemberSelfReadThrottle.__name__] = MemberSelfReadThrottle().get_cache_key(scan, None)
+    keys[MemberSelfWriteThrottle.__name__] = MemberSelfWriteThrottle().get_cache_key(scan, None)
+    keys[MemberFileWriteThrottle.__name__] = MemberFileWriteThrottle().get_cache_key(scan, None)
+    keys[MemberFileDownloadThrottle.__name__] = MemberFileDownloadThrottle().get_cache_key(
+        scan, None
+    )
     anon_key = AnonRateThrottle().get_cache_key(request, None)
 
     assert anon_key is not None
@@ -110,6 +134,37 @@ def test_security_boundaries_do_not_share_throttle_scopes_or_keys() -> None:
     assert reset_token not in rendered
     assert "secret-value" not in rendered
     assert "Member@Example.test" not in rendered
+
+    class _Membership:
+        def __init__(self, membership_id: object) -> None:
+            self.id = membership_id
+
+    payload = "gms-checkin:v1:trainer-payload-not-a-cache-key"
+    first_membership = uuid4()
+    second_membership = uuid4()
+    first = _request(data={"payload": payload, "member_id": str(uuid4())})
+    second = _request(data={"payload": payload, "member_id": str(uuid4())})
+    first.gym_membership = _Membership(first_membership)
+    second.gym_membership = _Membership(second_membership)
+    trainer_scan = TrainerCheckInScanThrottle()
+    first_key = trainer_scan.get_cache_key(first, None)
+    second_key = trainer_scan.get_cache_key(second, None)
+    assert first_key is not None
+    assert second_key is not None
+    assert first_key != second_key
+    assert first_key != keys[MemberCheckInScanThrottle.__name__]
+    assert first_key != keys[TrainerCheckInScanIPThrottle.__name__]
+    assert (
+        TrainerCheckInScanIPThrottle().get_cache_key(first, None)
+        == keys[TrainerCheckInScanIPThrottle.__name__]
+    )
+    assert {TrainerCheckInScanThrottle.scope, TrainerCheckInScanIPThrottle.scope}.isdisjoint(
+        {"anon", "user", "member_check_in_scan"}
+    )
+    trainer_rendered = f"{first_key} {second_key}"
+    assert payload not in trainer_rendered
+    assert str(first_membership) not in trainer_rendered
+    assert "member_id" not in trainer_rendered
 
 
 @override_settings(REFRESH_TOKEN_PEPPER="throttle-scope-pepper")

@@ -172,14 +172,16 @@ export function ReasonField({
   label,
   name = "reason",
   error,
+  required = true,
 }: {
   label: string;
   name?: string;
   error?: string | undefined;
+  required?: boolean;
 }) {
   return (
     <Field error={error} label={label}>
-      <textarea className="input min-h-24" name={name} required />
+      <textarea className="input min-h-24" name={name} required={required} />
     </Field>
   );
 }

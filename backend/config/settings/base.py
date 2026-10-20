@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     "apps.tenants",
     "apps.audit",
     "apps.members",
+    "apps.announcements",
     "apps.notifications",
     "apps.files",
     "apps.cashbook",
@@ -28,6 +29,9 @@ INSTALLED_APPS = [
     "apps.salaries",
     "apps.inventory",
     "apps.sales",
+    "apps.trainers",
+    "apps.classes",
+    "apps.reports",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -89,6 +93,12 @@ REST_FRAMEWORK = {
         "member_logout": "30/min",
         "member_logout_ip": "30/min",
         "member_check_in_scan": "30/min",
+        "trainer_check_in_scan": "30/min",
+        "trainer_check_in_scan_ip": "30/min",
+        "member_self_read": "60/min",
+        "member_self_write": "20/min",
+        "member_file_write": "10/min",
+        "member_file_download": "30/min",
         "device_challenge_ip": "60/min",
         "device_challenge_selector": "20/min",
         "device_ingest_ip": "60/min",
@@ -104,6 +114,14 @@ REST_FRAMEWORK = {
         "salaries_command": "120/60",
         "inventory_command": "120/60",
         "retail_command": "120/60",
+        "trainer_assignment_command": "120/60",
+        "service_package_command": "120/60",
+        "pt_sale_command": "120/60",
+        "pt_commission_command": "120/60",
+        "member_package_command": "120/60",
+        "class_command": "120/60",
+        "announcement_command": "120/60",
+        "booking_command": "120/60",
         "password_forgot": "5/min",
         "password_forgot_ip": "20/min",
         "password_reset": "10/min",
@@ -123,6 +141,22 @@ SPECTACULAR_SETTINGS = {
     "ENUM_NAME_OVERRIDES": {
         "SubscriptionPlanStatusEnum": "apps.tenants.models.SubscriptionPlan.Status",
         "PaymentMethodEnum": "apps.members.models.Payment.Method",
+        "MemberStatusEnum": "apps.members.models.Member.Status",
+        "MembershipStatusEnum": "apps.members.models.Membership.Status",
+        "KindEnum": ["NFC", "BIOMETRIC"],
+        "AnnouncementTypeEnum": [
+            ("EVENT", "EVENT"),
+            ("PROMOTION", "PROMOTION"),
+            ("GENERAL", "GENERAL"),
+        ],
+        "MemberNotificationTypeEnum": [
+            ("MEMBERSHIP_EXPIRY", "MEMBERSHIP_EXPIRY"),
+            ("ANNOUNCEMENT", "ANNOUNCEMENT"),
+        ],
+        "MemberScheduleBookingKindEnum": ["PT", "CLASS"],
+        # MembershipPlan.DurationUnit and ServicePackage.ValidityUnit are the same
+        # DAY/WEEK/MONTH/YEAR calendar set, so they share one schema component.
+        "ValidityUnitEnum": "apps.members.models.MembershipPlan.DurationUnit",
     },
     "PREPROCESSING_HOOKS": ["apps.common.api.schema.phase_1a_endpoints"],
 }
@@ -157,6 +191,11 @@ MFA_STEP_UP_TTL_SECONDS = int(os.environ.get("MFA_STEP_UP_TTL_SECONDS", "600"))
 INVITATION_TOKEN_PEPPER = os.environ.get("INVITATION_TOKEN_PEPPER", REFRESH_TOKEN_PEPPER)
 INVITATION_TTL_SECONDS = int(os.environ.get("INVITATION_TTL_SECONDS", str(48 * 60 * 60)))
 PASSWORD_RESET_TOKEN_PEPPER = os.environ.get("PASSWORD_RESET_TOKEN_PEPPER", "")
+PUSH_BACKEND = os.environ.get("PUSH_BACKEND", "locmem")
+PUSH_TOKEN_ENCRYPTION_KEY = os.environ.get("PUSH_TOKEN_ENCRYPTION_KEY", "")
+PUSH_TOKEN_FINGERPRINT_PEPPER = os.environ.get("PUSH_TOKEN_FINGERPRINT_PEPPER", "")
+FCM_PROJECT_ID = os.environ.get("FCM_PROJECT_ID", "")
+FCM_SERVICE_ACCOUNT_JSON = os.environ.get("FCM_SERVICE_ACCOUNT_JSON", "")
 PASSWORD_RESET_TTL_SECONDS = int(os.environ.get("PASSWORD_RESET_TTL_SECONDS", str(30 * 60)))
 APP_PUBLIC_URL = os.environ.get("APP_PUBLIC_URL", "http://localhost:3000")
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")

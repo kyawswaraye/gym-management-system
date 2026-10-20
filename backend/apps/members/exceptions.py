@@ -23,6 +23,12 @@ class MembershipOverlap(CodedAPIException):
     )
 
 
+class DeviceConflict(CodedAPIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "DEVICE_CONFLICT"
+    default_detail = "The device registration conflicts with an existing device."
+
+
 class MembershipStateConflict(CodedAPIException):
     status_code = status.HTTP_409_CONFLICT
     default_code = "MEMBERSHIP_STATE_CONFLICT"

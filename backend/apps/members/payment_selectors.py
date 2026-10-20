@@ -146,8 +146,9 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
     date, then subtract a full void and each partial return on its correction
     date. ``product_total`` is the net of ``PRODUCT`` payments and reconciles
     to that line revenue.
-    Draft, pending, rejected, and cancelled sales contribute nothing. PT and
-    class stay zero.
+    Draft, pending, rejected, and cancelled sales contribute nothing.
+    ``pt_total`` is the net of purpose ``PT`` charges and their refunds and
+    reversals. ``class_total`` stays zero.
     """
 
     charges = Q(
@@ -165,6 +166,7 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
     renewal = Q(membership__revenue_source=Membership.RevenueSource.RENEWAL)
     other = Q(purpose=Payment.Purpose.OTHER)
     product = Q(purpose=Payment.Purpose.PRODUCT)
+    pt = Q(purpose=Payment.Purpose.PT)
     original_membership = Q(original_payment__purpose=Payment.Purpose.MEMBERSHIP)
     original_new = Q(
         original_payment__membership__revenue_source=Membership.RevenueSource.NEW_MEMBER
@@ -174,6 +176,7 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
     )
     original_other = Q(original_payment__purpose=Payment.Purpose.OTHER)
     original_product = Q(original_payment__purpose=Payment.Purpose.PRODUCT)
+    original_pt = Q(original_payment__purpose=Payment.Purpose.PT)
     totals = finalized.aggregate(
         gross=_sum(charges),
         refunds=_sum(refunds),
@@ -186,6 +189,8 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
         other_returns=_sum(returns & original_other),
         product_charges=_sum(charges & product),
         product_returns=_sum(returns & original_product),
+        pt_charges=_sum(charges & pt),
+        pt_returns=_sum(returns & original_pt),
         **{f"method_{method}_charges": _sum(charges & Q(method=method)) for method in _METHODS},
         **{f"method_{method}_returns": _sum(returns & Q(method=method)) for method in _METHODS},
     )
@@ -232,7 +237,7 @@ def daily_sales(*, gym_id: UUID, business_date: date, currency: str) -> dict[str
         "renewal_total": money_text(
             _money(totals["renewal_charges"]) - _money(totals["renewal_returns"])
         ),
-        "pt_total": money_text(_ZERO),
+        "pt_total": money_text(_money(totals["pt_charges"]) - _money(totals["pt_returns"])),
         "class_total": money_text(_ZERO),
         "product_total": money_text(product_payment_net),
         "other_total": money_text(

@@ -1,0 +1,48 @@
+# Resolve react_native_pods.rb with node to allow for hoisting
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
+
+platform :ios, '16.0'
+prepare_react_native_project!
+
+# React Native Firebase 27 resolves the iOS SDK with Swift Package Manager
+# and requires dynamic frameworks. Do not set $RNFirebaseDisableSPM.
+use_frameworks! :linkage => :dynamic
+
+target 'GymMember' do
+  config = use_native_modules!
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    # An absolute path to your application root.
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+
+  post_install do |installer|
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false,
+      # :ccache_enabled => true
+    )
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |build_config|
+        build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
+      end
+      # image-picker calls Uniform Type Identifiers. Dynamic frameworks do not
+      # autolink MobileCoreServices, so the pod fails to link without these.
+      if target.name == 'react-native-image-picker'
+        target.build_configurations.each do |build_config|
+          flags = Array(build_config.build_settings['OTHER_LDFLAGS'])
+          flags << '$(inherited)' unless flags.include?('$(inherited)')
+          flags << '-framework MobileCoreServices'
+          flags << '-framework UniformTypeIdentifiers'
+          build_config.build_settings['OTHER_LDFLAGS'] = flags.uniq
+        end
+      end
+    end
+  end
+end

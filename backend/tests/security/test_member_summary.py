@@ -350,7 +350,10 @@ def test_member_summary_is_scoped_permissioned_and_query_strict() -> None:
     assert denied.status_code == 403
     assert denied.json()["error"]["code"] == "PERMISSION_DENIED"
 
-    allowed = _summary(api, member.id, trainer_headers)
+    hidden_trainer = _summary(api, member.id, trainer_headers)
+    assert hidden_trainer.status_code == 404
+    assert "Summary Secret" not in hidden_trainer.content.decode()
+    allowed = _summary(api, member.id, owner_headers)
     assert allowed.status_code == 200, allowed.json()
     data = allowed.json()["data"]
     assert data["member"]["id"] == str(member.id)

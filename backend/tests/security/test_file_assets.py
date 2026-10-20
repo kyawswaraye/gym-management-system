@@ -113,6 +113,7 @@ def test_file_asset_migration_state_constraints_indexes_rls_and_grants() -> None
         "0002_rls_integrity_and_grants",
         "0003_profile_photo_contract",
         "0004_expense_receipt_and_expense",
+        "0005_member_self_actors",
     ]
     assert (enabled, forced) == (True, True)
     assert owner != "gym_runtime"

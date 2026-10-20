@@ -15,6 +15,11 @@ MFA_ENCRYPTION_KEY = "test-mfa-encryption-key"
 FINANCE_IDEMPOTENCY_ENCRYPTION_KEY = "test-finance-idempotency-key"
 INVITATION_TOKEN_PEPPER = "test-invitation-token-pepper"
 PASSWORD_RESET_TOKEN_PEPPER = "test-password-reset-token-pepper"
+PUSH_BACKEND = "locmem"
+PUSH_TOKEN_ENCRYPTION_KEY = "test-push-token-encryption-key"
+PUSH_TOKEN_FINGERPRINT_PEPPER = "test-push-token-fingerprint-pepper"
+FCM_PROJECT_ID = ""
+FCM_SERVICE_ACCOUNT_JSON = ""
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 # Disposable verification uses a CREATEDB role, typically gym_admin. Runtime

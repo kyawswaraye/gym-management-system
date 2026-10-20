@@ -629,7 +629,10 @@ export function SalariesManager({
             {period.status === "POSTED" && canVoid && (
               <button
                 className="underline"
-                onClick={() => setAction("void")}
+                onClick={() => {
+                  setCorrectionDate(defaultDate);
+                  setAction("void");
+                }}
                 type="button"
               >
                 Void period
@@ -696,10 +699,12 @@ export function SalariesManager({
               {cashLines.length === 0 && <p>No cash line is mapped.</p>}
               {cashLines.map((line) => (
                 <CashSessionSelect
+                  collectionError={sessions.error}
                   currency={line.currency}
                   key={line.id}
                   label={`Session for ${line.staff.display_name}`}
                   name={`session-${line.id}`}
+                  pending={sessions.pending}
                   sessions={sessions.sessions}
                 />
               ))}
@@ -814,10 +819,12 @@ export function SalariesManager({
               </Field>
               {cashLines.map((line) => (
                 <CashSessionSelect
+                  collectionError={sessions.error}
                   currency={line.currency}
                   key={line.id}
                   label={`Destination session for ${line.staff.display_name}`}
                   name={`void-${line.id}`}
+                  pending={sessions.pending}
                   sessions={sessions.sessions}
                 />
               ))}

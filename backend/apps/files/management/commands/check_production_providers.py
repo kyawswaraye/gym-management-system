@@ -17,6 +17,7 @@ from apps.common.production import (
     require_https_endpoint,
     require_https_public_url,
     require_private_clamav_host,
+    require_push_backend,
     require_resend_api_key,
     require_resend_backend,
     require_reset_ttl_seconds,
@@ -58,6 +59,20 @@ class Command(BaseCommand):
             )
             require_reset_ttl_seconds(int(settings.PASSWORD_RESET_TTL_SECONDS))
             require_scheduler_commands(PRODUCTION_SCHEDULER_COMMANDS)
+            require_push_backend(
+                backend=str(settings.PUSH_BACKEND),
+                project_id=str(settings.FCM_PROJECT_ID),
+                service_account_json=str(settings.FCM_SERVICE_ACCOUNT_JSON),
+                encryption_key=str(settings.PUSH_TOKEN_ENCRYPTION_KEY),
+                fingerprint_pepper=str(settings.PUSH_TOKEN_FINGERPRINT_PEPPER),
+                other_secrets={
+                    "MFA_ENCRYPTION_KEY": str(settings.MFA_ENCRYPTION_KEY),
+                    "FINANCE_IDEMPOTENCY_ENCRYPTION_KEY": str(
+                        settings.FINANCE_IDEMPOTENCY_ENCRYPTION_KEY
+                    ),
+                    "PASSWORD_RESET_TOKEN_PEPPER": str(settings.PASSWORD_RESET_TOKEN_PEPPER),
+                },
+            )
             require_https_endpoint(str(settings.MINIO_ENDPOINT_URL), name="MINIO_ENDPOINT_URL")
             require_https_endpoint(str(settings.MINIO_PUBLIC_URL), name="MINIO_PUBLIC_URL")
             require_aws_singapore_region(str(settings.MINIO_REGION))

@@ -6,6 +6,9 @@ opclass. The captured plan is a gym-equality index scan, a limit, and an
 incremental sort for the ``id`` tie-break. Case-insensitive contains
 (``UPPER(column) LIKE '%term%'``) stays a filter, as do status, join dates, and
 the name/id keyset. An anchored prefix comparison is not the published search.
+The same statement carries a correlated active-assignment badge subquery. That
+probe may use the assignment badge index or the active-range exclusion index,
+and it does not replace the member name index.
 """
 
 from __future__ import annotations
@@ -46,9 +49,9 @@ pytestmark = [
 ]
 
 NAME_INDEX = "member_gym_name_idx"
-# Measured list requests are 10 statements, or 9 when is_pt_client skips the read.
-# The ceiling allows one extra auth or RLS statement. A second member SELECT fails
-# on its own assertion below.
+# Measured list requests are 10 statements. The member SELECT includes one
+# correlated active-assignment badge subquery. The ceiling allows one extra
+# auth or RLS statement. A second member SELECT fails on its own assertion.
 MEMBER_LIST_QUERY_BUDGET = 12
 PAGE_LIMIT = 2
 SEARCH = "ada"
@@ -203,6 +206,7 @@ def _explain(sql: str, gym_id: UUID) -> object:
     ``CaptureQueriesContext`` stores the SQL PostgreSQL executed. LIKE patterns
     keep their ``%`` wildcards in that text. psycopg treats ``%`` as a placeholder
     only when parameters are passed, so the statement is executed unchanged.
+    Verbose output keeps the assignment probe's ``member_id`` correlation visible.
     """
 
     if "%s" in sql:
@@ -214,7 +218,7 @@ def _explain(sql: str, gym_id: UUID) -> object:
         cursor.execute("SET LOCAL enable_sort = off")
         cursor.execute("SET LOCAL enable_incremental_sort = on")
         cursor.execute("SET LOCAL ROLE gym_runtime")
-        cursor.execute("EXPLAIN (FORMAT JSON) " + sql)
+        cursor.execute("EXPLAIN (VERBOSE, FORMAT JSON) " + sql)
         row = cursor.fetchone()
     assert row is not None
     plan = row[0]
@@ -239,10 +243,30 @@ def _assert_tenant_name_index(
         and node.get("Index Name") == NAME_INDEX
         and node.get("Relation Name") == "members_member"
     ]
-    index_names = {node.get("Index Name") for node in nodes if node.get("Index Name")}
+    member_indexes = {
+        node.get("Index Name")
+        for node in nodes
+        if node.get("Relation Name") == "members_member" and node.get("Index Name")
+    }
+    assignment_indexes = {
+        node.get("Index Name")
+        for node in nodes
+        if node.get("Relation Name") == "trainers_trainer_assignment" and node.get("Index Name")
+    }
     node_types = {str(node.get("Node Type")) for node in nodes}
     assert scans, rendered
-    assert index_names == {NAME_INDEX}, rendered
+    assert member_indexes == {NAME_INDEX}, rendered
+    assert assignment_indexes <= {
+        "trainer_asg_member_badge_idx",
+        "trainer_asg_active_overlap_excl",
+    }, rendered
+    assert assignment_indexes, rendered
+    assignment_detail = " ".join(
+        f"{node.get('Index Cond') or ''} {node.get('Filter') or ''} {node.get('Output') or ''}"
+        for node in nodes
+        if node.get("Relation Name") == "trainers_trainer_assignment"
+    )
+    assert "member_id" in assignment_detail, rendered
     assert nodes[0].get("Node Type") == "Limit", rendered
     assert "Incremental Sort" in node_types, rendered
     assert "Sort" not in node_types, rendered
@@ -432,7 +456,8 @@ def test_member_list_query_budget_and_tenant_leading_plan() -> None:
     assert small["pt_unavailable"][0].json()["meta"] == {"has_more": False, "next_after": None}
     for name, (_response, queries) in small.items():
         if name == "pt_unavailable":
-            assert _list_selects(queries) == []
+            assert small["pt_unavailable"][0].json()["data"] == []
+            _assert_one_bounded_list_query(queries, gym.id)
             continue
         small_statement = _assert_one_bounded_list_query(queries, gym.id)
         assert not _contains_uuid(small_statement, other_gym.id), small_statement
@@ -492,8 +517,8 @@ def test_member_list_query_budget_and_tenant_leading_plan() -> None:
         assert len(queries) == len(large_queries), name
         assert len(large_queries) <= MEMBER_LIST_QUERY_BUDGET, name
         if name == "pt_unavailable":
-            assert _list_selects(large_queries) == []
             assert large_response.json()["data"] == []
+            _assert_one_bounded_list_query(large_queries, gym.id)
             continue
         large_sql = _assert_one_bounded_list_query(large_queries, gym.id)
         assert not _contains_uuid(large_sql, other_gym.id), large_sql
@@ -505,4 +530,4 @@ def test_member_list_query_budget_and_tenant_leading_plan() -> None:
         )
     list_count = len(large["unfiltered"][1])
     assert list_count == len(large["search"][1]) == len(large["filtered_page"][1])
-    assert len(large["pt_unavailable"][1]) == list_count - 1
+    assert len(large["pt_unavailable"][1]) == list_count

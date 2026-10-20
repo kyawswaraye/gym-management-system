@@ -24,6 +24,92 @@ export function canOpenCheckIns(session: CurrentUser): boolean {
   );
 }
 
+export function holdsRole(session: CurrentUser, key: string): boolean {
+  return session.gym_membership?.roles?.includes(key) ?? false;
+}
+
+export function holdsProtectedManagement(session: CurrentUser): boolean {
+  return holdsRole(session, "OWNER") || holdsRole(session, "MANAGER");
+}
+
+export function trainerAssignmentRestricted(session: CurrentUser): boolean {
+  return holdsRole(session, "TRAINER") && !holdsProtectedManagement(session);
+}
+
+function protectedAdjuster(session: CurrentUser): boolean {
+  return (
+    holdsProtectedManagement(session) &&
+    !holdsRole(session, "TRAINER") &&
+    !holdsRole(session, "RECEPTIONIST")
+  );
+}
+
+export function canOpenPtTrainers(session: CurrentUser): boolean {
+  return hasTenantCapability(session, "pt.assignments.view", "pt");
+}
+
+export function canOpenPtSchedule(session: CurrentUser): boolean {
+  return hasTenantCapability(session, "pt.schedule.view", "pt");
+}
+
+export function canOpenPtSales(session: CurrentUser): boolean {
+  return hasTenantCapability(session, "pt.sales.view", "pt");
+}
+
+export function canOpenPtCommissions(session: CurrentUser): boolean {
+  return hasTenantCapability(session, "pt.commissions.view", "pt");
+}
+
+export function canOpenClasses(session: CurrentUser): boolean {
+  return hasTenantCapability(session, "classes.view", "pt");
+}
+
+export function canOpenTrainerDashboard(session: CurrentUser): boolean {
+  return (
+    holdsRole(session, "TRAINER") &&
+    hasTenantCapability(session, "reports.view", "reports") &&
+    hasFeature(session, "pt")
+  );
+}
+
+export function canAdjustMemberSessions(session: CurrentUser): boolean {
+  return (
+    hasFeature(session, "pt") &&
+    hasPermission(session, "pt.sessions.adjust") &&
+    protectedAdjuster(session)
+  );
+}
+
+export function canPayPtCommission(session: CurrentUser): boolean {
+  return (
+    hasFeature(session, "pt") &&
+    hasPermission(session, "pt.commissions.pay") &&
+    protectedAdjuster(session)
+  );
+}
+
+export function canApprovePtSale(session: CurrentUser): boolean {
+  return (
+    hasFeature(session, "pt") &&
+    hasPermission(session, "pt.sales.approve") &&
+    holdsProtectedManagement(session) &&
+    !holdsRole(session, "RECEPTIONIST")
+  );
+}
+
+export function canOfferUnmeteredBooking(session: CurrentUser): boolean {
+  return hasFeature(session, "pt") && protectedAdjuster(session);
+}
+
+export function canScanTrainerCheckIn(session: CurrentUser): boolean {
+  return (
+    holdsRole(session, "TRAINER") &&
+    hasPermission(session, "checkins.create") &&
+    hasFeature(session, "members") &&
+    hasFeature(session, "memberships")
+  );
+}
+
 export function hasTenantCapability(
   session: CurrentUser,
   permission: string,
@@ -133,7 +219,16 @@ export function platformHomePath(session: CurrentUser): string {
 }
 
 export function tenantHomePath(session: CurrentUser): string {
-  if (hasTenantCapability(session, "reports.view", "reports")) {
+  if (
+    trainerAssignmentRestricted(session) &&
+    canOpenTrainerDashboard(session)
+  ) {
+    return "/pt/dashboard";
+  }
+  if (
+    !trainerAssignmentRestricted(session) &&
+    hasTenantCapability(session, "reports.view", "reports")
+  ) {
     return "/dashboard";
   }
   if (hasTenantCapability(session, "members.view", "members")) {
@@ -163,6 +258,11 @@ export function tenantHomePath(session: CurrentUser): string {
   if (hasTenantCapability(session, "retail.view", "finance")) {
     return "/retail-sales";
   }
+  if (canOpenPtTrainers(session)) return "/pt/trainers";
+  if (canOpenPtSchedule(session)) return "/pt/packages";
+  if (canOpenPtSales(session)) return "/pt/sales";
+  if (canOpenPtCommissions(session)) return "/pt/commissions";
+  if (canOpenClasses(session)) return "/classes";
   if (hasPermission(session, "staff.view")) return "/staff";
   if (hasPermission(session, "roles.view")) return "/roles";
   if (canOpenGymSettings(session)) return "/settings";

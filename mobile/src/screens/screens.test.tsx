@@ -1,0 +1,166 @@
+import { fireEvent, render } from "@testing-library/react-native";
+import type { ReactElement } from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
+import { NetworkError } from "../api/errors";
+import type { MemberApi } from "../api/memberApi";
+import { MotionProvider } from "../a11y/motion";
+import { AppProviders } from "../app/providers";
+import { DashboardScreen } from "./DashboardScreen";
+import { LoginScreen } from "./LoginScreen";
+import { NotificationsScreen } from "./NotificationsScreen";
+import { ScanScreen } from "./ScanScreen";
+
+const cameraPermission = () =>
+  (
+    globalThis as unknown as {
+      __cameraPermission: {
+        hasPermission: boolean;
+        canRequestPermission: boolean;
+      };
+    }
+  ).__cameraPermission;
+
+const metrics = {
+  frame: { x: 0, y: 0, width: 390, height: 844 },
+  insets: { top: 0, left: 0, right: 0, bottom: 0 },
+};
+
+function renderSignedIn(ui: ReactElement, api: Partial<MemberApi>) {
+  return render(
+    <SafeAreaProvider initialMetrics={metrics}>
+      <MotionProvider>
+        <AppProviders sessionStatus="signed-in" api={api as MemberApi}>
+          {ui}
+        </AppProviders>
+      </MotionProvider>
+    </SafeAreaProvider>,
+  );
+}
+
+const dashboardData = {
+  member: {
+    id: "member-1",
+    member_number: "M1",
+    first_name: "Ana",
+    last_name: "Lee",
+    phone: null,
+    email: null,
+    gender: null,
+    date_of_birth: null,
+    address: {
+      address_line1: "",
+      address_line2: "",
+      city: "",
+      region: "",
+      postal_code: "",
+      country_code: "",
+    },
+    join_date: "2026-01-01",
+    emergency_contact_name: "",
+    emergency_contact_phone: "",
+    profile_photo_asset_id: null,
+    is_pt_client: false,
+    status: "ACTIVE" as const,
+    archived_at: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+  current_membership: null,
+  days_remaining: 12,
+  is_pt_client: false,
+  membership_history: [],
+  membership_history_has_more: false,
+  payment_summary: {
+    available: true,
+    currency: "THB",
+    total_charged: "10.00",
+    total_refunded: "0.00",
+    net_paid: "10.00",
+    outstanding_membership_balance: "0.00",
+  },
+  check_in_summary: {
+    available: true,
+    currently_checked_in: false,
+    open_check_in_id: null,
+    last_check_in_at: null,
+    last_check_out_at: null,
+  },
+};
+
+describe("member screens", () => {
+  afterEach(() => {
+    cameraPermission().hasPermission = true;
+    cameraPermission().canRequestPermission = true;
+  });
+
+  it("names the login controls", async () => {
+    const view = await render(
+      <SafeAreaProvider initialMetrics={metrics}>
+        <MotionProvider>
+          <AppProviders
+            sessionStatus="anonymous"
+            auth={{
+              status: "anonymous",
+              login: jest.fn(async () => undefined),
+              logout: jest.fn(async () => ({ serverConfirmed: true })),
+              retry: jest.fn(async () => undefined),
+            }}
+          >
+            <LoginScreen />
+          </AppProviders>
+        </MotionProvider>
+      </SafeAreaProvider>,
+    );
+    expect(view.getByLabelText("Email")).toBeTruthy();
+    expect(view.getByLabelText("Password")).toBeTruthy();
+    expect(view.getByRole("button", { name: "Sign in" })).toBeTruthy();
+  });
+
+  it("shows a dashboard error and the server payment amount after retry", async () => {
+    let fail = true;
+    const dashboard = jest.fn(async () => {
+      if (fail) {
+        throw new NetworkError();
+      }
+      return dashboardData;
+    });
+    const view = await renderSignedIn(<DashboardScreen />, { dashboard });
+    expect(await view.findByText(/offline/i)).toBeTruthy();
+    fail = false;
+    fireEvent.press(view.getByRole("button", { name: "Try again" }));
+    expect((await view.findAllByText(/THB 10\.00/)).length).toBeGreaterThan(0);
+    expect(view.getByText(/Days remaining:\s*12/)).toBeTruthy();
+  });
+
+  it("explains desk check-in when the camera is denied", async () => {
+    cameraPermission().hasPermission = false;
+    cameraPermission().canRequestPermission = false;
+    const view = await renderSignedIn(<ScanScreen />, {});
+    expect(view.getAllByText(/front desk/i).length).toBeGreaterThan(0);
+    expect(view.getAllByText(/system settings/i).length).toBeGreaterThan(0);
+  });
+
+  it("shows inbox content and a read action", async () => {
+    const notifications = jest.fn(async () => ({
+      items: [
+        {
+          id: "note-1",
+          type: "ANNOUNCEMENT" as const,
+          title: "Holiday hours",
+          body: "The gym closes at 6.",
+          announcement_type: "GENERAL" as const,
+          read_at: null,
+          created_at: "2026-10-20T09:00:00+07:00",
+        },
+      ],
+      meta: { has_more: false, next_after: null },
+    }));
+    const view = await renderSignedIn(<NotificationsScreen />, {
+      notifications,
+      markNotificationRead: jest.fn(),
+    });
+    expect(await view.findByText("Holiday hours")).toBeTruthy();
+    expect(view.getByRole("button", { name: "Mark read" })).toBeTruthy();
+  });
+});

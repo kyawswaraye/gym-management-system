@@ -2,6 +2,7 @@
 
 import importlib
 from decimal import Decimal
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -43,8 +44,35 @@ def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     inventory_return = ("inventory", "0005_retail_return_foundation")
     members_runtime = ("members", "0020_retail_product_reversal")
     members_refund = ("members", "0021_retail_product_refund")
+    members_pt_link = ("members", "0022_pt_sale_payment_link")
+    members_pt_guard = ("members", "0023_pt_payment_guard")
+    members_pt_void = ("members", "0024_pt_sale_payment_void")
+    members_phase7 = ("members", "0025_phase7_notifications")
+    members_device_guard = ("members", "0026_member_device_rls_and_guards")
+    trainers_sale = ("trainers", "0005_pt_sale")
+    trainers_sale_rls = ("trainers", "0006_pt_sale_rls_and_grants")
+    trainers_pt_link = ("trainers", "0007_pt_sale_payment_link")
+    trainers_pt_guard = ("trainers", "0008_pt_sale_workflow_guards")
+    trainers_pt_payout = ("trainers", "0009_pt_commission_payment")
+    trainers_pt_payout_guard = ("trainers", "0010_pt_commission_payment_guards")
+    trainers_pt_aggregate = ("trainers", "0011_pt_commission_aggregate_guard")
+    trainers_package = ("trainers", "0012_pt_sale_package_and_ledger")
+    trainers_package_guard = ("trainers", "0013_member_package_ledger_guards")
+    trainers_void_fields = ("trainers", "0014_pt_sale_void_fields")
+    trainers_void_guards = ("trainers", "0015_pt_sale_void_guards")
+    trainers_refund_link = ("trainers", "0016_pt_sale_refund_reversal_link")
+    trainers_class_link = ("trainers", "0017_class_schedule_catalog")
+    trainers_pt_booking = ("trainers", "0018_booking_foundation")
+    trainers_booking_link = ("trainers", "0019_booking_ledger_links")
+    trainers_payout_window = ("trainers", "0021_pt_commission_payout_window")
+    classes_type_rls = ("classes", "0002_class_type_rls_and_grants")
+    classes_guards = ("classes", "0004_class_schedule_guards")
+    classes_booking = ("classes", "0006_class_booking_guards")
+    classes_terminal = ("classes", "0008_member_self_actors")
     assert loader.graph.leaf_nodes("inventory") == [inventory_return]
-    assert loader.graph.leaf_nodes("members") == [members_refund]
+    assert loader.graph.leaf_nodes("members") == [members_device_guard]
+    assert loader.graph.leaf_nodes("trainers") == [trainers_payout_window]
+    assert loader.graph.leaf_nodes("classes") == [classes_terminal]
     initial = loader.disk_migrations[SALES_INITIAL].dependencies
     assert ("inventory", "0002_rls_integrity_and_grants") in initial
     assert ("members", "0017_payment_receipt_hardening") in initial
@@ -95,6 +123,114 @@ def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     assert return_plan.index(SALES_LEAF) < return_plan.index(inventory_return)
     assert inventory_return not in loader.graph.forwards_plan(SALES_LEAF)
     assert members_refund not in loader.graph.forwards_plan(SALES_LEAF)
+    assert loader.disk_migrations[trainers_sale].dependencies == [
+        members_refund,
+        ("tenants", "0026_pt_schedule_permission_catalog"),
+        ("trainers", "0004_service_package_rls_and_grants"),
+    ]
+    assert loader.disk_migrations[trainers_sale_rls].dependencies == [trainers_sale]
+    assert loader.disk_migrations[members_pt_link].dependencies == [
+        ("cashbook", "0002_correction_runtime_reversal"),
+        members_refund,
+        SALES_LEAF,
+        ("tenants", "0026_pt_schedule_permission_catalog"),
+        trainers_sale_rls,
+    ]
+    assert loader.disk_migrations[trainers_pt_link].dependencies == [
+        members_pt_link,
+        ("tenants", "0026_pt_schedule_permission_catalog"),
+        trainers_sale_rls,
+    ]
+    assert loader.disk_migrations[members_pt_guard].dependencies == [
+        members_pt_link,
+        trainers_pt_link,
+    ]
+    assert loader.disk_migrations[trainers_pt_guard].dependencies == [
+        trainers_pt_link,
+        members_pt_guard,
+    ]
+    assert loader.disk_migrations[trainers_pt_payout].dependencies == [
+        ("cashbook", "0002_correction_runtime_reversal"),
+        ("expenses", "0005_salary_void_set"),
+        ("tenants", "0026_pt_schedule_permission_catalog"),
+        trainers_pt_guard,
+    ]
+    assert loader.disk_migrations[trainers_pt_payout_guard].dependencies == [trainers_pt_payout]
+    assert loader.disk_migrations[trainers_pt_aggregate].dependencies == [trainers_pt_payout_guard]
+    assert loader.disk_migrations[trainers_package].dependencies == [
+        members_pt_guard,
+        ("tenants", "0027_pt_commission_pay_reservation"),
+        trainers_pt_aggregate,
+    ]
+    assert loader.disk_migrations[trainers_package_guard].dependencies == [trainers_package]
+    assert loader.disk_migrations[trainers_void_fields].dependencies == [
+        members_pt_guard,
+        ("tenants", "0027_pt_commission_pay_reservation"),
+        trainers_package_guard,
+    ]
+    assert loader.disk_migrations[trainers_void_guards].dependencies == [trainers_void_fields]
+    assert loader.disk_migrations[trainers_refund_link].dependencies == [
+        ("tenants", "0027_pt_commission_pay_reservation"),
+        trainers_void_guards,
+    ]
+    assert loader.disk_migrations[trainers_class_link].dependencies == [
+        classes_type_rls,
+        ("tenants", "0028_class_permission_catalog"),
+        trainers_refund_link,
+    ]
+    assert loader.disk_migrations[classes_guards].dependencies == [
+        ("classes", "0003_class_schedule_and_occurrence"),
+    ]
+    assert loader.disk_migrations[members_pt_void].dependencies == [members_pt_guard]
+    assert members_pt_void in loader.disk_migrations[members_phase7].dependencies
+    assert loader.disk_migrations[members_device_guard].dependencies == [members_phase7]
+    payout_source = (
+        Path(__file__).resolve().parents[2]
+        / "apps/trainers/migrations/0009_pt_commission_payment.py"
+    ).read_text()
+    assert "commission_expense_id IS NOT NULL" in payout_source
+    assert "reversal_commission_id IS NOT NULL" in payout_source
+    assert "legacy expense links are not null" in payout_source
+    pt_plan = loader.graph.forwards_plan(trainers_refund_link)
+    assert pt_plan.index(members_refund) < pt_plan.index(trainers_sale)
+    assert pt_plan.index(trainers_sale) < pt_plan.index(trainers_sale_rls)
+    assert pt_plan.index(trainers_sale_rls) < pt_plan.index(members_pt_link)
+    assert pt_plan.index(SALES_LEAF) < pt_plan.index(members_pt_link)
+    assert pt_plan.index(members_pt_link) < pt_plan.index(trainers_pt_link)
+    assert pt_plan.index(trainers_pt_link) < pt_plan.index(members_pt_guard)
+    assert pt_plan.index(members_pt_guard) < pt_plan.index(trainers_pt_guard)
+    assert pt_plan.index(trainers_pt_guard) < pt_plan.index(trainers_pt_payout)
+    assert pt_plan.index(trainers_pt_payout) < pt_plan.index(trainers_pt_payout_guard)
+    assert pt_plan.index(trainers_pt_payout_guard) < pt_plan.index(trainers_pt_aggregate)
+    assert pt_plan.index(trainers_pt_aggregate) < pt_plan.index(trainers_package)
+    assert pt_plan.index(trainers_package) < pt_plan.index(trainers_package_guard)
+    assert pt_plan.index(trainers_package_guard) < pt_plan.index(trainers_void_fields)
+    assert pt_plan.index(trainers_void_fields) < pt_plan.index(trainers_void_guards)
+    assert pt_plan.index(trainers_void_guards) < pt_plan.index(trainers_refund_link)
+    class_plan = loader.graph.forwards_plan(trainers_class_link)
+    assert class_plan.index(trainers_refund_link) < class_plan.index(trainers_class_link)
+    assert class_plan.index(classes_type_rls) < class_plan.index(trainers_class_link)
+    assert ("classes", "0004_class_schedule_guards") not in class_plan
+    booking_plan = loader.graph.forwards_plan(trainers_booking_link)
+    assert booking_plan.index(trainers_pt_booking) < booking_plan.index(classes_booking)
+    assert booking_plan.index(classes_booking) < booking_plan.index(trainers_booking_link)
+    assert ("classes", "0005_booking_foundation") not in loader.graph.forwards_plan(
+        trainers_pt_booking
+    )
+    assert classes_booking not in loader.graph.forwards_plan(members_pt_void)
+    assert trainers_package not in loader.graph.forwards_plan(members_pt_guard)
+    assert trainers_void_guards not in loader.graph.forwards_plan(members_pt_void)
+    assert trainers_refund_link not in loader.graph.forwards_plan(members_pt_void)
+    assert trainers_class_link not in loader.graph.forwards_plan(members_pt_void)
+    assert classes_guards not in loader.graph.forwards_plan(members_pt_void)
+    assert trainers_package_guard not in loader.graph.forwards_plan(
+        ("tenants", "0027_pt_commission_pay_reservation")
+    )
+    assert trainers_sale not in loader.graph.forwards_plan(members_refund)
+    assert members_pt_link not in loader.graph.forwards_plan(trainers_sale_rls)
+    assert trainers_pt_link not in loader.graph.forwards_plan(members_pt_link)
+    assert members_pt_guard not in loader.graph.forwards_plan(trainers_pt_link)
+    assert trainers_pt_guard not in loader.graph.forwards_plan(members_pt_guard)
 
 
 def test_quantity_times_money_rounds_half_up_to_minor_units() -> None:

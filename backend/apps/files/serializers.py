@@ -131,6 +131,20 @@ class CompleteUploadSerializer(StrictSerializer):
     byte_size = DeclaredSizeField()
 
 
+class MemberProfilePhotoIntentSerializer(StrictSerializer):
+    original_name = OriginalNameField()
+    content_type = serializers.CharField()
+    byte_size = DeclaredSizeField()
+    sha256 = DeclaredSha256Field()
+
+    def validate_content_type(self, value: str) -> str:
+        if value not in ALLOWED_CONTENT_TYPES:
+            raise serializers.ValidationError(
+                "This file type is not allowed.", code="FILE_TYPE_NOT_ALLOWED"
+            )
+        return value
+
+
 class UploadTargetSerializer(serializers.Serializer):
     method = serializers.CharField()
     url = serializers.CharField()

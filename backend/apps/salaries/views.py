@@ -54,7 +54,7 @@ from apps.salaries.services import (
     update_period,
     void_period,
 )
-from apps.users.permissions import RequiresEntitlement, RequiresPermission
+from apps.users.permissions import RequiresEntitlement, RequiresPermission, TrainerFinanceClosed
 
 _IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9._:-]{16,128}$")
 IDEMPOTENCY_HEADER = OpenApiParameter(
@@ -96,7 +96,12 @@ def _audit_context(request: Request) -> dict[str, Any]:
 
 
 class SalaryAPIView(APIView):
-    permission_classes = [IsAuthenticated, RequiresPermission, RequiresEntitlement]
+    permission_classes = [
+        IsAuthenticated,
+        RequiresPermission,
+        RequiresEntitlement,
+        TrainerFinanceClosed,
+    ]
     required_feature = "finance"
     required_permission = "salaries.view"
 

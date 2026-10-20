@@ -65,8 +65,13 @@ def test_seed_refuses_reused_object_keys_and_drops_members_first() -> None:
     handle = inspect.getsource(Command.handle)
     assert "E2E_MEMBER_PASSWORD" in handle
     assert "E2E_MANAGER_PASSWORD" in handle
+    assert "E2E_RECEPTION_PASSWORD" in handle
+    assert "E2E_TRAINER_PASSWORD" in handle
+    assert "E2E_BEA_PASSWORD" in handle
     assert "e2e-manager@example.test" not in handle
     assert "e2e-member@example.test" not in handle
+    assert "e2e-reception@example.test" not in handle
+    assert "e2e-trainer@example.test" not in handle
     assert source.index("Member.objects.filter") < source.index("FileAsset.objects.filter")
 
 

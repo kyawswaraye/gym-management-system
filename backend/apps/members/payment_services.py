@@ -46,6 +46,11 @@ class PaymentPostingConflict(FinanceStateConflict):
     """The locked payment or its source can no longer accept this command."""
 
 
+class PTPaymentOwned(FinanceStateConflict):
+    default_code = "PT_PAYMENT_OWNED"
+    default_detail = "This payment is owned by the PT sale workflow."
+
+
 class RefundExceedsBalance(FinanceStateConflict):
     default_code = "REFUND_EXCEEDS_BALANCE"
     default_detail = "The refund exceeds the refundable balance."
@@ -115,6 +120,7 @@ def update_payment_draft(
 ) -> Payment:
     gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="payments.update")
     payment = _lock_payment(gym_id=gym.id, payment_id=payment_id)
+    _reject_sale_owned_payment(payment)
     if payment.status != Payment.Status.DRAFT:
         raise ValidationError({"status": ["Only a draft payment can be edited."]})
     merged = _merged_fields(payment, fields)
@@ -155,6 +161,7 @@ def submit_payment(
 ) -> Payment:
     gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="payments.submit")
     payment = _lock_payment(gym_id=gym.id, payment_id=payment_id)
+    _reject_sale_owned_payment(payment)
     if payment.status != Payment.Status.DRAFT:
         raise ValidationError({"status": ["Only a draft payment can be submitted."]})
     now = timezone.now()
@@ -191,6 +198,7 @@ def approve_payment(
     gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="payments.approve")
     _assert_approver(gym_id=gym.id, actor=actor)
     payment = _lock_payment(gym_id=gym.id, payment_id=payment_id)
+    _reject_sale_owned_payment(payment)
     _assert_approver(gym_id=gym.id, actor=actor)
     if payment.status != Payment.Status.PENDING_APPROVAL:
         raise PaymentPostingConflict()
@@ -293,6 +301,7 @@ def reject_payment(
     gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="payments.approve")
     _assert_approver(gym_id=gym.id, actor=actor)
     payment = _lock_payment(gym_id=gym.id, payment_id=payment_id)
+    _reject_sale_owned_payment(payment)
     _assert_approver(gym_id=gym.id, actor=actor)
     if payment.status != Payment.Status.PENDING_APPROVAL:
         raise PaymentPostingConflict()
@@ -329,6 +338,7 @@ def cancel_payment(
 ) -> Payment:
     gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="payments.update")
     payment = _lock_payment(gym_id=gym.id, payment_id=payment_id)
+    _reject_sale_owned_payment(payment)
     if payment.status != Payment.Status.DRAFT or payment.submitted_at is not None:
         raise ValidationError({"status": ["Only an unsubmitted draft can be cancelled."]})
     now = timezone.now()
@@ -714,9 +724,42 @@ def post_retail_product_payment(
     )
     payment.updated_by_membership_id = approver.id
     payment.save()
+    payment, receipt, movement = _post_pending_charge(
+        gym=gym,
+        approver=approver,
+        payment=payment,
+        cash_session_id=cash_session_id,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        audit_extra={"retail_sale_id": str(retail_sale_id)},
+    )
+    return payment, receipt, movement
+
+
+def _post_pending_charge(
+    *,
+    gym: Gym,
+    approver: GymMembership,
+    payment: Payment,
+    cash_session_id: UUID | None,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+    audit_extra: dict[str, object] | None = None,
+) -> tuple[Payment, Receipt, CashTransaction | None]:
+    """Issue one receipt and optional cash movement for a pending charge."""
+
+    if payment.status != Payment.Status.PENDING_APPROVAL:
+        raise PaymentPostingConflict()
+    if payment.submitted_by_membership_id is None:
+        raise PaymentPostingConflict()
+    if approver.id in {payment.created_by_membership_id, payment.submitted_by_membership_id}:
+        raise PermissionDenied()
     movement: CashTransaction | None = None
-    if method == Payment.Method.CASH:
-        assert cash_session_id is not None
+    if payment.method == Payment.Method.CASH:
+        if cash_session_id is None:
+            raise ValidationError({"cash_session_id": ["A cash payment requires an open session."]})
         movement = record_cash_movement(
             gym=gym,
             actor=approver,
@@ -732,6 +775,8 @@ def post_retail_product_payment(
             reversal_of_id=None,
         )
         _assert_reception_till(payment=payment, session=movement.cash_session)
+    elif cash_session_id is not None:
+        raise ValidationError({"cash_session_id": ["Only a cash payment can use a cash session."]})
     number, sequence_value, sequence_year = _allocate_receipt_number(
         gym=gym, payment=payment, actor=approver
     )
@@ -756,6 +801,9 @@ def post_retail_product_payment(
         sequence_year=sequence_year,
         issued_at=posted_at,
     )
+    extra: dict[str, object] = {"receipt_number": receipt.receipt_number}
+    if audit_extra is not None:
+        extra.update(audit_extra)
     _audit(
         gym=gym,
         actor=approver,
@@ -764,9 +812,236 @@ def post_retail_product_payment(
         request_id=request_id,
         ip_address=ip_address,
         user_agent=user_agent,
-        extra={"receipt_number": receipt.receipt_number, "retail_sale_id": str(retail_sale_id)},
+        extra=extra,
     )
     return payment, receipt, movement
+
+
+def create_linked_pt_payment_draft(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    sale_id: UUID,
+    member: Member,
+    currency: str,
+    fields: dict[str, Any],
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> Payment:
+    """Insert one draft PT charge owned by the sale. No public permission check."""
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("PT payment drafts require an active transaction.")
+    if currency != gym.currency:
+        raise ValidationError({"currency": ["Currency must match the selected gym."]})
+    received_at = _received_at(gym=gym, fields={**fields, "business_date": fields["business_date"]})
+    payment = Payment(
+        gym=gym,
+        member=member,
+        membership=None,
+        pt_sale_id=sale_id,
+        entry_type=Payment.EntryType.CHARGE,
+        purpose=Payment.Purpose.PT,
+        description=str(fields["description"]),
+        amount=fields["amount"],
+        currency=currency,
+        method=fields["method"],
+        business_date=fields["business_date"],
+        received_at=received_at,
+        reference_number=str(fields.get("reference_number") or ""),
+        status=Payment.Status.DRAFT,
+        legacy_unlinked_cash=False,
+        created_with_reception_scope=_holds_reception(gym_id=gym.id, membership_id=actor.id),
+        created_by_membership_id=actor.id,
+        updated_by_membership_id=actor.id,
+    )
+    payment.save()
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="PAYMENT_DRAFT_CREATED",
+        payment=payment,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={"pt_sale_id": str(sale_id)},
+    )
+    return payment
+
+
+def update_linked_pt_payment_draft(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    payment: Payment,
+    member: Member,
+    fields: dict[str, Any],
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> Payment:
+    if payment.status != Payment.Status.DRAFT or payment.pt_sale_id is None:
+        raise PaymentPostingConflict()
+    merged: dict[str, Any] = {
+        "description": payment.description,
+        "amount": payment.amount,
+        "method": payment.method,
+        "business_date": payment.business_date,
+        "received_at": payment.received_at,
+        "reference_number": payment.reference_number,
+    }
+    merged.update(fields)
+    payment.member = member
+    payment.description = str(merged["description"])
+    payment.amount = merged["amount"]
+    payment.currency = gym.currency
+    payment.method = str(merged["method"])
+    payment.business_date = merged["business_date"]
+    payment.received_at = _received_at(gym=gym, fields=merged)
+    payment.reference_number = str(merged.get("reference_number") or "")
+    payment.updated_by_membership_id = actor.id
+    payment.save()
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="PAYMENT_DRAFT_UPDATED",
+        payment=payment,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={"pt_sale_id": str(payment.pt_sale_id)},
+    )
+    return payment
+
+
+def cancel_linked_pt_payment_draft(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    payment: Payment,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> Payment:
+    if payment.status != Payment.Status.DRAFT or payment.pt_sale_id is None:
+        raise PaymentPostingConflict()
+    now = timezone.now()
+    payment.status = Payment.Status.CANCELLED
+    payment.cancelled_at = now
+    payment.cancelled_by_membership_id = actor.id
+    payment.cancellation_reason = "Removed from the PT sale draft."
+    payment.pt_sale = None
+    payment.updated_by_membership_id = actor.id
+    payment.save()
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="PAYMENT_CANCELLED",
+        payment=payment,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    return payment
+
+
+def submit_linked_pt_payment(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    payment: Payment,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> Payment:
+    if payment.status != Payment.Status.DRAFT or payment.pt_sale_id is None:
+        raise PaymentPostingConflict()
+    now = timezone.now()
+    payment.status = Payment.Status.PENDING_APPROVAL
+    payment.submitted_at = now
+    payment.submitted_by_membership_id = actor.id
+    payment.submitted_with_reception_scope = _holds_reception(gym_id=gym.id, membership_id=actor.id)
+    payment.updated_by_membership_id = actor.id
+    payment.save()
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="PAYMENT_SUBMITTED",
+        payment=payment,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={"pt_sale_id": str(payment.pt_sale_id)},
+    )
+    return payment
+
+
+def reject_linked_pt_payment(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    payment: Payment,
+    reason: str,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> Payment:
+    if payment.status != Payment.Status.PENDING_APPROVAL or payment.pt_sale_id is None:
+        raise PaymentPostingConflict()
+    now = timezone.now()
+    payment.status = Payment.Status.REJECTED
+    payment.rejected_at = now
+    payment.rejected_by_membership_id = actor.id
+    payment.rejection_reason = reason
+    payment.updated_by_membership_id = actor.id
+    payment.save()
+    _audit(
+        gym=gym,
+        actor=actor,
+        action="PAYMENT_REJECTED",
+        payment=payment,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        extra={"pt_sale_id": str(payment.pt_sale_id)},
+    )
+    return payment
+
+
+def post_linked_pt_payment(
+    *,
+    gym: Gym,
+    approver: GymMembership,
+    payment: Payment,
+    cash_session_id: UUID | None,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> tuple[Payment, Receipt, CashTransaction | None]:
+    """Post the sale's pending charge through the shared receipt and cash helper."""
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("PT payment posting requires an active transaction.")
+    if (
+        payment.gym_id != gym.id
+        or payment.purpose != Payment.Purpose.PT
+        or payment.pt_sale_id is None
+        or payment.entry_type != Payment.EntryType.CHARGE
+        or payment.membership_id is not None
+        or payment.status != Payment.Status.PENDING_APPROVAL
+    ):
+        raise PaymentPostingConflict()
+    return _post_pending_charge(
+        gym=gym,
+        approver=approver,
+        payment=payment,
+        cash_session_id=cash_session_id,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        audit_extra={"pt_sale_id": str(payment.pt_sale_id)},
+    )
 
 
 def post_retail_product_refund(
@@ -903,6 +1178,7 @@ def void_payment(
     original = _lock_payment(gym_id=gym.id, payment_id=payment_id)
     gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="payments.void")
     _reject_retail_charge(original)
+    _reject_sale_owned_payment(original)
     if original.entry_type != Payment.EntryType.CHARGE or original.status != Payment.Status.POSTED:
         raise PaymentPostingConflict()
     related = _lock_related_payments(original)
@@ -1020,6 +1296,7 @@ def refund_payment(
     original = _lock_payment(gym_id=gym.id, payment_id=payment_id)
     gym, actor = _reload(gym_id=gym.id, membership_id=actor.id, permission_code="payments.refund")
     _reject_retail_charge(original)
+    _reject_sale_owned_payment(original)
     if original.entry_type != Payment.EntryType.CHARGE or original.status != Payment.Status.POSTED:
         raise PaymentPostingConflict()
     if original.currency != gym.currency:
@@ -1175,6 +1452,11 @@ def _reject_retail_charge(payment: Payment) -> None:
         raise RetailCorrectionUnavailable()
 
 
+def _reject_sale_owned_payment(payment: Payment) -> None:
+    if payment.pt_sale_id is not None:
+        raise PTPaymentOwned()
+
+
 def reverse_retail_product_payment(
     *,
     gym: Gym,
@@ -1195,8 +1477,6 @@ def reverse_retail_product_payment(
     session before calling this helper.
     """
 
-    if not connection.in_atomic_block:
-        raise RuntimeError("Retail payment reversal requires an active transaction.")
     if (
         original.gym_id != gym.id
         or original.purpose != Payment.Purpose.PRODUCT
@@ -1205,6 +1485,105 @@ def reverse_retail_product_payment(
         or original.status != Payment.Status.POSTED
     ):
         raise PaymentPostingConflict()
+    return _reverse_locked_posted_charge(
+        gym=gym,
+        actor=actor,
+        original=original,
+        receipts=receipts,
+        reason=reason,
+        business_date=business_date,
+        cash_session_id=cash_session_id,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        retail_sale_id=original.retail_sale_id,
+        audit_extra={"retail_sale_id": str(original.retail_sale_id)},
+    )
+
+
+def reverse_pt_sale_payment(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    original: Payment,
+    receipts: list[Receipt],
+    reason: str,
+    business_date: date,
+    cash_session_id: UUID | None,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> dict[str, Any]:
+    """Reverse one locked posted PT charge inside sale void.
+
+    Public payment void and refund still reject a sale-owned payment. The
+    reversal does not copy ``pt_sale_id``; the original charge keeps that link
+    and points at the reversal. A cash original uses the supplied open session,
+    including the reception till that created or submitted the charge.
+    """
+
+    if (
+        original.gym_id != gym.id
+        or original.purpose != Payment.Purpose.PT
+        or original.pt_sale_id is None
+        or original.entry_type != Payment.EntryType.CHARGE
+        or original.status != Payment.Status.POSTED
+    ):
+        raise PaymentPostingConflict()
+    if original.method == Payment.Method.CASH:
+        if cash_session_id is None:
+            raise ValidationError(
+                {"cash_session_id": ["A cash correction requires an open session."]}
+            )
+        session = (
+            CashSession.objects.select_for_update()
+            .filter(gym_id=gym.id, id=cash_session_id)
+            .first()
+        )
+        if session is None:
+            raise ValidationError(
+                {
+                    "cash_session_id": [
+                        "Select an open cash session for the correction date and currency."
+                    ]
+                }
+            )
+        _assert_reception_till(payment=original, session=session)
+    return _reverse_locked_posted_charge(
+        gym=gym,
+        actor=actor,
+        original=original,
+        receipts=receipts,
+        reason=reason,
+        business_date=business_date,
+        cash_session_id=cash_session_id,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        retail_sale_id=None,
+        audit_extra={"pt_sale_id": str(original.pt_sale_id)},
+    )
+
+
+def _reverse_locked_posted_charge(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    original: Payment,
+    receipts: list[Receipt],
+    reason: str,
+    business_date: date,
+    cash_session_id: UUID | None,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+    retail_sale_id: UUID | None,
+    audit_extra: dict[str, str],
+) -> dict[str, Any]:
+    """Post one equal reversal for a locked posted charge and void its receipt."""
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Payment reversal requires an active transaction.")
     related = list(
         Payment.objects.filter(gym_id=original.gym_id, original_payment_id=original.id).order_by(
             "id"
@@ -1240,7 +1619,7 @@ def reverse_retail_product_payment(
         movement=movement,
         legacy=False,
         posted_at=now,
-        retail_sale_id=original.retail_sale_id,
+        retail_sale_id=retail_sale_id,
     )
     number, sequence_value, sequence_year = _allocate_receipt_number(
         gym=gym, payment=reversal, actor=actor
@@ -1272,10 +1651,7 @@ def reverse_retail_product_payment(
         request_id=request_id,
         ip_address=ip_address,
         user_agent=user_agent,
-        extra={
-            "reversal_payment_id": str(reversal.id),
-            "retail_sale_id": str(original.retail_sale_id),
-        },
+        extra={"reversal_payment_id": str(reversal.id), **audit_extra},
     )
     _audit(
         gym=gym,

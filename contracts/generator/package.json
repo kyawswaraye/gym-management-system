@@ -6,7 +6,7 @@
     "node": "24.20.0"
   },
   "scripts": {
-    "generate": "openapi-typescript ../openapi.v1.json -o ../../web/src/types/api.generated.ts && prettier --write ../../web/src/types/api.generated.ts"
+    "generate": "openapi-typescript ../openapi.v1.json -o ../../web/src/types/api.generated.ts && prettier --write ../../web/src/types/api.generated.ts && openapi-typescript ../openapi.v1.json -o ../../mobile/src/types/api.generated.ts && prettier --write ../../mobile/src/types/api.generated.ts"
   },
   "devDependencies": {
     "openapi-typescript": "7.13.0",

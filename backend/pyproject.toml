@@ -9,9 +9,17 @@ select = ["E", "F", "I", "B", "UP", "DJ", "RUF"]
 [tool.ruff.lint.per-file-ignores]
 "apps/*/models.py" = ["DJ001", "RUF012"]
 "apps/*/views.py" = ["RUF012"]
+"apps/*/booking_views.py" = ["RUF012"]
+"apps/*/pt_booking_views.py" = ["RUF012"]
+"apps/*/pt_sale_views.py" = ["RUF012"]
+"apps/*/pt_commission_views.py" = ["RUF012"]
+"apps/*/package_views.py" = ["RUF012"]
 "apps/*/payment_views.py" = ["RUF012"]
+"apps/reports/views.py" = ["RUF012"]
 "apps/*/scan_views.py" = ["RUF012"]
+"apps/*/self_views.py" = ["RUF012"]
 "apps/*/device_views.py" = ["RUF012"]
+"apps/*/member_device_views.py" = ["RUF012"]
 "apps/*/member_views.py" = ["RUF012"]
 "apps/*/staff_views.py" = ["RUF012"]
 "apps/*/role_views.py" = ["RUF012"]
@@ -40,7 +48,10 @@ module = [
   "apps.common.finance.exceptions",
   "apps.files.exceptions",
   "apps.members.exceptions",
+  "apps.trainers.exceptions",
   "apps.cashbook.exceptions",
+  "apps.classes.exceptions",
+  "apps.announcements.exceptions",
   "apps.expenses.exceptions",
   "apps.salaries.exceptions",
   "apps.tenants.exceptions",
@@ -70,6 +81,13 @@ module = [
   "apps.salaries.serializers",
   "apps.inventory.serializers",
   "apps.sales.serializers",
+  "apps.trainers.serializers",
+  "apps.classes.serializers",
+  "apps.reports.serializers",
+  "apps.members.self_serializers",
+  "apps.members.member_device_serializers",
+  "apps.announcements.serializers",
+  "apps.notifications.member_serializers",
 ]
 disable_error_code = ["assignment", "type-arg"]
 
@@ -78,19 +96,33 @@ module = [
   "apps.common.api.middleware",
   "apps.members.views",
   "apps.members.scan_views",
+  "apps.members.self_views",
   "apps.members.device_views",
+  "apps.members.member_device_views",
+  "apps.announcements.views",
+  "apps.notifications.member_views",
   "apps.tenants.staff_views",
   "apps.tenants.role_views",
   "apps.tenants.views",
   "apps.users.authentication",
   "apps.users.views",
   "apps.files.views",
+  "apps.files.member_views",
   "apps.cashbook.views",
   "apps.expenses.views",
   "apps.salaries.views",
   "apps.inventory.views",
   "apps.sales.views",
+  "apps.trainers.views",
+  "apps.trainers.pt_sale_views",
+  "apps.trainers.pt_commission_views",
+  "apps.trainers.package_views",
+  "apps.classes.views",
+  "apps.classes.booking_views",
+  "apps.trainers.pt_booking_views",
   "apps.members.payment_views",
+  "apps.reports.views",
+  "apps.reports.export_views",
   "apps.files.authentication",
 ]
 disable_error_code = [

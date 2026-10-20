@@ -40,7 +40,7 @@ The bootstrap role cannot read member names, email, or phone. A pooled connectio
 
 ## Compatibility consequences
 
-`docs/DEVELOPMENT_PLAN.md` stays the historical baseline and is not edited. [ADR 0004](0004-defer-check-in-scan.md) still rejects a staff scan route. [ADR 0006](0006-member-check-in-scan.md) publishes the member route. Phase 3 implementation is complete as of 2026-10-18. Public member identity linking, multi-member selection, member MFA, the React Native app, and broader Phase 7 mobile APIs remain deferred and are not prerequisites for the already-linked member QR path.
+`docs/DEVELOPMENT_PLAN.md` stays the historical baseline and is not edited. [ADR 0004](0004-defer-check-in-scan.md) still rejects a staff scan route. [ADR 0006](0006-member-check-in-scan.md) publishes the member route. Phase 3 implementation is complete as of 2026-10-18. Public member identity linking, multi-member selection, and member MFA remain deferred and are not prerequisites for the already-linked member QR path. [ADR 0011](0011-bare-react-native-member-app.md) and [ADR 0012](0012-fcm-push-delivery.md) approve the bare React Native CLI client and FCM delivery. The later implementation publishes the member app and the remaining member routes. Live Firebase and APNs credentials, release signing, store submission, and a production device proof remain open. Production deployment is not complete.
 
 ## Alternatives considered
 

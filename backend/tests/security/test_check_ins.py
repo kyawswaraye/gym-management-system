@@ -115,7 +115,9 @@ def test_manual_check_in_checkout_history_and_summary() -> None:
     today = covered_on.isoformat()
 
     assert api.get("/api/v1/check-ins/", **accountant_headers).status_code == 403
-    assert api.get("/api/v1/check-ins/", **trainer_headers).status_code == 404
+    trainer_list = api.get("/api/v1/check-ins/", **trainer_headers)
+    assert trainer_list.status_code == 200
+    assert trainer_list.json()["data"] == []
     backdate_denied = api.post(
         "/api/v1/check-ins/",
         {"member_id": str(uuid4()), "occurred_at": timezone.now().isoformat()},

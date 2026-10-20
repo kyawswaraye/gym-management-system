@@ -70,7 +70,12 @@ from apps.members.payment_services import (
     void_receipt,
 )
 from apps.members.receipt_rendering import receipt_download_response
-from apps.users.permissions import RequiresEntitlement, RequiresEntitlements, RequiresPermission
+from apps.users.permissions import (
+    RequiresEntitlement,
+    RequiresEntitlements,
+    RequiresPermission,
+    TrainerFinanceClosed,
+)
 
 _IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9._:-]{16,128}$")
 IDEMPOTENCY_HEADER = OpenApiParameter(
@@ -112,7 +117,12 @@ def _audit_context(request: Request) -> dict[str, Any]:
 
 
 class PaymentAPIView(APIView):
-    permission_classes = [IsAuthenticated, RequiresPermission, RequiresEntitlement]
+    permission_classes = [
+        IsAuthenticated,
+        RequiresPermission,
+        RequiresEntitlement,
+        TrainerFinanceClosed,
+    ]
     required_feature = "finance"
     required_permission = "payments.view"
 
@@ -677,7 +687,12 @@ class ReceiptDownloadView(PaymentAPIView):
 
 
 class DailySalesView(APIView):
-    permission_classes = [IsAuthenticated, RequiresPermission, RequiresEntitlements]
+    permission_classes = [
+        IsAuthenticated,
+        RequiresPermission,
+        RequiresEntitlements,
+        TrainerFinanceClosed,
+    ]
     required_permission = "reports.financial"
     required_features = ("reports", "finance")
 

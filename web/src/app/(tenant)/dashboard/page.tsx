@@ -2,14 +2,21 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { OwnerDashboard } from "@/features/operations/owner-dashboard";
-import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
+import {
+  hasTenantCapability,
+  tenantHomePath,
+  trainerAssignmentRestricted,
+} from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
   const session = await requireTenantSession();
-  if (!hasTenantCapability(session, "reports.view", "reports")) {
+  if (
+    !hasTenantCapability(session, "reports.view", "reports") ||
+    trainerAssignmentRestricted(session)
+  ) {
     const homePath = tenantHomePath(session);
     if (homePath !== "/dashboard") redirect(homePath);
     return (
@@ -30,7 +37,8 @@ export default async function DashboardPage() {
         Owner dashboard
       </h1>
       <p className="muted mb-6 mt-2">
-        Revenue, outstanding membership payments, and expiring members.
+        Operational totals for the selected period. Financial totals appear when
+        this response includes them.
       </p>
       <OwnerDashboard />
     </section>

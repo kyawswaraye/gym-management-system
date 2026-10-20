@@ -348,9 +348,10 @@ def test_member_api_is_scoped_normalized_and_archive_is_idempotent() -> None:
         format="json",
         **trainer_headers,
     )
-    assert updated.status_code == 200, updated.json()
-    assert updated.json()["data"]["notes"] == "Floor access"
-    assert updated.json()["data"]["authz_version"] == 1
+    assert updated.status_code == 404
+    assert "Floor access" not in updated.content.decode()
+    assert _stored(gym_a.id, member_id).notes == ""
+    assert _stored(gym_a.id, member_id).authz_version == 1
     reception_archive = api.post(
         f"/api/v1/members/{member_id}/archive/", {}, format="json", **reception_headers
     )

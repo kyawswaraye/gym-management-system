@@ -8,6 +8,7 @@ from apps.common.production import (
     require_https_endpoint,
     require_https_public_url,
     require_private_clamav_host,
+    require_push_backend,
     require_resend_api_key,
     require_resend_backend,
     require_reset_ttl_seconds,
@@ -52,6 +53,18 @@ require_dedicated_reset_pepper(
 )
 require_reset_ttl_seconds(PASSWORD_RESET_TTL_SECONDS)  # noqa: F405
 require_scheduler_commands(PRODUCTION_SCHEDULER_COMMANDS)
+require_push_backend(
+    backend=PUSH_BACKEND,  # noqa: F405
+    project_id=FCM_PROJECT_ID,  # noqa: F405
+    service_account_json=FCM_SERVICE_ACCOUNT_JSON,  # noqa: F405
+    encryption_key=PUSH_TOKEN_ENCRYPTION_KEY,  # noqa: F405
+    fingerprint_pepper=PUSH_TOKEN_FINGERPRINT_PEPPER,  # noqa: F405
+    other_secrets={
+        "MFA_ENCRYPTION_KEY": MFA_ENCRYPTION_KEY,  # noqa: F405
+        "FINANCE_IDEMPOTENCY_ENCRYPTION_KEY": FINANCE_IDEMPOTENCY_ENCRYPTION_KEY,  # noqa: F405
+        "PASSWORD_RESET_TOKEN_PEPPER": PASSWORD_RESET_TOKEN_PEPPER,  # noqa: F405
+    },
+)
 require_https_endpoint(MINIO_ENDPOINT_URL, name="MINIO_ENDPOINT_URL")  # noqa: F405
 require_https_endpoint(MINIO_PUBLIC_URL, name="MINIO_PUBLIC_URL")  # noqa: F405
 require_aws_singapore_region(MINIO_REGION)  # noqa: F405

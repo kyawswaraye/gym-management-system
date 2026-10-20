@@ -1,6 +1,6 @@
 # ADR 0004: Do not publish a staff check-in scan route
 
-- **Status:** Accepted. The generic staff scan route stays unpublished. Member-self scan, display credentials, and NFC and biometric ingestion are specified in ADRs 0006–0008. Trainer scan remains a Phase 5 assignment extension.
+- **Status:** Accepted. The generic staff scan route stays unpublished. Member-self scan, display credentials, and NFC and biometric ingestion are specified in ADRs 0006–0008. Trainer scan was later published as an assignment-scoped route and is outside this record.
 - **Decision date:** 2026-10-17
 - **Applies from:** Phase 3 staff challenge issuance
 
@@ -39,7 +39,7 @@ Issuance locks gym settings, revokes prior active staff-issued challenges, and i
 
 No staff scan route is added. Owner and manager role templates gain `checkins.challenge.issue` through a forward data migration. Reception and trainer templates stay unchanged because their matrix entries are conditional and those conditions are not yet implemented. [ADR 0005](0005-member-session-foundation.md) publishes member login, refresh, and logout. [ADR 0006](0006-member-check-in-scan.md) publishes member-self redemption only. [ADR 0007](0007-display-device-credentials.md) adds a gym-owned display credential and a separate device challenge route. The generic `/api/v1/check-ins/scan/` path stays unpublished so a staff token cannot be aimed at an ambiguous scan URL.
 
-`docs/DEVELOPMENT_PLAN.md` remains the immutable historical baseline and is not edited by this deferral. Phase 3 implementation is complete as of 2026-10-18 under ADRs 0004–0008. This record still forbids the generic staff scan route. The approved QR path is authenticated member-self scan. Trainer scan remains a Phase 5 assignment-scoped extension and is not implemented. Display, NFC, and biometric credentials are specified in later ADRs and do not reopen this route.
+`docs/DEVELOPMENT_PLAN.md` remains the immutable historical baseline and is not edited by this deferral. Phase 3 implementation is complete as of 2026-10-18 under ADRs 0004–0008. This record still forbids the generic staff scan route. The approved QR path is authenticated member-self scan. Trainer scan was later published at `POST /api/v1/trainer/check-ins/scan/`. This record does not define that route. Display, NFC, and biometric credentials are specified in later ADRs and do not reopen this route.
 
 ## Alternatives considered
 

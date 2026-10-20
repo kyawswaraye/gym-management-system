@@ -34,6 +34,18 @@ export const managerAccount: E2EAccount = {
   totpSecret: requiredEnv("E2E_MANAGER_TOTP_SECRET"),
 };
 
+export const receptionAccount: E2EAccount = {
+  email: "e2e-reception@example.test",
+  password: requiredEnv("E2E_RECEPTION_PASSWORD"),
+  totpSecret: requiredEnv("E2E_RECEPTION_TOTP_SECRET"),
+};
+
+export const trainerAccount: E2EAccount = {
+  email: "e2e-trainer@example.test",
+  password: requiredEnv("E2E_TRAINER_PASSWORD"),
+  totpSecret: requiredEnv("E2E_TRAINER_TOTP_SECRET"),
+};
+
 export function memberAccount(): E2EAccount {
   return {
     email: "e2e-member@example.test",
@@ -44,6 +56,12 @@ export function memberAccount(): E2EAccount {
 
 const SECRET_RESPONSE =
   /"(?:access_token|refresh_token|mfa_challenge_token|invitation_token|gym_selection_ticket)"/;
+const CHECK_IN_CODE = /gms-checkin:v1:[A-Za-z0-9_-]+/g;
+
+function redactDiagnostics(body: string): string {
+  if (SECRET_RESPONSE.test(body)) return "[redacted credential response]";
+  return body.replace(CHECK_IN_CODE, "[check-in-code]").slice(0, 500);
+}
 
 const STORAGE_MARKERS = [
   "access_token",
@@ -98,13 +116,19 @@ export function watchJsonResponses(
   page.on("response", (response) => {
     const method = response.request().method();
     const pathname = responsePath(response.url());
-    if (response.status() >= 500 && MUTATING_METHODS.has(method)) {
+    const contentType = response.headers()["content-type"] ?? "";
+    const failed = response.status() >= 500 && MUTATING_METHODS.has(method);
+    if (failed && !contentType.includes("json")) {
       serverErrors.push(`${method} ${pathname} ${response.status()}`);
     }
-    const contentType = response.headers()["content-type"] ?? "";
     if (!contentType.includes("json")) return;
     pending.push(
       responseBody(response).then((body) => {
+        if (failed) {
+          serverErrors.push(
+            `${method} ${pathname} ${response.status()} ${redactDiagnostics(body)}`,
+          );
+        }
         if (!body) return;
         if (SECRET_RESPONSE.test(body)) leaks.push(pathname);
         const lowered = body.toLowerCase();

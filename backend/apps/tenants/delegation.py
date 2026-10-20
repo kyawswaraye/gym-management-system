@@ -2,11 +2,11 @@
 
 There is no public delegable-set resource. The tenant delegable set is the
 current permission set on the gym's active protected MANAGER role, excluding
-the five hard-reserved approval codes and the OWNER-only ``settings.manage``
-control. An active Owner changes that set by replacing the protected MANAGER
-role's permissions. OWNER permissions stay immutable. Custom roles and the
-protected RECEPTIONIST, ACCOUNTANT, and TRAINER roles cannot receive
-hard-reserved approvals or ``settings.manage``.
+the hard-reserved approval and payout codes and the OWNER-only
+``settings.manage`` control. An active Owner changes that set by replacing the
+protected MANAGER role's permissions. OWNER permissions stay immutable. Custom
+roles and the protected RECEPTIONIST, ACCOUNTANT, and TRAINER roles cannot
+receive hard-reserved approvals, ``pt.commissions.pay``, or ``settings.manage``.
 
 Staff invitation and membership-role replacement both call these helpers so
 the two assignment paths cannot drift.
@@ -26,6 +26,7 @@ HARD_RESERVED_APPROVALS = frozenset(
         "retail.approve",
         "pt.sales.approve",
         "salaries.approve",
+        "pt.commissions.pay",
     }
 )
 OWNER_ONLY_PERMISSIONS = frozenset({"settings.manage"})

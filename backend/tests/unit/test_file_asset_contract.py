@@ -28,6 +28,7 @@ EXPECTED_CONSTRAINTS = {
     "fileasset_scan_claim_ck",
     "fileasset_profile_photo_ck",
     "fileasset_expense_receipt_ck",
+    "fileasset_uploader_ck",
 }
 EXPECTED_INDEXES = {
     "fileasset_gym_purpose_idx": ("gym", "purpose"),
@@ -35,6 +36,7 @@ EXPECTED_INDEXES = {
     "fileasset_gym_scan_idx": ("gym", "scan_status"),
     "fileasset_gym_retention_idx": ("gym", "retention_status"),
     "fileasset_gym_uploader_idx": ("gym", "uploaded_by_membership_id"),
+    "fileasset_muploader_idx": ("gym", "uploaded_by_member_id"),
 }
 
 
@@ -47,8 +49,10 @@ def test_file_asset_model_matches_the_metadata_contract() -> None:
     object_key = FileAsset._meta.get_field("object_key")
     assert object_key.max_length == 73
     assert object_key.deconstruct()[3].get("db_index", False) is False
-    assert FileAsset._meta.get_field("uploaded_by_membership_id").null is False
+    assert FileAsset._meta.get_field("uploaded_by_membership_id").null is True
     assert not FileAsset._meta.get_field("uploaded_by_membership_id").is_relation
+    assert FileAsset._meta.get_field("uploaded_by_member_id").null is True
+    assert not FileAsset._meta.get_field("uploaded_by_member_id").is_relation
     assert FileAsset._meta.get_field("owner_type").null is True
     assert FileAsset._meta.get_field("owner_id").null is True
     assert FileAsset._meta.get_field("deleted_at").null is True
@@ -113,14 +117,20 @@ def test_file_migrations_are_linear_and_follow_the_tenants_leaf() -> None:
     security = nodes[("files", "0002_rls_integrity_and_grants")]
     profile = nodes[("files", "0003_profile_photo_contract")]
     receipt = nodes[("files", "0004_expense_receipt_and_expense")]
+    member_actor = nodes[("files", "0005_member_self_actors")]
 
     assert initial == [("tenants", "0020_retire_platform_settings_manage")]
     assert security == [("files", "0001_initial")]
     assert ("files", "0002_rls_integrity_and_grants") in profile
     assert ("tenants", "0021_security_definer_least_privilege") in profile
     assert ("files", "0003_profile_photo_contract") in receipt
-    assert _leaves(nodes)["files"] == [("files", "0004_expense_receipt_and_expense")]
-    assert _leaves(nodes)["tenants"] == [("tenants", "0025_finance_permission_catalog")]
+    assert member_actor == [
+        ("files", "0004_expense_receipt_and_expense"),
+        ("members", "0024_pt_sale_payment_void"),
+        ("tenants", "0029_member_self_actors"),
+    ]
+    assert _leaves(nodes)["files"] == [("files", "0005_member_self_actors")]
+    assert _leaves(nodes)["tenants"] == [("tenants", "0030_announcement_permission_catalog")]
     assert nodes[("tenants", "0022_check_in_challenge_permission")] == [
         ("tenants", "0021_security_definer_least_privilege")
     ]
@@ -133,6 +143,19 @@ def test_file_migrations_are_linear_and_follow_the_tenants_leaf() -> None:
     ]
     assert nodes[("tenants", "0025_finance_permission_catalog")] == [
         ("tenants", "0024_finance_idempotency_foundation")
+    ]
+    assert nodes[("tenants", "0026_pt_schedule_permission_catalog")] == [
+        ("tenants", "0025_finance_permission_catalog")
+    ]
+    assert nodes[("tenants", "0027_pt_commission_pay_reservation")] == [
+        ("tenants", "0026_pt_schedule_permission_catalog")
+    ]
+    assert nodes[("tenants", "0028_class_permission_catalog")] == [
+        ("tenants", "0027_pt_commission_pay_reservation")
+    ]
+    assert nodes[("tenants", "0029_member_self_actors")] == [
+        ("members", "0024_pt_sale_payment_void"),
+        ("tenants", "0028_class_permission_catalog"),
     ]
     assert all(len(leaves) == 1 for leaves in _leaves(nodes).values())
 
@@ -213,6 +236,10 @@ def test_profile_photo_routes_do_not_embed_storage_secrets() -> None:
         "api/v1/files/<uuid:id>/complete/",
         "api/v1/files/<uuid:id>/download-url/",
         "api/v1/files/<uuid:id>/",
+        "api/v1/member/files/upload-intents/",
+        "api/v1/member/files/<uuid:id>/complete/",
+        "api/v1/member/files/<uuid:id>/download-url/",
+        "api/v1/member/files/<uuid:id>/",
     } <= set(paths)
     assert "apps.files.urls" in (BACKEND_ROOT / "config" / "urls.py").read_text()
     assert 'os.environ.get("MINIO_SECRET_KEY", "")' in settings
