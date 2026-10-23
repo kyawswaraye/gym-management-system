@@ -138,6 +138,23 @@ def test_pt_commission_pay_is_hard_reserved_after_the_historical_grant() -> None
     assert "ACCOUNTANT" in source
 
 
+def test_member_restore_matches_archive_templates_and_stays_out_of_the_historical_seed() -> None:
+    catalog = importlib.import_module("apps.tenants.migrations.0031_member_restore_permission")
+    assert catalog.NEW_PERMISSIONS == (
+        ("members.restore", "members", "Restore an archived member", "HIGH"),
+    )
+    assert "members.restore" not in seed.PERMISSION_CODES
+    for key in ("OWNER", "MANAGER", "RECEPTIONIST", "ACCOUNTANT", "TRAINER"):
+        assert "members.restore" not in seed.TEMPLATES[key]
+    assert catalog.TEMPLATE_GRANTS == {
+        "OWNER": ("members.restore",),
+        "MANAGER": ("members.restore",),
+    }
+    assert "RECEPTIONIST" not in catalog.TEMPLATE_GRANTS
+    assert "ACCOUNTANT" not in catalog.TEMPLATE_GRANTS
+    assert "TRAINER" not in catalog.TEMPLATE_GRANTS
+
+
 def test_historical_catalog_retains_retired_platform_settings_code() -> None:
     assert "platform.settings.manage" in seed.PERMISSION_CODES
     assert "platform.settings.manage" not in seed.OWNER

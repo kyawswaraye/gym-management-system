@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import type { CurrentUser } from "@/types/api";
 
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
 }));
 

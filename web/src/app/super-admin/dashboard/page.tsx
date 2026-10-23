@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { PlatformDashboard } from "@/features/platform/platform-dashboard";
 import { hasPermission, platformHomePath } from "@/lib/auth/authorization";
 import { requirePlatformSession } from "@/lib/auth/session";
@@ -16,13 +17,13 @@ export default async function SuperAdminDashboardPage() {
 
   return (
     <section aria-labelledby="platform-dashboard-title">
-      <h1 id="platform-dashboard-title" className="text-3xl font-bold">
-        Platform dashboard
-      </h1>
-      <p className="muted mt-2">Gym, subscription, and plan status counts.</p>
-      <div className="mt-6">
-        <PlatformDashboard canView />
-      </div>
+      <PageHeader
+        description="Gym, subscription, and plan status counts."
+        eyebrow="Platform"
+        title="Platform dashboard"
+        titleId="platform-dashboard-title"
+      />
+      <PlatformDashboard canView />
     </section>
   );
 }

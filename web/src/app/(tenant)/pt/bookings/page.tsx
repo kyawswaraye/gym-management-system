@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { BookingsManager } from "@/features/pt/bookings-manager";
 import {
   canOfferUnmeteredBooking,
@@ -16,14 +17,12 @@ export default async function PtBookingsPage() {
 
   return (
     <section aria-labelledby="pt-bookings-title">
-      <h1 className="text-2xl font-bold" id="pt-bookings-title">
-        PT bookings
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Work a gym-local calendar of personal-training sessions. Attendance and
-        no-show consume a package unless a protected manager records an
-        unmetered reason.
-      </p>
+      <PageHeader
+        description="Work a gym-local calendar of personal-training sessions. Attendance and no-show consume a package unless a protected manager records an unmetered reason."
+        eyebrow="Personal training"
+        title="PT bookings"
+        titleId="pt-bookings-title"
+      />
       <BookingsManager
         canManage={hasPermission(session, "pt.schedule.manage")}
         canUnmetered={canOfferUnmeteredBooking(session)}

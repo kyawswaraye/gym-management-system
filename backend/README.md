@@ -196,9 +196,11 @@ Provision these roles before applying migrations:
   `updated_at`. Invitation identities and the one acceptance password
   transition go through locked security-definer functions.
 
-Run migrations with `make migrate` from the repository root, then run the API
-with `DATABASE_ROLE_MODE=runtime` on loopback only. All `/api/v1/auth/` routes
-require the BFF shared secret. Migrations fail if required roles are missing.
+Run migrations with `make migrate` from the repository root, then run the local
+API with `DATABASE_ROLE_MODE=runtime` bound to loopback. Production isolation
+is a container-private bind, no API host port, and the Caddy member-route
+allowlist. All `/api/v1/auth/` routes require the BFF shared secret. Migrations
+fail if required roles are missing.
 PostgreSQL-only tests use `make backend-test-pg` (`RUN_POSTGRESQL_TESTS=1` and
 `TEST_DB_USER=gym_admin`). Runtime RLS proofs `SET LOCAL ROLE gym_runtime`.
 
@@ -367,3 +369,11 @@ RUN_POSTGRESQL_TESTS=1 pytest -m postgresql
   marked inactive in Phase 1B. It has no HTTP route, is omitted from platform
   sessions while inactive, and never authorizes tenant `settings.manage`.
   The retirement migration does not reverse it into an active grant.
+- Phase 8 increment 13 adds an opt-in local identity-security characterization
+  on the disposable staging rehearsal. The record is
+  `docs/runbooks/phase8-increment-13.md`. It does not prove a penetration test,
+  a formal security review, production security, tenant isolation, or a live
+  provider. Phase 8 increment 14 adds an opt-in local tenant-isolation
+  characterization. The record is `docs/runbooks/phase8-increment-14.md`. It
+  does not prove independent tenant isolation, a penetration test, a formal
+  security review, or production proof. Phase 8 is not complete.

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { ReportsManager } from "@/features/reports/reports-manager";
 import {
   hasTenantCapability,
@@ -28,14 +29,24 @@ export default async function ReportsPage() {
 
   return (
     <section aria-labelledby="reports-title">
-      <h1 className="text-3xl font-bold" id="reports-title">
-        Reports
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Reports for the selected gym. Financial amounts are server totals.
-        Product sales are financial. Stock movement, inventory, membership
-        expiry, check-in, PT session, and class reports do not include money.
-      </p>
+      <PageHeader
+        description="Review operational trends and trusted server-calculated financial totals for your selected gym. Operational reports do not include money."
+        eyebrow="Analytics workspace"
+        title="Reports"
+        titleId="reports-title"
+      >
+        <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-slate-600">
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">
+            Financial totals
+          </span>
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">
+            Member activity
+          </span>
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">
+            Inventory insights
+          </span>
+        </div>
+      </PageHeader>
       <ReportsManager
         canExport={canExport}
         canViewFinancial={canViewFinancial}

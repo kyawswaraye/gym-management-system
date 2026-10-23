@@ -483,7 +483,7 @@ function LifecycleDialog({
               {pending ? "Saving…" : confirmLabel}
             </button>
             <button
-              className="button bg-white text-slate-900 ring-1 ring-slate-300"
+              className="button button-cancel"
               type="button"
               onClick={onCancel}
             >
@@ -1177,7 +1177,7 @@ export function StaffManager({
                 inputMode="decimal"
               />
               <button
-                className="button md:col-span-2"
+                className="button button-edit md:col-span-2"
                 disabled={pending}
                 type="submit"
               >
@@ -1189,7 +1189,7 @@ export function StaffManager({
           !locked &&
           selected.membership.status === "ACTIVE" ? (
             <button
-              className="button mt-4"
+              className="button button-warn mt-4"
               type="button"
               disabled={pending}
               onClick={() => {
@@ -1204,7 +1204,7 @@ export function StaffManager({
           !locked &&
           selected.membership.status === "SUSPENDED" ? (
             <button
-              className="button mt-4"
+              className="button button-success mt-4"
               type="button"
               disabled={pending}
               onClick={() => {
@@ -1326,7 +1326,11 @@ export function StaffManager({
                       </label>
                     ))}
                   </fieldset>
-                  <button className="button" disabled={pending} type="submit">
+                  <button
+                    className="button button-edit"
+                    disabled={pending}
+                    type="submit"
+                  >
                     {pending ? "Saving…" : "Save assigned roles"}
                   </button>
                 </form>

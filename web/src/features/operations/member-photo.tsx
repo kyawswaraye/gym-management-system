@@ -354,7 +354,7 @@ export function MemberPhoto({
         ) : null}
         {canDelete && assetId && !recovery ? (
           <button
-            className="button"
+            className="button button-delete"
             disabled={busy}
             onClick={() => void removeCurrent()}
             type="button"
@@ -381,7 +381,7 @@ export function MemberPhoto({
             ) : null}
             {canDelete ? (
               <button
-                className="button"
+                className="button button-delete"
                 disabled={busy}
                 onClick={() => void deleteRecoverable()}
                 type="button"

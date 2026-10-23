@@ -473,7 +473,7 @@ export function RetailSalesManager({
                   </p>
                 )}
                 <button
-                  className="underline"
+                  className="underline tone-delete"
                   onClick={() =>
                     setLines((current) =>
                       current.filter((item) => item.key !== line.key),
@@ -487,14 +487,18 @@ export function RetailSalesManager({
             );
           })}
           <button
-            className="underline"
+            className="underline tone-create"
             disabled={lines.length >= 100}
             onClick={() => setLines((current) => [...current, blankLine()])}
             type="button"
           >
             Add product line
           </button>
-          <button className="button" disabled={pending} type="submit">
+          <button
+            className="button button-edit"
+            disabled={pending}
+            type="submit"
+          >
             {editing ? "Save sale changes" : "Save draft"}
           </button>
         </form>
@@ -533,7 +537,7 @@ export function RetailSalesManager({
           <div className="flex flex-wrap gap-3">
             {sale.status === "DRAFT" && canUpdate && (
               <button
-                className="underline"
+                className="underline tone-edit"
                 onClick={() => setEditing(true)}
                 type="button"
               >
@@ -551,7 +555,7 @@ export function RetailSalesManager({
             )}
             {sale.status === "PENDING_APPROVAL" && canApprove && (
               <button
-                className="underline"
+                className="underline tone-success"
                 onClick={() => setAction("approve")}
                 type="button"
               >
@@ -560,7 +564,7 @@ export function RetailSalesManager({
             )}
             {sale.status === "PENDING_APPROVAL" && canApprove && (
               <button
-                className="underline"
+                className="underline tone-warn"
                 onClick={() => setAction("reject")}
                 type="button"
               >
@@ -569,7 +573,7 @@ export function RetailSalesManager({
             )}
             {sale.status === "DRAFT" && canUpdate && (
               <button
-                className="underline"
+                className="underline tone-cancel"
                 onClick={() => setAction("cancel")}
                 type="button"
               >
@@ -578,7 +582,7 @@ export function RetailSalesManager({
             )}
             {sale.status === "POSTED" && canVoid && sale.return_count === 0 && (
               <button
-                className="underline"
+                className="underline tone-delete"
                 onClick={() => {
                   setCorrectionDate(defaultDate);
                   setAction("void");
@@ -590,7 +594,7 @@ export function RetailSalesManager({
             )}
             {sale.status === "POSTED" && canVoid && (
               <button
-                className="underline"
+                className="underline tone-delete"
                 onClick={() => {
                   setCorrectionDate(defaultDate);
                   setAction("return");

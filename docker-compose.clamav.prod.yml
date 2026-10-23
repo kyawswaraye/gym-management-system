@@ -1,4 +1,6 @@
-# Production ClamAV fragment. Merge this with the VPS Compose file.
+# Historical ClamAV fragment. The Phase 8 increment 1 baseline is
+# infra/compose/docker-compose.prod.yml, which already keeps ClamAV private.
+# Merge this with the VPS Compose file only if you are not using that baseline.
 # The daemon publishes no host port. Django reaches it only on the private
 # application network. This file is not live-host proof.
 services:

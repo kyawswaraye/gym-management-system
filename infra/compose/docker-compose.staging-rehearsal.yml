@@ -1,0 +1,257 @@
+# Disposable staging rehearsal overlay for infra/compose/docker-compose.prod.yml.
+# Project name, credentials, volumes, and networks stay off the production stack.
+# Loopback Caddy is the only application ingress. This file is not a production
+# deploy and it does not publish GHCR or offsite backup proof.
+
+name: gym-staging-rehearsal
+
+services:
+  caddy:
+    ports: !override
+      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8443:443"
+    volumes: !override
+      - ../caddy/Caddyfile.staging-rehearsal:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  web:
+    environment:
+      APP_ORIGINS: https://localhost:8443
+
+  api:
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.staging_rehearsal
+      STAGING_REHEARSAL: "1"
+      EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+      PUSH_BACKEND: locmem
+      MINIO_ENDPOINT_URL: http://object-store:9000
+      MINIO_PUBLIC_URL: http://object-store:9000
+      MINIO_BUCKET: gym-staging-rehearsal-app
+      MINIO_REGION: us-east-1
+      MINIO_ADDRESSING_STYLE: path
+      APP_PUBLIC_URL: https://localhost:8443
+      JWT_PRIVATE_KEY_FILE: /run/secrets/jwt_private_key
+      JWT_PUBLIC_KEYS_FILE: /run/secrets/jwt_public_keys
+    networks:
+      - objects
+    secrets:
+      - jwt_private_key
+      - jwt_public_keys
+    depends_on:
+      object-store:
+        condition: service_healthy
+      object-init:
+        condition: service_completed_successfully
+
+  # The published ClamAV image is amd64-only on this ARM rehearsal host.
+  # Give signature loading emulation headroom and skip live signature
+  # refresh. Freshclam DNS stalls clamd under qemu. Do not inject clamd
+  # conf keys via environment: the image init runs sed -i on a read-only rootfs
+  # and the container never becomes healthy. This is not a capacity claim
+  # and does not change the production Compose resource budget.
+  clamav:
+    mem_limit: 2g
+    cpus: "1.00"
+    environment:
+      CLAMAV_NO_FRESHCLAMD: "true"
+
+  postgres:
+    environment:
+      BACKUP_REPO_MODE: rehearsal-s3-local
+      COMPOSE_PROJECT_NAME: gym-staging-rehearsal
+    secrets:
+      - staging_object_ca
+    depends_on:
+      object-backup:
+        condition: service_healthy
+      object-backup-init:
+        condition: service_completed_successfully
+
+  backup-full:
+    environment:
+      BACKUP_REPO_MODE: rehearsal-s3-local
+      COMPOSE_PROJECT_NAME: gym-staging-rehearsal
+    secrets:
+      - staging_object_ca
+
+  backup-diff:
+    environment:
+      BACKUP_REPO_MODE: rehearsal-s3-local
+      COMPOSE_PROJECT_NAME: gym-staging-rehearsal
+    secrets:
+      - staging_object_ca
+
+  backup-check:
+    environment:
+      BACKUP_REPO_MODE: rehearsal-s3-local
+      COMPOSE_PROJECT_NAME: gym-staging-rehearsal
+    secrets:
+      - staging_object_ca
+
+  backup-bootstrap:
+    environment:
+      BACKUP_REPO_MODE: rehearsal-s3-local
+      COMPOSE_PROJECT_NAME: gym-staging-rehearsal
+      # The built image checks freshness with a 3600s ceiling. The production
+      # 14400s value is for the backup itself. This overlay keeps the check
+      # inside that ceiling until the image includes the capped check.
+      BACKUP_TIMEOUT_SECONDS: "1800"
+    secrets:
+      - staging_object_ca
+
+  blackbox:
+    volumes: !override
+      - ${STAGING_BLACKBOX_FILE:?Set STAGING_BLACKBOX_FILE}:/etc/blackbox/blackbox.yml:ro
+
+  object-store:
+    image: docker.io/pgsty/silo@sha256:aaac6bce13eb99316b3c88bd20143fc3c38ab607585256a411a095c44ee57f62
+    command:
+      - server
+      - /data
+      - --console-address
+      - ":9001"
+    environment:
+      MINIO_ROOT_USER: ${OBJECT_STORE_ROOT_USER:?Set OBJECT_STORE_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${OBJECT_STORE_ROOT_PASSWORD:?Set OBJECT_STORE_ROOT_PASSWORD}
+    networks:
+      - objects
+    volumes:
+      - object_store_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: "0.40"
+    pids_limit: 128
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - http://127.0.0.1:9000/minio/health/live
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    restart: "no"
+
+  object-init:
+    image: docker.io/pgsty/silo@sha256:aaac6bce13eb99316b3c88bd20143fc3c38ab607585256a411a095c44ee57f62
+    entrypoint:
+      - /bin/sh
+      - /init-object-bucket.sh
+    environment:
+      OBJECT_SCHEME: http
+      OBJECT_HOST: object-store
+      OBJECT_PORT: "9000"
+      MINIO_BUCKET: gym-staging-rehearsal-app
+      MINIO_ROOT_USER: ${OBJECT_STORE_ROOT_USER:?Set OBJECT_STORE_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${OBJECT_STORE_ROOT_PASSWORD:?Set OBJECT_STORE_ROOT_PASSWORD}
+      HOME: /tmp
+    networks:
+      - objects
+    volumes:
+      - ../staging/init-object-bucket.sh:/init-object-bucket.sh:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    cpus: "0.10"
+    pids_limit: 64
+    depends_on:
+      object-store:
+        condition: service_healthy
+    restart: "no"
+
+  object-backup:
+    image: docker.io/pgsty/silo@sha256:aaac6bce13eb99316b3c88bd20143fc3c38ab607585256a411a095c44ee57f62
+    command:
+      - server
+      - /data
+      - --console-address
+      - ":9001"
+    environment:
+      MINIO_ROOT_USER: ${BACKUP_OBJECT_ROOT_USER:?Set BACKUP_OBJECT_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${BACKUP_OBJECT_ROOT_PASSWORD:?Set BACKUP_OBJECT_ROOT_PASSWORD}
+    networks:
+      - backup
+    volumes:
+      - object_backup_data:/data
+      # This image sets HOME=/tmp, so TLS material must live under that directory.
+      - ${STAGING_BACKUP_CERT_DIR:?Set STAGING_BACKUP_CERT_DIR}/public.crt:/tmp/.minio/certs/public.crt:ro
+      - ${STAGING_BACKUP_CERT_DIR:?Set STAGING_BACKUP_CERT_DIR}/private.key:/tmp/.minio/certs/private.key:ro
+      - ${STAGING_BACKUP_CA_FILE:?Set STAGING_BACKUP_CA_FILE}:/certs/ca.crt:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: "0.40"
+    pids_limit: 128
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - --cacert
+        - /certs/ca.crt
+        - https://object-backup:9000/minio/health/live
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    restart: "no"
+
+  object-backup-init:
+    image: docker.io/pgsty/silo@sha256:aaac6bce13eb99316b3c88bd20143fc3c38ab607585256a411a095c44ee57f62
+    entrypoint:
+      - /bin/sh
+      - /init-object-bucket.sh
+    environment:
+      OBJECT_SCHEME: https
+      OBJECT_HOST: object-backup
+      OBJECT_PORT: "9000"
+      MINIO_BUCKET: gym-staging-rehearsal-backup
+      MINIO_ROOT_USER: ${BACKUP_OBJECT_ROOT_USER:?Set BACKUP_OBJECT_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${BACKUP_OBJECT_ROOT_PASSWORD:?Set BACKUP_OBJECT_ROOT_PASSWORD}
+      OBJECT_CA_FILE: /certs/ca.crt
+      HOME: /tmp
+    networks:
+      - backup
+    volumes:
+      - ../staging/init-object-bucket.sh:/init-object-bucket.sh:ro
+      - ${STAGING_BACKUP_CA_FILE:?Set STAGING_BACKUP_CA_FILE}:/certs/ca.crt:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    cpus: "0.10"
+    pids_limit: 64
+    depends_on:
+      object-backup:
+        condition: service_healthy
+    restart: "no"
+
+networks:
+  objects:
+    internal: true
+
+volumes:
+  object_store_data:
+  object_backup_data:
+
+secrets:
+  jwt_private_key:
+    file: ${STAGING_JWT_PRIVATE_FILE:?Set STAGING_JWT_PRIVATE_FILE}
+  jwt_public_keys:
+    file: ${STAGING_JWT_PUBLIC_FILE:?Set STAGING_JWT_PUBLIC_FILE}
+  staging_object_ca:
+    file: ${STAGING_BACKUP_CA_FILE:?Set STAGING_BACKUP_CA_FILE}

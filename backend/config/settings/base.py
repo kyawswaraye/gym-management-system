@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "apps.reports",
 ]
 MIDDLEWARE = [
+    "apps.common.observability.request_log.RequestLogMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "apps.common.api.middleware.RequestIDMiddleware",
     "apps.common.api.bff.BffTrustMiddleware",
@@ -215,6 +216,7 @@ GYM_SELECTION_TICKET_TTL_SECONDS = 300
 GYM_SELECTION_TICKET_MAX_ATTEMPTS = 5
 GYM_SELECTION_TICKET_RETENTION_DAYS = 30
 REQUEST_ID_MAX_LENGTH = 128
+STRUCTURED_REQUEST_LOG = False
 MINIO_ENDPOINT_URL = os.environ.get("MINIO_ENDPOINT_URL", "")
 MINIO_PUBLIC_URL = os.environ.get("MINIO_PUBLIC_URL", "")
 MINIO_BUCKET = os.environ.get("MINIO_BUCKET", "")

@@ -272,3 +272,27 @@ jobs:
         run: npm ci
       - name: Browser smoke
         run: bash scripts/e2e.sh
+
+  production-artifacts:
+    name: Production artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.7"
+          cache: pip
+          cache-dependency-path: backend/requirements/development.txt
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements/development.txt
+      - name: Validate production artifacts
+        run: python scripts/production_artifacts.py --repo . --require-django --require-docker
+      - name: Test production artifact validation
+        working-directory: backend
+        run: python -m pytest tests/unit/test_production_artifacts.py tests/unit/test_release_supply_chain.py tests/unit/test_backup_policy.py tests/unit/test_restore_verification.py tests/unit/test_observability.py tests/unit/test_deployment_control.py tests/unit/test_staging_rehearsal.py tests/unit/test_load_characterization.py tests/unit/test_finance_characterization.py tests/unit/test_pt_characterization.py tests/unit/test_pt_cash_characterization.py tests/unit/test_endurance_characterization.py tests/unit/test_security_characterization.py tests/unit/test_identity_security_characterization.py tests/unit/test_isolation_characterization.py
+      - name: Build API image
+        run: docker build -f backend/Dockerfile -t gym-api:ci backend
+      - name: Build web image
+        run: docker build -f web/Dockerfile -t gym-web:ci web
+      - name: Build PostgreSQL image
+        run: docker build -f infra/postgres/Dockerfile -t gym-postgres:ci infra/postgres

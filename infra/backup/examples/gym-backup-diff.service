@@ -1,0 +1,13 @@
+# Example only. Installing this unit is not a scheduled backup and not an alert.
+# Do not enable it until gym-backup bootstrap has exited 0.
+
+[Unit]
+Description=Example gym PostgreSQL differential backup
+Documentation=file:docs/runbooks/phase8-increment-3.md
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/gym/infra/compose
+ExecStart=/usr/bin/docker compose --env-file /etc/gym/production.env -f docker-compose.prod.yml --profile backup run --rm backup-diff
+TimeoutStartSec=2h
+SuccessExitStatus=0

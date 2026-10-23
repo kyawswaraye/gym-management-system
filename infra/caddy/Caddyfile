@@ -1,0 +1,73 @@
+# Public origin. Staff and platform APIs stay behind the Next.js BFF.
+# Only the published member families are proxied to private Django.
+# Metrics listen on :2020 inside the private observe network. Admin stays off.
+# This file is not a live certificate proof.
+{
+	admin off
+	metrics
+	email {$ACME_EMAIL}
+	servers {
+		protocols h1 h2 h3
+	}
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>headers>Authorization delete
+				request>headers>Cookie delete
+				request>headers>X-Gym-Bff-Secret delete
+				request>headers>X-Gym-BFF-Secret delete
+				request>headers>Proxy-Authorization delete
+				resp_headers>Set-Cookie delete
+				request>uri replace {
+					regexp \?.*
+					replace ""
+				}
+			}
+		}
+	}
+}
+
+http://:2020 {
+	metrics /metrics
+}
+
+{$PUBLIC_HOST} {
+	map {http.request.header.X-Request-Id} {gym_request_id} {
+		~^([A-Za-z0-9._:-]{1,128})$ $1
+		default {http.request.uuid}
+	}
+	encode gzip
+	request_body {
+		max_size 12MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		X-DNS-Prefetch-Control "off"
+		X-Request-ID {gym_request_id}
+		-Server
+	}
+	route {
+		@member path /api/v1/member-auth /api/v1/member-auth/* /api/v1/member /api/v1/member/*
+		handle @member {
+			reverse_proxy api:8000 {
+				header_up Host {http.request.host}
+				header_up X-Request-ID {gym_request_id}
+			}
+		}
+		@blocked path /api/v1 /api/v1/*
+		handle @blocked {
+			respond "Not found" 404
+		}
+		handle {
+			reverse_proxy web:3000 {
+				header_up X-Request-ID {gym_request_id}
+			}
+		}
+	}
+}

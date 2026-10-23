@@ -8,6 +8,7 @@ import {
   type AuditListFilters,
 } from "@/features/platform/audit-policy";
 import { platformGetCollection } from "@/features/platform/client";
+import { IdentifierValue } from "@/lib/ui/identifier";
 import type { PlatformAuditItem } from "@/types/api";
 
 const INITIAL_FILTERS: AuditListFilters = {
@@ -224,15 +225,21 @@ export function PlatformAuditLog({ canView }: { canView: boolean }) {
               </div>
               <div>
                 <dt className="font-medium">Target gym ID</dt>
-                <dd>{display(audit.target_gym_id)}</dd>
+                <dd>
+                  <IdentifierValue value={display(audit.target_gym_id)} />
+                </dd>
               </div>
               <div>
                 <dt className="font-medium">Target ID</dt>
-                <dd>{display(audit.target_id)}</dd>
+                <dd>
+                  <IdentifierValue value={display(audit.target_id)} />
+                </dd>
               </div>
               <div>
                 <dt className="font-medium">Request ID</dt>
-                <dd>{audit.request_id}</dd>
+                <dd>
+                  <IdentifierValue value={audit.request_id} />
+                </dd>
               </div>
             </dl>
             <div className="mt-3 grid gap-3 lg:grid-cols-2">

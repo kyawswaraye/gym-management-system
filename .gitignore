@@ -1,3 +1,6 @@
+# Host-rendered deployment config. The tracked blackbox source stays the example.
+infra/compose/blackbox.rendered.yml
+
 # Secrets and local environment
 .env
 .env.*
@@ -62,3 +65,6 @@ tmp/
 
 # Cursor local artifacts
 .cursor/
+
+# Disposable staging rehearsal state, secrets, and evidence
+.staging-rehearsal/

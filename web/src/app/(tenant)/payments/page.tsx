@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { PaymentsManager } from "@/features/finance/payments-manager";
 import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -23,13 +24,12 @@ export default async function PaymentsPage() {
 
   return (
     <section aria-labelledby="payments-title">
-      <h1 className="text-2xl font-bold" id="payments-title">
-        Payments
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Record membership and other payment drafts, then submit them for
-        approval. Receipts stay with the posted payment.
-      </p>
+      <PageHeader
+        description="Record membership and other payment drafts, then submit them for approval. Receipts stay with the posted payment."
+        eyebrow="Finance"
+        title="Payments"
+        titleId="payments-title"
+      />
       <PaymentsManager
         canApprove={session.permissions.includes("payments.approve")}
         canCreate={

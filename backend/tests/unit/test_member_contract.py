@@ -11,6 +11,7 @@ from apps.members.serializers import (
     MemberArchiveSerializer,
     MemberCreateSerializer,
     MemberListQuerySerializer,
+    MemberRestoreSerializer,
     MemberSerializer,
     MemberUpdateSerializer,
 )
@@ -19,6 +20,7 @@ from apps.members.services import (
     encode_member_cursor,
     member_list_cursor_scope,
 )
+from apps.members.views import MemberArchiveView, MemberRestoreView
 
 WRITE_FIELDS = {
     "member_number",
@@ -196,7 +198,12 @@ def test_member_validation_normalizes_contacts_and_dates() -> None:
 
 def test_member_archive_and_list_query_are_strict() -> None:
     assert MemberArchiveSerializer(data={}).is_valid()
+    assert MemberRestoreSerializer(data={}).is_valid()
+    assert MemberRestoreView.required_permission == "members.restore"
+    assert MemberRestoreView.required_feature == "members"
+    assert MemberArchiveView.required_permission == "members.archive"
     archive = MemberArchiveSerializer(data={"status": "ARCHIVED", "reason": "left"})
+    restore = MemberRestoreSerializer(data={"status": "ACTIVE", "gym_id": str(MEMBER_ID)})
     query = MemberListQuerySerializer(data={"gym_id": MEMBER_ID, "bucket": "today"})
     accepted = MemberListQuerySerializer(
         data={"status": "ACTIVE", "search": " ada ", "is_pt_client": "false"}
@@ -206,6 +213,8 @@ def test_member_archive_and_list_query_are_strict() -> None:
 
     assert not archive.is_valid()
     assert set(archive.errors) == {"status", "reason"}
+    assert not restore.is_valid()
+    assert set(restore.errors) == {"gym_id", "status"}
     assert not query.is_valid()
     assert set(query.errors) == {"gym_id", "bucket"}
     assert accepted.is_valid(), accepted.errors

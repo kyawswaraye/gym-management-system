@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -133,6 +139,11 @@ describe("Check-ins manager", () => {
     render(<CheckInsManager canCreate canUpdate timeZone="Asia/Yangon" />);
     expect(
       await screen.findByText("Nobody is checked in."),
+    ).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole("region", { name: "Currently checked in" }),
+      ).getByRole("status", { name: "0 Open" }),
     ).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Search active members"), {

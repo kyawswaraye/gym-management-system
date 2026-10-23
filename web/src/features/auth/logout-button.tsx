@@ -28,7 +28,7 @@ export function LogoutButton() {
 
   return (
     <button
-      className="rounded-md border border-slate-300 bg-white px-3 py-2 font-semibold"
+      className="button button-sm button-cancel"
       type="button"
       onClick={logout}
       disabled={pending}

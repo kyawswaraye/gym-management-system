@@ -211,7 +211,7 @@ export function ExpensesManager({
               )}
               {canManageCategories && !protectedCategory(category) && (
                 <button
-                  className="underline"
+                  className="underline tone-edit"
                   onClick={() => setEditingCategory(category)}
                   type="button"
                 >
@@ -259,7 +259,11 @@ export function ExpensesManager({
             <Field error={fields.display_order} label="Display order">
               <TextInput defaultValue="0" name="display_order" type="number" />
             </Field>
-            <button className="button" disabled={pending} type="submit">
+            <button
+              className="button button-create"
+              disabled={pending}
+              type="submit"
+            >
               Create category
             </button>
           </form>
@@ -500,7 +504,11 @@ export function ExpensesManager({
                 />
               </Field>
             )}
-            <button className="button" disabled={pending} type="submit">
+            <button
+              className="button button-edit"
+              disabled={pending}
+              type="submit"
+            >
               {action === "edit" ? "Save changes" : "Save draft"}
             </button>
           </form>
@@ -531,7 +539,7 @@ export function ExpensesManager({
             <div className="flex flex-wrap gap-3">
               {expense.status === "DRAFT" && canUpdate && (
                 <button
-                  className="underline"
+                  className="underline tone-edit"
                   onClick={() => setAction("edit")}
                   type="button"
                 >
@@ -549,7 +557,7 @@ export function ExpensesManager({
               )}
               {expense.status === "PENDING_APPROVAL" && canApprove && (
                 <button
-                  className="underline"
+                  className="underline tone-success"
                   onClick={() => setAction("approve")}
                   type="button"
                 >
@@ -558,7 +566,7 @@ export function ExpensesManager({
               )}
               {expense.status === "PENDING_APPROVAL" && canApprove && (
                 <button
-                  className="underline"
+                  className="underline tone-warn"
                   onClick={() => setAction("reject")}
                   type="button"
                 >
@@ -567,7 +575,7 @@ export function ExpensesManager({
               )}
               {expense.status === "DRAFT" && canUpdate && (
                 <button
-                  className="underline"
+                  className="underline tone-cancel"
                   onClick={() => setAction("cancel")}
                   type="button"
                 >
@@ -578,7 +586,7 @@ export function ExpensesManager({
                 canVoid &&
                 !salaryCategory(selectedCategory) && (
                   <button
-                    className="underline"
+                    className="underline tone-delete"
                     onClick={() => {
                       setCorrectionDate(defaultDate);
                       setAction("void");

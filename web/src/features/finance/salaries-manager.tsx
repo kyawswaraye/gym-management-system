@@ -353,7 +353,11 @@ export function SalariesManager({
           <Field label="Description">
             <TextInput name="description" required />
           </Field>
-          <button className="button" disabled={pending} type="submit">
+          <button
+            className="button button-edit"
+            disabled={pending}
+            type="submit"
+          >
             Save period
           </button>
         </form>
@@ -427,7 +431,11 @@ export function SalariesManager({
                   required
                 />
               </Field>
-              <button className="button" disabled={pending} type="submit">
+              <button
+                className="button button-edit"
+                disabled={pending}
+                type="submit"
+              >
                 Save period changes
               </button>
             </form>
@@ -537,7 +545,7 @@ export function SalariesManager({
                     />
                   </Field>
                   <button
-                    className="underline"
+                    className="underline tone-delete"
                     onClick={() =>
                       setLines((current) =>
                         current.filter((item) => item.key !== line.key),
@@ -550,7 +558,7 @@ export function SalariesManager({
                 </div>
               ))}
               <button
-                className="underline"
+                className="underline tone-create"
                 disabled={lines.length >= 200}
                 onClick={() => setLines((current) => [...current, blankLine()])}
                 type="button"
@@ -583,7 +591,7 @@ export function SalariesManager({
           <div className="flex flex-wrap gap-3">
             {period.status === "DRAFT" && canUpdate && (
               <button
-                className="underline"
+                className="underline tone-edit"
                 onClick={() => setAction("edit")}
                 type="button"
               >
@@ -601,7 +609,7 @@ export function SalariesManager({
             )}
             {period.status === "PENDING_APPROVAL" && canApprove && (
               <button
-                className="underline"
+                className="underline tone-success"
                 onClick={() => setAction("approve")}
                 type="button"
               >
@@ -610,7 +618,7 @@ export function SalariesManager({
             )}
             {period.status === "PENDING_APPROVAL" && canApprove && (
               <button
-                className="underline"
+                className="underline tone-warn"
                 onClick={() => setAction("reject")}
                 type="button"
               >
@@ -619,7 +627,7 @@ export function SalariesManager({
             )}
             {period.status === "DRAFT" && canUpdate && (
               <button
-                className="underline"
+                className="underline tone-cancel"
                 onClick={() => setAction("cancel")}
                 type="button"
               >
@@ -628,7 +636,7 @@ export function SalariesManager({
             )}
             {period.status === "POSTED" && canVoid && (
               <button
-                className="underline"
+                className="underline tone-delete"
                 onClick={() => {
                   setCorrectionDate(defaultDate);
                   setAction("void");

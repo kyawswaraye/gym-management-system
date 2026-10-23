@@ -10,6 +10,7 @@ vi.mock("next/navigation", () => ({
   redirect: (path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
   },
+  usePathname: () => "/",
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
 }));
 
@@ -49,9 +50,11 @@ describe("reports page and navigation", () => {
   it("renders operational reports for reports.view and keeps trainers closed", async () => {
     requireSession.mockResolvedValue(session(["reports.view"], ["reports"]));
     render(await ReportsPage());
+    expect(screen.getByRole("region", { name: "Reports" })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Reports" }),
-    ).toBeInTheDocument();
+      screen.getByRole("heading", { level: 1, name: "Reports" }),
+    ).toHaveAttribute("id", "reports-title");
+    expect(screen.getByText("Analytics workspace")).toBeInTheDocument();
     expect(screen.getByText(/do not include money/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Show membership expiry" }),

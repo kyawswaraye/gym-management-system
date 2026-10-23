@@ -20,6 +20,7 @@ vi.mock("@/lib/auth/session", () => ({
 vi.mock("@/features/operations/member-detail", () => ({
   MemberDetail: ({
     canArchive,
+    canRestore,
     canUpdate,
     canViewPayments,
     canUploadPhoto,
@@ -28,6 +29,7 @@ vi.mock("@/features/operations/member-detail", () => ({
     memberId,
   }: {
     canArchive: boolean;
+    canRestore: boolean;
     canUpdate: boolean;
     canViewPayments: boolean;
     canUploadPhoto: boolean;
@@ -38,6 +40,7 @@ vi.mock("@/features/operations/member-detail", () => ({
     <section>
       <p>member:{memberId}</p>
       <p>archive:{String(canArchive)}</p>
+      <p>restore:{String(canRestore)}</p>
       <p>update:{String(canUpdate)}</p>
       <p>payments:{String(canViewPayments)}</p>
       <p>upload:{String(canUploadPhoto)}</p>
@@ -89,6 +92,12 @@ describe("member detail page capability", () => {
     const { rerender } = render(
       await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
     );
+    expect(
+      screen.getByRole("region", { name: "Member profile" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Member profile" }),
+    ).toHaveAttribute("id", "member-title");
     expect(screen.getByText(`member:${MEMBER_ID}`)).toBeInTheDocument();
     expect(screen.getByText("update:true")).toBeInTheDocument();
     expect(screen.getByText("payments:false")).toBeInTheDocument();
@@ -110,6 +119,7 @@ describe("member detail page capability", () => {
     expect(screen.getByText("payments:true")).toBeInTheDocument();
     expect(screen.getByText("update:false")).toBeInTheDocument();
     expect(screen.getByText("archive:false")).toBeInTheDocument();
+    expect(screen.getByText("restore:false")).toBeInTheDocument();
   });
 
   it("passes archive access only from members.archive", async () => {
@@ -133,6 +143,7 @@ describe("member detail page capability", () => {
       await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
     );
     expect(screen.getByText("archive:true")).toBeInTheDocument();
+    expect(screen.getByText("restore:false")).toBeInTheDocument();
     expect(screen.getByText("update:false")).toBeInTheDocument();
     expect(screen.getByText("payments:false")).toBeInTheDocument();
 
@@ -144,6 +155,31 @@ describe("member detail page capability", () => {
     requireSession.mockResolvedValue(
       session(["members.view", "members.archive"], ["finance"]),
     );
+    await expect(
+      MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
+    ).rejects.toThrow("NEXT_REDIRECT:");
+  });
+
+  it("passes restore access only from members.restore", async () => {
+    requireSession.mockResolvedValue(
+      session(["members.view", "members.archive"], ["members"]),
+    );
+    const { rerender } = render(
+      await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
+    );
+    expect(screen.getByText("restore:false")).toBeInTheDocument();
+    expect(screen.getByText("archive:true")).toBeInTheDocument();
+
+    requireSession.mockResolvedValue(
+      session(["members.view", "members.restore"], ["members"]),
+    );
+    rerender(
+      await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
+    );
+    expect(screen.getByText("restore:true")).toBeInTheDocument();
+    expect(screen.getByText("archive:false")).toBeInTheDocument();
+
+    requireSession.mockResolvedValue(session(["members.restore"], ["members"]));
     await expect(
       MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
     ).rejects.toThrow("NEXT_REDIRECT:");

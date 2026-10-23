@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { CommissionsManager } from "@/features/pt/commissions-manager";
 import {
   canOpenPtCommissions,
@@ -15,14 +16,12 @@ export default async function CommissionsPage() {
 
   return (
     <section aria-labelledby="commissions-title">
-      <h1 className="text-2xl font-bold" id="commissions-title">
-        Commissions
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Review scoped commission balances and payouts. Recording a payout stays
-        with a protected owner or manager who does not also hold trainer or
-        reception, and who did not create the accrual.
-      </p>
+      <PageHeader
+        description="Review scoped commission balances and payouts. Recording a payout stays with a protected owner or manager who does not also hold trainer or reception, and who did not create the accrual."
+        eyebrow="Personal training"
+        title="Commissions"
+        titleId="commissions-title"
+      />
       <CommissionsManager
         canPay={canPayPtCommission(session)}
         currency={session.gym?.currency ?? ""}

@@ -1,7 +1,16 @@
 # Production email, password recovery, and object storage
 
 This runbook is configuration readiness. It is not evidence that Resend, AWS,
-or ClamAV are live.
+or ClamAV are live. The Compose baseline that consumes these settings is
+[Phase 8 increment 1](./phase8-increment-1.md). That increment is not a deployment.
+Image publication is described by [Phase 8 increment 2](./phase8-increment-2.md).
+The backup repository baseline is [Phase 8 increment 3](./phase8-increment-3.md).
+The private metrics baseline is [Phase 8 increment 4](./phase8-increment-4.md) and does not prove alert delivery.
+Deployment control is [Phase 8 increment 5](./phase8-increment-5.md) and does not prove a deploy.
+The disposable local rehearsal is [Phase 8 increment 6](./phase8-increment-6.md) and does not prove a temporary VPS, GHCR, or an external provider.
+The opt-in local load characterization is [Phase 8 increment 7](./phase8-increment-7.md) and does not prove capacity or an SLO.
+The opt-in receipt and cash-close characterization is [Phase 8 increment 8](./phase8-increment-8.md) and does not prove a soak, an SLO, or a PT payout. The opt-in PT sale, session, payout, and report characterization is [Phase 8 increment 9](./phase8-increment-9.md) and does not prove a soak, an SLO, or financial reconciliation. The opt-in cash commission payout and till characterization is [Phase 8 increment 10](./phase8-increment-10.md) and does not prove a soak, an SLO, or financial reconciliation. The opt-in local bounded endurance characterization is [Phase 8 increment 11](./phase8-increment-11.md) and does not prove a soak, an SLO, or financial reconciliation. The opt-in local security characterization is [Phase 8 increment 12](./phase8-increment-12.md) and does not prove a penetration test, a formal security review, production security, or tenant isolation. The opt-in local identity-security characterization is [Phase 8 increment 13](./phase8-increment-13.md) and does not prove a penetration test, a formal security review, production security, tenant isolation, or a live provider. The opt-in local tenant-isolation characterization is [Phase 8 increment 14](./phase8-increment-14.md) and does not prove independent tenant isolation, a penetration test, a formal security review, or production proof.
+No GHCR push or offsite backup upload has been performed.
 
 ## Email
 

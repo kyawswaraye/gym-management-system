@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { MembersManager } from "@/features/operations/members-manager";
 import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -13,14 +14,16 @@ export default async function MembersPage() {
 
   return (
     <section aria-labelledby="members-title">
-      <h1 className="text-2xl font-bold" id="members-title">
-        Members
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Add, search, and manage members in this gym only.
-      </p>
+      <PageHeader
+        description="Search current members, or open Archived to find members who were archived."
+        eyebrow="Member directory"
+        title="Members"
+        titleId="members-title"
+      />
       <MembersManager
+        canArchive={session.permissions.includes("members.archive")}
         canCreate={session.permissions.includes("members.create")}
+        canRestore={session.permissions.includes("members.restore")}
         defaultDate={todayInTimezone(session.gym?.timezone ?? "UTC")}
       />
     </section>

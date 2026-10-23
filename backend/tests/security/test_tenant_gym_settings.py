@@ -85,10 +85,13 @@ def ensure_authorization_catalog() -> SubscriptionPlan:
     Class ``classes.view``, ``classes.manage``, ``classes.book``, and
     ``classes.attendance`` grants are applied only by the 0028 backfill.
     Announcement ``announcements.view`` and ``announcements.manage`` grants are
-    applied only by the 0030 backfill. The personal-training feature is
-    attached to the trial plan by the trainer-assignment migration. A clean
-    install runs those operations after the historical seed, and provisioning
-    copies the restored template permissions and plan features.
+    applied only by the 0030 backfill. ``members.restore`` is applied only by
+    the 0031 backfill, for OWNER and MANAGER templates and copied roles.
+    Migration 0008 attaches members,
+    memberships, finance, and reports to the trial plan. The personal-training
+    feature is attached to that plan by the trainer-assignment migration. A
+    clean install runs those operations after the historical seed, and
+    provisioning copies the restored template permissions and plan features.
     """
 
     seed = importlib.import_module("apps.tenants.migrations.0003_seed_authorization")
@@ -145,25 +148,13 @@ def ensure_authorization_catalog() -> SubscriptionPlan:
         "apps.tenants.migrations.0030_announcement_permission_catalog"
     )
     announcements.grant_announcement_permissions(django_apps, None)
-    feature, _ = Feature.objects.get_or_create(
-        code="members",
-        defaults={"name": "Members", "description": "Members module"},
+    restore = importlib.import_module("apps.tenants.migrations.0031_member_restore_permission")
+    restore.grant_member_restore_permission(django_apps, None)
+    trial = importlib.import_module(
+        "apps.tenants.migrations.0008_provisioning_defaults_and_security"
     )
-    plan, _ = SubscriptionPlan.objects.get_or_create(
-        code="TRIAL",
-        defaults={
-            "name": "Trial",
-            "status": SubscriptionPlan.Status.ACTIVE,
-            "price": "0.00",
-            "currency": "THB",
-            "billing_interval": "TRIAL",
-        },
-    )
-    SubscriptionPlanFeature.objects.get_or_create(
-        subscription_plan=plan,
-        feature=feature,
-        defaults={"enabled": True},
-    )
+    trial.seed_trial_plan(django_apps, None)
+    plan = SubscriptionPlan.objects.get(code="TRIAL")
     pt_feature, _ = Feature.objects.get_or_create(
         code="pt",
         defaults={
@@ -171,10 +162,10 @@ def ensure_authorization_catalog() -> SubscriptionPlan:
             "description": "Personal training module",
         },
     )
-    SubscriptionPlanFeature.objects.get_or_create(
+    SubscriptionPlanFeature.objects.update_or_create(
         subscription_plan=plan,
         feature=pt_feature,
-        defaults={"enabled": True},
+        defaults={"enabled": True, "limit_value": None},
     )
     return plan
 

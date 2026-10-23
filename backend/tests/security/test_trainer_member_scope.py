@@ -506,7 +506,7 @@ def test_trainer_only_member_routes_follow_effective_assignment() -> None:
 
     with transaction.atomic():
         set_gym_context(gym_id=gym_a.id)
-        for code in ("members.create", "members.archive", "memberships.create"):
+        for code in ("members.create", "members.archive", "members.restore", "memberships.create"):
             RolePermission.objects.create(
                 gym=gym_a,
                 role=floor_role,
@@ -533,6 +533,15 @@ def test_trainer_only_member_routes_follow_effective_assignment() -> None:
         assert archived.status_code == 404
         assert "Omar" not in archived.content.decode()
         assert "Una" not in archived.content.decode()
+        restored = api.post(
+            f"/api/v1/members/{member_id}/restore/",
+            {},
+            format="json",
+            **command_headers,
+        )
+        assert restored.status_code == 404
+        assert "Omar" not in restored.content.decode()
+        assert "Una" not in restored.content.decode()
     denied_sale = _sale(api, command_headers, member_id=una, plan_id=plan_id, start_date=today_text)
     hidden_inactive = _sale(
         api, command_headers, member_id=secret, plan_id=plan_id, start_date=today_text

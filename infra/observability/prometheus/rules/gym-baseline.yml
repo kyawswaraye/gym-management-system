@@ -1,0 +1,162 @@
+# gym-observability-rules/v1
+# Thresholds are provisional. They are not an approved SLO.
+# Deploy and restore evidence stays 0 until a reviewed drill changes this file.
+
+groups:
+  - name: gym-recording-v1
+    rules:
+      - record: gym:probe_success:min
+        expr: min(probe_success)
+      - record: gym:probe_duration:max
+        expr: max(probe_duration_seconds)
+      - record: gym:http_5xx:ratio5m
+        expr: sum(rate(caddy_http_request_duration_seconds_count{code=~"5.."}[5m])) / clamp_min(sum(rate(caddy_http_request_duration_seconds_count[5m])), 1)
+      - record: gym:http_429:rate5m
+        expr: sum(rate(caddy_http_request_duration_seconds_count{code="429"}[5m]))
+      - record: gym:host_cpu:ratio5m
+        expr: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))
+      - record: gym:host_memory_available:ratio
+        expr: node_memory_MemAvailable_bytes / clamp_min(node_memory_MemTotal_bytes, 1)
+      - record: gym:host_disk_available:ratio
+        expr: min(node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|ramfs|overlay"} / clamp_min(node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|ramfs|overlay"}, 1))
+      - record: gym_deploy_evidence_proven
+        expr: vector(0)
+      - record: gym_restore_evidence_proven
+        expr: vector(0)
+  - name: gym-alerts-v1
+    rules:
+      - alert: GymPrivateProbeFailed
+        expr: probe_success == 0
+        for: 5m
+        labels:
+          severity: page
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: Private probe failed. This threshold is provisional and is not an approved SLO.
+      - alert: GymPrivateProbeSlow
+        expr: probe_duration_seconds > 2
+        for: 10m
+        labels:
+          severity: ticket
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: Private probe is slower than the provisional 2 second mark.
+      - alert: GymHttp5xxRatio
+        expr: sum(rate(caddy_http_request_duration_seconds_count{code=~"5.."}[5m])) / clamp_min(sum(rate(caddy_http_request_duration_seconds_count[5m])), 1) > 0.05
+        for: 10m
+        labels:
+          severity: page
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: HTTP 5xx ratio is above the provisional 5 percent mark.
+      - alert: GymHttp429Rate
+        expr: sum(rate(caddy_http_request_duration_seconds_count{code="429"}[5m])) > 1
+        for: 10m
+        labels:
+          severity: ticket
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: HTTP 429 rate is above the provisional 1 request per second mark.
+      - alert: GymHostCpuHigh
+        expr: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) > 0.85
+        for: 15m
+        labels:
+          severity: ticket
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: Host CPU is above the provisional 85 percent mark.
+      - alert: GymHostMemoryLow
+        expr: node_memory_MemAvailable_bytes / clamp_min(node_memory_MemTotal_bytes, 1) < 0.15
+        for: 15m
+        labels:
+          severity: page
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: Available memory is below the provisional 15 percent mark.
+      - alert: GymHostDiskLow
+        expr: min(node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|ramfs|overlay"} / clamp_min(node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|ramfs|overlay"}, 1)) < 0.15
+        for: 15m
+        labels:
+          severity: page
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: Root filesystem free space is below the provisional 15 percent mark.
+      - alert: GymPostgresDown
+        expr: pg_up == 0
+        for: 2m
+        labels:
+          severity: page
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: PostgreSQL exporter cannot reach the database.
+      - alert: GymPostgresConnectionsHigh
+        expr: gym_pg_connections > 32
+        for: 10m
+        labels:
+          severity: ticket
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: Database connections are above the provisional 32 connection mark.
+      - alert: GymBackupAgeHigh
+        expr: gym_backup_age_seconds > 86400
+        for: 15m
+        labels:
+          severity: page
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: Backup age is above the provisional 24 hour mark.
+      - alert: GymBackupStatusAbsent
+        expr: absent(gym_backup_result)
+        for: 30m
+        labels:
+          severity: page
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: Backup status metric is absent. This is not a successful backup.
+      - alert: GymBackupWalAgeHigh
+        expr: gym_backup_wal_age_seconds > 900
+        for: 10m
+        labels:
+          severity: page
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: WAL archive age is above the provisional 900 second mark.
+      - alert: GymBackupUnhealthy
+        expr: gym_backup_result{result=~"stale|missing|failed|busy|rejected"} == 1
+        for: 15m
+        labels:
+          severity: page
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: Backup status is stale, missing, failed, busy, or rejected.
+      - alert: GymCertificateExpiry
+        expr: (probe_ssl_earliest_cert_expiry{job="blackbox-tls"} - time()) < 1209600 and probe_success{job="blackbox-tls"} == 1
+        for: 1h
+        labels:
+          severity: ticket
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: Certificate expiry is inside the provisional 14 day window.
+      - alert: GymDeployRestoreUnproven
+        expr: gym_deploy_evidence_proven == 0 or gym_restore_evidence_proven == 0
+        for: 24h
+        labels:
+          severity: info
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: Deploy and restore evidence is unproven. This is not a deployment or restore proof.

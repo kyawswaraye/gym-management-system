@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { TrainerDashboardManager } from "@/features/pt/trainer-dashboard";
 import {
   canOpenTrainerDashboard,
@@ -16,13 +17,12 @@ export default async function TrainerDashboardPage() {
 
   return (
     <section aria-labelledby="trainer-dashboard-title">
-      <h1 className="text-3xl font-bold" id="trainer-dashboard-title">
-        Trainer dashboard
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Your assigned members and personal-training sessions. Counts include
-        only your sessions.
-      </p>
+      <PageHeader
+        description="Your assigned members and personal-training sessions. Counts include only your sessions."
+        eyebrow="Personal training"
+        title="Trainer dashboard"
+        titleId="trainer-dashboard-title"
+      />
       <TrainerDashboardManager />
     </section>
   );

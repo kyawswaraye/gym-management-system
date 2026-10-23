@@ -32,7 +32,7 @@ export function MemberProfileFields({
   return (
     <>
       {includeMemberNumber ? (
-        <div className="grid gap-1">
+        <div className="grid gap-1 sm:col-span-2">
           <label className="field">
             Member number
             <input
@@ -122,8 +122,8 @@ export function MemberProfileFields({
           value={value.date_of_birth}
         />
       </label>
-      <fieldset className="grid gap-4" disabled={disabled}>
-        <legend className="font-semibold">Address</legend>
+      <fieldset className="grid gap-4 sm:grid-cols-2" disabled={disabled}>
+        <legend className="mb-3 font-semibold">Address</legend>
         <label className="field">
           Address line 1
           <input

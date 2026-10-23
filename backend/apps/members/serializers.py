@@ -247,6 +247,10 @@ class MemberArchiveSerializer(StrictSerializer):
     """Archive accepts no client fields."""
 
 
+class MemberRestoreSerializer(StrictSerializer):
+    """Restore accepts no client fields."""
+
+
 class MemberListQuerySerializer(StrictSerializer):
     status = serializers.ChoiceField(choices=Member.Status.choices, required=False)
     search = serializers.CharField(

@@ -57,8 +57,11 @@ describe("tenant audit page gating", () => {
     requireSession.mockResolvedValue(session(["audit.view"]));
     render(await AuditLogsPage());
     expect(
-      screen.getByRole("heading", { name: "Audit logs" }),
+      screen.getByRole("region", { name: "Audit logs" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Audit logs" }),
+    ).toHaveAttribute("id", "audit-logs-title");
     expect(screen.getByText("Loading audit events.")).toBeInTheDocument();
   });
 
@@ -74,7 +77,7 @@ describe("tenant audit page gating", () => {
     requireSession.mockResolvedValue(session([]));
     render(await DashboardPage());
     expect(
-      screen.getByRole("heading", { name: "No workspace access" }),
-    ).toBeInTheDocument();
+      screen.getByRole("heading", { level: 1, name: "No workspace access" }),
+    ).toHaveAttribute("id", "dashboard-title");
   });
 });

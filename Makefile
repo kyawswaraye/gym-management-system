@@ -1,4 +1,4 @@
-.PHONY: check-python check-node db-up db-down db-logs migrate backend-install backend-check backend-test backend-test-pg web-install web-check web-test mobile-install mobile-check mobile-test mobile-android mobile-ios e2e openapi-export openapi-generate openapi-check check
+.PHONY: check-python check-node db-up db-down db-logs migrate backend-install backend-check backend-test backend-test-pg web-install web-check web-test mobile-install mobile-check mobile-test mobile-android mobile-ios e2e openapi-export openapi-generate openapi-check check validate-production production-images
 
 ifneq ($(wildcard .env),)
 include .env
@@ -111,3 +111,11 @@ openapi-check: openapi-generate
 	git diff --exit-code -- contracts/openapi.v1.json web/src/types/api.generated.ts mobile/src/types/api.generated.ts
 
 check: backend-check backend-test web-check web-test mobile-check mobile-test openapi-check
+
+validate-production:
+	bash scripts/validate-production-artifacts.sh
+
+production-images:
+	docker build -f backend/Dockerfile -t gym-api:local backend
+	docker build -f web/Dockerfile -t gym-web:local web
+	docker build -f infra/postgres/Dockerfile -t gym-postgres:local infra/postgres

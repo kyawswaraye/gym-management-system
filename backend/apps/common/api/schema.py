@@ -48,6 +48,7 @@ def phase_1a_endpoints(endpoints: list[Endpoint]) -> list[Endpoint]:
             "/api/v1/members/",
             "/api/v1/members/{id}/",
             "/api/v1/members/{id}/archive/",
+            "/api/v1/members/{id}/restore/",
             "/api/v1/members/{id}/summary/",
             "/api/v1/members/{id}/payments/",
             "/api/v1/members/{id}/check-ins/",

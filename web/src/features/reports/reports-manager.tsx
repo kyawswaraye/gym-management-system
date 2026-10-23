@@ -5,6 +5,7 @@ import { useState } from "react";
 import { CursorControls } from "@/features/finance/ui";
 import { operationGet } from "@/features/operations/client";
 import { downloadReportCsv } from "@/features/reports/download";
+import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
   CashBookReport,
   CheckInReport,
@@ -138,6 +139,8 @@ type LoadedReport =
   | { kind: "stock-movements"; report: StockMovementReport }
   | { kind: "inventory"; report: InventoryReport };
 
+type ReportChoice = LoadedReport["kind"];
+
 type Identity = {
   gym: { code: string; name: string };
   timezone: string;
@@ -158,6 +161,9 @@ export function ReportsManager({
   const [month, setMonth] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [selectedReport, setSelectedReport] = useState<ReportChoice>(
+    canViewFinancial ? "daily" : "membership-expiry",
+  );
   const [loaded, setLoaded] = useState<LoadedReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -276,331 +282,531 @@ export function ReportsManager({
     }
   }
 
+  function generateSelectedReport() {
+    if (selectedReport === "daily" && date) {
+      void load<PeriodReport>(
+        `reports/daily/?date=${encodeURIComponent(date)}`,
+        (report) => ({ kind: "daily", report }),
+      );
+    } else if (selectedReport === "monthly" && year && month) {
+      void load<PeriodReport>(
+        `reports/monthly/?year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}`,
+        (report) => ({ kind: "monthly", report }),
+      );
+    } else if (selectedReport === "cash-book" && dateFrom && dateTo) {
+      void load<CashBookReport>(
+        rangePath("cash-book", dateFrom, dateTo),
+        (report) => ({ kind: "cash-book", report }),
+      );
+    } else if (selectedReport === "profit-loss" && dateFrom && dateTo) {
+      void load<ProfitLossReport>(
+        rangePath("profit-loss", dateFrom, dateTo),
+        (report) => ({ kind: "profit-loss", report }),
+      );
+    } else if (selectedReport === "product-sales" && dateFrom && dateTo) {
+      setProductCursors([""]);
+      setProductIndex(0);
+      showProductSales();
+    } else if (selectedReport === "membership-expiry" && dateFrom && dateTo) {
+      void load<MembershipExpiryReport>(
+        rangePath("membership-expiry", dateFrom, dateTo),
+        (report) => ({ kind: "membership-expiry", report }),
+      );
+    } else if (selectedReport === "check-ins" && dateFrom && dateTo) {
+      void load<CheckInReport>(
+        rangePath("check-ins", dateFrom, dateTo),
+        (report) => ({ kind: "check-ins", report }),
+      );
+    } else if (selectedReport === "pt-sessions" && dateFrom && dateTo) {
+      void load<PTSessionReport>(
+        rangePath("pt-sessions", dateFrom, dateTo),
+        (report) => ({ kind: "pt-sessions", report }),
+      );
+    } else if (selectedReport === "classes" && dateFrom && dateTo) {
+      void load<ClassReport>(
+        rangePath("classes", dateFrom, dateTo),
+        (report) => ({ kind: "classes", report }),
+      );
+    } else if (selectedReport === "stock-movements" && dateFrom && dateTo) {
+      void load<StockMovementReport>(
+        rangePath("stock-movements", dateFrom, dateTo),
+        (report) => ({ kind: "stock-movements", report }),
+      );
+    } else if (selectedReport === "inventory") {
+      setInventoryCursors([""]);
+      setInventoryIndex(0);
+      showInventory();
+    }
+  }
+
+  const rangeRequired = !["daily", "monthly", "inventory"].includes(
+    selectedReport,
+  );
+  const generateDisabled =
+    loading ||
+    (selectedReport === "daily" && !date) ||
+    (selectedReport === "monthly" && (!year || !month)) ||
+    (rangeRequired && (!dateFrom || !dateTo));
+
   return (
-    <div className="grid gap-6">
-      {canViewFinancial ? (
-        <>
+    <div className="grid gap-8">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 [&_.button]:hidden">
+        <div className="mb-5">
+          <p className="text-xs font-bold tracking-[0.16em] text-amber-600 uppercase">
+            Report builder
+          </p>
+          <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">
+            Choose what you want to review
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Select a date or range, then open the report you need.
+          </p>
+        </div>
+        <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+          <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+            Report type
+            <select
+              className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800"
+              onChange={(event) => {
+                setSelectedReport(event.target.value as ReportChoice);
+                resetPagedReports();
+              }}
+              value={selectedReport}
+            >
+              {canViewFinancial ? (
+                <optgroup label="Financial">
+                  <option value="daily">Daily report</option>
+                  <option value="monthly">Monthly report</option>
+                  <option value="cash-book">Cash book</option>
+                  <option value="profit-loss">Profit and loss</option>
+                  <option value="product-sales">Product sales</option>
+                </optgroup>
+              ) : null}
+              <optgroup label="Operations">
+                <option value="membership-expiry">Membership expiry</option>
+                <option value="check-ins">Check-ins</option>
+                <option value="pt-sessions">PT sessions</option>
+                <option value="classes">Classes</option>
+              </optgroup>
+              <optgroup label="Inventory">
+                <option value="stock-movements">Stock movements</option>
+                <option value="inventory">Inventory</option>
+              </optgroup>
+            </select>
+          </label>
+          <button
+            className="button"
+            disabled={generateDisabled}
+            onClick={generateSelectedReport}
+            type="button"
+          >
+            Generate report
+          </button>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          {canViewFinancial ? (
+            <>
+              <form
+                className={
+                  selectedReport === "daily"
+                    ? "flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 [&_input]:min-h-10 [&_input]:bg-white"
+                    : "hidden"
+                }
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!date) return;
+                  void load<PeriodReport>(
+                    `reports/daily/?date=${encodeURIComponent(date)}`,
+                    (report) => ({
+                      kind: "daily",
+                      report,
+                    }),
+                  );
+                }}
+              >
+                <label className="grid gap-1 text-sm">
+                  Date
+                  <input
+                    className="rounded-md border px-3 py-2"
+                    onChange={(event) => setDate(event.target.value)}
+                    required
+                    type="date"
+                    value={date}
+                  />
+                </label>
+                <button
+                  className="button"
+                  disabled={!date || loading}
+                  type="submit"
+                >
+                  Show daily report
+                </button>
+              </form>
+              <form
+                className={
+                  selectedReport === "monthly"
+                    ? "flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 [&_input]:min-h-10 [&_input]:bg-white"
+                    : "hidden"
+                }
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!year || !month) return;
+                  void load<PeriodReport>(
+                    `reports/monthly/?year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}`,
+                    (report) => ({ kind: "monthly", report }),
+                  );
+                }}
+              >
+                <label className="hidden">
+                  Year
+                  <input
+                    className="w-28 rounded-md border px-3 py-2"
+                    inputMode="numeric"
+                    onChange={(event) => setYear(event.target.value)}
+                    required
+                    value={year}
+                  />
+                </label>
+                <label className="hidden">
+                  Month
+                  <input
+                    className="w-24 rounded-md border px-3 py-2"
+                    inputMode="numeric"
+                    onChange={(event) => setMonth(event.target.value)}
+                    required
+                    value={month}
+                  />
+                </label>
+                <label className="grid w-full gap-1.5 text-sm font-semibold text-slate-700 sm:max-w-xs">
+                  Reporting month
+                  <input
+                    className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                    onChange={(event) => {
+                      const [nextYear = "", nextMonth = ""] =
+                        event.target.value.split("-");
+                      setYear(nextYear);
+                      setMonth(nextMonth);
+                    }}
+                    type="month"
+                    value={
+                      year && month ? `${year}-${month.padStart(2, "0")}` : ""
+                    }
+                  />
+                </label>
+                <button
+                  className="button"
+                  disabled={!year || !month || loading}
+                  type="submit"
+                >
+                  Show monthly report
+                </button>
+              </form>
+            </>
+          ) : null}
           <form
-            className="flex flex-wrap items-end gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!date) return;
-              void load<PeriodReport>(
-                `reports/daily/?date=${encodeURIComponent(date)}`,
-                (report) => ({
-                  kind: "daily",
-                  report,
-                }),
-              );
-            }}
+            className={
+              rangeRequired
+                ? "flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 xl:col-span-2 [&_input]:min-h-10 [&_input]:bg-white"
+                : "hidden"
+            }
           >
             <label className="grid gap-1 text-sm">
-              Date
+              From date
               <input
                 className="rounded-md border px-3 py-2"
-                onChange={(event) => setDate(event.target.value)}
+                onChange={(event) => {
+                  setDateFrom(event.target.value);
+                  resetPagedReports();
+                }}
                 required
                 type="date"
-                value={date}
-              />
-            </label>
-            <button
-              className="button"
-              disabled={!date || loading}
-              type="submit"
-            >
-              Show daily report
-            </button>
-          </form>
-          <form
-            className="flex flex-wrap items-end gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!year || !month) return;
-              void load<PeriodReport>(
-                `reports/monthly/?year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}`,
-                (report) => ({ kind: "monthly", report }),
-              );
-            }}
-          >
-            <label className="grid gap-1 text-sm">
-              Year
-              <input
-                className="w-28 rounded-md border px-3 py-2"
-                inputMode="numeric"
-                onChange={(event) => setYear(event.target.value)}
-                required
-                value={year}
+                value={dateFrom}
               />
             </label>
             <label className="grid gap-1 text-sm">
-              Month
+              To date
               <input
-                className="w-24 rounded-md border px-3 py-2"
-                inputMode="numeric"
-                onChange={(event) => setMonth(event.target.value)}
+                className="rounded-md border px-3 py-2"
+                onChange={(event) => {
+                  setDateTo(event.target.value);
+                  resetPagedReports();
+                }}
                 required
-                value={month}
+                type="date"
+                value={dateTo}
               />
             </label>
-            <button
-              className="button"
-              disabled={!year || !month || loading}
-              type="submit"
-            >
-              Show monthly report
-            </button>
+            <div className="hidden">
+              <div className="grid gap-5 lg:grid-cols-3">
+                {canViewFinancial ? (
+                  <div>
+                    <p className="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase">
+                      Financial
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className="button"
+                        disabled={!dateFrom || !dateTo || loading}
+                        onClick={() => {
+                          void load<CashBookReport>(
+                            rangePath("cash-book", dateFrom, dateTo),
+                            (report) => ({
+                              kind: "cash-book",
+                              report,
+                            }),
+                          );
+                        }}
+                        type="button"
+                      >
+                        Show cash book
+                      </button>
+                      <button
+                        className="button"
+                        disabled={!dateFrom || !dateTo || loading}
+                        onClick={() => {
+                          void load<ProfitLossReport>(
+                            rangePath("profit-loss", dateFrom, dateTo),
+                            (report) => ({
+                              kind: "profit-loss",
+                              report,
+                            }),
+                          );
+                        }}
+                        type="button"
+                      >
+                        Show profit and loss
+                      </button>
+                      <button
+                        className="button"
+                        disabled={!dateFrom || !dateTo || loading}
+                        onClick={() => {
+                          setProductCursors([""]);
+                          setProductIndex(0);
+                          showProductSales();
+                        }}
+                        type="button"
+                      >
+                        Show product sales
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                <div>
+                  <p className="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase">
+                    Operations
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="button"
+                      disabled={!dateFrom || !dateTo || loading}
+                      onClick={() => {
+                        void load<MembershipExpiryReport>(
+                          rangePath("membership-expiry", dateFrom, dateTo),
+                          (report) => ({
+                            kind: "membership-expiry",
+                            report,
+                          }),
+                        );
+                      }}
+                      type="button"
+                    >
+                      Show membership expiry
+                    </button>
+                    <button
+                      className="button"
+                      disabled={!dateFrom || !dateTo || loading}
+                      onClick={() => {
+                        void load<CheckInReport>(
+                          rangePath("check-ins", dateFrom, dateTo),
+                          (report) => ({
+                            kind: "check-ins",
+                            report,
+                          }),
+                        );
+                      }}
+                      type="button"
+                    >
+                      Show check-ins
+                    </button>
+                    <button
+                      className="button"
+                      disabled={!dateFrom || !dateTo || loading}
+                      onClick={() => {
+                        void load<PTSessionReport>(
+                          rangePath("pt-sessions", dateFrom, dateTo),
+                          (report) => ({
+                            kind: "pt-sessions",
+                            report,
+                          }),
+                        );
+                      }}
+                      type="button"
+                    >
+                      Show PT sessions
+                    </button>
+                    <button
+                      className="button"
+                      disabled={!dateFrom || !dateTo || loading}
+                      onClick={() => {
+                        void load<ClassReport>(
+                          rangePath("classes", dateFrom, dateTo),
+                          (report) => ({
+                            kind: "classes",
+                            report,
+                          }),
+                        );
+                      }}
+                      type="button"
+                    >
+                      Show classes
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase">
+                    Inventory
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="button"
+                      disabled={!dateFrom || !dateTo || loading}
+                      onClick={() => {
+                        void load<StockMovementReport>(
+                          rangePath("stock-movements", dateFrom, dateTo),
+                          (report) => ({
+                            kind: "stock-movements",
+                            report,
+                          }),
+                        );
+                      }}
+                      type="button"
+                    >
+                      Show stock movements
+                    </button>
+                    <button
+                      className="button"
+                      disabled={loading}
+                      onClick={() => {
+                        setInventoryCursors([""]);
+                        setInventoryIndex(0);
+                        showInventory();
+                      }}
+                      type="button"
+                    >
+                      Show inventory
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </form>
-        </>
-      ) : null}
-      <form className="flex flex-wrap items-end gap-3">
-        <label className="grid gap-1 text-sm">
-          From date
-          <input
-            className="rounded-md border px-3 py-2"
-            onChange={(event) => {
-              setDateFrom(event.target.value);
-              resetPagedReports();
-            }}
-            required
-            type="date"
-            value={dateFrom}
-          />
-        </label>
-        <label className="grid gap-1 text-sm">
-          To date
-          <input
-            className="rounded-md border px-3 py-2"
-            onChange={(event) => {
-              setDateTo(event.target.value);
-              resetPagedReports();
-            }}
-            required
-            type="date"
-            value={dateTo}
-          />
-        </label>
-        {canViewFinancial ? (
-          <>
-            <button
-              className="button"
-              disabled={!dateFrom || !dateTo || loading}
-              onClick={() => {
-                void load<CashBookReport>(
-                  rangePath("cash-book", dateFrom, dateTo),
-                  (report) => ({
-                    kind: "cash-book",
-                    report,
-                  }),
-                );
-              }}
-              type="button"
-            >
-              Show cash book
-            </button>
-            <button
-              className="button"
-              disabled={!dateFrom || !dateTo || loading}
-              onClick={() => {
-                void load<ProfitLossReport>(
-                  rangePath("profit-loss", dateFrom, dateTo),
-                  (report) => ({
-                    kind: "profit-loss",
-                    report,
-                  }),
-                );
-              }}
-              type="button"
-            >
-              Show profit and loss
-            </button>
-            <button
-              className="button"
-              disabled={!dateFrom || !dateTo || loading}
-              onClick={() => {
-                setProductCursors([""]);
-                setProductIndex(0);
-                showProductSales();
-              }}
-              type="button"
-            >
-              Show product sales
-            </button>
-          </>
-        ) : null}
-        <button
-          className="button"
-          disabled={!dateFrom || !dateTo || loading}
-          onClick={() => {
-            void load<MembershipExpiryReport>(
-              rangePath("membership-expiry", dateFrom, dateTo),
-              (report) => ({
-                kind: "membership-expiry",
-                report,
-              }),
-            );
-          }}
-          type="button"
-        >
-          Show membership expiry
-        </button>
-        <button
-          className="button"
-          disabled={!dateFrom || !dateTo || loading}
-          onClick={() => {
-            void load<CheckInReport>(
-              rangePath("check-ins", dateFrom, dateTo),
-              (report) => ({
-                kind: "check-ins",
-                report,
-              }),
-            );
-          }}
-          type="button"
-        >
-          Show check-ins
-        </button>
-        <button
-          className="button"
-          disabled={!dateFrom || !dateTo || loading}
-          onClick={() => {
-            void load<PTSessionReport>(
-              rangePath("pt-sessions", dateFrom, dateTo),
-              (report) => ({
-                kind: "pt-sessions",
-                report,
-              }),
-            );
-          }}
-          type="button"
-        >
-          Show PT sessions
-        </button>
-        <button
-          className="button"
-          disabled={!dateFrom || !dateTo || loading}
-          onClick={() => {
-            void load<ClassReport>(
-              rangePath("classes", dateFrom, dateTo),
-              (report) => ({
-                kind: "classes",
-                report,
-              }),
-            );
-          }}
-          type="button"
-        >
-          Show classes
-        </button>
-        <button
-          className="button"
-          disabled={!dateFrom || !dateTo || loading}
-          onClick={() => {
-            void load<StockMovementReport>(
-              rangePath("stock-movements", dateFrom, dateTo),
-              (report) => ({
-                kind: "stock-movements",
-                report,
-              }),
-            );
-          }}
-          type="button"
-        >
-          Show stock movements
-        </button>
-        <button
-          className="button"
-          disabled={loading}
-          onClick={() => {
-            setInventoryCursors([""]);
-            setInventoryIndex(0);
-            showInventory();
-          }}
-          type="button"
-        >
-          Show inventory
-        </button>
-      </form>
+        </div>
+      </section>
       {error ? (
-        <p className="error" role="alert">
+        <div
+          className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-medium text-red-800"
+          role="alert"
+        >
           {error}
-        </p>
+        </div>
       ) : null}
       {loading ? (
-        <p className="muted" role="status">
-          Loading report…
-        </p>
+        <div className="grid gap-4" role="status">
+          <span className="sr-only">Loading report…</span>
+          <div className="h-28 animate-pulse rounded-2xl bg-slate-200" />
+          <div className="h-72 animate-pulse rounded-2xl bg-slate-200" />
+        </div>
       ) : null}
       {!loading && !error && !loaded ? (
-        <p className="muted" role="status">
-          {canViewFinancial
-            ? "Choose a date, month, or range."
-            : "Choose a range."}
-        </p>
+        <div
+          className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center"
+          role="status"
+        >
+          <span
+            className="mx-auto grid size-12 place-items-center rounded-full bg-slate-200 text-xl text-slate-500"
+            aria-hidden="true"
+          >
+            ↗
+          </span>
+          <p className="mt-4 font-semibold text-slate-700">
+            {canViewFinancial
+              ? "Choose a date, month, or range."
+              : "Choose a range."}
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Your selected report will appear here.
+          </p>
+        </div>
       ) : null}
       {loaded && canExport && !loading ? (
-        <button
-          className="button"
-          onClick={() => void exportCurrent()}
-          type="button"
-        >
-          Export CSV
-        </button>
+        <div className="flex justify-end">
+          <button
+            className="button"
+            onClick={() => void exportCurrent()}
+            type="button"
+          >
+            Export CSV
+          </button>
+        </div>
       ) : null}
-      {loaded?.kind === "daily" || loaded?.kind === "monthly" ? (
-        <ReportView kind={loaded.kind} report={loaded.report} />
-      ) : null}
-      {loaded?.kind === "cash-book" ? (
-        <CashBookView report={loaded.report} />
-      ) : null}
-      {loaded?.kind === "profit-loss" ? (
-        <ProfitLossView report={loaded.report} />
-      ) : null}
-      {loaded?.kind === "membership-expiry" ? (
-        <MembershipExpiryView report={loaded.report} />
-      ) : null}
-      {loaded?.kind === "check-ins" ? (
-        <CheckInReportView report={loaded.report} />
-      ) : null}
-      {loaded?.kind === "pt-sessions" ? (
-        <PTSessionReportView report={loaded.report} />
-      ) : null}
-      {loaded?.kind === "classes" ? (
-        <ClassReportView report={loaded.report} />
-      ) : null}
-      {loaded?.kind === "product-sales" ? (
-        <ProductSalesView
-          bounded={
-            loaded.report.meta.has_more && productIndex + 1 >= REPORT_PAGE_CAP
-          }
-          hasMore={
-            loaded.report.meta.has_more && productIndex + 1 < REPORT_PAGE_CAP
-          }
-          index={productIndex}
-          loading={loading}
-          onNext={() => nextProduct(loaded.report.meta.next_after)}
-          onPrevious={previousProduct}
-          report={loaded.report}
-        />
-      ) : null}
-      {loaded?.kind === "stock-movements" ? (
-        <StockMovementView report={loaded.report} />
-      ) : null}
-      {loaded?.kind === "inventory" ? (
-        <InventoryView
-          bounded={
-            loaded.report.meta.has_more && inventoryIndex + 1 >= REPORT_PAGE_CAP
-          }
-          hasMore={
-            loaded.report.meta.has_more && inventoryIndex + 1 < REPORT_PAGE_CAP
-          }
-          index={inventoryIndex}
-          loading={loading}
-          onNext={() => nextInventory(loaded.report.meta.next_after)}
-          onPrevious={previousInventory}
-          report={loaded.report}
-        />
-      ) : null}
+      <div className="[&>section]:rounded-2xl [&>section]:border [&>section]:border-slate-200 [&>section]:bg-white [&>section]:p-5 [&>section]:shadow-sm [&>section]:sm:p-6 [&>section>h2]:text-2xl [&>section>h2]:font-black [&>section>h2]:tracking-tight [&>section>h2]:text-slate-900 [&>section>p]:text-sm [&>section>p]:text-slate-500">
+        {loaded?.kind === "daily" || loaded?.kind === "monthly" ? (
+          <ReportView kind={loaded.kind} report={loaded.report} />
+        ) : null}
+        {loaded?.kind === "cash-book" ? (
+          <CashBookView report={loaded.report} />
+        ) : null}
+        {loaded?.kind === "profit-loss" ? (
+          <ProfitLossView report={loaded.report} />
+        ) : null}
+        {loaded?.kind === "membership-expiry" ? (
+          <MembershipExpiryView report={loaded.report} />
+        ) : null}
+        {loaded?.kind === "check-ins" ? (
+          <CheckInReportView report={loaded.report} />
+        ) : null}
+        {loaded?.kind === "pt-sessions" ? (
+          <PTSessionReportView report={loaded.report} />
+        ) : null}
+        {loaded?.kind === "classes" ? (
+          <ClassReportView report={loaded.report} />
+        ) : null}
+        {loaded?.kind === "product-sales" ? (
+          <ProductSalesView
+            bounded={
+              loaded.report.meta.has_more && productIndex + 1 >= REPORT_PAGE_CAP
+            }
+            hasMore={
+              loaded.report.meta.has_more && productIndex + 1 < REPORT_PAGE_CAP
+            }
+            index={productIndex}
+            loading={loading}
+            onNext={() => nextProduct(loaded.report.meta.next_after)}
+            onPrevious={previousProduct}
+            report={loaded.report}
+          />
+        ) : null}
+        {loaded?.kind === "stock-movements" ? (
+          <StockMovementView report={loaded.report} />
+        ) : null}
+        {loaded?.kind === "inventory" ? (
+          <InventoryView
+            bounded={
+              loaded.report.meta.has_more &&
+              inventoryIndex + 1 >= REPORT_PAGE_CAP
+            }
+            hasMore={
+              loaded.report.meta.has_more &&
+              inventoryIndex + 1 < REPORT_PAGE_CAP
+            }
+            index={inventoryIndex}
+            loading={loading}
+            onNext={() => nextInventory(loaded.report.meta.next_after)}
+            onPrevious={previousInventory}
+            report={loaded.report}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -651,36 +857,42 @@ function ReportView({
         {title}
       </h2>
       <ReportIdentity report={report} />
-      <dl className="grid gap-2">
-        <div>
-          <dt>Revenue status</dt>
-          <dd>{report.source_status_policy.revenue}</dd>
-        </div>
-        <div>
-          <dt>Expense status</dt>
-          <dd>{report.source_status_policy.expenses}</dd>
-        </div>
-        <div>
-          <dt>Operations status</dt>
-          <dd>{report.source_status_policy.operations}</dd>
-        </div>
-      </dl>
+      <PolicyDetails
+        entries={[
+          ["Revenue", report.source_status_policy.revenue],
+          ["Expenses", report.source_status_policy.expenses],
+          ["Operations", report.source_status_policy.operations],
+        ]}
+      />
       <RowsTable columns={COLUMNS} rows={report.rows} />
-      <section aria-labelledby="report-totals-title">
-        <h3 className="text-lg font-semibold" id="report-totals-title">
+      <section
+        aria-labelledby="report-totals-title"
+        className="rounded-xl bg-slate-50 p-4"
+      >
+        <h3
+          className="text-base font-bold text-slate-900"
+          id="report-totals-title"
+        >
           Totals
         </h3>
-        <dl className="mt-3 grid gap-2">
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {TOTAL_FIELDS.map((field) => (
-            <div key={field.key}>
-              <dt>{field.label}</dt>
-              <dd>{report.totals[field.key]}</dd>
+            <div className="rounded-lg bg-white p-3" key={field.key}>
+              <dt className="text-xs font-medium text-slate-500">
+                {field.label}
+              </dt>
+              <dd className="mt-1 font-bold text-slate-900">
+                {report.totals[field.key]}
+              </dd>
             </div>
           ))}
         </dl>
-        <ul className="mt-3 grid gap-1">
-          {report.totals.expenses_by_category.map((category) => (
-            <li key={category.system_key}>
+        <ul className="mt-4 flex flex-wrap gap-2">
+          {(report.totals.expenses_by_category ?? []).map((category) => (
+            <li
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600"
+              key={category.system_key}
+            >
               {category.system_key} {category.amount}
             </li>
           ))}
@@ -697,16 +909,12 @@ function CashBookView({ report }: { report: CashBookReport }) {
         Cash book
       </h2>
       <ReportIdentity report={report} />
-      <dl className="grid gap-2">
-        <div>
-          <dt>Session status</dt>
-          <dd>{report.source_status_policy.sessions}</dd>
-        </div>
-        <div>
-          <dt>Transaction status</dt>
-          <dd>{report.source_status_policy.transactions}</dd>
-        </div>
-      </dl>
+      <PolicyDetails
+        entries={[
+          ["Sessions", report.source_status_policy.sessions],
+          ["Transactions", report.source_status_policy.transactions],
+        ]}
+      />
       <RowsTable columns={CASH_COLUMNS} rows={report.rows} />
       <TotalsList fields={CASH_TOTALS} totals={report.totals} />
     </section>
@@ -720,36 +928,42 @@ function ProfitLossView({ report }: { report: ProfitLossReport }) {
         Profit and loss
       </h2>
       <ReportIdentity report={report} />
-      <dl className="grid gap-2">
-        <div>
-          <dt>Revenue status</dt>
-          <dd>{report.source_status_policy.revenue}</dd>
-        </div>
-        <div>
-          <dt>Expense status</dt>
-          <dd>{report.source_status_policy.expenses}</dd>
-        </div>
-        <div>
-          <dt>Operations status</dt>
-          <dd>{report.source_status_policy.operations}</dd>
-        </div>
-      </dl>
+      <PolicyDetails
+        entries={[
+          ["Revenue", report.source_status_policy.revenue],
+          ["Expenses", report.source_status_policy.expenses],
+          ["Operations", report.source_status_policy.operations],
+        ]}
+      />
       <RowsTable columns={PROFIT_COLUMNS} rows={report.rows} />
-      <section aria-labelledby="report-totals-title">
-        <h3 className="text-lg font-semibold" id="report-totals-title">
+      <section
+        aria-labelledby="report-totals-title"
+        className="rounded-xl bg-slate-50 p-4"
+      >
+        <h3
+          className="text-base font-bold text-slate-900"
+          id="report-totals-title"
+        >
           Totals
         </h3>
-        <dl className="mt-3 grid gap-2">
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {PROFIT_TOTALS.map((field) => (
-            <div key={field.key}>
-              <dt>{field.label}</dt>
-              <dd>{report.totals[field.key]}</dd>
+            <div className="rounded-lg bg-white p-3" key={field.key}>
+              <dt className="text-xs font-medium text-slate-500">
+                {field.label}
+              </dt>
+              <dd className="mt-1 font-bold text-slate-900">
+                {report.totals[field.key]}
+              </dd>
             </div>
           ))}
         </dl>
-        <ul className="mt-3 grid gap-1">
-          {report.totals.expenses_by_category.map((category) => (
-            <li key={category.system_key}>
+        <ul className="mt-4 flex flex-wrap gap-2">
+          {(report.totals.expenses_by_category ?? []).map((category) => (
+            <li
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600"
+              key={category.system_key}
+            >
               {category.system_key} {category.amount}
             </li>
           ))}
@@ -793,10 +1007,7 @@ function MembershipExpiryView({ report }: { report: MembershipExpiryReport }) {
         Membership expiry
       </h2>
       <ReportIdentity report={report} />
-      <p>
-        <span className="sr-only">Source status </span>
-        {report.source_status_policy}
-      </p>
+      <PolicyDetails entries={[["Source", report.source_status_policy]]} />
       <RowsTable columns={EXPIRY_COLUMNS} rows={report.rows} />
       <CountTotals fields={EXPIRY_COLUMNS.slice(1)} totals={report.totals} />
     </section>
@@ -846,10 +1057,7 @@ function CheckInReportView({ report }: { report: CheckInReport }) {
         Check-ins
       </h2>
       <ReportIdentity report={report} />
-      <p>
-        <span className="sr-only">Source status </span>
-        {report.source_status_policy}
-      </p>
+      <PolicyDetails entries={[["Source", report.source_status_policy]]} />
       <RowsTable columns={CHECK_IN_COLUMNS} rows={report.rows} />
       <CountTotals
         fields={[
@@ -869,10 +1077,7 @@ function PTSessionReportView({ report }: { report: PTSessionReport }) {
         PT sessions
       </h2>
       <ReportIdentity report={report} />
-      <p>
-        <span className="sr-only">Source status </span>
-        {report.source_status_policy}
-      </p>
+      <PolicyDetails entries={[["Source", report.source_status_policy]]} />
       <RowsTable columns={PT_SESSION_COLUMNS} rows={report.rows} />
       <CountTotals
         fields={PT_SESSION_COLUMNS.slice(1)}
@@ -889,10 +1094,7 @@ function ClassReportView({ report }: { report: ClassReport }) {
         Classes
       </h2>
       <ReportIdentity report={report} />
-      <p>
-        <span className="sr-only">Source status </span>
-        {report.source_status_policy}
-      </p>
+      <PolicyDetails entries={[["Source", report.source_status_policy]]} />
       <RowsTable columns={CLASS_COLUMNS} rows={report.rows} />
       <CountTotals
         fields={[
@@ -972,10 +1174,7 @@ function ProductSalesView({
         Product sales
       </h2>
       <ReportIdentity report={report} />
-      <p>
-        <span className="sr-only">Source status </span>
-        {report.source_status_policy}
-      </p>
+      <PolicyDetails entries={[["Source", report.source_status_policy]]} />
       <CatalogTable columns={PRODUCT_SALES_COLUMNS} rows={report.rows} />
       <TotalsList
         fields={[
@@ -988,7 +1187,6 @@ function ProductSalesView({
         ]}
         totals={report.totals}
       />
-      <p>More results: {report.meta.has_more ? "yes" : "no"}</p>
       <CursorControls
         bounded={bounded}
         hasMore={hasMore}
@@ -1008,10 +1206,7 @@ function StockMovementView({ report }: { report: StockMovementReport }) {
         Stock movements
       </h2>
       <ReportIdentity report={report} />
-      <p>
-        <span className="sr-only">Source status </span>
-        {report.source_status_policy}
-      </p>
+      <PolicyDetails entries={[["Source", report.source_status_policy]]} />
       <RowsTable columns={STOCK_COLUMNS} rows={report.rows} />
       <TotalsList
         fields={STOCK_COLUMNS.slice(1).map((column) => ({
@@ -1047,10 +1242,7 @@ function InventoryView({
         Inventory
       </h2>
       <ReportIdentity report={report} />
-      <p>
-        <span className="sr-only">Source status </span>
-        {report.source_status_policy}
-      </p>
+      <PolicyDetails entries={[["Source", report.source_status_policy]]} />
       <CatalogTable columns={INVENTORY_COLUMNS} rows={report.rows} />
       <TotalsList
         fields={[
@@ -1061,7 +1253,6 @@ function InventoryView({
         ]}
         totals={report.totals}
       />
-      <p>More results: {report.meta.has_more ? "yes" : "no"}</p>
       <CursorControls
         bounded={bounded}
         hasMore={hasMore}
@@ -1082,15 +1273,25 @@ function CountTotals({
   totals: object;
 }) {
   return (
-    <section aria-labelledby="report-totals-title">
-      <h3 className="text-lg font-semibold" id="report-totals-title">
+    <section
+      aria-labelledby="report-totals-title"
+      className="rounded-xl bg-slate-50 p-4"
+    >
+      <h3
+        className="text-base font-bold text-slate-900"
+        id="report-totals-title"
+      >
         Totals
       </h3>
-      <dl className="mt-3 grid gap-2">
+      <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {fields.map((field) => (
-          <div key={field.key}>
-            <dt>{field.label}</dt>
-            <dd>{countValue(totals, field.key)}</dd>
+          <div className="rounded-lg bg-white p-3" key={field.key}>
+            <dt className="text-xs font-medium text-slate-500">
+              {field.label}
+            </dt>
+            <dd className="mt-1 text-lg font-bold text-slate-900">
+              {countValue(totals, field.key)}
+            </dd>
           </div>
         ))}
       </dl>
@@ -1104,19 +1305,62 @@ function countValue(totals: object, key: string): number {
 }
 
 function ReportIdentity({ report }: { report: Identity }) {
+  const generated = new Date(report.generated_at);
+  const generatedLabel = Number.isNaN(generated.getTime())
+    ? report.generated_at
+    : new Intl.DateTimeFormat("en", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(generated);
   return (
-    <>
-      <p>{report.gym.name}</p>
-      <p>{report.gym.code}</p>
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+      <span className="inline-flex items-center gap-2">
+        <span
+          className="size-2 rounded-full bg-emerald-500"
+          aria-hidden="true"
+        />
+        <strong className="text-sm text-slate-900">{report.gym.name}</strong>
+      </span>
+      <span className="rounded bg-white px-2 py-1 font-semibold">
+        {report.gym.code}
+      </span>
       {report.range ? (
-        <p>
+        <span>
           {report.range.date_from} to {report.range.date_to}
-        </p>
+        </span>
       ) : null}
-      <p>{report.timezone}</p>
-      {report.currency ? <p>{report.currency}</p> : null}
-      <p>{report.generated_at}</p>
-    </>
+      <span>{report.timezone}</span>
+      {report.currency ? <span>{report.currency}</span> : null}
+      <span className="ml-auto text-slate-400">Generated {generatedLabel}</span>
+    </div>
+  );
+}
+
+function PolicyDetails({ entries }: { entries: [string, string][] }) {
+  return (
+    <details className="rounded-xl border border-slate-200 bg-white">
+      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-600 marker:hidden">
+        <span className="inline-flex items-center gap-2">
+          <span
+            className="grid size-5 place-items-center rounded-full bg-emerald-100 text-xs text-emerald-700"
+            aria-hidden="true"
+          >
+            ✓
+          </span>
+          Verified data policy
+        </span>
+      </summary>
+      <dl className="grid gap-3 border-t border-slate-100 bg-slate-50 p-4">
+        {entries.map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-xs font-bold text-slate-500">{label}</dt>
+            <dd className="mt-1 break-words text-xs leading-5 text-slate-600">
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }
 
@@ -1128,33 +1372,47 @@ function CatalogTable<Row extends { product_id: string; sku: string }>({
   rows: Row[];
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-left text-sm">
-        <caption className="sr-only">Report rows</caption>
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th className="px-2 py-1" key={column.key} scope="col">
-                {column.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.product_id}>
-              <th className="px-2 py-1" scope="row">
-                {row.sku}
-              </th>
-              {columns.slice(1).map((column) => (
-                <td className="px-2 py-1" key={column.key}>
-                  {catalogCell(column.key, row[column.key])}
-                </td>
+    <div className="overflow-hidden rounded-xl border border-slate-200">
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <caption className="sr-only">Report rows</caption>
+          <thead className="bg-slate-800 text-white">
+            <tr>
+              {columns.map((column) => (
+                <th
+                  className="whitespace-nowrap px-4 py-3 text-xs font-semibold"
+                  key={column.key}
+                  scope="col"
+                >
+                  {column.label}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white">
+            {rows.map((row) => (
+              <tr className="hover:bg-slate-50" key={row.product_id}>
+                <th
+                  className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900"
+                  scope="row"
+                >
+                  <IdentifierValue value={row.sku} />
+                </th>
+                {columns.slice(1).map((column) => (
+                  <td
+                    className="whitespace-nowrap px-4 py-3 text-slate-600"
+                    key={column.key}
+                  >
+                    <IdentifierValue
+                      value={catalogCell(column.key, row[column.key])}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -1173,33 +1431,45 @@ function RowsTable<Row extends { date: string }>({
   rows: Row[];
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-left text-sm">
-        <caption className="sr-only">Report rows</caption>
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th className="px-2 py-1" key={column.key} scope="col">
-                {column.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.date}>
-              <th className="px-2 py-1" scope="row">
-                {row.date}
-              </th>
-              {columns.slice(1).map((column) => (
-                <td className="px-2 py-1" key={column.key}>
-                  {String(row[column.key])}
-                </td>
+    <div className="overflow-hidden rounded-xl border border-slate-200">
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <caption className="sr-only">Report rows</caption>
+          <thead className="bg-slate-800 text-white">
+            <tr>
+              {columns.map((column) => (
+                <th
+                  className="whitespace-nowrap px-4 py-3 text-xs font-semibold"
+                  key={column.key}
+                  scope="col"
+                >
+                  {column.label}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white">
+            {rows.map((row) => (
+              <tr className="hover:bg-slate-50" key={row.date}>
+                <th
+                  className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900"
+                  scope="row"
+                >
+                  <IdentifierValue value={row.date} />
+                </th>
+                {columns.slice(1).map((column) => (
+                  <td
+                    className="whitespace-nowrap px-4 py-3 text-slate-600"
+                    key={column.key}
+                  >
+                    <IdentifierValue value={String(row[column.key])} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -1212,15 +1482,25 @@ function TotalsList<Key extends string>({
   totals: Record<Key, string | number>;
 }) {
   return (
-    <section aria-labelledby="report-totals-title">
-      <h3 className="text-lg font-semibold" id="report-totals-title">
+    <section
+      aria-labelledby="report-totals-title"
+      className="rounded-xl bg-slate-50 p-4"
+    >
+      <h3
+        className="text-base font-bold text-slate-900"
+        id="report-totals-title"
+      >
         Totals
       </h3>
-      <dl className="mt-3 grid gap-2">
+      <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {fields.map((field) => (
-          <div key={field.key}>
-            <dt>{field.label}</dt>
-            <dd>{totals[field.key]}</dd>
+          <div className="rounded-lg bg-white p-3" key={field.key}>
+            <dt className="text-xs font-medium text-slate-500">
+              {field.label}
+            </dt>
+            <dd className="mt-1 font-bold text-slate-900">
+              {totals[field.key]}
+            </dd>
           </div>
         ))}
       </dl>

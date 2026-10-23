@@ -8,6 +8,53 @@ Android/iOS workspace are present. Live Firebase and APNs credentials, release
 signing, store submission, a production device proof, and Phase 8 production
 deployment remain open. This is not a production deployment.
 
+Phase 8 increment 1 adds the production image and Compose baseline recorded in
+[the increment 1 runbook](./runbooks/phase8-increment-1.md). Phase 8 increment 2
+adds the release supply chain recorded in
+[the increment 2 runbook](./runbooks/phase8-increment-2.md). Phase 8 increment 3
+adds the encrypted backup and isolated restore baseline recorded in
+[the increment 3 runbook](./runbooks/phase8-increment-3.md). Phase 8 increment 4
+adds the private observability baseline recorded in
+[the increment 4 runbook](./runbooks/phase8-increment-4.md). Phase 8 increment 5
+adds the manual deployment-control baseline recorded in
+[the increment 5 runbook](./runbooks/phase8-increment-5.md). Phase 8 increment 6
+adds the disposable local staging rehearsal recorded in
+[the increment 6 runbook](./runbooks/phase8-increment-6.md). Phase 8 increment 7
+adds the opt-in local load characterization recorded in
+[the increment 7 runbook](./runbooks/phase8-increment-7.md). That profile is
+not a load-test proof, a soak, a production-capacity proof, or an SLO. Phase 8
+increment 8 adds the opt-in receipt and cash-close characterization recorded in
+[the increment 8 runbook](./runbooks/phase8-increment-8.md). It does not prove a
+soak, capacity, an SLO, or financial reconciliation. PT payout stays uncovered.
+Phase 8 increment 9 adds the opt-in PT sale, session, payout, and report
+characterization recorded in
+[the increment 9 runbook](./runbooks/phase8-increment-9.md). It does not prove a
+soak, capacity, an SLO, or financial reconciliation. Phase 8 increment 10 adds
+the opt-in cash commission payout and till characterization recorded in
+[the increment 10 runbook](./runbooks/phase8-increment-10.md). It does not prove a
+soak, capacity, an SLO, or financial reconciliation. Phase 8 increment 11 adds
+the opt-in local bounded endurance characterization recorded in
+[the increment 11 runbook](./runbooks/phase8-increment-11.md). It does not prove a
+soak, capacity, an SLO, or financial reconciliation. Phase 8 increment 12 adds
+the opt-in local security characterization recorded in
+[the increment 12 runbook](./runbooks/phase8-increment-12.md). It does not prove a
+penetration test, a formal security review, production security, or tenant
+isolation. Phase 8 increment 13 adds the opt-in local identity-security
+characterization recorded in
+[the increment 13 runbook](./runbooks/phase8-increment-13.md). It does not prove a
+penetration test, a formal security review, production security, tenant
+isolation, or a live provider. Phase 8 increment 14 adds the opt-in local
+tenant-isolation characterization recorded in
+[the increment 14 runbook](./runbooks/phase8-increment-14.md). It does not prove
+independent tenant isolation, a penetration test, a formal security review, or
+production proof. No GHCR push has
+been performed, protections are unproven, and images stay unpublished until
+the release workflow runs. The deployment workflow has not been run. The local
+rehearsal is not a production deploy, a temporary-VPS proof, or an offsite
+backup proof. Phase 8
+is not complete. None of these increments is a deployment, a live alert proof,
+or a live provider proof.
+
 ## The seven authoritative documents
 
 | Document                                             | Owns                                                                                    |

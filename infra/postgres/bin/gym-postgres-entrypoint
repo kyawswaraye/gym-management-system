@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+/usr/local/bin/gym-backup render-config
+if [ "${1:-}" = "gym-backup" ]; then
+  shift
+  exec /usr/local/bin/gym-backup "$@"
+fi
+exec docker-entrypoint.sh "$@"

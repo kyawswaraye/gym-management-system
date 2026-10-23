@@ -4,8 +4,9 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   deleteFileAsset,
@@ -506,17 +507,15 @@ describe("Member detail summary", () => {
 describe("Member archive", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(window, "prompt").mockImplementation(() => {
-      throw new Error("browser prompt");
-    });
   });
 
-  afterEach(() => {
-    vi.mocked(window.prompt).mockRestore();
-    if (vi.isMockFunction(window.confirm)) {
-      vi.mocked(window.confirm).mockRestore();
-    }
-  });
+  function confirmArchive() {
+    const dialog = screen.getByRole("dialog", {
+      name: "Archive Ada Lovelace (MEM-000001)?",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Archive" }));
+    return dialog;
+  }
 
   function renderMember(canArchive: boolean) {
     return render(
@@ -557,15 +556,24 @@ describe("Member archive", () => {
 
   it("does not send a request when archive is cancelled", async () => {
     vi.mocked(operationGet).mockResolvedValue(summary());
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     renderMember(true);
 
-    (await screen.findByRole("button", { name: "Archive member" })).click();
-
-    expect(confirm).toHaveBeenCalledWith(
-      "Archive member Ada Lovelace (MEM-000001)?",
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Archive member" }),
     );
+    const dialog = screen.getByRole("dialog", {
+      name: "Archive Ada Lovelace (MEM-000001)?",
+    });
+    expect(dialog).toHaveTextContent("not deleted");
+    expect(dialog).toHaveTextContent("history remain");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
     expect(operationMutation).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("dialog", {
+        name: "Archive Ada Lovelace (MEM-000001)?",
+      }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("ACTIVE")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Archive member" }),
@@ -591,10 +599,12 @@ describe("Member archive", () => {
         authz_version: 2,
       }),
     );
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderMember(true);
 
-    (await screen.findByRole("button", { name: "Archive member" })).click();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Archive member" }),
+    );
+    confirmArchive();
 
     await waitFor(() =>
       expect(operationMutation).toHaveBeenCalledWith(
@@ -617,14 +627,19 @@ describe("Member archive", () => {
     const pending = deferred<Member>();
     vi.mocked(operationGet).mockResolvedValue(summary());
     vi.mocked(operationMutation).mockReturnValue(pending.promise);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderMember(true);
 
     const button = await screen.findByRole("button", {
       name: "Archive member",
     });
-    button.click();
-    button.click();
+    fireEvent.click(button);
+    const confirm = within(
+      screen.getByRole("dialog", {
+        name: "Archive Ada Lovelace (MEM-000001)?",
+      }),
+    ).getByRole("button", { name: "Archive" });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
 
     expect(operationMutation).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(button).toBeDisabled());
@@ -643,10 +658,12 @@ describe("Member archive", () => {
     vi.mocked(operationMutation).mockRejectedValue(
       new Error("Archive was rejected."),
     );
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderMember(true);
 
-    (await screen.findByRole("button", { name: "Archive member" })).click();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Archive member" }),
+    );
+    confirmArchive();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Archive was rejected.",
@@ -672,10 +689,12 @@ describe("Member archive", () => {
         is_pt_client: true,
       }),
     );
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderMember(true);
 
-    (await screen.findByRole("button", { name: "Archive member" })).click();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Archive member" }),
+    );
+    confirmArchive();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Summary refresh failed.",
@@ -691,6 +710,186 @@ describe("Member archive", () => {
       2,
       `members/${MEMBER_ID}/summary/`,
     );
+  });
+});
+
+describe("Member restore", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function archivedSummary() {
+    return summary({
+      member: member({
+        status: "ARCHIVED",
+        archived_at: "2026-10-17T00:00:00Z",
+        authz_version: 2,
+      }),
+    });
+  }
+
+  function confirmRestore() {
+    const dialog = screen.getByRole("dialog", {
+      name: "Restore Ada Lovelace (MEM-000001)?",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Restore" }));
+    return dialog;
+  }
+
+  function renderArchived(canRestore: boolean, canArchive = false) {
+    return render(
+      <MemberDetail
+        canArchive={canArchive}
+        canRestore={canRestore}
+        canUpdate={false}
+        canViewPayments={false}
+        memberId={MEMBER_ID}
+      />,
+    );
+  }
+
+  it("shows restore only for an archived member when the caller can restore", async () => {
+    vi.mocked(operationGet).mockResolvedValue(summary());
+    const active = render(
+      <MemberDetail
+        canArchive
+        canRestore
+        canUpdate={false}
+        canViewPayments={false}
+        memberId={MEMBER_ID}
+      />,
+    );
+
+    expect(await screen.findByText("ACTIVE")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Restore member" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive member" }),
+    ).toBeInTheDocument();
+    active.unmount();
+
+    vi.mocked(operationGet).mockResolvedValue(archivedSummary());
+    const hidden = renderArchived(false, true);
+    expect(await screen.findByText("ARCHIVED")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Restore member" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive member" }),
+    ).not.toBeInTheDocument();
+    hidden.unmount();
+
+    vi.mocked(operationGet).mockResolvedValue(archivedSummary());
+    renderArchived(true, true);
+    expect(
+      await screen.findByRole("button", { name: "Restore member" }),
+    ).toHaveClass("button-success");
+    expect(
+      screen.queryByRole("button", { name: "Archive member" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not send a request when restore is cancelled", async () => {
+    vi.mocked(operationGet).mockResolvedValue(archivedSummary());
+    renderArchived(true);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Restore member" }),
+    );
+    expect(
+      screen.getByRole("dialog", {
+        name: "Restore Ada Lovelace (MEM-000001)?",
+      }),
+    ).toHaveTextContent("not deleted");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(operationMutation).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("dialog", {
+        name: "Restore Ada Lovelace (MEM-000001)?",
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("ARCHIVED")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Restore member" }),
+    ).toBeInTheDocument();
+  });
+
+  it("restores after confirmation, refreshes the member, and shows ACTIVE", async () => {
+    vi.mocked(operationGet)
+      .mockResolvedValueOnce(archivedSummary())
+      .mockResolvedValueOnce(
+        summary({
+          member: member({
+            status: "ACTIVE",
+            archived_at: null,
+            authz_version: 3,
+          }),
+        }),
+      );
+    vi.mocked(operationMutation).mockResolvedValue(
+      member({
+        status: "ACTIVE",
+        archived_at: null,
+        authz_version: 3,
+      }),
+    );
+    renderArchived(true, true);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Restore member" }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "Restore Ada Lovelace (MEM-000001)?",
+    });
+    expect(within(dialog).getByRole("button", { name: "Restore" })).toHaveClass(
+      "button-success",
+    );
+    confirmRestore();
+
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith(
+        `members/${MEMBER_ID}/restore/`,
+        {},
+      ),
+    );
+    expect(operationGet).toHaveBeenNthCalledWith(
+      2,
+      `members/${MEMBER_ID}/summary/`,
+    );
+    expect(await screen.findByText("ACTIVE")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Restore member" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive member" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Total charged")).toBeInTheDocument();
+  });
+
+  it("keeps the archived member and shows an alert when restore fails", async () => {
+    vi.mocked(operationGet).mockResolvedValue(archivedSummary());
+    vi.mocked(operationMutation).mockRejectedValue(
+      new Error("Restore was rejected."),
+    );
+    renderArchived(true);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Restore member" }),
+    );
+    confirmRestore();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Restore was rejected.",
+    );
+    expect(screen.getByText("ARCHIVED")).toBeInTheDocument();
+    expect(screen.getByText("Total charged")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Restore member" }),
+    ).toBeEnabled();
+    expect(operationGet).toHaveBeenCalledTimes(1);
+    expect(operationMutation).toHaveBeenCalledTimes(1);
   });
 });
 

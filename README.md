@@ -49,6 +49,51 @@ code and test closure. Live Firebase and APNs credentials, release signing,
 store submission, and a production device proof remain open. Production
 deployment is not complete.
 
+Phase 8 increment 1 adds the production API and Next.js images, the private
+Compose baseline, and offline artifact validation. It does not publish images
+or deploy. Phase 8 increment 2 adds the tag-controlled GHCR release workflow,
+digest manifest, SBOM, and high/critical image scan. No GHCR push has been
+performed, images stay unpublished until that workflow runs, and branch or
+tag protections are unproven. Phase 8 increment 3 adds the encrypted backup
+and isolated restore baseline. Phase 8 increment 4 adds private logs, metrics,
+and alert rules. It does not prove alert delivery or an SLO. Phase 8
+increment 5 adds the manual deployment workflow, checksummed bundle, and
+host orchestration for temporary staging and the production VPS. It does not
+prove a protected environment, a deploy, smoke, backup, or rollback. Phase 8
+increment 6 adds a disposable local staging rehearsal with separate
+credentials and volumes. It does not prove GHCR, a protected environment, a
+temporary VPS, offsite backup, or RPO/RTO. Phase 8 increment 7 adds an
+opt-in local load characterization on that rehearsal. It does not prove a
+load test, soak, production capacity, or an SLO. Phase 8 increment 8 adds an
+opt-in receipt and cash-close characterization. It does not prove a soak,
+capacity, an SLO, or financial reconciliation, and PT payout stays uncovered.
+Phase 8 increment 9 adds an opt-in PT sale, session, payout, and report
+characterization. It does not prove a soak, capacity, an SLO, or financial
+reconciliation. Phase 8 increment 12 adds an opt-in local security
+characterization. It does not prove a penetration test, a formal security
+review, production security, or tenant isolation. Phase 8 increment 13 adds
+an opt-in local identity-security characterization. It does not prove a
+penetration test, a formal security review, production security, tenant
+isolation, or a live provider. Phase 8 increment 14 adds an opt-in local
+tenant-isolation characterization. It does not prove independent tenant
+isolation, a penetration test, a formal security review, or production
+proof. Phase 8
+is not complete. See
+[`docs/runbooks/phase8-increment-1.md`](docs/runbooks/phase8-increment-1.md),
+[`docs/runbooks/phase8-increment-2.md`](docs/runbooks/phase8-increment-2.md),
+[`docs/runbooks/phase8-increment-3.md`](docs/runbooks/phase8-increment-3.md),
+[`docs/runbooks/phase8-increment-4.md`](docs/runbooks/phase8-increment-4.md),
+[`docs/runbooks/phase8-increment-5.md`](docs/runbooks/phase8-increment-5.md),
+[`docs/runbooks/phase8-increment-6.md`](docs/runbooks/phase8-increment-6.md),
+[`docs/runbooks/phase8-increment-7.md`](docs/runbooks/phase8-increment-7.md),
+[`docs/runbooks/phase8-increment-8.md`](docs/runbooks/phase8-increment-8.md),
+[`docs/runbooks/phase8-increment-9.md`](docs/runbooks/phase8-increment-9.md),
+[`docs/runbooks/phase8-increment-10.md`](docs/runbooks/phase8-increment-10.md),
+[`docs/runbooks/phase8-increment-11.md`](docs/runbooks/phase8-increment-11.md),
+[`docs/runbooks/phase8-increment-12.md`](docs/runbooks/phase8-increment-12.md),
+[`docs/runbooks/phase8-increment-13.md`](docs/runbooks/phase8-increment-13.md),
+and [`docs/runbooks/phase8-increment-14.md`](docs/runbooks/phase8-increment-14.md).
+
 Phase 3 implementation is complete as of 2026-10-18 under ADRs 0004–0008.
 Phase 3 closure evidence: backend checks passed; 225 non-PostgreSQL unit
 tests passed; the full PostgreSQL security and integration suite passed 171
@@ -550,7 +595,8 @@ historical baseline and still records Next.js 16.3.3.
 6. Install the web workspace with Node.js 24.x (`24.20.0` in CI).
 
 Django authentication routes accept only the trusted Next.js BFF. Production
-Django listens on loopback and requires `BFF_SHARED_SECRET`.
+Django has no host port. Caddy allowlists only the member API families, and
+staff routes require `BFF_SHARED_SECRET`.
 
 `Secure` authentication cookies are mandatory outside isolated localhost
 development. Browser JavaScript never receives authentication tokens.

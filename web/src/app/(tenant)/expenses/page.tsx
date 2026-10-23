@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { ExpensesManager } from "@/features/finance/expenses-manager";
 import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -13,13 +14,12 @@ export default async function ExpensesPage() {
 
   return (
     <section aria-labelledby="expenses-title">
-      <h1 className="text-2xl font-bold" id="expenses-title">
-        Expenses
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Keep custom categories and expense drafts inside this gym. Protected
-        salary and commission categories stay unchanged.
-      </p>
+      <PageHeader
+        description="Keep custom categories and expense drafts inside this gym. Protected salary and commission categories stay unchanged."
+        eyebrow="Finance"
+        title="Expenses"
+        titleId="expenses-title"
+      />
       <ExpensesManager
         canApprove={session.permissions.includes("expenses.approve")}
         canCreate={session.permissions.includes("expenses.create")}

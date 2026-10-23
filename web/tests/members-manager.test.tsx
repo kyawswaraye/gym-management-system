@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -160,9 +161,7 @@ describe("Members manager", () => {
     fireEvent.change(screen.getByLabelText("Search members"), {
       target: { value: "Grace" },
     });
-    fireEvent.change(screen.getByLabelText("Filter by status"), {
-      target: { value: "ACTIVE" },
-    });
+    fireEvent.click(screen.getByRole("radio", { name: "Active" }));
     fireEvent.change(screen.getByLabelText("Joined from"), {
       target: { value: "2026-01-01" },
     });
@@ -406,9 +405,7 @@ describe("Members manager", () => {
       await screen.findByRole("link", { name: "Grace Hopper" }),
     ).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Filter by status"), {
-      target: { value: "ACTIVE" },
-    });
+    fireEvent.click(screen.getByRole("radio", { name: "Active" }));
     await waitFor(() =>
       expect(listMembers).toHaveBeenLastCalledWith({
         limit: 25,
@@ -471,6 +468,273 @@ describe("Members manager", () => {
     expect(vi.mocked(listMembers).mock.calls.at(-1)?.[0]).not.toHaveProperty(
       "after",
     );
+  });
+
+  it("loads archived members from the first page and resets an open cursor", async () => {
+    const requests: Array<ReturnType<typeof deferred<MemberListPage>>> = [];
+    vi.mocked(listMembers).mockImplementation(async () => {
+      const pending = deferred<MemberListPage>();
+      requests.push(pending);
+      pending.promise.then(
+        () => undefined,
+        () => undefined,
+      );
+      return pending.promise;
+    });
+    render(<MembersManager canCreate canRestore defaultDate="2026-10-17" />);
+
+    expect(
+      screen.getAllByRole("radio").map((radio) => radio.textContent),
+    ).toEqual([
+      "All",
+      "Active",
+      "Expired",
+      "Suspended",
+      "Cancelled",
+      "Archived",
+    ]);
+    expect(screen.getByRole("radio", { name: "All" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.queryByLabelText("Filter by status")).not.toBeInTheDocument();
+
+    await waitFor(() => expect(requests).toHaveLength(1));
+    requests[0]?.resolve(page([member()], "cursor.next"));
+    expect(
+      await screen.findByRole("link", { name: "Ada Lovelace" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Load more members" }));
+    await waitFor(() => expect(requests).toHaveLength(2));
+    expect(listMembers).toHaveBeenLastCalledWith({
+      limit: 25,
+      after: "cursor.next",
+    });
+
+    fireEvent.click(screen.getByRole("radio", { name: "Archived" }));
+    expect(screen.getByRole("radio", { name: "Archived" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByRole("radio", { name: "All" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    expect(
+      screen.queryByRole("link", { name: "Ada Lovelace" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Load more members" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading members.");
+
+    requests[1]?.resolve(
+      page([
+        member({
+          id: OTHER_ID,
+          first_name: "Stale",
+          last_name: "Page",
+        }),
+      ]),
+    );
+    expect(
+      screen.queryByRole("link", { name: "Stale Page" }),
+    ).not.toBeInTheDocument();
+
+    await waitFor(() => expect(requests.length).toBeGreaterThan(2));
+    expect(listMembers).toHaveBeenLastCalledWith({
+      limit: 25,
+      status: "ARCHIVED",
+    });
+    expect(vi.mocked(listMembers).mock.calls.at(-1)?.[0]).not.toHaveProperty(
+      "after",
+    );
+
+    requests.at(-1)?.resolve(
+      page([
+        member({
+          status: "ARCHIVED",
+          archived_at: "2026-10-17T00:00:00Z",
+        }),
+      ]),
+    );
+    const row = await screen.findByRole("row", { name: /Ada Lovelace/ });
+    expect(row).toHaveAttribute("data-status", "ARCHIVED");
+    expect(row).toHaveClass("bg-slate-100");
+    expect(
+      within(row).getByRole("link", { name: "Ada Lovelace" }),
+    ).toHaveAttribute("href", `/members/${MEMBER_ID}`);
+    expect(
+      within(row).getByRole("button", { name: "Restore Ada Lovelace" }),
+    ).toHaveClass("button-success");
+    expect(screen.getByText(/These members are archived/)).toBeInTheDocument();
+    expect(screen.getByText(/record is not deleted/)).toBeInTheDocument();
+  });
+
+  it("restores an archived member after confirmation and leaves other rows", async () => {
+    const archived = member({
+      status: "ARCHIVED",
+      archived_at: "2026-10-17T00:00:00Z",
+    });
+    const active = member({
+      id: OTHER_ID,
+      first_name: "Grace",
+      last_name: "Hopper",
+      member_number: "MEM-000002",
+      status: "ACTIVE",
+    });
+    vi.mocked(listMembers).mockResolvedValue(page([archived, active]));
+    vi.mocked(operationMutation).mockResolvedValue(
+      member({
+        status: "ACTIVE",
+        archived_at: null,
+        authz_version: 3,
+      }),
+    );
+    render(
+      <MembersManager canCreate={false} canRestore defaultDate="2026-10-17" />,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Restore Ada Lovelace" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Restore Grace Hopper" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Archived" }));
+    await waitFor(() =>
+      expect(listMembers).toHaveBeenLastCalledWith({
+        limit: 25,
+        status: "ARCHIVED",
+      }),
+    );
+    expect(
+      await screen.findByRole("link", { name: "Ada Lovelace" }),
+    ).toHaveAttribute("href", `/members/${MEMBER_ID}`);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Restore Ada Lovelace" }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "Restore Ada Lovelace (MEM-000001)?",
+    });
+    expect(dialog).toHaveTextContent("not deleted");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(operationMutation).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("dialog", {
+        name: "Restore Ada Lovelace (MEM-000001)?",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Ada Lovelace" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Restore Ada Lovelace" }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", {
+          name: "Restore Ada Lovelace (MEM-000001)?",
+        }),
+      ).getByRole("button", { name: "Restore" }),
+    );
+
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith(
+        `members/${MEMBER_ID}/restore/`,
+        {},
+      ),
+    );
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole("link", { name: "Ada Lovelace" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Grace Hopper" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Ada Lovelace restored to Active."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Delete/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the archived member visible when restore fails", async () => {
+    vi.mocked(listMembers).mockResolvedValue(
+      page([
+        member({
+          status: "ARCHIVED",
+          archived_at: "2026-10-17T00:00:00Z",
+        }),
+      ]),
+    );
+    vi.mocked(operationMutation).mockRejectedValue(
+      new Error("Restore was rejected."),
+    );
+    render(
+      <MembersManager canCreate={false} canRestore defaultDate="2026-10-17" />,
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "Archived" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Restore Ada Lovelace" }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", {
+          name: "Restore Ada Lovelace (MEM-000001)?",
+        }),
+      ).getByRole("button", { name: "Restore" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Restore was rejected.",
+    );
+    expect(
+      screen.getByRole("link", { name: "Ada Lovelace" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Restore Ada Lovelace" }),
+    ).toBeEnabled();
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not offer restore without members.restore", async () => {
+    vi.mocked(listMembers).mockResolvedValue(
+      page([
+        member({
+          status: "ARCHIVED",
+          archived_at: "2026-10-17T00:00:00Z",
+        }),
+      ]),
+    );
+    render(<MembersManager canCreate={false} defaultDate="2026-10-17" />);
+    fireEvent.click(screen.getByRole("radio", { name: "Archived" }));
+    await waitFor(() =>
+      expect(listMembers).toHaveBeenLastCalledWith({
+        limit: 25,
+        status: "ARCHIVED",
+      }),
+    );
+    expect(
+      await screen.findByRole("link", { name: "Ada Lovelace" }),
+    ).toHaveAttribute("href", `/members/${MEMBER_ID}`);
+    expect(screen.getByRole("row", { name: /Ada Lovelace/ })).toHaveAttribute(
+      "data-status",
+      "ARCHIVED",
+    );
+    expect(
+      screen.queryByRole("button", { name: /Restore/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Delete/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Open a name for the full profile/),
+    ).toBeInTheDocument();
   });
 
   it("hides the create form without members.create", async () => {
@@ -586,5 +850,325 @@ describe("Members manager", () => {
         notes: "Evening visits",
       }),
     );
+  });
+});
+
+describe("Members directory archive", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(listMembers).mockResolvedValue(page([member()]));
+    vi.mocked(operationMutation).mockResolvedValue(member());
+  });
+
+  function archivedMember() {
+    return member({
+      status: "ARCHIVED",
+      archived_at: "2026-10-17T00:00:00Z",
+    });
+  }
+
+  it("shows archive only for a current member when the caller can archive", async () => {
+    const view = render(
+      <MembersManager canCreate={false} defaultDate="2026-10-17" />,
+    );
+    expect(await screen.findByText("MEM-000001")).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader")).toHaveLength(4);
+    expect(
+      screen.queryByRole("columnheader", { name: "Action" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Archive|Restore|Delete/ }),
+    ).not.toBeInTheDocument();
+
+    view.rerender(
+      <MembersManager canArchive canCreate={false} defaultDate="2026-10-17" />,
+    );
+    expect(screen.getAllByRole("columnheader")).toHaveLength(5);
+    expect(
+      screen.getByRole("columnheader", { name: "Action" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive Ada Lovelace" }),
+    ).toHaveClass("button-archive");
+    expect(
+      screen.queryByRole("button", { name: /Restore|Delete/ }),
+    ).not.toBeInTheDocument();
+    view.unmount();
+
+    vi.mocked(listMembers).mockResolvedValue(page([archivedMember()]));
+    render(
+      <MembersManager canArchive canCreate={false} defaultDate="2026-10-17" />,
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "Archived" }));
+    expect(
+      await screen.findByRole("link", { name: "Ada Lovelace" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Archive|Restore|Delete/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not archive when confirmation is cancelled", async () => {
+    render(
+      <MembersManager canArchive canCreate={false} defaultDate="2026-10-17" />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Archive Ada Lovelace" }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "Archive Ada Lovelace (MEM-000001)?",
+    });
+    expect(dialog).toHaveTextContent("not deleted");
+    expect(dialog).toHaveTextContent("history remain");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(operationMutation).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive Ada Lovelace" }),
+    ).toBeEnabled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Archive Ada Lovelace" }),
+    );
+    fireEvent.keyDown(
+      screen.getByRole("dialog", {
+        name: "Archive Ada Lovelace (MEM-000001)?",
+      }),
+      { key: "Escape" },
+    );
+    expect(operationMutation).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+  });
+
+  it("removes the row from a status view and leaves the other member", async () => {
+    vi.mocked(listMembers).mockResolvedValue(
+      page([
+        member(),
+        member({
+          id: OTHER_ID,
+          first_name: "Grace",
+          last_name: "Hopper",
+          member_number: "MEM-000002",
+        }),
+      ]),
+    );
+    vi.mocked(operationMutation).mockResolvedValue(archivedMember());
+    render(
+      <MembersManager canArchive canCreate={false} defaultDate="2026-10-17" />,
+    );
+    fireEvent.click(await screen.findByRole("radio", { name: "Active" }));
+    await waitFor(() =>
+      expect(listMembers).toHaveBeenLastCalledWith({
+        limit: 25,
+        status: "ACTIVE",
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Archive Ada Lovelace" }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", {
+          name: "Archive Ada Lovelace (MEM-000001)?",
+        }),
+      ).getByRole("button", { name: "Archive" }),
+    );
+
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith(
+        `members/${MEMBER_ID}/archive/`,
+        {},
+      ),
+    );
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole("link", { name: "Ada Lovelace" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Grace Hopper" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Ada Lovelace archived.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Delete/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("updates the all-directory row and offers restore when permitted", async () => {
+    vi.mocked(listMembers).mockResolvedValue(
+      page([
+        member(),
+        member({
+          id: OTHER_ID,
+          first_name: "Grace",
+          last_name: "Hopper",
+          member_number: "MEM-000002",
+        }),
+      ]),
+    );
+    vi.mocked(operationMutation).mockResolvedValue(archivedMember());
+    render(
+      <MembersManager
+        canArchive
+        canCreate={false}
+        canRestore
+        defaultDate="2026-10-17"
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Archive Ada Lovelace" }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", {
+          name: "Archive Ada Lovelace (MEM-000001)?",
+        }),
+      ).getByRole("button", { name: "Archive" }),
+    );
+
+    const row = await screen.findByRole("row", { name: /Ada Lovelace/ });
+    expect(row).toHaveAttribute("data-status", "ARCHIVED");
+    expect(
+      within(row).queryByRole("button", { name: "Archive Ada Lovelace" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(row).getByRole("button", { name: "Restore Ada Lovelace" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive Grace Hopper" }),
+    ).toBeEnabled();
+    expect(screen.getByText("Ada Lovelace archived.")).toBeInTheDocument();
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a second click while archive is pending", async () => {
+    const pending = deferred<Member>();
+    vi.mocked(operationMutation).mockReturnValue(pending.promise);
+    render(
+      <MembersManager canArchive canCreate={false} defaultDate="2026-10-17" />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Archive Ada Lovelace" }),
+    );
+    const confirm = within(
+      screen.getByRole("dialog", {
+        name: "Archive Ada Lovelace (MEM-000001)?",
+      }),
+    ).getByRole("button", { name: "Archive" });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+    const rowButton = await screen.findByRole("button", {
+      name: "Archive Ada Lovelace",
+    });
+    expect(rowButton).toBeDisabled();
+    fireEvent.click(rowButton);
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+
+    pending.resolve(archivedMember());
+    expect(
+      await screen.findByText("Ada Lovelace archived."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /Ada Lovelace/ })).toHaveAttribute(
+      "data-status",
+      "ARCHIVED",
+    );
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the member and shows an alert when archive fails", async () => {
+    vi.mocked(operationMutation).mockRejectedValue(
+      new Error("Archive was rejected."),
+    );
+    render(
+      <MembersManager canArchive canCreate={false} defaultDate="2026-10-17" />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Archive Ada Lovelace" }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", {
+          name: "Archive Ada Lovelace (MEM-000001)?",
+        }),
+      ).getByRole("button", { name: "Archive" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Archive was rejected.",
+    );
+    expect(
+      screen.getByRole("link", { name: "Ada Lovelace" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archive Ada Lovelace" }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByText("Ada Lovelace archived."),
+    ).not.toBeInTheDocument();
+    expect(operationMutation).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a stale archive response after the directory changes", async () => {
+    const requests: Array<ReturnType<typeof deferred<MemberListPage>>> = [];
+    vi.mocked(listMembers).mockImplementation(async () => {
+      const pending = deferred<MemberListPage>();
+      requests.push(pending);
+      pending.promise.then(
+        () => undefined,
+        () => undefined,
+      );
+      return pending.promise;
+    });
+    const archive = deferred<Member>();
+    vi.mocked(operationMutation).mockReturnValue(archive.promise);
+    render(
+      <MembersManager canArchive canCreate={false} defaultDate="2026-10-17" />,
+    );
+
+    await waitFor(() => expect(requests).toHaveLength(1));
+    requests[0]?.resolve(page([member()]));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Archive Ada Lovelace" }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", {
+          name: "Archive Ada Lovelace (MEM-000001)?",
+        }),
+      ).getByRole("button", { name: "Archive" }),
+    );
+    await waitFor(() => expect(operationMutation).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("radio", { name: "Active" }));
+    await waitFor(() => expect(requests.length).toBeGreaterThan(1));
+    await act(async () => {
+      archive.resolve(archivedMember());
+      await archive.promise;
+    });
+    requests.at(-1)?.resolve(
+      page([
+        member({
+          id: OTHER_ID,
+          first_name: "Grace",
+          last_name: "Hopper",
+          member_number: "MEM-000002",
+        }),
+      ]),
+    );
+
+    expect(
+      await screen.findByRole("link", { name: "Grace Hopper" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Ada Lovelace" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Ada Lovelace archived."),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

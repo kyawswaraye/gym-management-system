@@ -9,6 +9,7 @@ import {
   type TenantAuditFilters,
 } from "@/features/operations/audit-policy";
 import { listAuditLogs } from "@/features/operations/client";
+import { IdentifierValue } from "@/lib/ui/identifier";
 import type { TenantAuditItem, TenantAuditMeta } from "@/types/api";
 
 const INITIAL_FILTERS: TenantAuditFilters = {
@@ -251,11 +252,17 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
             <dl className="mt-3 grid gap-2 md:grid-cols-2">
               <div>
                 <dt className="font-medium">Actor membership</dt>
-                <dd>{display(audit.actor_membership_id)}</dd>
+                <dd>
+                  <IdentifierValue value={display(audit.actor_membership_id)} />
+                </dd>
               </div>
               <div>
                 <dt className="font-medium">Impersonator membership</dt>
-                <dd>{display(audit.impersonator_membership_id)}</dd>
+                <dd>
+                  <IdentifierValue
+                    value={display(audit.impersonator_membership_id)}
+                  />
+                </dd>
               </div>
               <div>
                 <dt className="font-medium">Outcome</dt>
@@ -271,11 +278,15 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
               </div>
               <div>
                 <dt className="font-medium">Target ID</dt>
-                <dd>{audit.target_id}</dd>
+                <dd>
+                  <IdentifierValue value={audit.target_id} />
+                </dd>
               </div>
               <div>
                 <dt className="font-medium">Request ID</dt>
-                <dd>{audit.request_id}</dd>
+                <dd>
+                  <IdentifierValue value={audit.request_id} />
+                </dd>
               </div>
             </dl>
             <div className="mt-3 grid gap-3 lg:grid-cols-2">

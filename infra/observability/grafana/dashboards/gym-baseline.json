@@ -1,0 +1,126 @@
+{
+  "uid": "gym-baseline",
+  "title": "Gym production baseline",
+  "tags": ["gym", "provisional"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "editable": false,
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Baseline",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "Thresholds are provisional. This dashboard is not an approved SLO. Alert delivery is not claimed. Deploy and restore evidence stays at 0."
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Availability",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "gym:probe_success:min" }]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Latency",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "gym:probe_duration:max" }]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "HTTP 5xx",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "gym:http_5xx:ratio5m" }]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "HTTP 429",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "gym:http_429:rate5m" }]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Host CPU",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "gym:host_cpu:ratio5m" }]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Host memory",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "gym:host_memory_available:ratio" }]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Host disk",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "gym:host_disk_available:ratio" }]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "PostgreSQL",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "pg_up" },
+        { "refId": "B", "expr": "gym_pg_connections" }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Backup",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "gym_backup_age_seconds" },
+        { "refId": "B", "expr": "gym_backup_wal_age_seconds" },
+        { "refId": "C", "expr": "gym_backup_result" }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Deploy and restore evidence",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "gym_deploy_evidence_proven" },
+        { "refId": "B", "expr": "gym_restore_evidence_proven" }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Certificate expiry",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "probe_ssl_earliest_cert_expiry{job=\"blackbox-tls\"} - time()"
+        }
+      ]
+    }
+  ]
+}

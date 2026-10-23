@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { InventoryManager } from "@/features/finance/inventory-manager";
 import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -13,13 +14,12 @@ export default async function InventoryPage() {
 
   return (
     <section aria-labelledby="inventory-title">
-      <h1 className="text-2xl font-bold" id="inventory-title">
-        Inventory
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Maintain the product catalog and record manual stock movements. On-hand
-        quantity and sales totals come from the server.
-      </p>
+      <PageHeader
+        description="Maintain the product catalog and record manual stock movements. On-hand quantity and sales totals come from the server."
+        eyebrow="Finance"
+        title="Inventory"
+        titleId="inventory-title"
+      />
       <InventoryManager
         canAdjust={session.permissions.includes("inventory.adjust")}
         canManage={session.permissions.includes("inventory.manage")}

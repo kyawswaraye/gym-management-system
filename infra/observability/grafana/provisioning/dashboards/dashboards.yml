@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  - name: gym
+    orgId: 1
+    folder: Gym
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 60
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

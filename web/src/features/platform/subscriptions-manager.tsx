@@ -182,7 +182,7 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
               </select>
             </label>
             <button
-              className="button md:col-span-2"
+              className="button button-edit md:col-span-2"
               type="submit"
               disabled={pendingId !== null}
             >

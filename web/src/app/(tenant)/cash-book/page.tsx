@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { CashBookManager } from "@/features/finance/cash-book-manager";
 import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -13,13 +14,12 @@ export default async function CashBookPage() {
 
   return (
     <section aria-labelledby="cash-book-title">
-      <h1 className="text-2xl font-bold" id="cash-book-title">
-        Cash book
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Open a register session, review the server totals, and close it when the
-        counted cash is recorded.
-      </p>
+      <PageHeader
+        description="Open a register session, review the server totals, and close it when the counted cash is recorded."
+        eyebrow="Finance"
+        title="Cash book"
+        titleId="cash-book-title"
+      />
       <CashBookManager
         canAdjust={session.permissions.includes("cashbook.adjust")}
         canOpen={session.permissions.includes("cashbook.open")}

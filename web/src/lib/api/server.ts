@@ -1,5 +1,7 @@
 import "server-only";
 
+import { AsyncLocalStorage } from "node:async_hooks";
+import { headers as nextHeaders } from "next/headers";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -25,6 +27,11 @@ import {
 } from "@/lib/auth/cookies";
 import { verifyMutationRequest } from "@/lib/auth/csrf";
 import { getServerEnv } from "@/lib/env";
+import {
+  logBffFailure,
+  normalizedRoute,
+  resolveRequestId,
+} from "@/lib/log/structured";
 import type { ApiErrorBody } from "@/types/api";
 
 const ALLOWED_PATHS = new Set([
@@ -588,6 +595,74 @@ function allowsForwardedQuery(
   return allowsExactPlatformQuery(pathname, search);
 }
 
+type BffContext = {
+  requestId: string;
+  method: string;
+  route: string;
+};
+
+const bffContext = new AsyncLocalStorage<BffContext>();
+
+function runWithBffRequest<T>(
+  request: NextRequest,
+  route: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return bffContext.run(
+    {
+      requestId: resolveRequestId(request.headers.get("x-request-id")),
+      method: request.method,
+      route: normalizedRoute(route),
+    },
+    fn,
+  );
+}
+
+function stamp(response: NextResponse): NextResponse {
+  const context = bffContext.getStore();
+  if (context) response.headers.set("X-Request-ID", context.requestId);
+  return response;
+}
+
+function failureOutcome(status: number, body: unknown): string | null {
+  const code = errorCode(body);
+  if (
+    code === "UPSTREAM_UNAVAILABLE" ||
+    code === "INVALID_UPSTREAM_RESPONSE" ||
+    code === "CSRF_FAILED" ||
+    code === "AUTHENTICATION_REQUIRED" ||
+    code === "AUTHENTICATION_FAILED" ||
+    code === "BFF_REQUIRED" ||
+    code === "ACCESS_TOKEN_EXPIRED"
+  ) {
+    return code;
+  }
+  if (status === 401 || status === 403) return "authentication_failed";
+  if (status === 429) return "rate_limited";
+  if (status >= 500) return "upstream_error";
+  return null;
+}
+
+function finishBffResponse(
+  response: NextResponse,
+  body: unknown,
+): NextResponse {
+  const context = bffContext.getStore();
+  if (!context) return response;
+  response.headers.set("X-Request-ID", context.requestId);
+  const outcome = failureOutcome(response.status, body);
+  if (outcome) {
+    logBffFailure({
+      requestId: context.requestId,
+      route: context.route,
+      method: context.method,
+      status: response.status,
+      outcome,
+    });
+  }
+  return response;
+}
+
 async function callDjango(path: string, init: RequestInit): Promise<Response> {
   const canonicalPath = canonicalDjangoPath(path);
   const parsed = new URL(canonicalPath, "http://internal");
@@ -599,7 +674,8 @@ async function callDjango(path: string, init: RequestInit): Promise<Response> {
   if (!allowed || !allowsForwardedQuery(pathname, parsed.search, init.method)) {
     throw new Error("Django route is not allowed.");
   }
-  const { djangoApiUrl, bffSharedSecret } = getServerEnv();
+  const { djangoApiUrl, bffSharedSecret, secureCookies } = getServerEnv();
+  const context = bffContext.getStore();
   return fetch(`${djangoApiUrl}${canonicalPath}`, {
     ...init,
     cache: "no-store",
@@ -607,6 +683,10 @@ async function callDjango(path: string, init: RequestInit): Promise<Response> {
       Accept: "application/json",
       [BFF_SECRET_HEADER]: bffSharedSecret,
       ...init.headers,
+      ...(context ? { "X-Request-ID": context.requestId } : {}),
+      // Production Django redirects plain HTTP. This marks the private hop
+      // after the browser already used HTTPS at Caddy. It is not a TLS proof.
+      ...(secureCookies ? { "X-Forwarded-Proto": "https" } : {}),
     },
   });
 }
@@ -619,25 +699,33 @@ function responseFromUpstream(
   present?: UpstreamPresenter,
 ): NextResponse {
   const headers = { "Cache-Control": "no-store, private" };
-  if (status === 204) return new NextResponse(null, { status, headers });
+  if (status === 204) {
+    return finishBffResponse(new NextResponse(null, { status, headers }), body);
+  }
   if (body === null) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "INVALID_UPSTREAM_RESPONSE",
-          message: "The service returned an invalid response.",
+    return finishBffResponse(
+      NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "INVALID_UPSTREAM_RESPONSE",
+            message: "The service returned an invalid response.",
+          },
         },
-      },
-      { status: 502, headers },
+        { status: 502, headers },
+      ),
+      body,
     );
   }
-  return NextResponse.json(
-    present ? present(status, body) : stripCredentials(body),
-    {
-      status,
-      headers,
-    },
+  return finishBffResponse(
+    NextResponse.json(
+      present ? present(status, body) : stripCredentials(body),
+      {
+        status,
+        headers,
+      },
+    ),
+    body,
   );
 }
 
@@ -773,7 +861,24 @@ export async function parseRequestBody(
   }
 }
 
-export async function authMutation(
+export function authMutation(
+  request: NextRequest,
+  path: string,
+  body: JsonRecord,
+  options: {
+    includeAccess?: boolean;
+    includeRefresh?: boolean;
+    includeSelectionTicket?: boolean;
+    includeMfaChallenge?: boolean;
+    clearAfter?: boolean;
+  } = {},
+): Promise<NextResponse> {
+  return runWithBffRequest(request, path, () =>
+    authMutationBound(request, path, body, options),
+  );
+}
+
+async function authMutationBound(
   request: NextRequest,
   path: string,
   body: JsonRecord,
@@ -788,16 +893,10 @@ export async function authMutation(
   const env = getServerEnv();
   const verified = verifyMutationRequest(request, env.allowedOrigins);
   if (!verified.ok) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: { code: "CSRF_FAILED", message: verified.message },
-      },
-      {
-        status: 403,
-        headers: { "Cache-Control": "no-store, private" },
-      },
-    );
+    return responseFromUpstream(403, {
+      success: false,
+      error: { code: "CSRF_FAILED", message: verified.message },
+    });
   }
 
   const access = request.cookies.get(AUTH_COOKIES.access)?.value;
@@ -843,19 +942,13 @@ export async function authMutation(
     }
     return response;
   } catch {
-    const response = NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "UPSTREAM_UNAVAILABLE",
-          message: "The service is temporarily unavailable. Please try again.",
-        },
+    const response = responseFromUpstream(503, {
+      success: false,
+      error: {
+        code: "UPSTREAM_UNAVAILABLE",
+        message: "The service is temporarily unavailable. Please try again.",
       },
-      {
-        status: 503,
-        headers: { "Cache-Control": "no-store, private" },
-      },
-    );
+    });
     if (options.clearAfter) clearAuthCookies(response);
     return response;
   }
@@ -932,7 +1025,17 @@ async function refreshAndRetry(
   }
 }
 
-export async function authenticatedGet(
+export function authenticatedGet(
+  request: NextRequest,
+  path: string,
+  present?: UpstreamPresenter,
+): Promise<NextResponse> {
+  return runWithBffRequest(request, path, () =>
+    authenticatedGetBound(request, path, present),
+  );
+}
+
+async function authenticatedGetBound(
   request: NextRequest,
   path: string,
   present?: UpstreamPresenter,
@@ -1000,16 +1103,18 @@ function csvDocumentResponse(
   body: string,
   disposition: string | null,
 ): NextResponse {
-  return new NextResponse(body, {
-    status,
-    headers: {
-      "Cache-Control": "no-store, private",
-      "Content-Disposition": `attachment; filename="${csvFileName(disposition)}"`,
-      "Content-Type": "text/csv; charset=utf-8",
-      "Referrer-Policy": "no-referrer",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+  return stamp(
+    new NextResponse(body, {
+      status,
+      headers: {
+        "Cache-Control": "no-store, private",
+        "Content-Disposition": `attachment; filename="${csvFileName(disposition)}"`,
+        "Content-Type": "text/csv; charset=utf-8",
+        "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff",
+      },
+    }),
+  );
 }
 
 function receiptHtmlResponse(
@@ -1026,17 +1131,19 @@ function receiptHtmlResponse(
       },
     });
   }
-  return new NextResponse(html, {
-    status,
-    headers: {
-      "Cache-Control": "no-store, private",
-      "Content-Disposition": `attachment; filename="${receiptFileName(disposition)}"`,
-      "Content-Security-Policy": RECEIPT_DOCUMENT_CSP,
-      "Content-Type": "text/html; charset=utf-8",
-      "Referrer-Policy": "no-referrer",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+  return stamp(
+    new NextResponse(html, {
+      status,
+      headers: {
+        "Cache-Control": "no-store, private",
+        "Content-Disposition": `attachment; filename="${receiptFileName(disposition)}"`,
+        "Content-Security-Policy": RECEIPT_DOCUMENT_CSP,
+        "Content-Type": "text/html; charset=utf-8",
+        "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff",
+      },
+    }),
+  );
 }
 
 async function responseForDocument(upstream: Response): Promise<NextResponse> {
@@ -1058,7 +1165,17 @@ async function responseForDocument(upstream: Response): Promise<NextResponse> {
   return responseFromUpstream(upstream.status, await parseJson(upstream));
 }
 
-export async function authenticatedDocumentGet(
+export function authenticatedDocumentGet(
+  request: NextRequest,
+  path: string,
+  documentKind: "html" | "csv" = "html",
+): Promise<NextResponse> {
+  return runWithBffRequest(request, path, () =>
+    authenticatedDocumentGetBound(request, path, documentKind),
+  );
+}
+
+async function authenticatedDocumentGetBound(
   request: NextRequest,
   path: string,
   documentKind: "html" | "csv" = "html",
@@ -1153,7 +1270,17 @@ function idempotencyKeyForMutation(
   return crypto.randomUUID();
 }
 
-export async function authenticatedMutation(
+export function authenticatedMutation(
+  request: NextRequest,
+  path: string,
+  method: "POST" | "PATCH" | "PUT" | "DELETE" = "POST",
+): Promise<NextResponse> {
+  return runWithBffRequest(request, path, () =>
+    authenticatedMutationBound(request, path, method),
+  );
+}
+
+async function authenticatedMutationBound(
   request: NextRequest,
   path: string,
   method: "POST" | "PATCH" | "PUT" | "DELETE" = "POST",
@@ -1645,8 +1772,51 @@ export function listTenantAuditLogs(
 }
 
 export async function serverAuthMe(accessToken: string): Promise<Response> {
-  return callDjango("/api/v1/auth/me/", {
-    method: "GET",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const existing = bffContext.getStore();
+  const requestId =
+    existing?.requestId ??
+    resolveRequestId((await nextHeaders()).get("x-request-id"));
+  const send = () =>
+    callDjango("/api/v1/auth/me/", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  const load = async () => {
+    try {
+      const response = await send();
+      if (
+        response.status === 401 ||
+        response.status === 403 ||
+        response.status >= 500
+      ) {
+        logBffFailure({
+          requestId,
+          route: "/api/v1/auth/me/",
+          method: "GET",
+          status: response.status,
+          outcome:
+            response.status >= 500 ? "upstream_error" : "authentication_failed",
+        });
+      }
+      return response;
+    } catch (error) {
+      logBffFailure({
+        requestId,
+        route: "/api/v1/auth/me/",
+        method: "GET",
+        status: 503,
+        outcome: "upstream_unavailable",
+      });
+      throw error;
+    }
+  };
+  if (existing) return load();
+  return bffContext.run(
+    {
+      requestId,
+      method: "GET",
+      route: normalizedRoute("/api/v1/auth/me/"),
+    },
+    load,
+  );
 }

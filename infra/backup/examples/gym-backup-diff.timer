@@ -1,0 +1,13 @@
+# Example only. This timer is not installed and is not proof of a backup schedule.
+# Do not enable it until gym-backup bootstrap has exited 0.
+
+[Unit]
+Description=Example six-hour gym PostgreSQL differential backup
+
+[Timer]
+OnCalendar=*-*-* 00/6:20:00 UTC
+Persistent=false
+Unit=gym-backup-diff.service
+
+[Install]
+WantedBy=timers.target

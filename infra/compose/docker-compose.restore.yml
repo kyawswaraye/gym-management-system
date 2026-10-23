@@ -1,0 +1,102 @@
+# NON-PRODUCTION disposable restore target.
+# This project is not the production stack. It publishes no host port.
+# The one-shot restore container fetches repository data first. This network
+# then stays internal: the restored server and verifier have no egress.
+# archive_mode stays off so recovery cannot write WAL back to the repository.
+# RPO and RTO are not proven by starting this file.
+
+name: ${RESTORE_PROJECT:?Set RESTORE_PROJECT}
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE to a repository@sha256 digest}
+    entrypoint:
+      - /usr/local/bin/docker-entrypoint.sh
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${RESTORE_DB_USER:?Set RESTORE_DB_USER}
+      POSTGRES_PASSWORD: ${RESTORE_DB_PASSWORD:?Set RESTORE_DB_PASSWORD}
+      PGDATA: /var/lib/gym-restore
+    command:
+      - postgres
+      - -c
+      - archive_mode=off
+      - -c
+      - max_connections=20
+    networks:
+      - restore
+    volumes:
+      - restore_data:/var/lib/gym-restore
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1024m
+    cpus: "1.00"
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: "no"
+
+  verify:
+    image: ${API_IMAGE:?Set API_IMAGE to a repository@sha256 digest}
+    profiles:
+      - verify
+    user: "10001:10001"
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.restore_verify
+      DATABASE_ROLE_MODE: RESTORE_VERIFY
+      RESTORE_TARGET: disposable
+      RESTORE_CONFIRMATION: restore-disposable
+      RESTORE_PROJECT: ${RESTORE_PROJECT:?Set RESTORE_PROJECT}
+      RESTORE_DB_USER: ${RESTORE_DB_USER:?Set RESTORE_DB_USER}
+      RESTORE_DB_PASSWORD: ${RESTORE_DB_PASSWORD:?Set RESTORE_DB_PASSWORD}
+      RESTORE_DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:?Set POSTGRES_DB}
+      DJANGO_SECRET_KEY: ${RESTORE_DJANGO_SECRET_KEY:?Set RESTORE_DJANGO_SECRET_KEY}
+    command:
+      - python
+      - manage.py
+      - verify_restore_rehearsal
+    networks:
+      - restore
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: "0.50"
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  restore:
+    internal: true
+
+volumes:
+  restore_data:
+    name: ${RESTORE_VOLUME:?Set RESTORE_VOLUME}
+    external: true

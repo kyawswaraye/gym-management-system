@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 
 import { operationGet, operationMutation } from "@/features/operations/client";
 import type { OwnerInvitation, OwnerItem } from "@/types/api";
@@ -17,6 +24,8 @@ export function OwnersManager({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [revokeTarget, setRevokeTarget] = useState<OwnerItem | null>(null);
+  const pendingRef = useRef(false);
 
   const load = useCallback(async () => {
     setOwners(await operationGet<OwnerItem[]>("owners"));
@@ -45,6 +54,8 @@ export function OwnersManager({
     event.preventDefault();
     const form = event.currentTarget;
     const values = new FormData(form);
+    if (pendingRef.current) return;
+    pendingRef.current = true;
     setPending(true);
     setError(null);
     try {
@@ -66,23 +77,22 @@ export function OwnersManager({
         failure instanceof Error ? failure.message : "Unable to invite Owner.",
       );
     } finally {
+      pendingRef.current = false;
       setPending(false);
     }
   }
 
-  async function revoke(owner: OwnerItem) {
-    const reason = globalThis.prompt("Reason for revoking this Owner:");
-    if (!reason || reason.trim().length < 3) {
-      setError("A reason of at least 3 characters is required.");
-      return;
-    }
-    if (!globalThis.confirm(`Revoke Owner access for ${owner.email}?`)) return;
+  async function revoke(owner: OwnerItem, reason: string) {
+    const trimmed = reason.trim();
+    if (pendingRef.current || trimmed.length < 3) return;
+    pendingRef.current = true;
+    setRevokeTarget(null);
     setPending(true);
     setError(null);
     try {
       await operationMutation<OwnerItem>(
         `owners/${owner.gym_membership_id}/revoke`,
-        { reason: reason.trim() },
+        { reason: trimmed },
       );
       setSuccess(`${owner.email} was revoked.`);
       await load();
@@ -91,6 +101,7 @@ export function OwnersManager({
         failure instanceof Error ? failure.message : "Unable to revoke Owner.",
       );
     } finally {
+      pendingRef.current = false;
       setPending(false);
     }
   }
@@ -161,10 +172,13 @@ export function OwnersManager({
                   owner.status === "ACTIVE" &&
                   owner.gym_membership_id !== currentMembershipId && (
                     <button
-                      className="button"
+                      className="button button-delete"
                       type="button"
                       disabled={pending}
-                      onClick={() => void revoke(owner)}
+                      onClick={() => {
+                        if (pendingRef.current) return;
+                        setRevokeTarget(owner);
+                      }}
                     >
                       Revoke
                     </button>
@@ -174,6 +188,104 @@ export function OwnersManager({
           ))}
         </ul>
       </section>
+      {revokeTarget ? (
+        <RevokeOwnerDialog
+          email={revokeTarget.email}
+          onCancel={() => setRevokeTarget(null)}
+          onConfirm={(reason) => void revoke(revokeTarget, reason)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function RevokeOwnerDialog({
+  email,
+  onCancel,
+  onConfirm,
+}: {
+  email: string;
+  onCancel: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const titleId = useId();
+  const reasonId = useId();
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = reason.trim();
+    if (trimmed.length < 3) {
+      setError("A reason of at least 3 characters is required.");
+      return;
+    }
+    onConfirm(trimmed);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center p-4"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
+      <form
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="w-full max-w-md overflow-hidden"
+        role="dialog"
+        onSubmit={submit}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onCancel();
+        }}
+      >
+        <div className="border-b border-slate-200 px-5 py-4">
+          <p className="text-xs font-bold tracking-[0.16em] text-red-600 uppercase">
+            Revoke owner
+          </p>
+          <h2
+            className="mt-1 text-xl font-black tracking-tight text-slate-900"
+            id={titleId}
+          >
+            Revoke {email}?
+          </h2>
+        </div>
+        <div className="grid gap-4 p-5">
+          <p className="text-sm leading-6 text-slate-600">
+            This owner will lose access to the gym. The revocation reason is
+            kept with the audit record.
+          </p>
+          <label className="field" htmlFor={reasonId}>
+            Reason
+            <textarea
+              className="input min-h-24"
+              id={reasonId}
+              maxLength={500}
+              onChange={(event) => setReason(event.target.value)}
+              value={reason}
+            />
+          </label>
+          {error ? (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex justify-end">
+            <button
+              className="button button-cancel"
+              onClick={onCancel}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button className="button button-delete" type="submit">
+              Revoke owner
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
   );
 }

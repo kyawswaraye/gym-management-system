@@ -22,6 +22,11 @@ import {
   memberUpdatePayload,
   type MemberProfileInput,
 } from "@/features/operations/member-profile";
+import {
+  ArchiveMemberDialog,
+  memberArchiveIdentity,
+  RestoreMemberDialog,
+} from "@/features/operations/member-restore-dialog";
 import { formatInstant } from "@/lib/date";
 import type {
   Member,
@@ -31,11 +36,6 @@ import type {
 
 function dayLabel(days: number): string {
   return days === 1 ? "1 day remaining" : `${days} days remaining`;
-}
-
-function memberArchiveIdentity(member: Member): string {
-  const name = `${member.first_name} ${member.last_name}`.trim();
-  return name ? `${name} (${member.member_number})` : member.member_number;
 }
 
 function appendPayments(
@@ -189,6 +189,7 @@ function PaymentHistory({ memberId }: { memberId: string }) {
 export function MemberDetail({
   memberId,
   canArchive,
+  canRestore = false,
   canUpdate,
   canViewPayments,
   canViewCheckIns = false,
@@ -199,6 +200,7 @@ export function MemberDetail({
 }: {
   memberId: string;
   canArchive: boolean;
+  canRestore?: boolean;
   canUpdate: boolean;
   canViewPayments: boolean;
   canViewCheckIns?: boolean;
@@ -210,6 +212,9 @@ export function MemberDetail({
   const [summary, setSummary] = useState<MemberSummary | null>(null);
   const [error, setError] = useState("");
   const [archiving, setArchiving] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreOpen, setRestoreOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeMemberId, setActiveMemberId] = useState(memberId);
   const [draftState, setDraftState] = useState<{
@@ -217,6 +222,7 @@ export function MemberDetail({
     draft: MemberProfileInput;
   } | null>(null);
   const archiveLocked = useRef(false);
+  const restoreLocked = useRef(false);
   const saveLocked = useRef(false);
   const loadGeneration = useRef(0);
   const viewedMemberId = useRef(memberId);
@@ -240,6 +246,9 @@ export function MemberDetail({
     setError("");
     setSaving(false);
     setArchiving(false);
+    setArchiveOpen(false);
+    setRestoring(false);
+    setRestoreOpen(false);
   }
 
   const load = useCallback(async () => {
@@ -332,13 +341,13 @@ export function MemberDetail({
   const noFinalizedPayments =
     payments.total_charged === "0.00" && payments.total_refunded === "0.00";
   const showArchive = canArchive && member.status !== "ARCHIVED";
+  const showRestore = canRestore && member.status === "ARCHIVED";
+  const commandPending = archiving || restoring || saving;
 
   async function archiveMember() {
     if (archiveLocked.current || !showArchive) return;
-    if (!window.confirm(`Archive member ${memberArchiveIdentity(member)}?`)) {
-      return;
-    }
     archiveLocked.current = true;
+    setArchiveOpen(false);
     setArchiving(true);
     setError("");
     try {
@@ -363,6 +372,37 @@ export function MemberDetail({
     } finally {
       archiveLocked.current = false;
       setArchiving(false);
+    }
+  }
+
+  async function restoreMember() {
+    if (restoreLocked.current || !showRestore) return;
+    restoreLocked.current = true;
+    setRestoreOpen(false);
+    setRestoring(true);
+    setError("");
+    try {
+      const restored = await operationMutation<Member>(
+        `members/${memberId}/restore/`,
+        {},
+      );
+      setSummary((current) =>
+        current
+          ? {
+              ...current,
+              member: restored,
+              is_pt_client: restored.is_pt_client,
+            }
+          : current,
+      );
+      await load();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to restore member.",
+      );
+    } finally {
+      restoreLocked.current = false;
+      setRestoring(false);
     }
   }
 
@@ -405,7 +445,7 @@ export function MemberDetail({
             <dd>{member.status}</dd>
           </dl>
           <MemberProfileFields
-            disabled={!canUpdate || saving || archiving}
+            disabled={!canUpdate || commandPending}
             includeMemberNumber={false}
             onChange={(next) =>
               setDraftState({ snapshot: profileSnapshot, draft: next })
@@ -414,8 +454,8 @@ export function MemberDetail({
           />
           {canUpdate && (
             <button
-              className="button"
-              disabled={saving || archiving}
+              className="button button-edit"
+              disabled={commandPending}
               type="submit"
             >
               {saving ? "Saving…" : "Save changes"}
@@ -424,15 +464,45 @@ export function MemberDetail({
         </form>
         {showArchive ? (
           <button
-            className="button"
-            disabled={archiving || saving}
-            onClick={() => void archiveMember()}
+            className="button button-archive"
+            disabled={commandPending}
+            onClick={() => {
+              if (archiveLocked.current || commandPending) return;
+              setArchiveOpen(true);
+            }}
             type="button"
           >
             Archive member
           </button>
         ) : null}
+        {showRestore ? (
+          <button
+            className="button button-success"
+            disabled={commandPending}
+            onClick={() => {
+              if (restoreLocked.current || commandPending) return;
+              setRestoreOpen(true);
+            }}
+            type="button"
+          >
+            Restore member
+          </button>
+        ) : null}
       </div>
+      {archiveOpen ? (
+        <ArchiveMemberDialog
+          identity={memberArchiveIdentity(member)}
+          onCancel={() => setArchiveOpen(false)}
+          onConfirm={() => void archiveMember()}
+        />
+      ) : null}
+      {restoreOpen ? (
+        <RestoreMemberDialog
+          identity={memberArchiveIdentity(member)}
+          onCancel={() => setRestoreOpen(false)}
+          onConfirm={() => void restoreMember()}
+        />
+      ) : null}
       <div className="grid gap-6">
         <section
           aria-labelledby="current-membership-title"

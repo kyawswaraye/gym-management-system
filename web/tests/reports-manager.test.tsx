@@ -352,7 +352,6 @@ describe("reports manager", () => {
     expect(
       within(salesTotals).getByText("Revenue").closest("div"),
     ).toHaveTextContent("12.00");
-    expect(salesReport).toHaveTextContent("More results: yes");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     await waitFor(() => {
       expect(loadReport).toHaveBeenCalledWith(
@@ -700,7 +699,6 @@ describe("reports manager", () => {
     expect(
       within(inventoryTotals).getByText("Total stock").closest("div"),
     ).toHaveTextContent("6.000");
-    expect(inventoryReport).toHaveTextContent("More results: no");
   });
 
   it("exports the loaded report and omits page cursors without permission", async () => {

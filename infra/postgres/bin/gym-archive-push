@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+import sys
+
+from backup_policy import archive_push_main
+
+if __name__ == "__main__":
+    sys.exit(archive_push_main(sys.argv[1:]))

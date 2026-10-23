@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { MemberPackagesManager } from "@/features/pt/member-packages-manager";
 import {
   canAdjustMemberSessions,
@@ -15,14 +16,12 @@ export default async function MemberPackagesPage() {
 
   return (
     <section aria-labelledby="member-packages-title">
-      <h1 className="text-2xl font-bold" id="member-packages-title">
-        Member packages
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Read grants, balances, and the session ledger. Grant and correction stay
-        with a protected owner or manager who does not also hold trainer or
-        reception.
-      </p>
+      <PageHeader
+        description="Read grants, balances, and the session ledger. Grant and correction stay with a protected owner or manager who does not also hold trainer or reception."
+        eyebrow="Personal training"
+        title="Member packages"
+        titleId="member-packages-title"
+      />
       <MemberPackagesManager
         canAdjust={canAdjustMemberSessions(session)}
         today={todayInTimezone(session.gym?.timezone ?? "UTC")}

@@ -1,0 +1,3 @@
+# Single-target mode for postgres_exporter v0.20.1.
+# The password stays in DATA_SOURCE_PASS_FILE. This file has no credentials.
+auth_modules: {}

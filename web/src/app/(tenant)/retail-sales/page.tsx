@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { RetailSalesManager } from "@/features/finance/retail-sales-manager";
 import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -13,13 +14,12 @@ export default async function RetailSalesPage() {
 
   return (
     <section aria-labelledby="retail-sales-title">
-      <h1 className="text-2xl font-bold" id="retail-sales-title">
-        Retail sales
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Build a draft sale and submit it for approval. A posted sale can be
-        returned in part, or voided in full while nothing has been returned.
-      </p>
+      <PageHeader
+        description="Build a draft sale and submit it for approval. A posted sale can be returned in part, or voided in full while nothing has been returned."
+        eyebrow="Finance"
+        title="Retail sales"
+        titleId="retail-sales-title"
+      />
       <RetailSalesManager
         canApprove={session.permissions.includes("retail.approve")}
         canCreate={session.permissions.includes("retail.create")}

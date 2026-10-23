@@ -1,0 +1,13 @@
+# Example only. A nonzero status is observable later. Alert delivery is not claimed.
+# Exit 75 means the non-overlapping backup lock is busy.
+
+[Unit]
+Description=Example gym backup freshness check
+Documentation=file:docs/runbooks/phase8-increment-3.md
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/gym/infra/compose
+ExecStart=/usr/bin/docker compose --env-file /etc/gym/production.env -f docker-compose.prod.yml --profile backup run --rm backup-check
+TimeoutStartSec=30min
+SuccessExitStatus=0

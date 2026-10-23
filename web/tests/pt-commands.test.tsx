@@ -275,6 +275,12 @@ describe("phase 5 command coverage", () => {
       );
     render(<PackagesManager canManage currency="MMK" />);
     fireEvent.click(screen.getByRole("button", { name: "Create package" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Create package",
+    });
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Type" }), {
+      target: { value: "CLASS" },
+    });
     expect(
       await screen.findByRole("option", { name: /SPIN/ }),
     ).toBeInTheDocument();
@@ -1201,7 +1207,9 @@ describe("phase 5 command coverage", () => {
         today="2026-10-19"
       />,
     );
-    expect(await screen.findByText(/Member 22222222/)).toBeInTheDocument();
+    expect(await screen.findByTitle(MEMBER)).toHaveTextContent(
+      MEMBER.slice(-6),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Mark attended" }));
     await waitFor(() =>
       expect(attendPtBooking).toHaveBeenCalledWith(

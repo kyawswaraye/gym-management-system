@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Production image copies .next/standalone and does not ship the full tree.
+  output: "standalone",
   reactStrictMode: true,
   poweredByHeader: false,
   async headers() {

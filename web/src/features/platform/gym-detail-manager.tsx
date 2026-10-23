@@ -344,7 +344,10 @@ export function GymDetailManager({
                     </label>
                   </>
                 )}
-                <button className="button md:col-span-2" disabled={pending}>
+                <button
+                  className="button button-edit md:col-span-2"
+                  disabled={pending}
+                >
                   {pending ? "Saving…" : "Save changes"}
                 </button>
               </form>
@@ -381,7 +384,7 @@ export function GymDetailManager({
               <div className="mt-4 flex flex-wrap gap-3">
                 {capabilities.canActivate && (
                   <button
-                    className="button"
+                    className="button button-success"
                     type="button"
                     disabled={pending}
                     onClick={() => void transition("activate")}
@@ -391,7 +394,7 @@ export function GymDetailManager({
                 )}
                 {capabilities.canSuspend && (
                   <button
-                    className="button"
+                    className="button button-warn"
                     type="button"
                     disabled={pending}
                     onClick={() => void transition("suspend")}

@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { Fragment, type FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import { listMembers, operationMutation } from "@/features/operations/client";
@@ -10,6 +10,13 @@ import {
   memberCreatePayload,
   type MemberProfileInput,
 } from "@/features/operations/member-profile";
+import {
+  ArchiveMemberDialog,
+  memberArchiveIdentity,
+  memberDisplayName,
+  RestoreMemberDialog,
+} from "@/features/operations/member-restore-dialog";
+import { actionButtonClass } from "@/lib/ui/action-button";
 import type { Member, MemberListPage, MemberListQuery } from "@/types/api";
 
 const PAGE_LIMIT = 25;
@@ -23,6 +30,18 @@ const MEMBER_STATUSES = [
 
 type MemberStatus = (typeof MEMBER_STATUSES)[number];
 
+const DIRECTORY_VIEWS: ReadonlyArray<{
+  value: "" | MemberStatus;
+  label: string;
+}> = [
+  { value: "", label: "All" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "EXPIRED", label: "Expired" },
+  { value: "SUSPENDED", label: "Suspended" },
+  { value: "CANCELLED", label: "Cancelled" },
+  { value: "ARCHIVED", label: "Archived" },
+];
+
 type PtClientFilter = "" | "true";
 
 type MemberFilters = {
@@ -32,10 +51,6 @@ type MemberFilters = {
   joinedTo: string;
   ptClient: PtClientFilter;
 };
-
-function isMemberStatus(value: string): value is MemberStatus {
-  return (MEMBER_STATUSES as readonly string[]).includes(value);
-}
 
 function memberQuery(filters: MemberFilters, after?: string): MemberListQuery {
   const query: MemberListQuery = { limit: PAGE_LIMIT };
@@ -72,6 +87,22 @@ function errorText(caught: unknown, fallback: string): string {
   return caught instanceof Error ? caught.message : fallback;
 }
 
+function directoryButtonClass(
+  value: "" | MemberStatus,
+  selected: boolean,
+): string {
+  const base =
+    "min-h-10 rounded-full px-3.5 py-1.5 text-sm font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900";
+  if (value === "ARCHIVED") {
+    return selected
+      ? `${base} border border-slate-900 bg-slate-700 text-white`
+      : `${base} border border-slate-500 bg-slate-100 text-slate-800 hover:bg-slate-200`;
+  }
+  return selected
+    ? `${base} border border-slate-900 bg-slate-900 text-white`
+    : `${base} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`;
+}
+
 function applyCursor(
   meta: MemberListPage["meta"],
   cursor: string | undefined,
@@ -83,10 +114,14 @@ function applyCursor(
 }
 
 export function MembersManager({
+  canArchive = false,
   canCreate,
+  canRestore = false,
   defaultDate,
 }: {
+  canArchive?: boolean;
   canCreate: boolean;
+  canRestore?: boolean;
   defaultDate: string;
 }) {
   const [members, setMembers] = useState<Member[]>([]);
@@ -97,6 +132,12 @@ export function MembersManager({
   const [error, setError] = useState("");
   const [errorScope, setErrorScope] = useState<"list" | "page" | null>(null);
   const [pending, setPending] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [archiveTarget, setArchiveTarget] = useState<Member | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<Member | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
   const [draft, setDraft] = useState<MemberProfileInput>(() =>
     emptyMemberProfile(defaultDate),
   );
@@ -108,6 +149,8 @@ export function MembersManager({
   const requestVersion = useRef(0);
   const appliedCursors = useRef(new Set<string>());
   const submitLock = useRef(false);
+  const archiveLock = useRef(false);
+  const restoreLock = useRef(false);
   const filters = { search, status, joinedFrom, joinedTo, ptClient };
 
   function resetPage() {
@@ -120,6 +163,9 @@ export function MembersManager({
     setPaging(false);
     setError("");
     setErrorScope(null);
+    setNotice("");
+    setArchiveTarget(null);
+    setRestoreTarget(null);
   }
 
   async function loadFirst() {
@@ -132,6 +178,9 @@ export function MembersManager({
     setPaging(false);
     setError("");
     setErrorScope(null);
+    setNotice("");
+    setArchiveTarget(null);
+    setRestoreTarget(null);
     try {
       const page = await listMembers(memberQuery(filters));
       if (version !== requestVersion.current) return;
@@ -233,6 +282,92 @@ export function MembersManager({
     void loadFirst();
   }
 
+  function selectStatus(next: "" | MemberStatus) {
+    if (next === status) return;
+    setStatus(next);
+    resetPage();
+  }
+
+  async function confirmArchive() {
+    const target = archiveTarget;
+    if (
+      !target ||
+      archiveLock.current ||
+      archiving ||
+      restoring ||
+      !canArchive ||
+      target.status === "ARCHIVED"
+    ) {
+      return;
+    }
+    archiveLock.current = true;
+    const version = requestVersion.current;
+    setArchiveTarget(null);
+    setArchiving(true);
+    setError("");
+    setErrorScope(null);
+    try {
+      const archived = await operationMutation<Member>(
+        `members/${target.id}/archive/`,
+        {},
+      );
+      if (version !== requestVersion.current) return;
+      setMembers((current) =>
+        status === "" || status === "ARCHIVED"
+          ? current.map((row) => (row.id === archived.id ? archived : row))
+          : current.filter((row) => row.id !== target.id),
+      );
+      setNotice(`${memberDisplayName(target)} archived.`);
+    } catch (caught) {
+      if (version !== requestVersion.current) return;
+      setError(errorText(caught, "Unable to archive member."));
+      setErrorScope(null);
+    } finally {
+      archiveLock.current = false;
+      setArchiving(false);
+    }
+  }
+
+  async function confirmRestore() {
+    const target = restoreTarget;
+    if (
+      !target ||
+      restoreLock.current ||
+      restoring ||
+      archiving ||
+      !canRestore ||
+      target.status !== "ARCHIVED"
+    ) {
+      return;
+    }
+    restoreLock.current = true;
+    const version = requestVersion.current;
+    setRestoreTarget(null);
+    setRestoring(true);
+    setError("");
+    setErrorScope(null);
+    try {
+      const restored = await operationMutation<Member>(
+        `members/${target.id}/restore/`,
+        {},
+      );
+      if (version !== requestVersion.current) return;
+      setMembers((current) =>
+        status === "" || status === "ACTIVE"
+          ? current.map((row) => (row.id === restored.id ? restored : row))
+          : current.filter((row) => row.id !== target.id),
+      );
+      setNotice(`${memberDisplayName(target)} restored to Active.`);
+    } catch (caught) {
+      if (version !== requestVersion.current) return;
+      setError(errorText(caught, "Unable to restore member."));
+      setErrorScope(null);
+    } finally {
+      restoreLock.current = false;
+      setRestoring(false);
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitLock.current) return;
@@ -247,6 +382,7 @@ export function MembersManager({
     try {
       await operationMutation<Member>("members/", payload);
       setDraft(emptyMemberProfile(defaultDate));
+      setShowCreate(false);
       await loadFirst();
     } catch (caught) {
       setError(errorText(caught, "Unable to create member."));
@@ -257,150 +393,379 @@ export function MembersManager({
     }
   }
 
+  const showingArchived = status === "ARCHIVED";
+  const archivedDirectoryEmpty =
+    showingArchived && !search && !joinedFrom && !joinedTo && !ptClient;
+  const showActions = canArchive || canRestore;
+  const tableColumns = showActions ? 5 : 4;
+  const commandPending = archiving || restoring;
+
   return (
-    <div className="grid gap-6 xl:grid-cols-[22rem_1fr]">
-      {canCreate && (
-        <form className="card grid gap-4 p-5" onSubmit={submit}>
-          <h2 className="text-lg font-bold">Add member</h2>
-          <MemberProfileFields
-            disabled={pending}
-            includeMemberNumber
-            onChange={setDraft}
-            value={draft}
-          />
-          <button className="button" disabled={pending} type="submit">
-            {pending ? "Saving…" : "Save member"}
+    <div className="grid gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-700">
+            {loading
+              ? showingArchived
+                ? "Loading archived members…"
+                : "Loading directory…"
+              : showingArchived
+                ? `${members.length} archived members shown`
+                : `${members.length} members shown`}
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {showingArchived
+              ? "Open a member for the full profile."
+              : "Select a member to view their full profile."}
+          </p>
+        </div>
+        {canCreate && (
+          <button
+            aria-expanded={showCreate}
+            className={actionButtonClass(
+              showCreate ? "Close form" : "Add member",
+            )}
+            onClick={() => setShowCreate((current) => !current)}
+            type="button"
+          >
+            {showCreate ? "Close form" : "Add member"}
           </button>
+        )}
+      </div>
+      {canCreate && (
+        <form
+          className={
+            showCreate
+              ? "grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+              : "hidden"
+          }
+          onSubmit={submit}
+        >
+          <div className="border-b border-slate-100 pb-4">
+            <h2 className="text-xl font-bold text-slate-900">Add member</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Enter the member&apos;s personal and contact information.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 [&>fieldset]:sm:col-span-2 [&>label:last-child]:sm:col-span-2">
+            <MemberProfileFields
+              disabled={pending}
+              includeMemberNumber
+              onChange={setDraft}
+              value={draft}
+            />
+          </div>
+          <div className="flex justify-end border-t border-slate-100 pt-4">
+            <button
+              className="button button-edit"
+              disabled={pending}
+              type="submit"
+            >
+              {pending ? "Saving…" : "Save member"}
+            </button>
+          </div>
         </form>
       )}
-      <section aria-busy={loading || paging} className="card overflow-hidden">
-        <div className="flex flex-wrap gap-3 border-b border-slate-200 p-4">
-          <input
-            aria-label="Search members"
-            className="input max-w-sm"
-            maxLength={100}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              resetPage();
-            }}
-            placeholder="Search name, number, phone, email"
-            value={search}
-          />
-          <select
-            aria-label="Filter by status"
-            className="input max-w-48"
-            onChange={(event) => {
-              const value = event.target.value;
-              setStatus(isMemberStatus(value) ? value : "");
-              resetPage();
-            }}
-            value={status}
+      <section
+        aria-busy={loading || paging}
+        className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      >
+        <div className="border-b border-slate-200 px-4 py-4 sm:px-5">
+          <h2 className="text-sm font-bold tracking-wide text-slate-700 uppercase">
+            Directory view
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+            {showingArchived
+              ? canRestore
+                ? "These members are archived. Open a name for the full profile, or restore them to Active. Membership and payment history stay in place, and the record is not deleted."
+                : "These members are archived. Open a name for the full profile."
+              : "Choose who appears in this table. Archived members are listed in their own view."}
+          </p>
+          <div
+            aria-label="Member status"
+            className="mt-3 flex flex-wrap items-center gap-2"
+            role="radiogroup"
           >
-            <option value="">All statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="EXPIRED">Expired</option>
-            <option value="SUSPENDED">Suspended</option>
-            <option value="CANCELLED">Cancelled</option>
-            <option value="ARCHIVED">Archived</option>
-          </select>
-          <select
-            aria-label="Filter by PT client"
-            className="input max-w-56"
-            onChange={(event) => {
-              setPtClient(event.target.value === "true" ? "true" : "");
-              resetPage();
-            }}
-            value={ptClient}
-          >
-            <option value="">All members</option>
-            <option value="true">Active PT clients</option>
-          </select>
-          <input
-            aria-label="Joined from"
-            className="input max-w-44"
-            max={joinedTo || undefined}
-            onChange={(event) => {
-              const value = event.target.value;
-              setJoinedFrom(value);
-              if (joinedTo && value > joinedTo) setJoinedTo("");
-              resetPage();
-            }}
-            type="date"
-            value={joinedFrom}
-          />
-          <input
-            aria-label="Joined to"
-            className="input max-w-44"
-            min={joinedFrom || undefined}
-            onChange={(event) => {
-              setJoinedTo(event.target.value);
-              resetPage();
-            }}
-            type="date"
-            value={joinedTo}
-          />
+            {DIRECTORY_VIEWS.map((view) => (
+              <Fragment key={view.value || "ALL"}>
+                {view.value === "ARCHIVED" ? (
+                  <span
+                    aria-hidden="true"
+                    className="mx-1 hidden h-6 w-px bg-slate-300 sm:block"
+                  />
+                ) : null}
+                <button
+                  aria-checked={status === view.value}
+                  className={directoryButtonClass(
+                    view.value,
+                    status === view.value,
+                  )}
+                  onClick={() => selectStatus(view.value)}
+                  role="radio"
+                  type="button"
+                >
+                  {view.label}
+                </button>
+              </Fragment>
+            ))}
+          </div>
+        </div>
+        <div className="border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold tracking-wide text-slate-700 uppercase">
+              Search and filters
+            </h2>
+            {(search || status || joinedFrom || joinedTo || ptClient) && (
+              <button
+                className="text-sm font-semibold text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline"
+                onClick={() => {
+                  setSearch("");
+                  setStatus("");
+                  setJoinedFrom("");
+                  setJoinedTo("");
+                  setPtClient("");
+                  resetPage();
+                }}
+                type="button"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_repeat(3,auto)]">
+            <input
+              aria-label="Search members"
+              className="input w-full"
+              maxLength={100}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                resetPage();
+              }}
+              placeholder="Search name, number, phone, email"
+              value={search}
+            />
+            <select
+              aria-label="Filter by PT client"
+              className="input xl:w-44"
+              onChange={(event) => {
+                setPtClient(event.target.value === "true" ? "true" : "");
+                resetPage();
+              }}
+              value={ptClient}
+            >
+              <option value="">All members</option>
+              <option value="true">Active PT clients</option>
+            </select>
+            <input
+              aria-label="Joined from"
+              className="input xl:w-40"
+              max={joinedTo || undefined}
+              onChange={(event) => {
+                const value = event.target.value;
+                setJoinedFrom(value);
+                if (joinedTo && value > joinedTo) setJoinedTo("");
+                resetPage();
+              }}
+              type="date"
+              value={joinedFrom}
+            />
+            <input
+              aria-label="Joined to"
+              className="input xl:w-40"
+              min={joinedFrom || undefined}
+              onChange={(event) => {
+                setJoinedTo(event.target.value);
+                resetPage();
+              }}
+              type="date"
+              value={joinedTo}
+            />
+          </div>
         </div>
         {loading ? (
-          <p className="muted m-4" role="status">
-            Loading members.
-          </p>
+          <div className="grid gap-3 p-5" role="status">
+            <span className="sr-only">Loading members.</span>
+            {[0, 1, 2].map((item) => (
+              <div
+                className="h-16 animate-pulse rounded-xl bg-slate-100"
+                key={item}
+              />
+            ))}
+          </div>
         ) : null}
         {error ? (
-          <div className="m-4 grid gap-3">
-            <p className="error" role="alert">
+          <div className="m-4 grid gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+            <p className="text-sm font-medium text-red-800" role="alert">
               {error}
             </p>
             {errorScope ? (
-              <button className="button" onClick={retry} type="button">
+              <button className="button w-fit" onClick={retry} type="button">
                 {errorScope === "page" ? "Retry loading members" : "Retry"}
               </button>
             ) : null}
           </div>
         ) : null}
+        {notice ? (
+          <p
+            className="m-4 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-900"
+            role="status"
+          >
+            {notice}
+          </p>
+        ) : null}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50">
+            <thead className="bg-slate-800 text-white">
               <tr>
-                <th className="p-3" scope="col">
+                <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Member
                 </th>
-                <th className="p-3" scope="col">
+                <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Phone
                 </th>
-                <th className="p-3" scope="col">
+                <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Joined
                 </th>
-                <th className="p-3" scope="col">
+                <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Status
                 </th>
+                {showActions ? (
+                  <th className="px-5 py-3 text-xs font-semibold" scope="col">
+                    Action
+                  </th>
+                ) : null}
               </tr>
             </thead>
-            <tbody>
-              {members.map((member) => (
-                <tr className="border-t border-slate-100" key={member.id}>
-                  <td className="p-3">
-                    <Link
-                      className="font-semibold underline"
-                      href={`/members/${member.id}`}
-                    >
-                      {`${member.first_name} ${member.last_name}`.trim()}
-                      {member.is_pt_client && (
-                        <span className="ml-2 rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
-                          PT
+            <tbody className="divide-y divide-slate-100">
+              {members.map((member) => {
+                const archived = member.status === "ARCHIVED";
+                const name = memberDisplayName(member);
+                return (
+                  <tr
+                    className={
+                      archived
+                        ? "bg-slate-100 text-slate-600"
+                        : "bg-white hover:bg-slate-50"
+                    }
+                    data-status={member.status}
+                    key={member.id}
+                  >
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`grid size-10 shrink-0 place-items-center rounded-full text-xs font-black ${archived ? "bg-slate-200 text-slate-500" : "bg-slate-100 text-slate-600"}`}
+                          aria-hidden="true"
+                        >
+                          {member.first_name.slice(0, 1)}
+                          {member.last_name.slice(0, 1)}
                         </span>
-                      )}
-                    </Link>
-                    <span className="muted block">{member.member_number}</span>
-                  </td>
-                  <td className="p-3">{member.phone || "—"}</td>
-                  <td className="p-3">{member.join_date}</td>
-                  <td className="p-3">{member.status}</td>
-                </tr>
-              ))}
+                        <span>
+                          <Link
+                            className={
+                              archived
+                                ? "font-bold text-slate-700 underline decoration-slate-400 underline-offset-2 hover:text-amber-700"
+                                : "font-bold text-slate-900 hover:text-amber-700 hover:underline"
+                            }
+                            href={`/members/${member.id}`}
+                          >
+                            {`${member.first_name} ${member.last_name}`.trim()}
+                            {member.is_pt_client && (
+                              <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                                PT
+                              </span>
+                            )}
+                          </Link>
+                          <span className="mt-0.5 block text-xs text-slate-500">
+                            {member.member_number}
+                          </span>
+                        </span>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-600">
+                      {member.phone || "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-600">
+                      {member.join_date}
+                    </td>
+                    <td className="px-5 py-4">
+                      <MemberStatusBadge status={member.status} />
+                    </td>
+                    {showActions ? (
+                      <td className="whitespace-nowrap px-5 py-4">
+                        {canArchive && !archived ? (
+                          <button
+                            aria-label={`Archive ${name}`}
+                            className={actionButtonClass(
+                              "Archive member",
+                              "button-sm",
+                            )}
+                            disabled={
+                              commandPending ||
+                              archiveTarget !== null ||
+                              restoreTarget !== null
+                            }
+                            onClick={() => {
+                              if (
+                                archiveLock.current ||
+                                commandPending ||
+                                archiveTarget ||
+                                restoreTarget
+                              ) {
+                                return;
+                              }
+                              setArchiveTarget(member);
+                            }}
+                            type="button"
+                          >
+                            Archive
+                          </button>
+                        ) : null}
+                        {archived && canRestore ? (
+                          <button
+                            aria-label={`Restore ${name}`}
+                            className={actionButtonClass(
+                              "Restore member",
+                              "button-sm",
+                            )}
+                            disabled={
+                              commandPending ||
+                              archiveTarget !== null ||
+                              restoreTarget !== null
+                            }
+                            onClick={() => {
+                              if (
+                                restoreLock.current ||
+                                commandPending ||
+                                archiveTarget ||
+                                restoreTarget
+                              ) {
+                                return;
+                              }
+                              setRestoreTarget(member);
+                            }}
+                            type="button"
+                          >
+                            Restore
+                          </button>
+                        ) : null}
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
               {!loading && !error && members.length === 0 ? (
                 <tr>
-                  <td className="muted p-6 text-center" colSpan={4}>
-                    No members found.
+                  <td className="px-6 py-14 text-center" colSpan={tableColumns}>
+                    <p className="font-semibold text-slate-700">
+                      {archivedDirectoryEmpty
+                        ? "No archived members."
+                        : "No members found."}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {archivedDirectoryEmpty
+                        ? "Members you archive will appear in this view."
+                        : "Try changing or clearing the current filters."}
+                    </p>
                   </td>
                 </tr>
               ) : null}
@@ -408,12 +773,12 @@ export function MembersManager({
           </table>
         </div>
         {paging ? (
-          <p className="muted m-4" role="status">
+          <p className="m-4 text-center text-sm text-slate-500" role="status">
             Loading more members.
           </p>
         ) : null}
         {hasMore && nextAfter ? (
-          <div className="p-4">
+          <div className="flex justify-center border-t border-slate-100 p-4">
             <button
               className="button"
               disabled={paging}
@@ -425,6 +790,37 @@ export function MembersManager({
           </div>
         ) : null}
       </section>
+      {archiveTarget ? (
+        <ArchiveMemberDialog
+          identity={memberArchiveIdentity(archiveTarget)}
+          onCancel={() => setArchiveTarget(null)}
+          onConfirm={() => void confirmArchive()}
+        />
+      ) : null}
+      {restoreTarget ? (
+        <RestoreMemberDialog
+          identity={memberArchiveIdentity(restoreTarget)}
+          onCancel={() => setRestoreTarget(null)}
+          onConfirm={() => void confirmRestore()}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function MemberStatusBadge({ status }: { status: string }) {
+  const tones: Record<string, string> = {
+    ACTIVE: "bg-emerald-100 text-emerald-700",
+    EXPIRED: "bg-slate-100 text-slate-600",
+    SUSPENDED: "bg-amber-100 text-amber-800",
+    CANCELLED: "bg-red-100 text-red-700",
+    ARCHIVED: "bg-slate-200 text-slate-600",
+  };
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${tones[status] ?? "bg-slate-100 text-slate-600"}`}
+    >
+      {status}
+    </span>
   );
 }

@@ -13,6 +13,8 @@ import {
   updateMembership,
   updateMembershipPlan,
 } from "@/features/operations/membership-writes";
+import { actionButtonClass } from "@/lib/ui/action-button";
+import { compactIdentifier, IdentifierValue } from "@/lib/ui/identifier";
 import type {
   Member,
   Membership,
@@ -127,7 +129,13 @@ function membershipNoteActionName(
   row: Membership,
   memberLabel: string,
 ): string {
-  return `Edit note for ${memberLabel}, ${row.plan_name}, ${row.id}`;
+  return `Edit note for ${compactIdentifier(memberLabel)} · ${row.plan_name}`;
+}
+
+function rowActionClass(
+  tone: "edit" | "archive" | "cancel" | "warn" | "success",
+): string {
+  return `button button-sm button-${tone}`;
 }
 
 const PLAN_PRICE = /^(?:0|[1-9]\d{0,15})(?:\.\d{1,2})?$/;
@@ -316,6 +324,10 @@ export function MembershipsManager({
   const [plansLoading, setPlansLoading] = useState(canCreate || canUpdate);
   const [lockedPlanIds, setLockedPlanIds] = useState<readonly string[]>([]);
   const [planEditor, setPlanEditor] = useState<PlanEditorState | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<MembershipPlan | null>(
+    null,
+  );
+  const [cancelTarget, setCancelTarget] = useState<Membership | null>(null);
   const [planEditError, setPlanEditError] = useState("");
   const [noteEditor, setNoteEditor] = useState<NoteEditorState | null>(null);
   const [noteError, setNoteError] = useState("");
@@ -328,6 +340,14 @@ export function MembershipsManager({
   const [error, setError] = useState("");
   const [errorScope, setErrorScope] = useState<"list" | "page" | null>(null);
   const [pending, setPending] = useState(false);
+  const [showPlanForm, setShowPlanForm] = useState(false);
+  const [showMembershipForm, setShowMembershipForm] = useState(false);
+  const [draftPlanId, setDraftPlanId] = useState("");
+  const [draftStartDate, setDraftStartDate] = useState(defaultDate);
+  const [draftDiscount, setDraftDiscount] = useState("0.00");
+  const [draftNote, setDraftNote] = useState("");
+  const [membershipFormError, setMembershipFormError] = useState("");
+  const [showPlans, setShowPlans] = useState(false);
   const [listMode, setListMode] = useState<ListMode>("all");
   const [status, setStatus] = useState<"" | MembershipStatus>("");
   const [paymentStatus, setPaymentStatus] = useState<"" | PaymentStatus>("");
@@ -350,6 +370,11 @@ export function MembershipsManager({
   const membershipBusy = useRef<string | null>(null);
   const pendingRef = useRef(false);
   const mountedRef = useRef(true);
+  const memberSearchRef = useRef<HTMLInputElement>(null);
+  const startMembershipButtonRef = useRef<HTMLButtonElement>(null);
+  const startMembershipWasOpen = useRef(false);
+  const newPlanTitleId = useId();
+  const startMembershipTitleId = useId();
   const canManagePlans = canCreate || canUpdate;
   const filters = { listMode, status, paymentStatus };
   const membershipActionsLocked = pending || membershipBusyId !== null;
@@ -513,6 +538,17 @@ export function MembershipsManager({
     };
   }, [memberQuery]);
 
+  useEffect(() => {
+    if (showMembershipForm) {
+      startMembershipWasOpen.current = true;
+      memberSearchRef.current?.focus();
+      return;
+    }
+    if (!startMembershipWasOpen.current) return;
+    startMembershipWasOpen.current = false;
+    startMembershipButtonRef.current?.focus();
+  }, [showMembershipForm]);
+
   async function loadMore() {
     const cursor = nextAfter;
     if (
@@ -631,10 +667,7 @@ export function MembershipsManager({
     }
     planLocks.current.add(target.id);
     setLockedPlanIds([...planLocks.current]);
-    if (!window.confirm(`Archive plan ${target.name} (${target.code})?`)) {
-      releasePlan(target.id);
-      return;
-    }
+    setArchiveTarget(null);
     const version = planVersions.current.get(target.id) ?? 0;
     setError("");
     setErrorScope(null);
@@ -662,6 +695,7 @@ export function MembershipsManager({
     if (selectedMember?.id !== member.id) memberEpoch.current += 1;
     setSelectedMember(member);
     setKnownMembers((current) => rememberMembers(current, [member]));
+    setMembershipFormError("");
   }
 
   function beginSharedPending(): boolean {
@@ -693,6 +727,7 @@ export function MembershipsManager({
         price: form.get("price"),
       });
       formElement.reset();
+      setShowPlanForm(false);
       setPlanGeneration((current) => current + 1);
       await refreshMemberships();
     } catch (caught) {
@@ -707,11 +742,11 @@ export function MembershipsManager({
   async function createMembership(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedMember) {
-      setError("Select a member.");
-      setErrorScope(null);
+      setMembershipFormError("Select a member.");
       return;
     }
     if (!beginSharedPending()) return;
+    setMembershipFormError("");
     const form = new FormData(event.currentTarget);
     const body = {
       member_id: selectedMember.id,
@@ -722,14 +757,20 @@ export function MembershipsManager({
     } satisfies MembershipCreateRequest;
     try {
       await operationMutation<Membership>("memberships/", body);
+      setShowMembershipForm(false);
       await refreshMemberships();
     } catch (caught) {
       if (!mountedRef.current) return;
-      setError(errorText(caught, "Unable to create membership."));
-      setErrorScope(null);
+      setMembershipFormError(errorText(caught, "Unable to create membership."));
     } finally {
       endSharedPending();
     }
+  }
+
+  function closeStartMembershipForm() {
+    if (pendingRef.current) return;
+    setMembershipFormError("");
+    setShowMembershipForm(false);
   }
 
   function openNoteEditor(membership: Membership) {
@@ -797,14 +838,14 @@ export function MembershipsManager({
   async function membershipAction(
     membership: Membership,
     action: "suspend" | "resume" | "cancel",
+    reason?: string,
   ) {
     if (pendingRef.current || membershipBusy.current !== null) return;
     const body: { reason?: string } = {};
     if (action === "cancel") {
-      const reason = window.prompt("Cancellation reason");
-      if (reason === null || reason.trim() === "") return;
-      if (pendingRef.current || membershipBusy.current !== null) return;
-      body.reason = reason.trim();
+      const trimmed = reason?.trim() ?? "";
+      if (!trimmed) return;
+      body.reason = trimmed;
     }
     if (!beginSharedPending()) return;
     membershipBusy.current = membership.id;
@@ -831,29 +872,110 @@ export function MembershipsManager({
   const trimmedMemberQuery = memberQuery.trim();
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-5">
       {error ? (
-        <div className="grid gap-3">
-          <p className="error" role="alert">
+        <div className="order-1 grid gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-medium text-red-800" role="alert">
             {error}
           </p>
           {errorScope ? (
-            <button className="button" onClick={retry} type="button">
+            <button className="button w-fit" onClick={retry} type="button">
               {errorScope === "page" ? "Retry loading memberships" : "Retry"}
             </button>
           ) : null}
         </div>
       ) : null}
+      {canCreate || canManagePlans ? (
+        <section className="order-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold tracking-[0.16em] text-amber-600 uppercase">
+                Quick actions
+              </p>
+              <h2 className="mt-1 text-lg font-bold text-slate-900">
+                What would you like to do?
+              </h2>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Start a membership or manage the plans available to members.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {canCreate ? (
+                <button
+                  aria-expanded={showPlanForm}
+                  className={actionButtonClass(
+                    showPlanForm ? "Close plan form" : "New plan",
+                  )}
+                  onClick={() => setShowPlanForm((current) => !current)}
+                  type="button"
+                >
+                  {showPlanForm ? "Close plan form" : "New plan"}
+                </button>
+              ) : null}
+              {canManagePlans ? (
+                <button
+                  aria-expanded={showPlans}
+                  className={actionButtonClass(
+                    showPlans ? "Hide plans" : "View plans",
+                  )}
+                  onClick={() => setShowPlans((current) => !current)}
+                  type="button"
+                >
+                  {showPlans ? "Hide plans" : "View plans"}
+                </button>
+              ) : null}
+              {canCreate ? (
+                <button
+                  ref={startMembershipButtonRef}
+                  aria-label={
+                    showMembershipForm
+                      ? "Close start membership form"
+                      : "Open start membership form"
+                  }
+                  aria-expanded={showMembershipForm}
+                  className={actionButtonClass(
+                    showMembershipForm
+                      ? "Close membership form"
+                      : "Start membership",
+                  )}
+                  onClick={() => {
+                    if (showMembershipForm) {
+                      closeStartMembershipForm();
+                      return;
+                    }
+                    setShowMembershipForm(true);
+                  }}
+                  type="button"
+                >
+                  {showMembershipForm
+                    ? "Close membership form"
+                    : "Start membership"}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
       {canManagePlans ? (
         <section
           aria-busy={plansLoading}
           aria-labelledby="membership-plans-title"
-          className="card overflow-hidden"
+          className={
+            showPlans
+              ? "order-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+              : "hidden"
+          }
         >
-          <div className="border-b border-slate-200 p-4">
-            <h2 className="text-lg font-bold" id="membership-plans-title">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <h2
+              className="text-lg font-bold text-slate-900"
+              id="membership-plans-title"
+            >
               Membership plans
             </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Available pricing and duration options.
+            </p>
           </div>
           {plansLoading && !planError && plans.length === 0 ? (
             <p className="muted m-4" role="status">
@@ -885,64 +1007,78 @@ export function MembershipsManager({
                 aria-label="Membership plans"
                 className="w-full text-left text-sm"
               >
-                <thead className="bg-slate-50">
+                <thead className="bg-slate-800 text-white">
                   <tr>
-                    <th className="p-3" scope="col">
+                    <th className="px-5 py-3 text-xs font-semibold" scope="col">
                       Code
                     </th>
-                    <th className="p-3" scope="col">
+                    <th className="px-5 py-3 text-xs font-semibold" scope="col">
                       Name
                     </th>
-                    <th className="p-3" scope="col">
+                    <th className="px-5 py-3 text-xs font-semibold" scope="col">
                       Duration
                     </th>
-                    <th className="p-3" scope="col">
+                    <th className="px-5 py-3 text-xs font-semibold" scope="col">
                       Price
                     </th>
-                    <th className="p-3" scope="col">
+                    <th className="px-5 py-3 text-xs font-semibold" scope="col">
                       Status
                     </th>
                     {canUpdate ? (
-                      <th className="p-3" scope="col">
+                      <th
+                        className="px-5 py-3 text-xs font-semibold"
+                        scope="col"
+                      >
                         Action
                       </th>
                     ) : null}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100">
                   {plans.map((plan) => (
-                    <tr className="border-t border-slate-100" key={plan.id}>
-                      <td className="p-3">{plan.code}</td>
-                      <td className="p-3">{plan.name}</td>
-                      <td className="p-3">{planDurationLabel(plan)}</td>
-                      <td className="p-3">
+                    <tr className="hover:bg-slate-50" key={plan.id}>
+                      <td className="px-5 py-4 font-mono text-xs font-bold text-slate-600">
+                        {plan.code}
+                      </td>
+                      <td className="px-5 py-4 font-semibold text-slate-900">
+                        {plan.name}
+                      </td>
+                      <td className="px-5 py-4 text-slate-600">
+                        {planDurationLabel(plan)}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-900">
                         {plan.price} {plan.currency}
                       </td>
-                      <td className="p-3">{planStatusLabel(plan)}</td>
+                      <td className="px-5 py-4">
+                        <StatusBadge
+                          label={planStatusLabel(plan)}
+                          status={planStatusLabel(plan).toUpperCase()}
+                        />
+                      </td>
                       {canUpdate ? (
-                        <td className="p-3">
-                          <div className="flex flex-wrap gap-3">
+                        <td className="px-5 py-4">
+                          <div className="flex flex-nowrap gap-2">
                             <button
                               aria-label={planEditActionName(plan)}
-                              className="underline"
+                              className={rowActionClass("edit")}
                               disabled={lockedPlanIds.includes(plan.id)}
                               onClick={() => openPlanEditor(plan)}
                               type="button"
                             >
-                              Edit {plan.name} plan
+                              Edit
                             </button>
                             {plan.is_active ? (
                               <button
                                 aria-label={planArchiveActionName(plan)}
-                                className="underline"
+                                className={rowActionClass("archive")}
                                 disabled={
                                   lockedPlanIds.includes(plan.id) ||
                                   planEditor?.source.id === plan.id
                                 }
-                                onClick={() => void archivePlan(plan)}
+                                onClick={() => setArchiveTarget(plan)}
                                 type="button"
                               >
-                                Archive {plan.name} plan
+                                Archive
                               </button>
                             ) : null}
                           </div>
@@ -957,290 +1093,275 @@ export function MembershipsManager({
         </section>
       ) : null}
       {canCreate && (
-        <div className="grid gap-6 xl:grid-cols-2">
-          <form className="card grid gap-4 p-5" onSubmit={createPlan}>
-            <h2 className="text-lg font-bold">New plan</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="field">
-                Code
-                <input className="input" name="code" required />
-              </label>
-              <label className="field">
-                Name
-                <input className="input" name="name" required />
-              </label>
-              <label className="field">
-                Duration
-                <input
-                  className="input"
-                  min="1"
-                  name="duration_value"
-                  required
-                  type="number"
-                />
-              </label>
-              <label className="field">
-                Unit
-                <select className="input" name="duration_unit">
-                  <option value="MONTH">Month</option>
-                  <option value="DAY">Day</option>
-                  <option value="WEEK">Week</option>
-                  <option value="YEAR">Year</option>
-                </select>
-              </label>
-              <label className="field">
-                Price
-                <input
-                  className="input"
-                  min="0"
-                  name="price"
-                  required
-                  step="0.01"
-                  type="number"
-                />
-              </label>
-              <label className="field">
-                Currency
-                <input
-                  className="input"
-                  defaultValue={currency}
-                  maxLength={3}
-                  readOnly
-                />
-              </label>
-            </div>
-            <button className="button" disabled={pending} type="submit">
-              Save plan
-            </button>
-          </form>
-          <form className="card grid gap-4 p-5" onSubmit={createMembership}>
-            <h2 className="text-lg font-bold">Start membership</h2>
-            <fieldset className="grid gap-3">
-              <legend className="font-semibold">Member</legend>
-              <label className="field">
-                Search members
-                <input
-                  aria-label="Search members"
-                  className="input"
-                  maxLength={100}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setMemberQuery(value);
-                    memberSearchVersion.current += 1;
-                    if (!value.trim()) {
-                      setMemberResults([]);
-                      setMemberSearchLoading(false);
-                      setMemberSearchError("");
-                      return;
-                    }
-                    setMemberSearchLoading(true);
-                    setMemberSearchError("");
-                  }}
-                  placeholder="Name, number, phone, or email"
-                  value={memberQuery}
-                />
-              </label>
-              {memberSearchLoading ? (
-                <p className="muted" role="status">
-                  Searching members.
-                </p>
-              ) : null}
-              {memberSearchError ? (
-                <p className="error" role="alert">
-                  {memberSearchError}
-                </p>
-              ) : null}
-              {!memberSearchLoading &&
-              trimmedMemberQuery &&
-              memberResults.length === 0 &&
-              !memberSearchError ? (
-                <p className="muted">No matching members.</p>
-              ) : null}
-              {memberResults.length > 0 ? (
-                <ul aria-label="Matching members" className="grid gap-2">
-                  {memberResults.map((member) => (
-                    <li key={member.id}>
-                      <button
-                        aria-pressed={selectedMember?.id === member.id}
-                        className="underline"
-                        onClick={() => selectMember(member)}
-                        type="button"
-                      >
-                        {memberOptionLabel(member)}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              <p>
-                {selectedMember
-                  ? `Selected member: ${memberOptionLabel(selectedMember)}`
-                  : "No member selected."}
-              </p>
-            </fieldset>
-            <label className="field">
-              Plan
-              <select
-                className="input"
-                disabled={Boolean(planError)}
-                name="plan_id"
-                required
+        <div className="order-4">
+          {showPlanForm ? (
+            <div
+              className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-4 py-8"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !pending) {
+                  setShowPlanForm(false);
+                }
+              }}
+            >
+              <form
+                aria-labelledby={newPlanTitleId}
+                aria-modal="true"
+                className="grid max-h-[90vh] w-full max-w-xl gap-5 overflow-y-auto rounded-2xl bg-white p-5 sm:p-6"
+                onSubmit={createPlan}
+                role="dialog"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && !pending) {
+                    setShowPlanForm(false);
+                  }
+                }}
               >
-                <option value="">Select plan</option>
-                {activePlans.map((plan) => (
-                  <option key={plan.id} value={plan.id}>
-                    {plan.name} — {plan.price} {plan.currency}
+                <div className="flex items-start gap-3 border-b border-slate-100 pb-4">
+                  <span
+                    className="grid min-h-9 shrink-0 place-items-center rounded-lg bg-slate-100 px-2 text-[0.65rem] font-black tracking-wide text-slate-700"
+                    aria-hidden="true"
+                  >
+                    PLAN
+                  </span>
+                  <div>
+                    <h2
+                      className="text-xl font-bold text-slate-900"
+                      id={newPlanTitleId}
+                    >
+                      New plan
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Define the price and membership duration.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 [&_.field]:text-sm [&_.field]:font-semibold [&_.field]:text-slate-700">
+                  <label className="field sm:col-span-2">
+                    Code
+                    <input
+                      className="input"
+                      name="code"
+                      placeholder="e.g. MONTHLY"
+                      required
+                    />
+                  </label>
+                  <label className="field sm:col-span-2">
+                    Name
+                    <input
+                      className="input"
+                      name="name"
+                      placeholder="e.g. Monthly membership"
+                      required
+                    />
+                  </label>
+                  <label className="field">
+                    Duration
+                    <input
+                      className="input"
+                      min="1"
+                      name="duration_value"
+                      required
+                      type="number"
+                    />
+                  </label>
+                  <label className="field">
+                    Unit
+                    <select className="input" name="duration_unit">
+                      <option value="MONTH">Month</option>
+                      <option value="DAY">Day</option>
+                      <option value="WEEK">Week</option>
+                      <option value="YEAR">Year</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    Price
+                    <input
+                      className="input"
+                      min="0"
+                      name="price"
+                      placeholder="0.00"
+                      required
+                      step="0.01"
+                      type="number"
+                    />
+                  </label>
+                  <label className="field">
+                    Currency
+                    <input
+                      className="input bg-slate-50 text-slate-500"
+                      defaultValue={currency}
+                      maxLength={3}
+                      readOnly
+                    />
+                  </label>
+                </div>
+                <div className="flex justify-end border-t border-slate-100 pt-4">
+                  <button
+                    className="button button-cancel"
+                    disabled={pending}
+                    onClick={() => setShowPlanForm(false)}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="button button-edit"
+                    disabled={pending}
+                    type="submit"
+                  >
+                    {pending ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : null}
+        </div>
+      )}
+      <section
+        aria-busy={loading || paging}
+        className="order-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      >
+        <div className="border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+          <h2 className="mb-3 text-sm font-bold tracking-wide text-slate-700 uppercase">
+            Membership directory
+          </h2>
+          <div className="grid gap-3 md:grid-cols-3">
+            <label className="grid gap-1.5 text-xs font-semibold text-slate-600">
+              View
+              <select
+                aria-label="Membership list"
+                className="input"
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setListMode(isExpiryBucket(value) ? value : "all");
+                  resetMembershipPage();
+                }}
+                value={listMode}
+              >
+                <option value="all">All memberships</option>
+                {EXPIRY_BUCKETS.map((bucket) => (
+                  <option key={bucket} value={bucket}>
+                    {EXPIRY_LABELS[bucket]}
                   </option>
                 ))}
               </select>
             </label>
-            <label className="field">
-              Start date
-              <input
+            <label className="grid gap-1.5 text-xs font-semibold text-slate-600">
+              Membership status
+              <select
+                aria-label="Filter by status"
                 className="input"
-                defaultValue={defaultDate}
-                name="start_date"
-                required
-                type="date"
-              />
+                disabled={listMode !== "all"}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setStatus(isMembershipStatus(value) ? value : "");
+                  resetMembershipPage();
+                }}
+                value={status}
+              >
+                <option value="">All statuses</option>
+                <option value="PENDING">Pending</option>
+                <option value="ACTIVE">Active</option>
+                <option value="EXPIRED">Expired</option>
+                <option value="SUSPENDED">Suspended</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
             </label>
-            <label className="field">
-              Discount
-              <input
+            <label className="grid gap-1.5 text-xs font-semibold text-slate-600">
+              Payment status
+              <select
+                aria-label="Filter by payment status"
                 className="input"
-                defaultValue="0.00"
-                min="0"
-                name="discount_amount"
-                step="0.01"
-                type="number"
-              />
+                disabled={listMode !== "all"}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setPaymentStatus(isPaymentStatus(value) ? value : "");
+                  resetMembershipPage();
+                }}
+                value={paymentStatus}
+              >
+                <option value="">All payment statuses</option>
+                <option value="UNPAID">Unpaid</option>
+                <option value="PARTIAL">Partial</option>
+                <option value="PAID">Paid</option>
+                <option value="PARTIALLY_REFUNDED">Partially refunded</option>
+                <option value="REFUNDED">Refunded</option>
+              </select>
             </label>
-            <label className="field">
-              Note
-              <textarea
-                className="input min-h-24"
-                maxLength={4000}
-                name="note"
-              />
-            </label>
-            <button className="button" disabled={pending} type="submit">
-              Start membership
-            </button>
-          </form>
-        </div>
-      )}
-      <section aria-busy={loading || paging} className="card overflow-hidden">
-        <div className="flex flex-wrap gap-3 border-b border-slate-200 p-4">
-          <select
-            aria-label="Membership list"
-            className="input max-w-56"
-            onChange={(event) => {
-              const value = event.target.value;
-              setListMode(isExpiryBucket(value) ? value : "all");
-              resetMembershipPage();
-            }}
-            value={listMode}
-          >
-            <option value="all">All memberships</option>
-            {EXPIRY_BUCKETS.map((bucket) => (
-              <option key={bucket} value={bucket}>
-                {EXPIRY_LABELS[bucket]}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Filter by status"
-            className="input max-w-48"
-            disabled={listMode !== "all"}
-            onChange={(event) => {
-              const value = event.target.value;
-              setStatus(isMembershipStatus(value) ? value : "");
-              resetMembershipPage();
-            }}
-            value={status}
-          >
-            <option value="">All statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="ACTIVE">Active</option>
-            <option value="EXPIRED">Expired</option>
-            <option value="SUSPENDED">Suspended</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
-          <select
-            aria-label="Filter by payment status"
-            className="input max-w-56"
-            disabled={listMode !== "all"}
-            onChange={(event) => {
-              const value = event.target.value;
-              setPaymentStatus(isPaymentStatus(value) ? value : "");
-              resetMembershipPage();
-            }}
-            value={paymentStatus}
-          >
-            <option value="">All payment statuses</option>
-            <option value="UNPAID">Unpaid</option>
-            <option value="PARTIAL">Partial</option>
-            <option value="PAID">Paid</option>
-            <option value="PARTIALLY_REFUNDED">Partially refunded</option>
-            <option value="REFUNDED">Refunded</option>
-          </select>
+          </div>
         </div>
         {loading ? (
-          <p className="muted m-4" role="status">
-            Loading memberships.
-          </p>
+          <div className="grid gap-3 p-5" role="status">
+            <span className="sr-only">Loading memberships.</span>
+            {[0, 1, 2].map((item) => (
+              <div
+                className="h-16 animate-pulse rounded-xl bg-slate-100"
+                key={item}
+              />
+            ))}
+          </div>
         ) : null}
         <div className="overflow-x-auto">
           <table aria-label="Memberships" className="w-full text-left text-sm">
-            <thead className="bg-slate-50">
+            <thead className="bg-slate-800 text-white">
               <tr>
-                <th className="p-3" scope="col">
+                <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Member
                 </th>
-                <th className="p-3" scope="col">
+                <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Plan
                 </th>
-                <th className="p-3" scope="col">
+                <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Dates
                 </th>
-                <th className="p-3" scope="col">
+                <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Total
                 </th>
-                <th className="p-3" scope="col">
+                <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Status
                 </th>
-                <th className="p-3" scope="col">
+                <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Note
                 </th>
-                <th className="p-3" scope="col">
+                <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Action
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               {memberships.map((membership) => (
-                <tr className="border-t border-slate-100" key={membership.id}>
-                  <td className="p-3">
-                    {memberTableLabel(
-                      knownMembers.get(membership.member_id),
-                      membership.member_id,
-                    )}
+                <tr className="hover:bg-slate-50" key={membership.id}>
+                  <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-900">
+                    <IdentifierValue
+                      value={memberTableLabel(
+                        knownMembers.get(membership.member_id),
+                        membership.member_id,
+                      )}
+                    />
                   </td>
-                  <td className="p-3">{membership.plan_name}</td>
-                  <td className="p-3">
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">
+                    {membership.plan_name}
+                  </td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-600">
                     {membership.start_date} – {membership.expiry_date}
                   </td>
-                  <td className="p-3">
+                  <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-900">
                     {membership.final_amount} {membership.currency}
                   </td>
-                  <td className="p-3">
-                    {membership.status} / {membership.payment_status}
+                  <td className="px-5 py-4">
+                    <span className="sr-only">
+                      {membership.status} / {membership.payment_status}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <StatusBadge status={membership.status} />
+                      <StatusBadge status={membership.payment_status} />
+                    </div>
                   </td>
-                  <td className="p-3">
+                  <td className="max-w-56 truncate px-5 py-4 text-slate-600">
                     {membership.note ? membership.note : "No note"}
                   </td>
-                  <td className="p-3">
-                    <div className="flex flex-wrap gap-3">
+                  <td className="px-5 py-4">
+                    <div className="flex flex-nowrap gap-2">
                       {canUpdate ? (
                         <button
                           aria-label={membershipNoteActionName(
@@ -1250,7 +1371,7 @@ export function MembershipsManager({
                               membership.member_id,
                             ),
                           )}
-                          className="underline"
+                          className={rowActionClass("edit")}
                           disabled={membershipActionsLocked}
                           onClick={() => openNoteEditor(membership)}
                           type="button"
@@ -1260,7 +1381,7 @@ export function MembershipsManager({
                       ) : null}
                       {canUpdate && membership.status === "ACTIVE" && (
                         <button
-                          className="underline"
+                          className={rowActionClass("warn")}
                           disabled={membershipActionsLocked}
                           onClick={() =>
                             void membershipAction(membership, "suspend")
@@ -1272,7 +1393,7 @@ export function MembershipsManager({
                       )}
                       {canUpdate && membership.status === "SUSPENDED" && (
                         <button
-                          className="underline"
+                          className={rowActionClass("success")}
                           disabled={membershipActionsLocked}
                           onClick={() =>
                             void membershipAction(membership, "resume")
@@ -1287,11 +1408,9 @@ export function MembershipsManager({
                           membership.status,
                         ) && (
                           <button
-                            className="underline"
+                            className={rowActionClass("cancel")}
                             disabled={membershipActionsLocked}
-                            onClick={() =>
-                              void membershipAction(membership, "cancel")
-                            }
+                            onClick={() => setCancelTarget(membership)}
                             type="button"
                           >
                             Cancel
@@ -1303,8 +1422,13 @@ export function MembershipsManager({
               ))}
               {!loading && !error && memberships.length === 0 ? (
                 <tr>
-                  <td className="muted p-6 text-center" colSpan={7}>
-                    No memberships found.
+                  <td className="px-6 py-14 text-center" colSpan={7}>
+                    <p className="font-semibold text-slate-700">
+                      No memberships found.
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Try selecting a different status or expiry range.
+                    </p>
                   </td>
                 </tr>
               ) : null}
@@ -1312,12 +1436,12 @@ export function MembershipsManager({
           </table>
         </div>
         {paging ? (
-          <p className="muted m-4" role="status">
+          <p className="m-4 text-center text-sm text-slate-500" role="status">
             Loading more memberships.
           </p>
         ) : null}
         {hasMore && nextAfter ? (
-          <div className="p-4">
+          <div className="flex justify-center border-t border-slate-100 p-4">
             <button
               className="button"
               disabled={paging}
@@ -1329,6 +1453,28 @@ export function MembershipsManager({
           </div>
         ) : null}
       </section>
+      {archiveTarget ? (
+        <ArchivePlanDialog
+          plan={archiveTarget}
+          onCancel={() => setArchiveTarget(null)}
+          onConfirm={() => void archivePlan(archiveTarget)}
+        />
+      ) : null}
+      {cancelTarget ? (
+        <CancelMembershipDialog
+          memberLabel={memberTableLabel(
+            knownMembers.get(cancelTarget.member_id),
+            cancelTarget.member_id,
+          )}
+          planName={cancelTarget.plan_name}
+          onCancel={() => setCancelTarget(null)}
+          onConfirm={(reason) => {
+            const target = cancelTarget;
+            setCancelTarget(null);
+            void membershipAction(target, "cancel", reason);
+          }}
+        />
+      ) : null}
       {planEditor ? (
         <PlanEditorDialog
           error={planEditError}
@@ -1357,8 +1503,408 @@ export function MembershipsManager({
           onSubmit={(event) => void saveNote(event)}
         />
       ) : null}
+      {canCreate && showMembershipForm ? (
+        <div
+          className="fixed inset-0 z-50 grid overflow-hidden p-2 sm:place-items-center sm:p-6"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget)
+              closeStartMembershipForm();
+          }}
+        >
+          <form
+            aria-busy={pending}
+            aria-labelledby={startMembershipTitleId}
+            aria-modal="true"
+            className="flex h-full max-h-full min-h-0 w-full flex-col overflow-y-auto overscroll-contain sm:h-auto sm:max-h-[min(90dvh,48rem)] sm:max-w-3xl"
+            onKeyDown={(event) => {
+              if (event.key !== "Escape") return;
+              event.stopPropagation();
+              if (pendingRef.current) return;
+              event.preventDefault();
+              closeStartMembershipForm();
+            }}
+            onSubmit={createMembership}
+            role="dialog"
+          >
+            <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
+              <span
+                aria-hidden="true"
+                className="grid min-h-9 shrink-0 place-items-center rounded-lg bg-amber-100 px-2 text-[0.65rem] font-black tracking-wide text-amber-800"
+              >
+                MEMBER
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2
+                  className="text-xl font-bold text-slate-900"
+                  id={startMembershipTitleId}
+                >
+                  Start membership
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Find a member, choose a plan, and confirm the start date.
+                </p>
+              </div>
+              <button
+                className="button button-cancel button-sm"
+                disabled={pending}
+                onClick={closeStartMembershipForm}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+            <div className="grid gap-5 px-5 py-4 sm:px-6">
+              <fieldset className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <legend className="px-2 text-sm font-bold text-slate-700">
+                  Member selection
+                </legend>
+                <label className="field">
+                  Search members
+                  <input
+                    aria-label="Search members"
+                    className="input"
+                    maxLength={100}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setMemberQuery(value);
+                      memberSearchVersion.current += 1;
+                      if (!value.trim()) {
+                        setMemberResults([]);
+                        setMemberSearchLoading(false);
+                        setMemberSearchError("");
+                        return;
+                      }
+                      setMemberSearchLoading(true);
+                      setMemberSearchError("");
+                    }}
+                    placeholder="Name, number, phone, or email"
+                    ref={memberSearchRef}
+                    value={memberQuery}
+                  />
+                </label>
+                {memberSearchLoading ? (
+                  <p className="text-sm text-slate-500" role="status">
+                    Searching members.
+                  </p>
+                ) : null}
+                {memberSearchError ? (
+                  <p className="error" role="alert">
+                    {memberSearchError}
+                  </p>
+                ) : null}
+                {!memberSearchLoading &&
+                trimmedMemberQuery &&
+                memberResults.length === 0 &&
+                !memberSearchError ? (
+                  <p className="muted">No matching members.</p>
+                ) : null}
+                {memberResults.length > 0 ? (
+                  <ul
+                    aria-label="Matching members"
+                    className="grid max-h-48 gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2"
+                  >
+                    {memberResults.map((member) => (
+                      <li key={member.id}>
+                        <button
+                          aria-pressed={selectedMember?.id === member.id}
+                          className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 aria-pressed:bg-amber-100 aria-pressed:text-amber-900"
+                          onClick={() => selectMember(member)}
+                          type="button"
+                        >
+                          {memberOptionLabel(member)}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <p
+                  className={
+                    selectedMember
+                      ? "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-800"
+                      : "rounded-lg border border-dashed border-slate-300 px-3 py-2.5 text-sm text-slate-500"
+                  }
+                >
+                  {selectedMember
+                    ? `Selected member: ${memberOptionLabel(selectedMember)}`
+                    : "No member selected."}
+                </p>
+              </fieldset>
+              <div className="grid gap-4 sm:grid-cols-2 [&_.field]:text-sm [&_.field]:font-semibold [&_.field]:text-slate-700">
+                <label className="field sm:col-span-2">
+                  Plan
+                  <select
+                    className="input"
+                    disabled={Boolean(planError)}
+                    name="plan_id"
+                    onChange={(event) => setDraftPlanId(event.target.value)}
+                    required
+                    value={draftPlanId}
+                  >
+                    <option value="">Select plan</option>
+                    {activePlans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name} — {plan.price} {plan.currency}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  Start date
+                  <input
+                    className="input"
+                    name="start_date"
+                    onChange={(event) => setDraftStartDate(event.target.value)}
+                    required
+                    type="date"
+                    value={draftStartDate}
+                  />
+                </label>
+                <label className="field">
+                  Discount
+                  <input
+                    className="input"
+                    min="0"
+                    name="discount_amount"
+                    onChange={(event) => setDraftDiscount(event.target.value)}
+                    step="0.01"
+                    type="number"
+                    value={draftDiscount}
+                  />
+                </label>
+              </div>
+              <label className="field text-sm font-semibold text-slate-700">
+                Note
+                <textarea
+                  className="input min-h-24"
+                  maxLength={4000}
+                  name="note"
+                  onChange={(event) => setDraftNote(event.target.value)}
+                  value={draftNote}
+                />
+              </label>
+            </div>
+            <div className="sticky bottom-0 z-10 border-t border-slate-100 bg-white px-5 py-4 sm:px-6">
+              {membershipFormError ? (
+                <p className="error mb-3" role="alert">
+                  {membershipFormError}
+                </p>
+              ) : null}
+              <div>
+                <button
+                  className="button button-cancel w-full sm:w-auto"
+                  disabled={pending}
+                  onClick={closeStartMembershipForm}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="button button-create w-full sm:w-auto"
+                  disabled={pending}
+                  type="submit"
+                >
+                  Start membership
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function ArchivePlanDialog({
+  plan,
+  onCancel,
+  onConfirm,
+}: {
+  plan: MembershipPlan;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const titleId = useId();
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center p-4"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
+      <section
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="w-full max-w-md overflow-hidden"
+        role="dialog"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onCancel();
+        }}
+      >
+        <div className="border-b border-slate-200 px-5 py-4">
+          <p className="text-xs font-bold tracking-[0.16em] text-red-600 uppercase">
+            Archive plan
+          </p>
+          <h2
+            className="mt-1 text-xl font-black tracking-tight text-slate-900"
+            id={titleId}
+          >
+            Archive {plan.name}?
+          </h2>
+        </div>
+        <div className="p-5">
+          <p className="text-sm leading-6 text-slate-600">
+            This plan will no longer be available for new memberships. Existing
+            memberships and historical records will remain unchanged.
+          </p>
+          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+            {plan.name} ({plan.code})
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              className="button button-cancel"
+              onClick={onCancel}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="button button-archive"
+              onClick={onConfirm}
+              type="button"
+            >
+              Archive
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CancelMembershipDialog({
+  memberLabel,
+  planName,
+  onCancel,
+  onConfirm,
+}: {
+  memberLabel: string;
+  planName: string;
+  onCancel: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const titleId = useId();
+  const reasonId = useId();
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = reason.trim();
+    if (!trimmed) {
+      setError("Enter a cancellation reason.");
+      return;
+    }
+    onConfirm(trimmed);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center p-4"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
+      <form
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="w-full max-w-md overflow-hidden"
+        role="dialog"
+        onSubmit={submit}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onCancel();
+        }}
+      >
+        <div className="border-b border-slate-200 px-5 py-4">
+          <p className="text-xs font-bold tracking-[0.16em] text-red-600 uppercase">
+            Cancel membership
+          </p>
+          <h2
+            className="mt-1 text-xl font-black tracking-tight text-slate-900"
+            id={titleId}
+          >
+            Cancel this membership?
+          </h2>
+        </div>
+        <div className="grid gap-4 p-5">
+          <p className="text-sm leading-6 text-slate-600">
+            {memberLabel} will lose the {planName} membership. This does not
+            delete payment history.
+          </p>
+          <label className="field" htmlFor={reasonId}>
+            Cancellation reason
+            <textarea
+              className="input min-h-24"
+              id={reasonId}
+              maxLength={500}
+              onChange={(event) => setReason(event.target.value)}
+              value={reason}
+            />
+          </label>
+          {error ? (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex justify-end">
+            <button
+              className="button button-cancel"
+              onClick={onCancel}
+              type="button"
+            >
+              Back
+            </button>
+            <button className="button button-delete" type="submit">
+              Cancel membership
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function StatusBadge({ status, label }: { status: string; label?: string }) {
+  const tones: Record<string, string> = {
+    ACTIVE: "bg-emerald-100 text-emerald-700",
+    PAID: "bg-emerald-100 text-emerald-700",
+    PENDING: "bg-amber-100 text-amber-800",
+    PARTIAL: "bg-amber-100 text-amber-800",
+    PARTIALLY_REFUNDED: "bg-amber-100 text-amber-800",
+    SUSPENDED: "bg-orange-100 text-orange-700",
+    EXPIRED: "bg-slate-100 text-slate-600",
+    CANCELLED: "bg-red-100 text-red-700",
+    UNPAID: "bg-red-100 text-red-700",
+    REFUNDED: "bg-slate-100 text-slate-600",
+    ARCHIVED: "bg-slate-100 text-slate-600",
+  };
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${tones[status] ?? "bg-slate-100 text-slate-600"}`}
+    >
+      {label ?? statusLabel(status)}
+    </span>
+  );
+}
+
+function statusLabel(status: string): string {
+  return status
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function PlanEditorDialog({
@@ -1380,22 +1926,39 @@ function PlanEditorDialog({
   const { source, draft } = state;
   const title = `Edit ${source.name} (${source.code})`;
   return (
-    <div className="fixed inset-0 z-20 grid place-items-center bg-slate-950/40 p-4">
+    <div
+      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-4 py-8"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !pending) onCancel();
+      }}
+    >
       <div
         aria-busy={pending}
         aria-labelledby={titleId}
         aria-modal="true"
-        className="card grid max-h-[90vh] w-full max-w-lg gap-4 overflow-y-auto p-5"
+        className="grid max-h-[90vh] w-full max-w-xl overflow-y-auto"
         role="dialog"
         onKeyDown={(event) => {
           if (event.key === "Escape" && !pending) onCancel();
         }}
       >
-        <h2 className="text-lg font-bold" id={titleId}>
-          {title}
-        </h2>
-        <form className="grid gap-4" onSubmit={onSubmit}>
-          <div className="grid grid-cols-2 gap-3">
+        <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
+          <p className="text-xs font-bold tracking-[0.16em] text-amber-600 uppercase">
+            Membership plan
+          </p>
+          <h2
+            className="mt-1 text-xl font-black tracking-tight text-slate-900"
+            id={titleId}
+          >
+            {title}
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Update the plan details below, then save your changes.
+          </p>
+        </div>
+        <form className="grid gap-5 p-5 sm:p-6" onSubmit={onSubmit}>
+          <div className="grid gap-4 sm:grid-cols-2 [&_.field]:text-sm [&_.field]:font-semibold [&_.field]:text-slate-700">
             <label className="field">
               Code
               <input
@@ -1476,28 +2039,40 @@ function PlanEditorDialog({
             </label>
             <label className="field">
               Currency
-              <input className="input" readOnly value={source.currency} />
+              <input
+                className="input bg-slate-50 text-slate-500"
+                readOnly
+                value={source.currency}
+              />
             </label>
           </div>
-          <p>
-            Status <span>{planStatusLabel(source)}</span>
+          <p className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+            Status
+            <StatusBadge
+              label={planStatusLabel(source)}
+              status={planStatusLabel(source).toUpperCase()}
+            />
           </p>
           {error ? (
             <p className="error" role="alert">
               {error}
             </p>
           ) : null}
-          <div className="flex flex-wrap gap-2">
-            <button className="button" disabled={pending} type="submit">
-              {`Save ${source.name} (${source.code}) plan`}
-            </button>
+          <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
             <button
-              className="button bg-white text-slate-900 ring-1 ring-slate-300"
+              className="button button-cancel"
               disabled={pending}
               onClick={onCancel}
               type="button"
             >
-              {`Cancel editing ${source.name} (${source.code}) plan`}
+              Cancel
+            </button>
+            <button
+              className="button button-edit"
+              disabled={pending}
+              type="submit"
+            >
+              {pending ? "Saving…" : "Save"}
             </button>
           </div>
         </form>
@@ -1522,8 +2097,7 @@ function NoteEditorDialog({
   onCancel: () => void;
 }) {
   const titleId = useId();
-  const identity = `${state.memberLabel}, ${state.planName}, ${state.membershipId}`;
-  const title = `Edit note for ${identity}`;
+  const shortMember = compactIdentifier(state.memberLabel);
   return (
     <div className="fixed inset-0 z-20 grid place-items-center bg-slate-950/40 p-4">
       <div
@@ -1536,9 +2110,15 @@ function NoteEditorDialog({
           if (event.key === "Escape" && !pending) onCancel();
         }}
       >
-        <h2 className="text-lg font-bold" id={titleId}>
-          {title}
-        </h2>
+        <div>
+          <h2 className="text-lg font-bold" id={titleId}>
+            Edit membership note
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {shortMember} · {state.planName} · Membership{" "}
+            <IdentifierValue value={state.membershipId} />
+          </p>
+        </div>
         <form className="grid gap-4" onSubmit={onSubmit}>
           <label className="field">
             Membership note
@@ -1555,16 +2135,22 @@ function NoteEditorDialog({
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
-            <button className="button" disabled={pending} type="submit">
-              {`Save note for ${identity}`}
+            <button
+              aria-label={`Save note for ${shortMember} · ${state.planName}`}
+              className="button button-edit"
+              disabled={pending}
+              type="submit"
+            >
+              Save
             </button>
             <button
-              className="button bg-white text-slate-900 ring-1 ring-slate-300"
+              aria-label="Discard note changes"
+              className="button button-cancel"
               disabled={pending}
               onClick={onCancel}
               type="button"
             >
-              {`Discard note edit for ${identity}`}
+              Cancel
             </button>
           </div>
         </form>

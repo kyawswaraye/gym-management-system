@@ -77,6 +77,7 @@ PUBLISHED_PATHS = {
     "/api/v1/members/",
     "/api/v1/members/{id}/",
     "/api/v1/members/{id}/archive/",
+    "/api/v1/members/{id}/restore/",
     "/api/v1/members/{id}/check-ins/",
     "/api/v1/members/{id}/payments/",
     "/api/v1/members/{id}/summary/",
@@ -249,6 +250,7 @@ def test_openapi_contract_publishes_approved_routes_only() -> None:
     assert "/api/v1/members/" in schema["paths"]
     assert "/api/v1/members/{id}/" in schema["paths"]
     assert "/api/v1/members/{id}/archive/" in schema["paths"]
+    assert "/api/v1/members/{id}/restore/" in schema["paths"]
     unpublished = (
         "/api/v1/check-ins/scan/",
         "/api/v1/notifications/",
@@ -946,6 +948,7 @@ def test_openapi_documents_members() -> None:
     collection = document["paths"]["/api/v1/members/"]
     detail = document["paths"]["/api/v1/members/{id}/"]
     archive = document["paths"]["/api/v1/members/{id}/archive/"]["post"]
+    restore = document["paths"]["/api/v1/members/{id}/restore/"]["post"]
     schemas = document["components"]["schemas"]
     create = schemas["MemberCreateRequest"]["properties"]
     update = schemas["PatchedMemberUpdateRequest"]["properties"]
@@ -1018,20 +1021,26 @@ def test_openapi_documents_members() -> None:
         detail["get"],
         detail["patch"],
         archive,
+        restore,
     ):
         assert {"staffBearerAuth": []} in operation["security"]
     assert "201" in collection["post"]["responses"]
     assert "409" in collection["post"]["responses"]
     assert "404" in detail["get"]["responses"]
     assert "404" in archive["responses"]
-    assert (
-        archive.get("requestBody", {})
-        .get("content", {})
-        .get("application/json", {})
-        .get("schema", {})
-        .get("properties", {})
-        == {}
-    )
+    assert "404" in restore["responses"]
+    assert archive["operationId"] == "members_archive"
+    assert restore["operationId"] == "members_restore"
+    assert "get" not in document["paths"]["/api/v1/members/{id}/restore/"]
+    for command in (archive, restore):
+        assert (
+            command.get("requestBody", {})
+            .get("content", {})
+            .get("application/json", {})
+            .get("schema", {})
+            .get("properties", {})
+            == {}
+        )
     rendered_members = json.dumps(
         {
             "collection": collection,

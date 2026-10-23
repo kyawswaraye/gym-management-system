@@ -436,7 +436,11 @@ export function PaymentsManager({
             onMember={setDraftMember}
             onSearch={setMemberSearch}
           />
-          <button className="button" disabled={pending} type="submit">
+          <button
+            className="button button-edit"
+            disabled={pending}
+            type="submit"
+          >
             Save draft
           </button>
         </form>
@@ -483,7 +487,7 @@ export function PaymentsManager({
           <div className="flex flex-wrap gap-3">
             {payment.status === "DRAFT" && canUpdate && (
               <button
-                className="underline"
+                className="underline tone-edit"
                 onClick={() => setAction("edit")}
                 type="button"
               >
@@ -501,7 +505,7 @@ export function PaymentsManager({
             )}
             {payment.status === "PENDING_APPROVAL" && canApprove && (
               <button
-                className="underline"
+                className="underline tone-success"
                 onClick={() => setAction("approve")}
                 type="button"
               >
@@ -510,7 +514,7 @@ export function PaymentsManager({
             )}
             {payment.status === "PENDING_APPROVAL" && canApprove && (
               <button
-                className="underline"
+                className="underline tone-warn"
                 onClick={() => setAction("reject")}
                 type="button"
               >
@@ -519,7 +523,7 @@ export function PaymentsManager({
             )}
             {payment.status === "DRAFT" && canUpdate && (
               <button
-                className="underline"
+                className="underline tone-cancel"
                 onClick={() => setAction("cancel")}
                 type="button"
               >
@@ -530,7 +534,7 @@ export function PaymentsManager({
               canVoid &&
               !productCorrection(payment) && (
                 <button
-                  className="underline"
+                  className="underline tone-delete"
                   onClick={() => {
                     setCorrectionDate(defaultDate);
                     setAction("void");
@@ -544,7 +548,7 @@ export function PaymentsManager({
               canRefund &&
               !productCorrection(payment) && (
                 <button
-                  className="underline"
+                  className="underline tone-delete"
                   onClick={() => {
                     setCorrectionDate(defaultDate);
                     setAction("refund");
@@ -582,7 +586,11 @@ export function PaymentsManager({
                 onSearch={setMemberSearch}
                 payment={payment}
               />
-              <button className="button" disabled={pending} type="submit">
+              <button
+                className="button button-edit"
+                disabled={pending}
+                type="submit"
+              >
                 Save changes
               </button>
             </form>
@@ -946,7 +954,7 @@ export function PaymentsManager({
               </button>
               {receipt.status === "ISSUED" && canVoidReceipt && (
                 <button
-                  className="underline"
+                  className="underline tone-delete"
                   onClick={() => setReceiptAction(true)}
                   type="button"
                 >

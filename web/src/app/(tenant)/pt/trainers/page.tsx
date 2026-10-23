@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { TrainersManager } from "@/features/pt/trainers-manager";
 import {
   canOpenPtTrainers,
@@ -20,12 +21,12 @@ export default async function TrainersPage() {
 
   return (
     <section aria-labelledby="trainers-title">
-      <h1 className="text-2xl font-bold" id="trainers-title">
-        Trainers
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Review trainers, current assignments, and the members assigned today.
-      </p>
+      <PageHeader
+        description="Review your coaching team, current assignments, and members assigned today."
+        eyebrow="Personal training"
+        title="Trainers"
+        titleId="trainers-title"
+      />
       <TrainersManager
         canClose={canManage}
         canCreate={canManage && !restricted}

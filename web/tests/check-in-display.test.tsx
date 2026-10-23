@@ -60,6 +60,9 @@ describe("Check-in QR display", () => {
     expect(
       screen.getByRole("img", { name: "Current onsite check-in code" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Live")).toBeInTheDocument();
+    expect(screen.getByText("Front desk")).toBeInTheDocument();
+    expect(screen.getByText(/Refreshes before/)).toBeInTheDocument();
     expect(
       screen.queryByText("gms-checkin:v1:secret-value"),
     ).not.toBeInTheDocument();
@@ -70,5 +73,31 @@ describe("Check-in QR display", () => {
       await vi.advanceTimersByTimeAsync(15_000);
     });
     expect(issueCheckInChallenge).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops the rotation timer when the display unmounts", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.mocked(issueCheckInChallenge).mockImplementation(async () => ({
+      id: "22222222-2222-4222-8222-222222222222",
+      payload: "gms-checkin:v1:secret-value",
+      display_location: "Front desk",
+      issued_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 20_000).toISOString(),
+      max_uses: 1,
+      status: "ACTIVE",
+    }));
+
+    const view = render(<CheckInDisplay />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(issueCheckInChallenge).toHaveBeenCalledTimes(1);
+    view.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(issueCheckInChallenge).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 });

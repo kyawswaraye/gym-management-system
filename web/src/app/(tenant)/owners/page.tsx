@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { OwnersManager } from "@/features/operations/owners-manager";
 import { requireTenantSession } from "@/lib/auth/session";
 
@@ -11,19 +12,16 @@ export default async function OwnersPage() {
 
   return (
     <section aria-labelledby="owners-title">
-      <h1 id="owners-title" className="text-3xl font-bold">
-        Owner management
-      </h1>
-      <p className="muted mt-2">
-        Invite equal-authority Owners and protect the gym from becoming
-        ownerless.
-      </p>
-      <div className="mt-6">
-        <OwnersManager
-          currentMembershipId={session.gym_membership.id}
-          mfaRecent={session.mfa_recent}
-        />
-      </div>
+      <PageHeader
+        description="Invite equal-authority Owners and protect the gym from becoming ownerless."
+        eyebrow="Operations"
+        title="Owner management"
+        titleId="owners-title"
+      />
+      <OwnersManager
+        currentMembershipId={session.gym_membership.id}
+        mfaRecent={session.mfa_recent}
+      />
     </section>
   );
 }

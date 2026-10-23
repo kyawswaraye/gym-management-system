@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { PackagesManager } from "@/features/pt/packages-manager";
 import {
   canOpenPtSchedule,
@@ -14,13 +15,12 @@ export default async function PackagesPage() {
 
   return (
     <section aria-labelledby="packages-title">
-      <h1 className="text-2xl font-bold" id="packages-title">
-        Packages
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Browse PT and class package definitions. A granted manage permission can
-        create one. Definitions are not edited here.
-      </p>
+      <PageHeader
+        description="Browse PT and class packages, session allowances, validity, and pricing in one place."
+        eyebrow="Personal training"
+        title="Packages"
+        titleId="packages-title"
+      />
       <PackagesManager
         canManage={hasPermission(session, "pt.schedule.manage")}
         currency={session.gym?.currency ?? ""}

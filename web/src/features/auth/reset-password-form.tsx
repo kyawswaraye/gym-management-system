@@ -140,7 +140,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
           <span className="error">{fields.password_confirmation}</span>
         ) : null}
       </div>
-      <button className="button" type="submit" disabled={pending}>
+      <button className="button button-edit" type="submit" disabled={pending}>
         {pending ? "Updating…" : "Update password"}
       </button>
     </form>

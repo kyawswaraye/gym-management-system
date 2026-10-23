@@ -1,0 +1,15 @@
+# Example only. Installing this unit is not a scheduled backup and not an alert.
+# Do not enable it until gym-backup bootstrap has exited 0.
+# A nonzero exit is the signal reserved for the later observability increment.
+# Alert delivery is not claimed.
+
+[Unit]
+Description=Example gym PostgreSQL full backup
+Documentation=file:docs/runbooks/phase8-increment-3.md
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/gym/infra/compose
+ExecStart=/usr/bin/docker compose --env-file /etc/gym/production.env -f docker-compose.prod.yml --profile backup run --rm backup-full
+TimeoutStartSec=4h
+SuccessExitStatus=0

@@ -7,7 +7,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   listAllMembershipPlans,
@@ -162,6 +162,13 @@ function renderManager(
   );
 }
 
+function openStartMembershipDialog() {
+  fireEvent.click(
+    screen.getByRole("button", { name: "Open start membership form" }),
+  );
+  return screen.getByRole("dialog", { name: "Start membership" });
+}
+
 describe("Memberships manager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -174,14 +181,9 @@ describe("Memberships manager", () => {
     vi.mocked(operationMutation).mockResolvedValue({});
   });
 
-  afterEach(() => {
-    if (vi.isMockFunction(window.confirm)) {
-      vi.mocked(window.confirm).mockRestore();
-    }
-  });
-
   it("renders published plan and membership fields and the member id until search", async () => {
     renderManager();
+    openStartMembershipDialog();
 
     expect(
       await screen.findByRole("option", { name: "Monthly — 1500.00 THB" }),
@@ -209,12 +211,14 @@ describe("Memberships manager", () => {
     expect(
       within(planCatalog).getByRole("cell", { name: "Active" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(MEMBER_ID)).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("table", { name: "Memberships" })).getByTitle(
+        MEMBER_ID,
+      ),
+    ).toHaveTextContent("111111");
     expect(screen.getByText("2026-01-31 – 2026-02-27")).toBeInTheDocument();
     expect(screen.getByText("1399.50 THB")).toBeInTheDocument();
     expect(screen.getByText("ACTIVE / UNPAID")).toBeInTheDocument();
-    expect(screen.getByLabelText("Currency")).toHaveValue("THB");
-    expect(screen.getByLabelText("Currency")).not.toHaveAttribute("name");
     expect(screen.queryByText("ada lovelace")).not.toBeInTheDocument();
     expect(listMembers).not.toHaveBeenCalled();
     expect(listMemberships).toHaveBeenCalledWith({ limit: 25 });
@@ -234,8 +238,9 @@ describe("Memberships manager", () => {
 
   it("creates a plan without sending currency and refreshes the catalogs", async () => {
     renderManager();
-    await screen.findByRole("option", { name: "Monthly — 1500.00 THB" });
+    await screen.findByRole("cell", { name: "1500.00 THB" });
     expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "New plan" }));
 
     fireEvent.change(screen.getByLabelText("Code"), {
       target: { value: "MONTH" },
@@ -249,7 +254,7 @@ describe("Memberships manager", () => {
     fireEvent.change(screen.getByLabelText("Price"), {
       target: { value: "1500.00" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
       expect(operationMutation).toHaveBeenCalledWith("membership-plans/", {
@@ -268,6 +273,122 @@ describe("Memberships manager", () => {
     });
   });
 
+  it("opens the start membership dialog and closes it only while idle", async () => {
+    const pendingCreate = deferred<Membership>();
+    vi.mocked(operationMutation).mockImplementation((path) => {
+      if (path === "memberships/") return pendingCreate.promise;
+      return Promise.resolve({});
+    });
+    renderManager();
+    await screen.findByText("ACTIVE / UNPAID");
+
+    expect(
+      screen.queryByRole("dialog", { name: "Start membership" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Start membership" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open start membership form" }),
+    ).toHaveAttribute("aria-expanded", "false");
+
+    const dialog = openStartMembershipDialog();
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    const titleId = dialog.getAttribute("aria-labelledby");
+    expect(titleId).toBeTruthy();
+    expect(
+      within(dialog).getByRole("heading", { name: "Start membership" }),
+    ).toHaveAttribute("id", titleId);
+    expect(
+      screen.getByRole("button", { name: "Close start membership form" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(within(dialog).getByRole("button", { name: "Close" })).toBeEnabled();
+    expect(
+      within(dialog).getByRole("button", { name: "Cancel" }),
+    ).toBeEnabled();
+
+    fireEvent.change(within(dialog).getByLabelText("Note"), {
+      target: { value: "Keep me" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Discount"), {
+      target: { value: "5.00" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(
+      screen.queryByRole("dialog", { name: "Start membership" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open start membership form" }),
+    ).toHaveAttribute("aria-expanded", "false");
+
+    const reopened = openStartMembershipDialog();
+    expect(within(reopened).getByLabelText("Note")).toHaveValue("Keep me");
+    expect(within(reopened).getByLabelText("Discount")).toHaveValue(5);
+    fireEvent.keyDown(reopened, { key: "Escape" });
+    expect(
+      screen.queryByRole("dialog", { name: "Start membership" }),
+    ).not.toBeInTheDocument();
+
+    const backdropTarget = openStartMembershipDialog();
+    const backdrop = backdropTarget.parentElement;
+    if (!backdrop) throw new Error("Missing start membership backdrop.");
+    fireEvent.mouseDown(backdrop);
+    expect(
+      screen.queryByRole("dialog", { name: "Start membership" }),
+    ).not.toBeInTheDocument();
+
+    const working = openStartMembershipDialog();
+    expect(within(working).getByLabelText("Note")).toHaveValue("Keep me");
+    fireEvent.change(within(working).getByLabelText("Search members"), {
+      target: { value: "Ada" },
+    });
+    fireEvent.click(
+      await within(working).findByRole("button", {
+        name: "MEM-000001 — Ada Lovelace",
+      }),
+    );
+    await within(working).findByRole("option", {
+      name: "Monthly — 1500.00 THB",
+    });
+    fireEvent.change(within(working).getByLabelText("Plan"), {
+      target: { value: PLAN_ID },
+    });
+    fireEvent.click(
+      within(working).getByRole("button", { name: "Start membership" }),
+    );
+    await waitFor(() => expect(operationMutation).toHaveBeenCalledTimes(1));
+    expect(
+      within(working).getByRole("button", { name: "Cancel" }),
+    ).toBeDisabled();
+    expect(
+      within(working).getByRole("button", { name: "Close" }),
+    ).toBeDisabled();
+    expect(
+      within(working).getByRole("button", { name: "Start membership" }),
+    ).toBeDisabled();
+
+    fireEvent.keyDown(working, { key: "Escape" });
+    fireEvent.click(within(working).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(within(working).getByRole("button", { name: "Close" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Close start membership form" }),
+    );
+    fireEvent.mouseDown(working.parentElement ?? working);
+    expect(screen.getByRole("dialog", { name: "Start membership" })).toBe(
+      working,
+    );
+
+    await act(async () => {
+      pendingCreate.resolve(membership());
+      await pendingCreate.promise;
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Start membership" }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
   it("searches past the first member page and does not auto-select", async () => {
     const zara = member({
       id: LATER_MEMBER_ID,
@@ -280,6 +401,7 @@ describe("Memberships manager", () => {
       return memberPage([member()]);
     });
     renderManager();
+    openStartMembershipDialog();
     await screen.findByRole("option", { name: "Monthly — 1500.00 THB" });
 
     fireEvent.change(screen.getByLabelText("Search members"), {
@@ -300,9 +422,11 @@ describe("Memberships manager", () => {
       target: { value: PLAN_ID },
     });
     fireEvent.click(screen.getByRole("button", { name: "Start membership" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Select a member.",
-    );
+    expect(
+      await within(
+        screen.getByRole("dialog", { name: "Start membership" }),
+      ).findByRole("alert"),
+    ).toHaveTextContent("Select a member.");
     expect(operationMutation).not.toHaveBeenCalled();
 
     fireEvent.click(choice);
@@ -339,6 +463,7 @@ describe("Memberships manager", () => {
       return pending.promise;
     });
     renderManager();
+    openStartMembershipDialog();
     await screen.findByRole("option", { name: "Monthly — 1500.00 THB" });
 
     fireEvent.change(screen.getByLabelText("Search members"), {
@@ -483,6 +608,7 @@ describe("Memberships manager", () => {
       }),
     ]);
     renderManager();
+    openStartMembershipDialog();
 
     expect(
       await screen.findByRole("option", { name: "Monthly — 1500.00 THB" }),
@@ -514,6 +640,7 @@ describe("Memberships manager", () => {
     vi.mocked(listAllMembershipPlans).mockRejectedValue(
       new Error("The membership plan list is too large to load."),
     );
+    fireEvent.click(screen.getByRole("button", { name: "New plan" }));
     fireEvent.change(screen.getByLabelText("Code"), {
       target: { value: "DAY" },
     });
@@ -526,7 +653,7 @@ describe("Memberships manager", () => {
     fireEvent.change(screen.getByLabelText("Price"), {
       target: { value: "100.00" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(
       await screen.findByText("The membership plan list is too large to load."),
@@ -574,26 +701,44 @@ describe("Memberships manager", () => {
       ),
     );
 
-    const prompt = vi
-      .spyOn(window, "prompt")
-      .mockReturnValue("  Member moved  ");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "Cancel this membership?",
+    });
+    fireEvent.change(within(dialog).getByLabelText("Cancellation reason"), {
+      target: { value: "  Member moved  " },
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Cancel membership" }),
+    );
     await waitFor(() =>
       expect(operationMutation).toHaveBeenCalledWith(
         `memberships/${MEMBERSHIP_ID}/cancel/`,
         { reason: "Member moved" },
       ),
     );
-    expect(prompt).toHaveBeenCalledWith("Cancellation reason");
 
     vi.mocked(operationMutation).mockClear();
-    prompt.mockReturnValue("   ");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    const blankDialog = screen.getByRole("dialog", {
+      name: "Cancel this membership?",
+    });
+    fireEvent.change(
+      within(blankDialog).getByLabelText("Cancellation reason"),
+      { target: { value: "   " } },
+    );
+    fireEvent.click(
+      within(blankDialog).getByRole("button", { name: "Cancel membership" }),
+    );
     expect(operationMutation).not.toHaveBeenCalled();
-    prompt.mockReturnValue(null);
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(within(blankDialog).getByRole("alert")).toHaveTextContent(
+      "Enter a cancellation reason.",
+    );
+    fireEvent.click(within(blankDialog).getByRole("button", { name: "Back" }));
+    expect(
+      screen.queryByRole("dialog", { name: "Cancel this membership?" }),
+    ).not.toBeInTheDocument();
     expect(operationMutation).not.toHaveBeenCalled();
-    prompt.mockRestore();
   });
 
   it("hides create and lifecycle actions without permission", async () => {
@@ -627,7 +772,7 @@ describe("Memberships manager", () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", {
-        name: `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+        name: `Edit note for ${MEMBER_ID.slice(-6)} · Monthly`,
       }),
     ).not.toBeInTheDocument();
     expect(listAllMembershipPlans).not.toHaveBeenCalled();
@@ -782,8 +927,9 @@ describe("Memberships manager", () => {
       screen.queryByRole("button", { name: "Edit Legacy (OLD) plan" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "New plan" }),
+      screen.getByRole("button", { name: "New plan" }),
     ).toBeInTheDocument();
+    openStartMembershipDialog();
     expect(
       screen.getByRole("option", { name: "Monthly — 1500.00 THB" }),
     ).toBeInTheDocument();
@@ -794,7 +940,6 @@ describe("Memberships manager", () => {
   });
 
   it("does not archive a plan when confirmation is cancelled", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     renderManager({ canCreate: false, canUpdate: true });
 
     fireEvent.click(
@@ -803,8 +948,9 @@ describe("Memberships manager", () => {
       }),
     );
 
-    expect(confirm).toHaveBeenCalledTimes(1);
-    expect(confirm).toHaveBeenCalledWith("Archive plan Monthly (MONTH)?");
+    const dialog = screen.getByRole("dialog", { name: "Archive Monthly?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(operationMutation).not.toHaveBeenCalled();
     expect(
       screen.getByRole("button", { name: "Archive Monthly (MONTH) plan" }),
@@ -836,7 +982,6 @@ describe("Memberships manager", () => {
         updated_at: "2026-10-17T12:00:00Z",
       }),
     );
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderManager();
     await screen.findByText("ACTIVE / UNPAID");
     const membershipLoads = vi.mocked(listMemberships).mock.calls.length;
@@ -846,6 +991,11 @@ describe("Memberships manager", () => {
         name: "Archive Monthly (MONTH) plan",
       }),
     );
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", { name: "Archive Monthly?" }),
+      ).getByRole("button", { name: "Archive" }),
+    );
 
     await waitFor(() =>
       expect(operationMutation).toHaveBeenCalledWith(
@@ -854,7 +1004,6 @@ describe("Memberships manager", () => {
       ),
     );
     expect(operationMutation).toHaveBeenCalledTimes(1);
-    expect(confirm).toHaveBeenCalledWith("Archive plan Monthly (MONTH)?");
     expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
     expect(vi.mocked(listMemberships).mock.calls.length).toBe(membershipLoads);
 
@@ -874,6 +1023,7 @@ describe("Memberships manager", () => {
     expect(
       screen.getByRole("button", { name: "Archive Annual (YEAR) plan" }),
     ).toBeInTheDocument();
+    openStartMembershipDialog();
     expect(
       screen.queryByRole("option", { name: "Monthly — 1500.00 THB" }),
     ).not.toBeInTheDocument();
@@ -891,14 +1041,15 @@ describe("Memberships manager", () => {
   it("ignores a second archive click while the command is pending", async () => {
     const pending = deferred<MembershipPlan>();
     vi.mocked(operationMutation).mockReturnValue(pending.promise);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderManager({ canCreate: false, canUpdate: true });
 
     const button = await screen.findByRole("button", {
       name: "Archive Monthly (MONTH) plan",
     });
-    button.click();
-    button.click();
+    fireEvent.click(button);
+    const confirmArchive = screen.getByRole("button", { name: "Archive" });
+    confirmArchive.click();
+    confirmArchive.click();
 
     expect(operationMutation).toHaveBeenCalledTimes(1);
     expect(operationMutation).toHaveBeenCalledWith(
@@ -931,13 +1082,17 @@ describe("Memberships manager", () => {
     vi.mocked(operationMutation).mockRejectedValue(
       new Error("Plan archive was rejected."),
     );
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderManager();
 
     fireEvent.click(
       await screen.findByRole("button", {
         name: "Archive Monthly (MONTH) plan",
       }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", { name: "Archive Monthly?" }),
+      ).getByRole("button", { name: "Archive" }),
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -953,6 +1108,7 @@ describe("Memberships manager", () => {
         { name: "Active" },
       ),
     ).toBeInTheDocument();
+    openStartMembershipDialog();
     expect(
       screen.getByRole("option", { name: "Monthly — 1500.00 THB" }),
     ).toBeInTheDocument();
@@ -1064,7 +1220,7 @@ describe("Memberships manager", () => {
     expect(within(archivedDialog).getByText("Archived")).toBeInTheDocument();
     fireEvent.click(
       within(archivedDialog).getByRole("button", {
-        name: "Cancel editing Legacy (OLD) plan",
+        name: "Cancel",
       }),
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -1116,7 +1272,7 @@ describe("Memberships manager", () => {
     );
     fireEvent.click(
       within(dialog).getByRole("button", {
-        name: "Save Monthly (MONTH) plan",
+        name: "Save",
       }),
     );
 
@@ -1150,6 +1306,7 @@ describe("Memberships manager", () => {
     expect(
       within(planCatalog).queryByRole("cell", { name: "1500.00 THB" }),
     ).not.toBeInTheDocument();
+    openStartMembershipDialog();
     expect(
       screen.getByRole("option", { name: "Annual pass — 2000.50 THB" }),
     ).toBeInTheDocument();
@@ -1175,7 +1332,7 @@ describe("Memberships manager", () => {
     });
     fireEvent.click(
       within(dialog).getByRole("button", {
-        name: "Cancel editing Monthly (MONTH) plan",
+        name: "Cancel",
       }),
     );
     expect(operationMutation).not.toHaveBeenCalled();
@@ -1202,7 +1359,7 @@ describe("Memberships manager", () => {
     );
     fireEvent.click(
       within(reopened).getByRole("button", {
-        name: "Save Monthly (MONTH) plan",
+        name: "Save",
       }),
     );
 
@@ -1217,6 +1374,7 @@ describe("Memberships manager", () => {
         { name: "Monthly" },
       ),
     ).toBeInTheDocument();
+    openStartMembershipDialog();
     expect(
       screen.getByRole("option", { name: "Monthly — 1500.00 THB" }),
     ).toBeInTheDocument();
@@ -1245,7 +1403,7 @@ describe("Memberships manager", () => {
       target: { value: "Renamed" },
     });
     const save = within(dialog).getByRole("button", {
-      name: "Save Monthly (MONTH) plan",
+      name: "Save",
     });
     save.click();
     save.click();
@@ -1302,7 +1460,7 @@ describe("Memberships manager", () => {
     fireEvent.click(
       within(
         screen.getByRole("dialog", { name: "Edit Monthly (MONTH)" }),
-      ).getByRole("button", { name: "Save Monthly (MONTH) plan" }),
+      ).getByRole("button", { name: "Save" }),
     );
 
     expect(
@@ -1313,6 +1471,7 @@ describe("Memberships manager", () => {
     expect(
       screen.queryByRole("button", { name: "Archive Monthly (MONTH) plan" }),
     ).not.toBeInTheDocument();
+    openStartMembershipDialog();
     expect(
       screen.queryByRole("option", { name: "Monthly — 1500.00 THB" }),
     ).not.toBeInTheDocument();
@@ -1332,6 +1491,7 @@ describe("Memberships manager", () => {
       membership({ note: "Front desk" }),
     );
     renderManager();
+    openStartMembershipDialog();
     await screen.findByRole("option", { name: "Monthly — 1500.00 THB" });
     expect(screen.getByLabelText("Note")).toHaveAttribute("maxLength", "4000");
 
@@ -1391,11 +1551,11 @@ describe("Memberships manager", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+        name: `Edit note for ${MEMBER_ID.slice(-6)} · Monthly`,
       }),
     );
     const dialog = screen.getByRole("dialog", {
-      name: `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+      name: "Edit membership note",
     });
     expect(within(dialog).getByLabelText("Membership note")).toHaveValue(
       "Desk note",
@@ -1412,7 +1572,7 @@ describe("Memberships manager", () => {
     );
     fireEvent.click(
       within(dialog).getByRole("button", {
-        name: `Save note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+        name: `Save note for ${MEMBER_ID.slice(-6)} · Monthly`,
       }),
     );
 
@@ -1446,15 +1606,17 @@ describe("Memberships manager", () => {
 
   it("trims a blank note, and cancel or failure keeps the loaded note", async () => {
     renderManager();
-    const editName = `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`;
+    const editName = `Edit note for ${MEMBER_ID.slice(-6)} · Monthly`;
     fireEvent.click(await screen.findByRole("button", { name: editName }));
-    const dialog = screen.getByRole("dialog", { name: editName });
+    const dialog = screen.getByRole("dialog", {
+      name: "Edit membership note",
+    });
     fireEvent.change(within(dialog).getByLabelText("Membership note"), {
       target: { value: "Temporary" },
     });
     fireEvent.click(
       within(dialog).getByRole("button", {
-        name: `Discard note edit for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+        name: "Discard note changes",
       }),
     );
     expect(operationMutation).not.toHaveBeenCalled();
@@ -1467,7 +1629,9 @@ describe("Memberships manager", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: editName }));
-    const reopened = screen.getByRole("dialog", { name: editName });
+    const reopened = screen.getByRole("dialog", {
+      name: "Edit membership note",
+    });
     expect(within(reopened).getByLabelText("Membership note")).toHaveValue(
       "Desk note",
     );
@@ -1479,7 +1643,7 @@ describe("Memberships manager", () => {
     );
     fireEvent.click(
       within(reopened).getByRole("button", {
-        name: `Save note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+        name: `Save note for ${MEMBER_ID.slice(-6)} · Monthly`,
       }),
     );
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -1502,7 +1666,7 @@ describe("Memberships manager", () => {
     vi.mocked(operationMutation).mockResolvedValue(membership({ note: "" }));
     fireEvent.click(
       within(reopened).getByRole("button", {
-        name: `Save note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+        name: `Save note for ${MEMBER_ID.slice(-6)} · Monthly`,
       }),
     );
     await waitFor(() =>
@@ -1552,28 +1716,28 @@ describe("Memberships manager", () => {
 
     expect(
       await screen.findByRole("button", {
-        name: `Edit note for ${LATER_MEMBER_ID}, Annual, ${LATER_MEMBERSHIP_ID}`,
+        name: `Edit note for ${LATER_MEMBER_ID.slice(-6)} · Annual`,
       }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+        name: `Edit note for ${MEMBER_ID.slice(-6)} · Monthly`,
       }),
     ).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+        name: `Edit note for ${MEMBER_ID.slice(-6)} · Monthly`,
       }),
     );
     const dialog = screen.getByRole("dialog", {
-      name: `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+      name: "Edit membership note",
     });
     fireEvent.change(within(dialog).getByLabelText("Membership note"), {
       target: { value: "Local draft" },
     });
     const save = within(dialog).getByRole("button", {
-      name: `Save note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+      name: `Save note for ${MEMBER_ID.slice(-6)} · Monthly`,
     });
     save.click();
     save.click();
@@ -1631,17 +1795,20 @@ describe("Memberships manager", () => {
       return Promise.resolve({});
     });
     renderManager();
-    const editName = `Edit note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`;
+    const editName = `Edit note for ${MEMBER_ID.slice(-6)} · Monthly`;
     fireEvent.click(await screen.findByRole("button", { name: editName }));
-    const dialog = screen.getByRole("dialog", { name: editName });
+    const dialog = screen.getByRole("dialog", {
+      name: "Edit membership note",
+    });
     fireEvent.change(within(dialog).getByLabelText("Membership note"), {
       target: { value: "Local draft" },
     });
     fireEvent.click(
       within(dialog).getByRole("button", {
-        name: `Save note for ${MEMBER_ID}, Monthly, ${MEMBERSHIP_ID}`,
+        name: `Save note for ${MEMBER_ID.slice(-6)} · Monthly`,
       }),
     );
+    openStartMembershipDialog();
     fireEvent.change(screen.getByLabelText("Search members"), {
       target: { value: "Ada" },
     });

@@ -651,8 +651,8 @@ describe("retail sales", () => {
     );
     expect(screen.getByText("R-RET")).toBeVisible();
     expect(
-      screen.getByText("cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd"),
-    ).toBeVisible();
+      screen.getByTitle("cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd"),
+    ).toHaveTextContent("cdcdcd");
     expect(screen.getByText("Cash movement").parentElement).toHaveTextContent(
       "None",
     );

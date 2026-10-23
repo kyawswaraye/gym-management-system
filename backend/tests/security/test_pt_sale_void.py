@@ -27,6 +27,7 @@ from apps.tenants.models import (
     GymFeatureEntitlement,
     GymMembership,
     StaffProfile,
+    SubscriptionPlanFeature,
 )
 from apps.trainers.exceptions import (
     CommissionOverpay,
@@ -150,6 +151,30 @@ def _void(
         **headers,
         **({"HTTP_IDEMPOTENCY_KEY": key} if key else _key("void")),
     )
+
+
+@override_settings(**jwt_settings())
+def test_owner_daily_sales_survives_flushed_trial_catalog() -> None:
+    """A transactional flush drops migration plan rows. Provision must restore reports."""
+
+    SubscriptionPlanFeature.objects.filter(subscription_plan__code="TRIAL").delete()
+    client, platform_access = platform_token("ptvoid-catalog-platform@example.test")
+    payload = provision(
+        client,
+        platform_access,
+        code="PTV-C",
+        owner_email="ptvoid-catalog-owner@example.test",
+    )
+    gym = Gym.objects.get(id=payload["gym"]["id"])
+    _enable(gym, "finance")
+    owner = GymMembership.objects.select_related("user").get(
+        id=payload["owner"]["gym_membership"]["id"]
+    )
+    response = _client().get(
+        f"/api/v1/sales/daily/?date={gym_today(gym).isoformat()}",
+        **auth_headers(staff_token(owner)),
+    )
+    assert response.status_code == 200, response.json()
 
 
 @override_settings(**jwt_settings())

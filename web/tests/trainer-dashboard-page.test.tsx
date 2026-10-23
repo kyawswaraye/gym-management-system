@@ -12,6 +12,7 @@ vi.mock("next/navigation", () => ({
   redirect: (path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
   },
+  usePathname: () => "/",
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
 }));
 
@@ -63,8 +64,11 @@ describe("trainer dashboard page and navigation", () => {
     requireSession.mockResolvedValue(trainer);
     render(await TrainerDashboardPage());
     expect(
-      screen.getByRole("heading", { name: "Trainer dashboard" }),
+      screen.getByRole("region", { name: "Trainer dashboard" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Trainer dashboard" }),
+    ).toHaveAttribute("id", "trainer-dashboard-title");
     expect(screen.getByText(/Loading trainer dashboard/)).toHaveAttribute(
       "role",
       "status",
@@ -123,8 +127,8 @@ describe("trainer dashboard page and navigation", () => {
     );
     render(await DashboardPage());
     expect(
-      screen.getByRole("heading", { name: "No workspace access" }),
-    ).toBeInTheDocument();
+      screen.getByRole("heading", { level: 1, name: "No workspace access" }),
+    ).toHaveAttribute("id", "dashboard-title");
     expect(
       screen.queryByRole("heading", { name: "Owner dashboard" }),
     ).not.toBeInTheDocument();
@@ -134,8 +138,9 @@ describe("trainer dashboard page and navigation", () => {
     );
     render(await DashboardPage());
     expect(
-      screen.getByRole("heading", { name: "Owner dashboard" }),
-    ).toBeInTheDocument();
+      screen.getByRole("heading", { level: 1, name: "Owner dashboard" }),
+    ).toHaveAttribute("id", "dashboard-title");
+    expect(screen.getByText("Live overview")).toBeInTheDocument();
   });
 
   it("links the trainer dashboard only for that capability", () => {

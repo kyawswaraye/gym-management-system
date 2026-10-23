@@ -41,6 +41,7 @@ from apps.members.serializers import (
     MemberPaymentHistoryEnvelopeSerializer,
     MemberPaymentHistoryItemSerializer,
     MemberPaymentHistoryQuerySerializer,
+    MemberRestoreSerializer,
     MemberSerializer,
     MembershipCancelSerializer,
     MembershipCommandSerializer,
@@ -77,6 +78,7 @@ from apps.members.services import (
     page_membership_expiry,
     page_membership_plans,
     page_memberships,
+    restore_member,
     resume_membership,
     suspend_membership,
     update_member,
@@ -274,6 +276,34 @@ class MemberArchiveView(MemberFeatureAPIView):
         MemberArchiveSerializer(data=request.data).is_valid(raise_exception=True)
         member = archive_member(gym=request.gym, actor=request.gym_membership, member_id=id)
         return success_response(MemberSerializer(member).data, message="Member archived")
+
+
+class MemberRestoreView(MemberFeatureAPIView):
+    required_permission = "members.restore"
+
+    @extend_schema(
+        operation_id="members_restore",
+        request=MemberRestoreSerializer,
+        responses={
+            200: MemberEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, id: UUID) -> Response:
+        MemberRestoreSerializer(data=request.data).is_valid(raise_exception=True)
+        address = request.META.get("REMOTE_ADDR")
+        member = restore_member(
+            gym=request.gym,
+            actor=request.gym_membership,
+            member_id=id,
+            request_id=str(getattr(request, "request_id", "") or "req_unknown"),
+            ip_address=str(address) if address else None,
+            user_agent=str(request.META.get("HTTP_USER_AGENT", "")),
+        )
+        return success_response(MemberSerializer(member).data, message="Member restored")
 
 
 class MemberSummaryView(MemberFeatureAPIView):

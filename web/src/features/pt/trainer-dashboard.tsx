@@ -6,6 +6,7 @@ import {
   getTrainerDashboard,
   getTrainerSessionReport,
 } from "@/features/pt/client";
+import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
   DashboardRangePreset,
   TrainerDashboard,
@@ -191,7 +192,7 @@ export function TrainerDashboardManager() {
           <p className="text-sm">
             Trainer profile{" "}
             <span className="font-mono">
-              {dashboard.trainer_staff_profile_id}
+              <IdentifierValue value={dashboard.trainer_staff_profile_id} />
             </span>
           </p>
           <section

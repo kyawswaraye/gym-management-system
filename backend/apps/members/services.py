@@ -27,6 +27,7 @@ from django.http import Http404
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from apps.audit.services import write_tenant_audit
 from apps.common.db.tenant_context import set_gym_context
 from apps.files.models import FileAsset
 from apps.members.checkin_services import member_check_in_summary
@@ -579,7 +580,7 @@ def _locked_member(*, gym: Gym, member_id: UUID) -> Member:
 
 
 def _deny_trainer_member_command(*, gym_id: UUID, actor: GymMembership) -> None:
-    """Fail closed when no trainer create, edit, or archive contract exists."""
+    """Fail closed when no trainer create, edit, archive, or restore contract exists."""
 
     from apps.trainers.selectors import trainer_member_scope
 
@@ -729,6 +730,72 @@ def archive_member(*, gym: Gym, actor: GymMembership, member_id: UUID) -> Member
     from apps.users.member_sessions import revoke_member_sessions
 
     revoke_member_sessions(gym_id=gym.id, member_id=member.id, reason="MEMBER_ARCHIVED")
+    return member
+
+
+@transaction.atomic
+def restore_member(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    member_id: UUID,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> Member:
+    """Return an archived member to ACTIVE.
+
+    A member that is already not archived is unchanged: no ``authz_version``
+    move, no updater write, and no audit row. A real transition clears
+    ``archived_at``, records the updater, increments ``authz_version`` once,
+    and writes one tenant audit event in the same locked transaction.
+    """
+
+    set_gym_context(gym_id=gym.id)
+    _deny_trainer_member_command(gym_id=gym.id, actor=actor)
+    member = _locked_member(gym=gym, member_id=member_id)
+    if member.status != Member.Status.ARCHIVED and member.archived_at is None:
+        return member
+    previous_status = member.status
+    previous_archived_at = member.archived_at
+    previous_version = member.authz_version
+    member.status = Member.Status.ACTIVE
+    member.archived_at = None
+    member.authz_version += 1
+    member.updated_by_membership_id = actor.id
+    member.save(
+        update_fields=[
+            "status",
+            "archived_at",
+            "authz_version",
+            "updated_by_membership_id",
+            "updated_at",
+        ]
+    )
+    write_tenant_audit(
+        gym=gym,
+        actor_user=actor.user,
+        actor_membership_id=actor.id,
+        action="MEMBER_RESTORED",
+        module="members",
+        target_type="Member",
+        target_id=member.id,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        old_values={
+            "status": previous_status,
+            "archived_at": (
+                None if previous_archived_at is None else previous_archived_at.isoformat()
+            ),
+            "authz_version": previous_version,
+        },
+        new_values={
+            "status": member.status,
+            "archived_at": None,
+            "authz_version": member.authz_version,
+        },
+    )
     return member
 
 

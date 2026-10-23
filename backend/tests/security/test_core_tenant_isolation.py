@@ -101,6 +101,7 @@ def _ensure_owner_permission_catalog() -> None:
         "members.create",
         "members.update",
         "members.archive",
+        "members.restore",
         "memberships.view",
         "memberships.cancel",
         "payments.view",
@@ -293,6 +294,15 @@ def test_tenant_a_api_cannot_access_tenant_b_core_operations() -> None:
     assert (
         api.post(
             f"/api/v1/members/{member_b.id}/archive/",
+            {},
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_a}",
+        ).status_code
+        == 404
+    )
+    assert (
+        api.post(
+            f"/api/v1/members/{member_b.id}/restore/",
             {},
             format="json",
             HTTP_AUTHORIZATION=f"Bearer {token_a}",

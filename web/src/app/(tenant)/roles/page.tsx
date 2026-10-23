@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { RoleManager } from "@/features/operations/role-manager";
 import { roleAccess, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -16,20 +17,17 @@ export default async function RolesPage() {
 
   return (
     <section aria-labelledby="roles-title">
-      <h1 id="roles-title" className="text-3xl font-bold">
-        Roles
-      </h1>
-      <p className="muted mt-2">
-        Review protected and custom roles for this gym. Permission changes stay
-        inside the delegation policy, and the server confirms every save.
-      </p>
-      <div className="mt-6">
-        <RoleManager
-          canManage={access.canManage}
-          isOwner={access.isOwner}
-          permissions={access.permissions}
-        />
-      </div>
+      <PageHeader
+        description="Review protected and custom roles for this gym. Permission changes stay inside the delegation policy, and the server confirms every save."
+        eyebrow="Operations"
+        title="Roles"
+        titleId="roles-title"
+      />
+      <RoleManager
+        canManage={access.canManage}
+        isOwner={access.isOwner}
+        permissions={access.permissions}
+      />
     </section>
   );
 }

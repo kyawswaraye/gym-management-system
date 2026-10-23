@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { PlatformAuditLog } from "@/features/platform/audit-log-manager";
 import { hasPermission, platformHomePath } from "@/lib/auth/authorization";
 import { requirePlatformSession } from "@/lib/auth/session";
@@ -16,13 +17,13 @@ export default async function SuperAdminAuditLogsPage() {
 
   return (
     <section aria-labelledby="platform-audit-title">
-      <h1 id="platform-audit-title" className="text-3xl font-bold">
-        Platform audit logs
-      </h1>
-      <p className="muted mt-2">Review redacted platform audit events.</p>
-      <div className="mt-6">
-        <PlatformAuditLog canView />
-      </div>
+      <PageHeader
+        description="Review redacted platform audit events."
+        eyebrow="Platform"
+        title="Platform audit logs"
+        titleId="platform-audit-title"
+      />
+      <PlatformAuditLog canView />
     </section>
   );
 }

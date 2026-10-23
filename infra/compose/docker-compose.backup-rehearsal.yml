@@ -1,0 +1,84 @@
+# NON-PRODUCTION filesystem repository.
+# Local backup and restore rehearsal only. This is not offsite storage,
+# not the production project, and not proof of RPO or RTO.
+
+name: gym-backup-rehearsal
+
+services:
+  postgres:
+    image: ${REHEARSAL_POSTGRES_IMAGE:?Set REHEARSAL_POSTGRES_IMAGE}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      POSTGRES_PASSWORD: ${REHEARSAL_DB_PASSWORD:?Set REHEARSAL_DB_PASSWORD}
+      POSTGRES_MIGRATION_PASSWORD: ${REHEARSAL_MIGRATION_PASSWORD:?Set REHEARSAL_MIGRATION_PASSWORD}
+      POSTGRES_RUNTIME_PASSWORD: ${REHEARSAL_RUNTIME_PASSWORD:?Set REHEARSAL_RUNTIME_PASSWORD}
+      PGBACKREST_CONFIG: /run/pgbackrest/pgbackrest.conf
+      BACKUP_REPO_MODE: rehearsal-posix
+      BACKUP_REPO_PATH: /var/lib/pgbackrest
+      BACKUP_STANZA: gym
+      BACKUP_PG_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      BACKUP_PG_DATABASE: ${POSTGRES_DB:?Set POSTGRES_DB}
+      BACKUP_ARCHIVE_PUSH_TIMEOUT_SECONDS: "60"
+      BACKUP_TIMEOUT_SECONDS: "600"
+      BACKUP_MAX_AGE_SECONDS: "86400"
+      BACKUP_WAL_MAX_AGE_SECONDS: "900"
+    command:
+      - postgres
+      - -c
+      - max_connections=20
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=/usr/local/bin/pgbackrest-archive-push %p
+      - -c
+      - archive_timeout=60
+      - -c
+      - max_wal_senders=3
+    networks:
+      - rehearsal
+    secrets:
+      - backup_repo_cipher_pass
+    volumes:
+      - rehearsal_cluster:/var/lib/postgresql
+      - rehearsal_socket:/var/run/postgresql
+      - rehearsal_spool:/var/spool/pgbackrest
+      - rehearsal_log:/var/log/pgbackrest
+      - rehearsal_repo:/var/lib/pgbackrest
+      - ../postgres/init/001-create-roles.sh:/docker-entrypoint-initdb.d/001-create-roles.sh:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/pgbackrest:uid=999,gid=999,mode=0700
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1024m
+    cpus: "1.00"
+    pids_limit: 128
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB
+      interval: 5s
+      timeout: 5s
+      retries: 40
+    restart: "no"
+
+networks:
+  rehearsal:
+    internal: true
+
+volumes:
+  rehearsal_cluster:
+  rehearsal_socket:
+  rehearsal_spool:
+  rehearsal_log:
+  rehearsal_repo:
+    name: ${REHEARSAL_REPO_VOLUME:?Set REHEARSAL_REPO_VOLUME}
+    external: true
+
+secrets:
+  backup_repo_cipher_pass:
+    file: ${BACKUP_REPO_CIPHER_PASS_FILE:?Set BACKUP_REPO_CIPHER_PASS_FILE}

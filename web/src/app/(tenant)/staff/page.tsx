@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { StaffManager } from "@/features/operations/staff-manager";
 import { staffAccess, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -16,16 +17,13 @@ export default async function StaffPage() {
 
   return (
     <section aria-labelledby="staff-title">
-      <h1 id="staff-title" className="text-3xl font-bold">
-        Staff
-      </h1>
-      <p className="muted mt-2">
-        Review non-owner staff records for this gym. Access changes stay
-        separate from profile edits.
-      </p>
-      <div className="mt-6">
-        <StaffManager {...access} />
-      </div>
+      <PageHeader
+        description="Review non-owner staff records for this gym. Access changes stay separate from profile edits."
+        eyebrow="Operations"
+        title="Staff"
+        titleId="staff-title"
+      />
+      <StaffManager {...access} />
     </section>
   );
 }

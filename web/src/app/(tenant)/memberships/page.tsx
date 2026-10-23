@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { MembershipsManager } from "@/features/operations/memberships-manager";
 import { hasTenantCapability, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -13,12 +14,12 @@ export default async function MembershipsPage() {
 
   return (
     <section aria-labelledby="memberships-title">
-      <h1 className="text-2xl font-bold" id="memberships-title">
-        Memberships
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Create plans, start memberships, and track expiry and balances.
-      </p>
+      <PageHeader
+        description="Manage plans, start memberships, and monitor expiry and payment status."
+        eyebrow="Membership management"
+        title="Memberships"
+        titleId="memberships-title"
+      />
       <MembershipsManager
         canCancel={session.permissions.includes("memberships.cancel")}
         canCreate={session.permissions.includes("memberships.create")}

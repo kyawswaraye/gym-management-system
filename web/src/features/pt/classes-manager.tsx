@@ -14,6 +14,7 @@ import {
   TextInput,
 } from "@/features/finance/ui";
 import { useCursorPages } from "@/features/finance/paging";
+import { compactIdentifier, IdentifierValue } from "@/lib/ui/identifier";
 import {
   attendClassBooking,
   cancelClassBooking,
@@ -194,7 +195,7 @@ export function ClassesManager({
                 {row.description ? ` · ${row.description}` : ""}
                 {canManage ? (
                   <button
-                    className="ml-3 underline"
+                    className="ml-3 underline tone-edit"
                     disabled={pending}
                     onClick={() => setEditingType(row)}
                     type="button"
@@ -260,7 +261,11 @@ export function ClassesManager({
                 type="number"
               />
             </Field>
-            <button className="button" disabled={pending} type="submit">
+            <button
+              className="button button-create"
+              disabled={pending}
+              type="submit"
+            >
               Create class type
             </button>
           </form>
@@ -331,7 +336,11 @@ export function ClassesManager({
                 <option value="false">Archived</option>
               </SelectInput>
             </Field>
-            <button className="button" disabled={pending} type="submit">
+            <button
+              className="button button-edit"
+              disabled={pending}
+              type="submit"
+            >
               Save class type
             </button>
           </form>
@@ -350,8 +359,9 @@ export function ClassesManager({
           <ul className="grid gap-2">
             {schedules.rows.map((row) => (
               <li key={row.id}>
-                Type {row.class_type_id} · trainer{" "}
-                {row.trainer_staff_profile_id} · {row.location}
+                Type <IdentifierValue value={row.class_type_id} /> · trainer{" "}
+                <IdentifierValue value={row.trainer_staff_profile_id} /> ·{" "}
+                {row.location}
                 {row.location_is_exclusive ? " exclusive" : ""} ·{" "}
                 {row.local_start_time}–{row.local_end_time} · weekdays{" "}
                 {row.weekdays.join(",")} · capacity {row.capacity} ·{" "}
@@ -359,7 +369,7 @@ export function ClassesManager({
                 <StatusText status={row.status} />
                 {canManage && row.status === "ACTIVE" ? (
                   <button
-                    className="ml-3 underline"
+                    className="ml-3 underline tone-edit"
                     onClick={() => setEditing(row)}
                     type="button"
                   >
@@ -465,7 +475,11 @@ export function ClassesManager({
             <Field label="Capacity">
               <TextInput min={1} name="capacity" required type="number" />
             </Field>
-            <button className="button" disabled={pending} type="submit">
+            <button
+              className="button button-create"
+              disabled={pending}
+              type="submit"
+            >
               Create schedule
             </button>
           </form>
@@ -641,7 +655,11 @@ export function ClassesManager({
                 type="number"
               />
             </Field>
-            <button className="button" disabled={pending} type="submit">
+            <button
+              className="button button-edit"
+              disabled={pending}
+              type="submit"
+            >
               Save schedule
             </button>
           </form>
@@ -690,13 +708,14 @@ export function ClassesManager({
             {occurrences.rows.map((row) => (
               <li key={row.id}>
                 {row.local_date} · {row.starts_at}–{row.ends_at} · type{" "}
-                {row.class_type_id} · trainer {row.trainer_staff_profile_id} ·{" "}
+                <IdentifierValue value={row.class_type_id} /> · trainer{" "}
+                <IdentifierValue value={row.trainer_staff_profile_id} /> ·{" "}
                 {row.location}
                 {row.location_is_exclusive ? " exclusive" : ""} · capacity{" "}
                 {row.capacity} <StatusText status={row.status} />
                 {canManage && row.status === "SCHEDULED" ? (
                   <button
-                    className="ml-3 underline"
+                    className="ml-3 underline tone-cancel"
                     disabled={pending}
                     onClick={() => setCancellingOccurrence(row)}
                     type="button"
@@ -745,7 +764,11 @@ export function ClassesManager({
               Cancel occurrence
             </h3>
             <ReasonField label="Occurrence cancellation reason" />
-            <button className="button" disabled={pending} type="submit">
+            <button
+              className="button button-cancel"
+              disabled={pending}
+              type="submit"
+            >
               Confirm occurrence cancellation
             </button>
           </form>
@@ -784,11 +807,18 @@ export function ClassesManager({
                   <StatusText status={row.status} />
                 </p>
                 <p className="muted">
-                  Member {row.member_id} · occurrence {row.class_occurrence_id}{" "}
-                  ·{" "}
-                  {row.unmetered
-                    ? `Unmetered · ${row.unmetered_reason}`
-                    : `Package ${row.member_service_package_id ?? "missing"}`}
+                  Member <IdentifierValue value={row.member_id} /> · occurrence{" "}
+                  <IdentifierValue value={row.class_occurrence_id} /> ·{" "}
+                  {row.unmetered ? (
+                    `Unmetered · ${row.unmetered_reason}`
+                  ) : (
+                    <>
+                      Package{" "}
+                      <IdentifierValue
+                        value={row.member_service_package_id ?? "missing"}
+                      />
+                    </>
+                  )}
                 </p>
                 {row.status === "BOOKED" ? (
                   <div className="mt-2 flex flex-wrap gap-3">
@@ -832,7 +862,7 @@ export function ClassesManager({
                     ) : null}
                     {canCancelBooking ? (
                       <button
-                        className="underline"
+                        className="underline tone-cancel"
                         disabled={pending}
                         onClick={() => setCancellingBooking(row)}
                         type="button"
@@ -889,7 +919,11 @@ export function ClassesManager({
               label="Class booking cancellation reason"
               required={canLateCancel}
             />
-            <button className="button" disabled={pending} type="submit">
+            <button
+              className="button button-cancel"
+              disabled={pending}
+              type="submit"
+            >
               Confirm class booking cancellation
             </button>
           </form>
@@ -946,9 +980,14 @@ export function ClassesManager({
                 {occurrences.rows
                   .filter((row) => row.status === "SCHEDULED")
                   .map((row) => (
-                    <option key={row.id} value={row.id}>
+                    <option
+                      key={row.id}
+                      title={row.class_type_id}
+                      value={row.id}
+                    >
                       {row.local_date} · {row.starts_at}–{row.ends_at} ·{" "}
-                      {row.location} · type {row.class_type_id} · capacity{" "}
+                      {row.location} · type{" "}
+                      {compactIdentifier(row.class_type_id)} · capacity{" "}
                       {row.capacity}
                     </option>
                   ))}
@@ -1009,7 +1048,11 @@ export function ClassesManager({
                 </SelectInput>
               </Field>
             )}
-            <button className="button" disabled={pending} type="submit">
+            <button
+              className="button button-edit"
+              disabled={pending}
+              type="submit"
+            >
               Save class booking
             </button>
           </form>

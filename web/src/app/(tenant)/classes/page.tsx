@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { ClassesManager } from "@/features/pt/classes-manager";
 import {
   canOfferUnmeteredBooking,
@@ -18,14 +19,12 @@ export default async function ClassesPage() {
 
   return (
     <section aria-labelledby="classes-title">
-      <h1 className="text-2xl font-bold" id="classes-title">
-        Classes
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Maintain class types, weekly schedules, occurrences, and bookings.
-        Capacity, attendance, no-show, and cutoff cancellation follow the
-        published class rules.
-      </p>
+      <PageHeader
+        description="Maintain class types, weekly schedules, occurrences, and bookings. Capacity, attendance, no-show, and cutoff cancellation follow the published class rules."
+        eyebrow="Personal training"
+        title="Classes"
+        titleId="classes-title"
+      />
       <ClassesManager
         canAttend={hasPermission(session, "classes.attendance")}
         canBook={hasPermission(session, "classes.book")}

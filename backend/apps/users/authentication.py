@@ -9,6 +9,7 @@ from rest_framework.request import Request
 
 from apps.common.api.exceptions import AccessTokenExpired, AuthenticationFailed
 from apps.common.db.tenant_context import set_gym_context, set_identity_context
+from apps.common.observability.authority import note_observability_authority
 from apps.tenants.models import Gym, GymMembership, Permission, RolePermission
 
 from .member_sessions import establish_member_principal
@@ -82,6 +83,7 @@ class StaffJWTAuthentication(BaseAuthentication):
         request.permission_codes = permission_codes
         request.refresh_session = session
         request.principal_type = RefreshSession.PrincipalType.STAFF
+        note_observability_authority(request, actor_id=session.user.id, gym_id=gym.id)
         return session.user, claims
 
 
@@ -119,6 +121,7 @@ class PlatformJWTAuthentication(BaseAuthentication):
         )
         request.refresh_session = session
         request.principal_type = RefreshSession.PrincipalType.PLATFORM
+        note_observability_authority(request, actor_id=session.user.id, gym_id=None)
         return session.user, claims
 
 
@@ -162,6 +165,7 @@ class MemberJWTAuthentication(BaseAuthentication):
         request.permission_codes = frozenset()
         request.refresh_session = session
         request.principal_type = RefreshSession.PrincipalType.MEMBER
+        note_observability_authority(request, actor_id=session.user.id, gym_id=gym.id)
         return session.user, claims
 
 

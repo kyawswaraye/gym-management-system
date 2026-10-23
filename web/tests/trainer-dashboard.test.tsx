@@ -149,8 +149,8 @@ describe("trainer dashboard manager", () => {
       screen.getByText(/Generated 2026-10-20T01:00:00Z/),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("11111111-1111-4111-8111-111111111111"),
-    ).toBeInTheDocument();
+      screen.getByTitle("11111111-1111-4111-8111-111111111111"),
+    ).toHaveTextContent("111111");
     expect(screen.getByText("No-show sessions")).toBeInTheDocument();
     const upcoming = screen.getByRole("region", { name: "Upcoming sessions" });
     expect(

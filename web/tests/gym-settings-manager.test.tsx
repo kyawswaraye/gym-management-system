@@ -121,8 +121,8 @@ describe("Gym settings manager", () => {
     expect(screen.getByText("Trial")).toBeInTheDocument();
     expect(screen.getByText("TRIAL")).toBeInTheDocument();
     expect(
-      screen.getByText("39f07d2b-bbd8-43d2-9c18-e4cbf3af131e"),
-    ).toBeInTheDocument();
+      screen.getByTitle("39f07d2b-bbd8-43d2-9c18-e4cbf3af131e"),
+    ).toHaveTextContent("af131e");
     expect(screen.getByText("Monday")).toBeInTheDocument();
     expect(screen.getByText("Required")).toBeInTheDocument();
     expect(screen.getByText("41")).toBeInTheDocument();

@@ -13,9 +13,13 @@ export function safeErrorResponse(
     error: { code, message },
     ...(requestId ? { request_id: requestId } : {}),
   };
+  const headers: Record<string, string> = {
+    "Cache-Control": "no-store, private",
+  };
+  if (requestId) headers["X-Request-ID"] = requestId;
   return NextResponse.json(body, {
     status,
-    headers: { "Cache-Control": "no-store, private" },
+    headers,
   });
 }
 

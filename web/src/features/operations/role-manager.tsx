@@ -158,7 +158,7 @@ function ArchiveDialog({
         ) : null}
         <div className="mt-4 flex flex-wrap gap-2">
           <button
-            className="button"
+            className="button button-archive"
             type="button"
             disabled={pending}
             onClick={onConfirm}
@@ -166,7 +166,7 @@ function ArchiveDialog({
             {pending ? "Archiving…" : "Confirm archive"}
           </button>
           <button
-            className="button bg-white text-slate-900 ring-1 ring-slate-300"
+            className="button button-cancel"
             type="button"
             onClick={onCancel}
           >
@@ -273,7 +273,11 @@ function PermissionEditor({
             No permissions in the current delegation policy can be selected.
           </p>
         ) : null}
-        <button className="button mt-2" disabled={pending} type="submit">
+        <button
+          className="button button-edit mt-2"
+          disabled={pending}
+          type="submit"
+        >
           {pending ? "Saving…" : `Save permissions for ${role.name}`}
         </button>
       </fieldset>
@@ -558,7 +562,7 @@ export function RoleManager({
               <span>Active</span>
             </label>
             <button
-              className="button md:col-span-2"
+              className="button button-create md:col-span-2"
               disabled={pending}
               type="submit"
             >
@@ -669,12 +673,16 @@ export function RoleManager({
                     }
                   />
                   <div className="flex flex-wrap gap-2 md:col-span-2">
-                    <button className="button" disabled={pending} type="submit">
+                    <button
+                      className="button button-edit"
+                      disabled={pending}
+                      type="submit"
+                    >
                       {pending ? "Saving…" : `Save ${role.name}`}
                     </button>
                     {role.is_active ? (
                       <button
-                        className="button bg-white text-slate-900 ring-1 ring-slate-300"
+                        className="button button-archive"
                         type="button"
                         disabled={pending}
                         onClick={() => {
@@ -686,7 +694,7 @@ export function RoleManager({
                       </button>
                     ) : (
                       <button
-                        className="button bg-white text-slate-900 ring-1 ring-slate-300"
+                        className="button button-success"
                         type="button"
                         disabled={pending}
                         onClick={() => void restoreRole(role)}

@@ -1,0 +1,874 @@
+# Phase 8 increment 1 baseline. Image values must be repository@sha256 digests.
+# Caddy is the only published service. This file does not deploy or prove providers.
+# Increment 4 adds private observability. It does not prove alerts or an SLO.
+# See docs/runbooks/phase8-increment-1.md and docs/runbooks/phase8-increment-4.md.
+
+name: gym-production
+
+services:
+  caddy:
+    image: ${CADDY_IMAGE:?Set CADDY_IMAGE to a repository@sha256 digest}
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Set PUBLIC_HOST}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - edge
+      - app
+      - probe
+      - observe
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    cpus: "0.15"
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - caddy
+        - version
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  web:
+    image: ${WEB_IMAGE:?Set WEB_IMAGE to a repository@sha256 digest}
+    user: "10001:10001"
+    environment:
+      DJANGO_API_URL: http://api:8000
+      BFF_SHARED_SECRET: ${BFF_SHARED_SECRET:?Set BFF_SHARED_SECRET}
+      APP_ORIGINS: ${APP_ORIGINS:?Set APP_ORIGINS}
+      ACCESS_EXPIRED_CODE: ACCESS_TOKEN_EXPIRED
+    networks:
+      - edge
+      - app
+      - probe
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: "0.40"
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/login').then(function (response) { process.exit(Number(response.status !== 200)); }).catch(function () { process.exit(1); })"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    image: ${API_IMAGE:?Set API_IMAGE to a repository@sha256 digest}
+    user: "10001:10001"
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY}
+      ALLOWED_HOSTS: ${PUBLIC_HOST:?Set PUBLIC_HOST},api,127.0.0.1
+      DATABASE_ROLE_MODE: runtime
+      DB_NAME: ${POSTGRES_DB:?Set POSTGRES_DB}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_CONN_MAX_AGE: "60"
+      RUNTIME_DB_USER: ${RUNTIME_DB_USER:?Set RUNTIME_DB_USER}
+      RUNTIME_DB_PASSWORD: ${RUNTIME_DB_PASSWORD:?Set RUNTIME_DB_PASSWORD}
+      WEB_CONCURRENCY: "2"
+      JWT_ISSUER: gym-platform-api
+      JWT_STAFF_AUDIENCE: gym-platform
+      JWT_MEMBER_AUDIENCE: gym-platform-member
+      JWT_KEY_ID: ${JWT_KEY_ID:?Set JWT_KEY_ID}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?Set JWT_PRIVATE_KEY}
+      JWT_PUBLIC_KEYS: ${JWT_PUBLIC_KEYS:?Set JWT_PUBLIC_KEYS}
+      REFRESH_TOKEN_PEPPER: ${REFRESH_TOKEN_PEPPER:?Set REFRESH_TOKEN_PEPPER}
+      MFA_TOKEN_PEPPER: ${MFA_TOKEN_PEPPER:?Set MFA_TOKEN_PEPPER}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Set MFA_ENCRYPTION_KEY}
+      FINANCE_IDEMPOTENCY_ENCRYPTION_KEY: ${FINANCE_IDEMPOTENCY_ENCRYPTION_KEY:?Set FINANCE_IDEMPOTENCY_ENCRYPTION_KEY}
+      INVITATION_TOKEN_PEPPER: ${INVITATION_TOKEN_PEPPER:?Set INVITATION_TOKEN_PEPPER}
+      PASSWORD_RESET_TOKEN_PEPPER: ${PASSWORD_RESET_TOKEN_PEPPER:?Set PASSWORD_RESET_TOKEN_PEPPER}
+      PASSWORD_RESET_TTL_SECONDS: "1800"
+      BFF_SHARED_SECRET: ${BFF_SHARED_SECRET:?Set BFF_SHARED_SECRET}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:?Set APP_PUBLIC_URL}
+      EMAIL_BACKEND: apps.common.mail.resend.EmailBackend
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:?Set DEFAULT_FROM_EMAIL}
+      RESEND_API_KEY: ${RESEND_API_KEY:?Set RESEND_API_KEY}
+      PUSH_BACKEND: fcm
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:?Set FCM_PROJECT_ID}
+      FCM_SERVICE_ACCOUNT_JSON: ${FCM_SERVICE_ACCOUNT_JSON:?Set FCM_SERVICE_ACCOUNT_JSON}
+      PUSH_TOKEN_ENCRYPTION_KEY: ${PUSH_TOKEN_ENCRYPTION_KEY:?Set PUSH_TOKEN_ENCRYPTION_KEY}
+      PUSH_TOKEN_FINGERPRINT_PEPPER: ${PUSH_TOKEN_FINGERPRINT_PEPPER:?Set PUSH_TOKEN_FINGERPRINT_PEPPER}
+      MINIO_ENDPOINT_URL: ${MINIO_ENDPOINT_URL:?Set MINIO_ENDPOINT_URL}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:?Set MINIO_PUBLIC_URL}
+      MINIO_BUCKET: ${MINIO_BUCKET:?Set MINIO_BUCKET}
+      MINIO_REGION: ap-southeast-1
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY}
+      MINIO_SESSION_TOKEN: ${MINIO_SESSION_TOKEN}
+      MINIO_ADDRESSING_STYLE: virtual
+      OBJECT_STORE_BUCKET_ALLOWLIST: ${OBJECT_STORE_BUCKET_ALLOWLIST:?Set OBJECT_STORE_BUCKET_ALLOWLIST}
+      OBJECT_STORE_ORIGIN_ALLOWLIST: ${OBJECT_STORE_ORIGIN_ALLOWLIST:?Set OBJECT_STORE_ORIGIN_ALLOWLIST}
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+    networks:
+      - app
+      - data
+      - scan
+      - probe
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 768m
+    cpus: "0.70"
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - docker/healthcheck.py
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    stop_grace_period: 25s
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE to a repository@sha256 digest}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_MIGRATION_PASSWORD: ${MIGRATION_DB_PASSWORD:?Set MIGRATION_DB_PASSWORD}
+      POSTGRES_RUNTIME_PASSWORD: ${RUNTIME_DB_PASSWORD:?Set RUNTIME_DB_PASSWORD}
+      PGBACKREST_CONFIG: /run/pgbackrest/pgbackrest.conf
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?Set BACKUP_S3_ENDPOINT}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:?Set BACKUP_S3_REGION}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:?Set BACKUP_S3_BUCKET}
+      BACKUP_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:?Set BACKUP_S3_URI_STYLE}
+      BACKUP_REPO_PATH: ${BACKUP_REPO_PATH:?Set BACKUP_REPO_PATH}
+      BACKUP_STANZA: ${BACKUP_STANZA:?Set BACKUP_STANZA}
+      BACKUP_PG_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      BACKUP_PG_DATABASE: ${POSTGRES_DB:?Set POSTGRES_DB}
+      BACKUP_ARCHIVE_PUSH_TIMEOUT_SECONDS: "60"
+    command:
+      - postgres
+      - -c
+      - max_connections=40
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=/usr/local/bin/pgbackrest-archive-push %p
+      - -c
+      - archive_timeout=60
+      - -c
+      - max_wal_senders=3
+    networks:
+      - data
+      - backup
+    secrets:
+      - backup_repo_cipher_pass
+      - backup_s3_access_key
+      - backup_s3_secret_key
+      - monitor_db_password
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - postgres_socket:/var/run/postgresql
+      - pgbackrest_spool:/var/spool/pgbackrest
+      - pgbackrest_log:/var/log/pgbackrest
+      - backup_metrics:/var/lib/gym-backup-metrics
+      - ../postgres/init/001-create-roles.sh:/docker-entrypoint-initdb.d/001-create-roles.sh:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/pgbackrest:uid=999,gid=999,mode=0700
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 2560m
+    cpus: "1.25"
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  clamav:
+    image: ${CLAMAV_IMAGE:?Set CLAMAV_IMAGE to a repository@sha256 digest}
+    networks:
+      - scan
+    volumes:
+      - clamav_data:/var/lib/clamav
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+      # clamav/clamav:1.4 runs clamd as uid 100, gid 101 and writes logs here.
+      - /var/log/clamav:uid=100,gid=101,mode=0755
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1152m
+    cpus: "0.30"
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - clamdcheck.sh
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    restart: unless-stopped
+
+  migrate:
+    image: ${API_IMAGE:?Set API_IMAGE to a repository@sha256 digest}
+    profiles:
+      - migrate
+    user: "10001:10001"
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.migration
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY}
+      DATABASE_ROLE_MODE: MIGRATION
+      DB_NAME: ${POSTGRES_DB:?Set POSTGRES_DB}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_CONN_MAX_AGE: "0"
+      MIGRATION_DB_USER: ${MIGRATION_DB_USER:?Set MIGRATION_DB_USER}
+      MIGRATION_DB_PASSWORD: ${MIGRATION_DB_PASSWORD:?Set MIGRATION_DB_PASSWORD}
+    command:
+      - python
+      - manage.py
+      - migrate
+      - --noinput
+    networks:
+      - data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: "0.50"
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backup-full:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE to a repository@sha256 digest}
+    profiles:
+      - backup
+    environment:
+      PGBACKREST_CONFIG: /run/pgbackrest/pgbackrest.conf
+      BACKUP_OPERATION: full
+      BACKUP_TIMEOUT_SECONDS: "14400"
+      BACKUP_MAX_AGE_SECONDS: "86400"
+      BACKUP_WAL_MAX_AGE_SECONDS: "900"
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?Set BACKUP_S3_ENDPOINT}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:?Set BACKUP_S3_REGION}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:?Set BACKUP_S3_BUCKET}
+      BACKUP_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:?Set BACKUP_S3_URI_STYLE}
+      BACKUP_REPO_PATH: ${BACKUP_REPO_PATH:?Set BACKUP_REPO_PATH}
+      BACKUP_STANZA: ${BACKUP_STANZA:?Set BACKUP_STANZA}
+      BACKUP_PG_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      BACKUP_PG_DATABASE: ${POSTGRES_DB:?Set POSTGRES_DB}
+      BACKUP_METRICS_PATH: /var/lib/gym-backup-metrics/backup.prom
+    command:
+      - gym-backup
+      - full
+    networks:
+      - backup
+    secrets:
+      - backup_repo_cipher_pass
+      - backup_s3_access_key
+      - backup_s3_secret_key
+    volumes:
+      - postgres_data:/var/lib/postgresql:ro
+      - postgres_socket:/var/run/postgresql
+      - pgbackrest_spool:/var/spool/pgbackrest
+      - pgbackrest_log:/var/log/pgbackrest
+      - backup_metrics:/var/lib/gym-backup-metrics
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/pgbackrest:uid=999,gid=999,mode=0700
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 768m
+    cpus: "0.50"
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backup-diff:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE to a repository@sha256 digest}
+    profiles:
+      - backup
+    environment:
+      PGBACKREST_CONFIG: /run/pgbackrest/pgbackrest.conf
+      BACKUP_OPERATION: diff
+      BACKUP_TIMEOUT_SECONDS: "7200"
+      BACKUP_MAX_AGE_SECONDS: "86400"
+      BACKUP_WAL_MAX_AGE_SECONDS: "900"
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?Set BACKUP_S3_ENDPOINT}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:?Set BACKUP_S3_REGION}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:?Set BACKUP_S3_BUCKET}
+      BACKUP_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:?Set BACKUP_S3_URI_STYLE}
+      BACKUP_REPO_PATH: ${BACKUP_REPO_PATH:?Set BACKUP_REPO_PATH}
+      BACKUP_STANZA: ${BACKUP_STANZA:?Set BACKUP_STANZA}
+      BACKUP_PG_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      BACKUP_PG_DATABASE: ${POSTGRES_DB:?Set POSTGRES_DB}
+      BACKUP_METRICS_PATH: /var/lib/gym-backup-metrics/backup.prom
+    command:
+      - gym-backup
+      - diff
+    networks:
+      - backup
+    secrets:
+      - backup_repo_cipher_pass
+      - backup_s3_access_key
+      - backup_s3_secret_key
+    volumes:
+      - postgres_data:/var/lib/postgresql:ro
+      - postgres_socket:/var/run/postgresql
+      - pgbackrest_spool:/var/spool/pgbackrest
+      - pgbackrest_log:/var/log/pgbackrest
+      - backup_metrics:/var/lib/gym-backup-metrics
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/pgbackrest:uid=999,gid=999,mode=0700
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 768m
+    cpus: "0.50"
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backup-check:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE to a repository@sha256 digest}
+    profiles:
+      - backup
+    environment:
+      PGBACKREST_CONFIG: /run/pgbackrest/pgbackrest.conf
+      BACKUP_OPERATION: check
+      BACKUP_TIMEOUT_SECONDS: "1800"
+      BACKUP_MAX_AGE_SECONDS: "86400"
+      BACKUP_WAL_MAX_AGE_SECONDS: "900"
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?Set BACKUP_S3_ENDPOINT}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:?Set BACKUP_S3_REGION}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:?Set BACKUP_S3_BUCKET}
+      BACKUP_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:?Set BACKUP_S3_URI_STYLE}
+      BACKUP_REPO_PATH: ${BACKUP_REPO_PATH:?Set BACKUP_REPO_PATH}
+      BACKUP_STANZA: ${BACKUP_STANZA:?Set BACKUP_STANZA}
+      BACKUP_PG_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      BACKUP_PG_DATABASE: ${POSTGRES_DB:?Set POSTGRES_DB}
+      BACKUP_METRICS_PATH: /var/lib/gym-backup-metrics/backup.prom
+    command:
+      - gym-backup
+      - check
+    networks:
+      - backup
+    secrets:
+      - backup_repo_cipher_pass
+      - backup_s3_access_key
+      - backup_s3_secret_key
+    volumes:
+      - postgres_data:/var/lib/postgresql:ro
+      - postgres_socket:/var/run/postgresql
+      - pgbackrest_spool:/var/spool/pgbackrest
+      - pgbackrest_log:/var/log/pgbackrest
+      - backup_metrics:/var/lib/gym-backup-metrics
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/pgbackrest:uid=999,gid=999,mode=0700
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: "0.20"
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backup-bootstrap:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE to a repository@sha256 digest}
+    profiles:
+      - bootstrap
+    environment:
+      PGBACKREST_CONFIG: /run/pgbackrest/pgbackrest.conf
+      BACKUP_OPERATION: bootstrap
+      BACKUP_TIMEOUT_SECONDS: "14400"
+      BACKUP_MAX_AGE_SECONDS: "86400"
+      BACKUP_WAL_MAX_AGE_SECONDS: "900"
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?Set BACKUP_S3_ENDPOINT}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:?Set BACKUP_S3_REGION}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:?Set BACKUP_S3_BUCKET}
+      BACKUP_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:?Set BACKUP_S3_URI_STYLE}
+      BACKUP_REPO_PATH: ${BACKUP_REPO_PATH:?Set BACKUP_REPO_PATH}
+      BACKUP_STANZA: ${BACKUP_STANZA:?Set BACKUP_STANZA}
+      BACKUP_PG_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      BACKUP_PG_DATABASE: ${POSTGRES_DB:?Set POSTGRES_DB}
+      BACKUP_METRICS_PATH: /var/lib/gym-backup-metrics/backup.prom
+    command:
+      - gym-backup
+      - bootstrap
+    networks:
+      - backup
+    secrets:
+      - backup_repo_cipher_pass
+      - backup_s3_access_key
+      - backup_s3_secret_key
+    volumes:
+      - postgres_data:/var/lib/postgresql:ro
+      - postgres_socket:/var/run/postgresql
+      - pgbackrest_spool:/var/spool/pgbackrest
+      - pgbackrest_log:/var/log/pgbackrest
+      - backup_metrics:/var/lib/gym-backup-metrics
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/pgbackrest:uid=999,gid=999,mode=0700
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 768m
+    cpus: "0.50"
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:?Set PROMETHEUS_IMAGE to a repository@sha256 digest}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=512MB
+      - --web.listen-address=0.0.0.0:9090
+      # Prometheus 3 rejects --flag=false. Omitting these flags keeps both off.
+    networks:
+      - observe
+    volumes:
+      - ../observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../observability/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: "0.10"
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - /bin/prometheus
+        - --version
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  alertmanager:
+    image: ${ALERTMANAGER_IMAGE:?Set ALERTMANAGER_IMAGE to a repository@sha256 digest}
+    entrypoint:
+      - /bin/sh
+      - /etc/alertmanager/entrypoint.sh
+    networks:
+      - observe
+    secrets:
+      - alert_sink_url
+    volumes:
+      - ../observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ../observability/alertmanager/entrypoint.sh:/etc/alertmanager/entrypoint.sh:ro
+      - ../observability/alertmanager/non-production-sink.url:/etc/alertmanager/non-production-sink.url:ro
+      - alertmanager_data:/alertmanager
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 64m
+    cpus: "0.05"
+    pids_limit: 32
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - /bin/alertmanager
+        - --version
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  grafana:
+    image: ${GRAFANA_IMAGE:?Set GRAFANA_IMAGE to a repository@sha256 digest}
+    environment:
+      GF_SERVER_HTTP_ADDR: 0.0.0.0
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_SECURITY_ADMIN_USER: gym-observer
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/gym-baseline.json
+    networks:
+      - observe
+    secrets:
+      - grafana_admin_password
+    volumes:
+      - ../observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ../observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    cpus: "0.10"
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - /usr/bin/curl
+        - -fsS
+        - http://127.0.0.1:3000/api/health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  node-exporter:
+    image: ${NODE_EXPORTER_IMAGE:?Set NODE_EXPORTER_IMAGE to a repository@sha256 digest}
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/host/root
+      - --collector.disable-defaults
+      - --collector.cpu
+      - --collector.meminfo
+      - --collector.filesystem
+      - --collector.loadavg
+      - --collector.textfile
+      - --collector.textfile.directory=/textfile
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker|var/lib/containers)($$|/)
+      - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|tmpfs|ramfs)$$
+      - --web.listen-address=:9100
+    networks:
+      - observe
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      - backup_metrics:/textfile:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 48m
+    cpus: "0.05"
+    pids_limit: 32
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - /bin/node_exporter
+        - --version
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  blackbox:
+    image: ${BLACKBOX_EXPORTER_IMAGE:?Set BLACKBOX_EXPORTER_IMAGE to a repository@sha256 digest}
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+    networks:
+      - probe
+      - observe
+    volumes:
+      - ./blackbox.rendered.yml:/etc/blackbox/blackbox.yml:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 32m
+    cpus: "0.05"
+    pids_limit: 32
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - /bin/blackbox_exporter
+        - --version
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  postgres-exporter:
+    image: ${POSTGRES_EXPORTER_IMAGE:?Set POSTGRES_EXPORTER_IMAGE to a repository@sha256 digest}
+    environment:
+      DATA_SOURCE_URI: postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB}?sslmode=disable
+      DATA_SOURCE_USER: gym_monitor
+      DATA_SOURCE_PASS_FILE: /run/secrets/monitor_db_password
+    command:
+      - --config.file=/etc/postgres_exporter/postgres_exporter.yml
+      - --disable-default-metrics
+      - --extend.query-path=/etc/postgres_exporter/queries.yaml
+      - --no-collector.database
+      - --no-collector.locks
+      - --no-collector.replication
+      - --no-collector.replication_slots
+      - --no-collector.roles
+      - --no-collector.settings
+      - --no-collector.stat_activity
+      - --no-collector.stat_archiver
+      - --no-collector.stat_bgwriter
+      - --no-collector.stat_database
+      - --no-collector.stat_progress_vacuum
+      - --no-collector.stat_replication
+      - --no-collector.stat_statements
+      - --no-collector.stat_statements.include_query
+      - --no-collector.stat_user_tables
+      - --no-collector.statio_user_tables
+      - --no-collector.wal
+      - --web.listen-address=:9187
+      - --log.format=json
+      - --log.level=info
+    networks:
+      - data
+      - observe
+    secrets:
+      - monitor_db_password
+    volumes:
+      - ../observability/postgres/postgres_exporter.yml:/etc/postgres_exporter/postgres_exporter.yml:ro
+      - ../observability/postgres/queries.yaml:/etc/postgres_exporter/queries.yaml:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 64m
+    cpus: "0.05"
+    pids_limit: 32
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - /bin/postgres_exporter
+        - --version
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  edge:
+    internal: false
+  app:
+    internal: false
+  data:
+    internal: true
+  scan:
+    internal: true
+  backup:
+    internal: false
+  probe:
+    internal: true
+  observe:
+    internal: true
+
+volumes:
+  postgres_data:
+  postgres_socket:
+  pgbackrest_spool:
+  pgbackrest_log:
+  backup_metrics:
+  clamav_data:
+  caddy_data:
+  caddy_config:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:
+
+secrets:
+  backup_repo_cipher_pass:
+    file: ${BACKUP_REPO_CIPHER_PASS_FILE:?Set BACKUP_REPO_CIPHER_PASS_FILE}
+  backup_s3_access_key:
+    file: ${BACKUP_S3_ACCESS_KEY_FILE:?Set BACKUP_S3_ACCESS_KEY_FILE}
+  backup_s3_secret_key:
+    file: ${BACKUP_S3_SECRET_KEY_FILE:?Set BACKUP_S3_SECRET_KEY_FILE}
+  monitor_db_password:
+    file: ${MONITOR_DB_PASSWORD_FILE:?Set MONITOR_DB_PASSWORD_FILE}
+  grafana_admin_password:
+    file: ${GRAFANA_ADMIN_PASSWORD_FILE:?Set GRAFANA_ADMIN_PASSWORD_FILE}
+  alert_sink_url:
+    file: ${ALERT_SINK_URL_FILE:?Set ALERT_SINK_URL_FILE}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import {
   PLATFORM_ACCESS_PATH,
   platformHomePath,
@@ -17,10 +18,12 @@ export default async function PlatformAccessPage() {
 
   return (
     <section aria-labelledby="platform-access-title">
-      <h1 id="platform-access-title" className="text-3xl font-bold">
-        No platform access
-      </h1>
-      <p className="muted mt-2">This account has no platform tool assigned.</p>
+      <PageHeader
+        description="This account has no platform tool assigned."
+        eyebrow="Platform"
+        title="No platform access"
+        titleId="platform-access-title"
+      />
     </section>
   );
 }

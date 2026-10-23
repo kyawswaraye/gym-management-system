@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { MemberDetail } from "@/features/operations/member-detail";
 import {
   canOpenCheckIns,
@@ -22,11 +23,14 @@ export default async function MemberDetailPage({
   const photo = memberPhotoAccess(session);
   return (
     <section aria-labelledby="member-title">
-      <h1 className="mb-6 text-2xl font-bold" id="member-title">
-        Member profile
-      </h1>
+      <PageHeader
+        eyebrow="Member directory"
+        title="Member profile"
+        titleId="member-title"
+      />
       <MemberDetail
         canArchive={session.permissions.includes("members.archive")}
+        canRestore={session.permissions.includes("members.restore")}
         canDeletePhoto={photo.canDelete}
         canUpdate={session.permissions.includes("members.update")}
         canUploadPhoto={photo.canUpload}

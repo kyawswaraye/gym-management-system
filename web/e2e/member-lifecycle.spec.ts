@@ -136,9 +136,21 @@ async function responseData(
   return data as Record<string, unknown>;
 }
 
+async function openStartMembershipDialog(page: Page): Promise<Locator> {
+  await page
+    .getByRole("button", { name: "Open start membership form", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Start membership",
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
 async function openSection(
   page: Page,
-  name: "Members" | "Memberships" | "Check-ins" | "Check-in QR",
+  name: "Members" | "Memberships" | "Check-ins",
 ): Promise<void> {
   await page
     .getByRole("navigation", { name: "Primary" })
@@ -174,6 +186,23 @@ async function settleMembers(
 function memberRow(page: Page, name: string): Locator {
   return page.getByRole("row").filter({
     has: page.getByRole("link", { name, exact: true }),
+  });
+}
+
+const MEMBER_STATUS_LABEL = {
+  "": "All",
+  ACTIVE: "Active",
+  SUSPENDED: "Suspended",
+  ARCHIVED: "Archived",
+} as const;
+
+function memberStatusOption(
+  page: Page,
+  status: keyof typeof MEMBER_STATUS_LABEL,
+): Locator {
+  return page.getByRole("radio", {
+    name: MEMBER_STATUS_LABEL[status],
+    exact: true,
   });
 }
 
@@ -310,34 +339,24 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
 
     await settleMembers(
       page,
-      () =>
-        page
-          .getByRole("combobox", { name: "Filter by status", exact: true })
-          .selectOption("ACTIVE"),
+      () => memberStatusOption(page, "ACTIVE").click(),
       { status: "ACTIVE", search: memberNumber, limit: "25" },
     );
     await expect(memberRow(page, ORIGINAL_NAME)).toBeVisible();
 
     await settleMembers(
       page,
-      () =>
-        page
-          .getByRole("combobox", { name: "Filter by status", exact: true })
-          .selectOption("SUSPENDED"),
+      () => memberStatusOption(page, "SUSPENDED").click(),
       { status: "SUSPENDED", search: memberNumber, limit: "25" },
     );
     await expect(
       page.getByText("No members found.", { exact: true }),
     ).toBeVisible();
 
-    await settleMembers(
-      page,
-      () =>
-        page
-          .getByRole("combobox", { name: "Filter by status", exact: true })
-          .selectOption(""),
-      { search: memberNumber, limit: "25" },
-    );
+    await settleMembers(page, () => memberStatusOption(page, "").click(), {
+      search: memberNumber,
+      limit: "25",
+    });
     await settleMembers(
       page,
       () => page.getByLabel("Search members", { exact: true }).fill(""),
@@ -636,9 +655,6 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   const newPlan = page.locator("form").filter({
     has: page.getByRole("heading", { name: "New plan", exact: true }),
   });
-  const startForm = page.locator("form").filter({
-    has: page.getByRole("heading", { name: "Start membership", exact: true }),
-  });
   await expect(newPlan.getByLabel("Currency", { exact: true })).not.toHaveValue(
     "",
   );
@@ -709,6 +725,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
 
   let startDate = "";
   await test.step("sell the plan and edit its note", async () => {
+    const startForm = await openStartMembershipDialog(page);
     await startForm
       .getByLabel("Search members", { exact: true })
       .fill(UPDATED_FIRST);
@@ -958,6 +975,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
       })
       .click();
     await expect(planRow).toContainText("Archived");
+    const startForm = await openStartMembershipDialog(page);
     const planSelect = startForm.getByRole("combobox", {
       name: "Plan",
       exact: true,
@@ -967,23 +985,32 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     ).toHaveCount(0);
 
     await openSection(page, "Members");
-    await memberRow(page, UPDATED_NAME)
+    const directoryRow = memberRow(page, UPDATED_NAME);
+    await expect(
+      directoryRow.getByRole("button", {
+        name: `Archive ${UPDATED_NAME}`,
+        exact: true,
+      }),
+    ).toBeVisible();
+    await directoryRow
       .getByRole("link", { name: UPDATED_NAME, exact: true })
       .click();
-    page.once("dialog", (dialog) => {
-      expect(dialog.type()).toBe("confirm");
-      expect(dialog.message()).toContain(UPDATED_NAME);
-      expect(dialog.message()).toContain(memberNumber);
-      return dialog.accept();
+    await page
+      .getByRole("button", { name: "Archive member", exact: true })
+      .click();
+    const archiveDialog = page.getByRole("dialog", {
+      name: `Archive ${UPDATED_NAME} (${memberNumber})?`,
     });
+    await expect(archiveDialog).toContainText("not deleted");
+    await expect(archiveDialog).toContainText("history remain");
     const archived = page.waitForResponse(
       (response) =>
         settledResponse(response) &&
         response.request().method() === "POST" &&
         /\/archive\/?$/.test(new URL(response.url()).pathname),
     );
-    await page
-      .getByRole("button", { name: "Archive member", exact: true })
+    await archiveDialog
+      .getByRole("button", { name: "Archive", exact: true })
       .click();
     const archiveResponse = await archived;
     expect(archiveResponse.ok()).toBeTruthy();
@@ -1003,19 +1030,13 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     await expect(memberRow(page, UPDATED_NAME)).toContainText("ARCHIVED");
     await settleMembers(
       page,
-      () =>
-        page
-          .getByRole("combobox", { name: "Filter by status", exact: true })
-          .selectOption("ACTIVE"),
+      () => memberStatusOption(page, "ACTIVE").click(),
       { status: "ACTIVE", search: UPDATED_FIRST, limit: "25" },
     );
     await expect(memberRow(page, UPDATED_NAME)).toHaveCount(0);
     await settleMembers(
       page,
-      () =>
-        page
-          .getByRole("combobox", { name: "Filter by status", exact: true })
-          .selectOption("ARCHIVED"),
+      () => memberStatusOption(page, "ARCHIVED").click(),
       { status: "ARCHIVED", search: UPDATED_FIRST, limit: "25" },
     );
     await expect(memberRow(page, UPDATED_NAME)).toContainText("ARCHIVED");
@@ -1032,14 +1053,15 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     ).toBeVisible();
 
     await openSection(page, "Memberships");
-    await startForm
+    const archivedSearch = await openStartMembershipDialog(page);
+    await archivedSearch
       .getByLabel("Search members", { exact: true })
       .fill(UPDATED_FIRST);
     await expect(
-      startForm.getByText("No matching members.", { exact: true }),
+      archivedSearch.getByText("No matching members.", { exact: true }),
     ).toBeVisible();
     await expect(
-      startForm.getByRole("list", { name: "Matching members" }),
+      archivedSearch.getByRole("list", { name: "Matching members" }),
     ).toHaveCount(0);
   });
 
@@ -1057,7 +1079,11 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
           new URL(response.url()).pathname,
         ),
     );
-    await openSection(page, "Check-in QR");
+    await openSection(page, "Check-ins");
+    await page.getByRole("tab", { name: "QR display", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Onsite check-in code", exact: true }),
+    ).toBeVisible();
     const first = await issued;
     const firstBody = await first.text();
     expect(first.status(), firstBody).toBe(201);

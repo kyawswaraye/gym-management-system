@@ -86,6 +86,7 @@ members.view
 members.create
 members.update
 members.archive
+members.restore
 memberships.view
 memberships.create
 memberships.update
@@ -164,6 +165,8 @@ notifications.manage
 announcements.view
 announcements.manage
 ```
+
+`members.restore` is not part of migration `0003`. Migration `0031_member_restore_permission` adds it and grants it on the protected OWNER and MANAGER templates, the same templates that hold `members.archive`. Reception, accountant, trainer, and custom roles are not granted automatically.
 
 `expense_categories.manage` is not part of migration `0003`. Migration `0025_finance_permission_catalog` adds it with the Phase 4 inventory and retail codes that were documented but missing. `retail.approve` stays the migration `0016` row and is not inserted again. The new code authorizes custom expense-category create and update only. It is not implied by any `expenses.*` code. See [ADR 0009](./adr/0009-finance-foundation-defaults.md).
 

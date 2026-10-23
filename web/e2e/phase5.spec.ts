@@ -29,8 +29,11 @@ test("owner assigns trainers and prepares the catalogs", async ({ page }) => {
   await signIn(page, ownerAccount);
   const links = page.getByRole("navigation", { name: "Primary" });
   await expect(
-    links.getByRole("link", { name: "Check-in QR", exact: true }),
+    links.getByRole("link", { name: "Check-ins", exact: true }),
   ).toBeVisible();
+  await expect(
+    links.getByRole("link", { name: "Check-in QR", exact: true }),
+  ).toHaveCount(0);
   await expect(
     links.getByRole("link", { name: "Commissions", exact: true }),
   ).toBeVisible();
@@ -120,6 +123,9 @@ test("reception submits packaged cash sales and cannot approve", async ({
   await expect(
     links.getByRole("link", { name: "Commissions", exact: true }),
   ).toHaveCount(0);
+  await expect(
+    links.getByRole("link", { name: "Check-ins", exact: true }),
+  ).toBeVisible();
   await expect(
     links.getByRole("link", { name: "Check-in QR", exact: true }),
   ).toHaveCount(0);
@@ -1093,8 +1099,12 @@ async function issueChallenge(page: Page): Promise<string> {
     );
   });
   await page.goto("/check-ins/display");
+  await expect(page).toHaveURL(/\/check-ins\?view=qr$/);
   await expect(
-    page.getByRole("heading", { name: "Check-in QR", exact: true }),
+    page.getByRole("heading", { name: "Check-ins", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Onsite check-in code", exact: true }),
   ).toBeVisible();
   const response = await issued;
   const body = await response.text();

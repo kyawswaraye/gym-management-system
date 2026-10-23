@@ -293,7 +293,11 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
               <span>Owner phone</span>
               <input className="input" name="owner_phone" disabled={pending} />
             </label>
-            <button className="button" type="submit" disabled={pending}>
+            <button
+              className="button button-create"
+              type="submit"
+              disabled={pending}
+            >
               {pending ? "Provisioning…" : "Provision gym and email Owner"}
             </button>
           </form>

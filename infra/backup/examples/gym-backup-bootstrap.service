@@ -1,0 +1,14 @@
+# Example only. Run this once before enabling full or differential timers.
+# Installing this unit is not proof that bootstrap succeeded.
+# Do not schedule it. The database entrypoint does not run it.
+
+[Unit]
+Description=Example gym PostgreSQL backup bootstrap
+Documentation=file:docs/runbooks/phase8-increment-3.md
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/gym/infra/compose
+ExecStart=/usr/bin/docker compose --env-file /etc/gym/production.env -f docker-compose.prod.yml --profile bootstrap run --rm backup-bootstrap
+TimeoutStartSec=4h
+SuccessExitStatus=0

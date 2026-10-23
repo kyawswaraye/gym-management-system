@@ -46,7 +46,7 @@ Refresh rotates the credential and hashed server session atomically. Reuse revok
 
 XSS cannot directly read authentication credentials or the gym-selection ticket from browser APIs, although XSS remains dangerous and still requires CSP and output controls. CSRF protection applies to every cookie mutation, including login, refresh, selected-gym changes, and logout. Host scoping limits cookie reach, and production-like deployments cannot disable `Secure`.
 
-The BFF must redact credentials and tickets and prevent authentication responses from being cached across users or gyms. Django `/api/v1/auth/` accepts only requests that present the configured BFF shared secret; production Django listens on loopback only. Django rate-limits ticket issue and selection by safe combinations of account/user, source, and ticket hash prefix or internal ticket ID; audit and diagnostic records never contain plaintext. Django continues to enforce exact issuer/audience, claims, session, gym membership, authorization version, Django scope, and forced RLS.
+The BFF must redact credentials and tickets and prevent authentication responses from being cached across users or gyms. Django `/api/v1/auth/` accepts only requests that present the configured BFF shared secret. Production does not publish a Django host port; Gunicorn binds inside the container, and Caddy rejects `/api/v1/auth/`. Django rate-limits ticket issue and selection by safe combinations of account/user, source, and ticket hash prefix or internal ticket ID; audit and diagnostic records never contain plaintext. Django continues to enforce exact issuer/audience, claims, session, gym membership, authorization version, Django scope, and forced RLS.
 
 ### Production network boundary
 
@@ -56,16 +56,15 @@ Desired topology: `Browser → Next.js BFF → private Django → PostgreSQL`. I
 
 - `/api/v1/auth/` requires `X-Gym-BFF-Secret` matching a server-only secret of at least 32 characters;
 - production settings refuse to start without that secret;
-- production settings refuse a Django listen host other than `127.0.0.1` or `localhost`;
 - the BFF strips inbound browser `gym_selection_ticket` / access / refresh values and forwards a ticket only from its HttpOnly cookie.
 
 **Infrastructure must enforce (this repository cannot prove it at runtime):**
 
 - only Caddy (behind Cloudflare) publishes host ports 80/443;
-- the Django/Gunicorn container has **no published host port** and is reachable only on the private Docker network from the Next.js BFF;
+- the Django/Gunicorn container has **no published host port**. Caddy proxies only `/api/v1/member-auth/` and `/api/v1/member/` to it and rejects every other `/api/v1` path. Staff routes are reachable only from the Next.js BFF on the private Docker network;
 - PostgreSQL has **no published host port**. Production object storage is AWS S3 under [ADR 0010](./0010-production-provider-readiness.md), not a VPS MinIO container. Local and end-to-end object storage, and ClamAV, publish no host port;
 - host firewall and Docker networks match ADR 0001;
-- mobile/direct API clients, if any, never receive the BFF shared secret and never target a public Django listener.
+- mobile clients call the member allowlist and never receive the BFF shared secret. They do not get a general Django listener.
 
 The shared secret authenticates the BFF process. It is **not** a substitute for network isolation. A leaked secret plus a publicly bound Django listener is a failed deployment, not an accepted control.
 

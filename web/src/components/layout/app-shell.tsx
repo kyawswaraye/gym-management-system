@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { NavLink } from "@/components/layout/nav-link";
+
 import { LogoutButton } from "@/features/auth/logout-button";
+import { SessionKeepalive } from "@/features/auth/session-keepalive";
 import {
   canIssueCheckInChallenge,
   canOpenCheckIns,
@@ -96,279 +99,160 @@ export function AppShell({
   const canViewStaff = hasPermission(session, "staff.view");
   const canViewRoles = hasPermission(session, "roles.view");
   const canViewTenantAudit = hasPermission(session, "audit.view");
+  const navigation: Array<{ href: string; label: string }> = [];
+  if (!platform && canViewDashboard) {
+    navigation.push({ href: "/dashboard", label: "Dashboard" });
+  }
+  if (!platform && canViewTrainerDashboard) {
+    navigation.push({ href: "/pt/dashboard", label: "Trainer dashboard" });
+  }
+  if (!platform && canViewReports) {
+    navigation.push({ href: "/reports", label: "Reports" });
+  }
+  if (platform && canViewPlatformDashboard) {
+    navigation.push({ href: "/super-admin/dashboard", label: "Dashboard" });
+  }
+  if (platform && hasPermission(session, "platform.gyms.view")) {
+    navigation.push({ href: "/super-admin/gyms", label: "Gyms" });
+  }
+  if (platform && canManageSubscriptions) {
+    navigation.push({
+      href: "/super-admin/subscriptions",
+      label: "Subscriptions",
+    });
+  }
+  if (platform && canViewPlatformAudit) {
+    navigation.push({ href: "/super-admin/audit-logs", label: "Audit logs" });
+  }
+  if (!platform && canViewMembers) {
+    navigation.push({ href: "/members", label: "Members" });
+  }
+  if (!platform && canViewMemberships) {
+    navigation.push({ href: "/memberships", label: "Memberships" });
+  }
+  if (!platform && (canViewCheckIns || canIssueChallenge)) {
+    navigation.push({ href: "/check-ins", label: "Check-ins" });
+  }
+  if (!platform && canViewPtTrainers) {
+    navigation.push({ href: "/pt/trainers", label: "Trainers" });
+  }
+  if (!platform && canViewPtSchedule) {
+    navigation.push({ href: "/pt/packages", label: "Packages" });
+  }
+  if (!platform && canViewPtSchedule) {
+    navigation.push({ href: "/pt/member-packages", label: "Member packages" });
+  }
+  if (!platform && canViewPtSales) {
+    navigation.push({ href: "/pt/sales", label: "PT sales" });
+  }
+  if (!platform && canViewPtCommissions) {
+    navigation.push({ href: "/pt/commissions", label: "Commissions" });
+  }
+  if (!platform && canViewPtSchedule) {
+    navigation.push({ href: "/pt/bookings", label: "PT bookings" });
+  }
+  if (!platform && canViewClasses) {
+    navigation.push({ href: "/classes", label: "Classes" });
+  }
+  if (!platform && canViewPayments) {
+    navigation.push({
+      href: "/payments",
+      label: hasTenantCapability(session, "payments.view", "finance")
+        ? "Payments"
+        : "Receipts",
+    });
+  }
+  if (!platform && canViewCashBook) {
+    navigation.push({ href: "/cash-book", label: "Cash book" });
+  }
+  if (!platform && canViewExpenses) {
+    navigation.push({ href: "/expenses", label: "Expenses" });
+  }
+  if (!platform && canViewSalaries) {
+    navigation.push({ href: "/salaries", label: "Salaries" });
+  }
+  if (!platform && canViewInventory) {
+    navigation.push({ href: "/inventory", label: "Inventory" });
+  }
+  if (!platform && canViewRetail) {
+    navigation.push({ href: "/retail-sales", label: "Retail sales" });
+  }
+  if (!platform && canViewStaff) {
+    navigation.push({ href: "/staff", label: "Staff" });
+  }
+  if (!platform && canViewRoles) {
+    navigation.push({ href: "/roles", label: "Roles" });
+  }
+  if (!platform && canOpenGymSettings(session)) {
+    navigation.push({ href: "/settings", label: "Settings" });
+  }
+  if (!platform && canViewTenantAudit) {
+    navigation.push({ href: "/audit-logs", label: "Audit logs" });
+  }
+  if (!platform && session.gym_membership?.is_owner) {
+    navigation.push({ href: "/owners", label: "Owners" });
+  }
+  if (!session.mfa_enabled) {
+    navigation.push({ href: "/mfa-setup", label: "Set up MFA" });
+  }
+  if (!platform && canUsePlatform) {
+    navigation.push({
+      href: platformHomePath(session),
+      label: "Super admin",
+    });
+  }
+  if (platform && session.gym) {
+    navigation.push({
+      href: tenantHomePath(session),
+      label: "Tenant workspace",
+    });
+  }
+  const navigationHrefs = navigation.map((item) => item.href);
 
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[15rem_1fr]">
-      <aside className="border-b border-slate-200 bg-slate-950 p-5 text-white md:min-h-screen md:border-b-0">
-        <Link className="text-xl font-bold" href={homePath}>
-          Gym Management
+    <div className="min-h-screen bg-[#f6f7f9]">
+      <SessionKeepalive />
+      <aside className="border-b border-slate-700 bg-gradient-to-b from-[#25324a] via-[#2d3b55] to-[#34445f] p-4 text-white shadow-xl shadow-slate-950/15 md:fixed md:inset-y-0 md:left-0 md:z-30 md:w-64 md:overflow-y-auto md:border-r md:border-b-0 md:p-6">
+        <Link
+          aria-label="Gym Management"
+          className="flex items-center gap-3"
+          href={homePath}
+        >
+          <span
+            className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-400 text-lg font-black text-slate-900 shadow-lg shadow-slate-950/20"
+            aria-hidden="true"
+          >
+            G
+          </span>
+          <span className="min-w-0">
+            <span className="block text-lg leading-tight font-bold tracking-tight">
+              Gym Management
+            </span>
+            <span className="mt-1 block truncate text-xs font-medium text-slate-300">
+              {platform ? "Platform workspace" : gymName}
+            </span>
+          </span>
         </Link>
-        <p className="mt-2 text-sm text-slate-300">
-          {platform ? "Platform workspace" : gymName}
+        <p className="mt-7 hidden px-3 text-[0.65rem] font-bold tracking-[0.18em] text-amber-300/70 uppercase md:block">
+          Workspace
         </p>
-        <nav className="mt-6 flex flex-wrap gap-2 md:grid" aria-label="Primary">
-          {!platform && canViewDashboard && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/dashboard"
+        <nav
+          aria-label="Primary"
+          className="mt-4 flex gap-2 overflow-x-auto pb-1 md:grid md:gap-1 md:overflow-visible md:pb-6"
+        >
+          {navigation.map((item) => (
+            <NavLink
+              href={item.href}
+              key={`${item.label}:${item.href}`}
+              peers={navigationHrefs}
             >
-              Dashboard
-            </Link>
-          )}
-          {!platform && canViewTrainerDashboard && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/pt/dashboard"
-            >
-              Trainer dashboard
-            </Link>
-          )}
-          {!platform && canViewReports && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/reports"
-            >
-              Reports
-            </Link>
-          )}
-          {platform && canViewPlatformDashboard && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/super-admin/dashboard"
-            >
-              Dashboard
-            </Link>
-          )}
-          {platform && hasPermission(session, "platform.gyms.view") && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/super-admin/gyms"
-            >
-              Gyms
-            </Link>
-          )}
-          {platform && canManageSubscriptions && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/super-admin/subscriptions"
-            >
-              Subscriptions
-            </Link>
-          )}
-          {platform && canViewPlatformAudit && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/super-admin/audit-logs"
-            >
-              Audit logs
-            </Link>
-          )}
-          {!platform && canViewMembers && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/members"
-            >
-              Members
-            </Link>
-          )}
-          {!platform && canViewMemberships && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/memberships"
-            >
-              Memberships
-            </Link>
-          )}
-          {!platform && canViewCheckIns && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/check-ins"
-            >
-              Check-ins
-            </Link>
-          )}
-          {!platform && canIssueChallenge && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/check-ins/display"
-            >
-              Check-in QR
-            </Link>
-          )}
-          {!platform && canViewPtTrainers && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/pt/trainers"
-            >
-              Trainers
-            </Link>
-          )}
-          {!platform && canViewPtSchedule && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/pt/packages"
-            >
-              Packages
-            </Link>
-          )}
-          {!platform && canViewPtSchedule && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/pt/member-packages"
-            >
-              Member packages
-            </Link>
-          )}
-          {!platform && canViewPtSales && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/pt/sales"
-            >
-              PT sales
-            </Link>
-          )}
-          {!platform && canViewPtCommissions && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/pt/commissions"
-            >
-              Commissions
-            </Link>
-          )}
-          {!platform && canViewPtSchedule && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/pt/bookings"
-            >
-              PT bookings
-            </Link>
-          )}
-          {!platform && canViewClasses && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/classes"
-            >
-              Classes
-            </Link>
-          )}
-          {!platform && canViewPayments && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/payments"
-            >
-              {hasTenantCapability(session, "payments.view", "finance")
-                ? "Payments"
-                : "Receipts"}
-            </Link>
-          )}
-          {!platform && canViewCashBook && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/cash-book"
-            >
-              Cash book
-            </Link>
-          )}
-          {!platform && canViewExpenses && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/expenses"
-            >
-              Expenses
-            </Link>
-          )}
-          {!platform && canViewSalaries && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/salaries"
-            >
-              Salaries
-            </Link>
-          )}
-          {!platform && canViewInventory && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/inventory"
-            >
-              Inventory
-            </Link>
-          )}
-          {!platform && canViewRetail && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/retail-sales"
-            >
-              Retail sales
-            </Link>
-          )}
-          {!platform && canViewStaff && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/staff"
-            >
-              Staff
-            </Link>
-          )}
-          {!platform && canViewRoles && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/roles"
-            >
-              Roles
-            </Link>
-          )}
-          {!platform && canOpenGymSettings(session) && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/settings"
-            >
-              Settings
-            </Link>
-          )}
-          {!platform && canViewTenantAudit && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/audit-logs"
-            >
-              Audit logs
-            </Link>
-          )}
-          {!platform && session.gym_membership?.is_owner && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/owners"
-            >
-              Owners
-            </Link>
-          )}
-          {!session.mfa_enabled && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href="/mfa-setup"
-            >
-              Set up MFA
-            </Link>
-          )}
-          {!platform && canUsePlatform && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href={platformHomePath(session)}
-            >
-              Super admin
-            </Link>
-          )}
-          {platform && session.gym && (
-            <Link
-              className="rounded-md px-3 py-2 hover:bg-slate-800"
-              href={tenantHomePath(session)}
-            >
-              Tenant workspace
-            </Link>
-          )}
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
       </aside>
-      <div>
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+      <div className="min-w-0 md:ml-64">
+        <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-white/90 px-5 py-4 shadow-sm backdrop-blur-md">
           <p className="min-w-0 truncate">
             <span className="font-semibold">
               {session.user.first_name || session.user.email}
@@ -377,7 +261,9 @@ export function AppShell({
           </p>
           <LogoutButton />
         </header>
-        <main className="p-5 md:p-8">{children}</main>
+        <main className="mx-auto w-full max-w-[100rem] p-5 md:p-8">
+          {children}
+        </main>
       </div>
     </div>
   );

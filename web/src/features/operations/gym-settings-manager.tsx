@@ -9,6 +9,7 @@ import {
   updateGymSettings,
 } from "@/features/operations/client";
 import type { GymSettingsAccess } from "@/lib/auth/authorization";
+import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
   GymProfile,
   GymProfileUpdate,
@@ -295,9 +296,15 @@ function ReadOnlyRows({
         <div key={row.label}>
           <dt className="text-sm font-semibold">{row.label}</dt>
           <dd>
-            {row.value === "" || row.value === null || row.value === undefined
-              ? "—"
-              : row.value}
+            {row.value === "" ||
+            row.value === null ||
+            row.value === undefined ? (
+              "—"
+            ) : typeof row.value === "string" ? (
+              <IdentifierValue value={row.value} />
+            ) : (
+              row.value
+            )}
           </dd>
         </div>
       ))}
@@ -467,7 +474,11 @@ function ProfileSection({
               required
             />
           </label>
-          <button className="button" disabled={pending} type="submit">
+          <button
+            className="button button-edit"
+            disabled={pending}
+            type="submit"
+          >
             Save gym profile
           </button>
         </form>
@@ -724,7 +735,11 @@ function SettingsSection({
               { label: "Updated", value: settings.updated_at },
             ]}
           />
-          <button className="button" disabled={pending} type="submit">
+          <button
+            className="button button-edit"
+            disabled={pending}
+            type="submit"
+          >
             Save operational settings
           </button>
         </form>

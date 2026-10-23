@@ -1,0 +1,202 @@
+# Phase 8 increment 5. Manual deployment control only.
+# This file does not prove a protected GitHub environment, a GHCR pull,
+# a VPS deploy, a backup, or a rollback.
+# Transfer uses StrictHostKeyChecking=yes and a pinned known_hosts file.
+# Control scripts are checked out at the bound default-branch head.
+# If that head moves after resolve, the deploy job stops.
+
+name: Deploy
+
+"on":
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deployment target
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      release_run_id:
+        description: Successful image-release workflow run id
+        required: true
+        type: string
+      expected_sha:
+        description: Expected release commit SHA
+        required: true
+        type: string
+      expected_tag:
+        description: Expected release tag
+        required: true
+        type: string
+      operation:
+        description: Forward deploy or authorized app rollback
+        required: true
+        type: choice
+        options:
+          - deploy
+          - rollback-app
+      schema_compatibility:
+        description: Schema compatibility for rollback-app
+        required: true
+        type: choice
+        options:
+          - not-applicable
+          - reviewed-authorized
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Bind release manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      attestations: read
+      packages: read
+    concurrency:
+      group: deploy-resolve-${{ inputs.target }}
+      cancel-in-progress: false
+    outputs:
+      release_sha: ${{ steps.bind.outputs.release_sha }}
+      control_sha: ${{ steps.bind.outputs.control_sha }}
+      target: ${{ steps.bind.outputs.target }}
+      operation: ${{ steps.bind.outputs.operation }}
+      schema_compatibility: ${{ steps.bind.outputs.schema_compatibility }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Bind the image-release run
+        id: bind
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_EVENT: ${{ github.event_name }}
+          DEPLOY_TARGET: ${{ inputs.target }}
+          DEPLOY_RELEASE_RUN_ID: ${{ inputs.release_run_id }}
+          DEPLOY_EXPECTED_SHA: ${{ inputs.expected_sha }}
+          DEPLOY_EXPECTED_TAG: ${{ inputs.expected_tag }}
+          DEPLOY_OPERATION: ${{ inputs.operation }}
+          DEPLOY_SCHEMA_COMPATIBILITY: ${{ inputs.schema_compatibility }}
+          DEPLOY_CALLER_SHA: ${{ github.sha }}
+          DEPLOY_CALLER_REF: ${{ github.ref }}
+          DEPLOY_REPOSITORY: ${{ github.repository }}
+          SSH_STRICT_HOST_KEY_CHECKING: "yes"
+        run: python3 scripts/deployment_control.py resolve-release --output bound-release.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bound-release
+          path: bound-release.json
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy-staging:
+    name: Deploy staging
+    needs: resolve
+    if: needs.resolve.outputs.target == 'staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: gym-staging
+    permissions:
+      contents: read
+      actions: read
+      attestations: read
+      packages: read
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    steps:
+      - name: Check the release SHA
+        env:
+          RELEASE_SHA: ${{ needs.resolve.outputs.release_sha }}
+        run: python3 -c 'import os,re,sys; sys.exit(0 if re.fullmatch(r"[0-9a-f]{40}", os.environ.get("RELEASE_SHA","")) else 1)'
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ needs.resolve.outputs.release_sha }}
+          path: release-source
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ needs.resolve.outputs.control_sha }}
+          path: control-source
+      - uses: actions/download-artifact@v4
+        with:
+          name: bound-release
+          path: bound
+      - name: Build and transfer
+        working-directory: control-source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SSH_STRICT_HOST_KEY_CHECKING: "yes"
+          DEPLOY_TARGET: staging
+          DEPLOY_OPERATION: ${{ needs.resolve.outputs.operation }}
+          DEPLOY_SCHEMA_COMPATIBILITY: ${{ needs.resolve.outputs.schema_compatibility }}
+          DEPLOY_CALLER_SHA: ${{ github.sha }}
+          DEPLOY_CALLER_REF: ${{ github.ref }}
+          DEPLOY_CONTROL_SHA: ${{ needs.resolve.outputs.control_sha }}
+          RELEASE_SHA: ${{ needs.resolve.outputs.release_sha }}
+          DEPLOY_SSH_HOST: ${{ vars.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_USER: ${{ vars.DEPLOY_SSH_USER }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_HOST_KEY: ${{ secrets.DEPLOY_SSH_HOST_KEY }}
+        run: python3 scripts/deployment_control.py transfer-and-apply --source-repo ../release-source --bound ../bound/bound-release.json --bundle ../gym-deploy-bundle.tar
+
+  deploy-production:
+    name: Deploy production
+    needs: resolve
+    if: needs.resolve.outputs.target == 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: gym-production
+    permissions:
+      contents: read
+      actions: read
+      attestations: read
+      packages: read
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Check the release SHA
+        env:
+          RELEASE_SHA: ${{ needs.resolve.outputs.release_sha }}
+        run: python3 -c 'import os,re,sys; sys.exit(0 if re.fullmatch(r"[0-9a-f]{40}", os.environ.get("RELEASE_SHA","")) else 1)'
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ needs.resolve.outputs.release_sha }}
+          path: release-source
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ needs.resolve.outputs.control_sha }}
+          path: control-source
+      - uses: actions/download-artifact@v4
+        with:
+          name: bound-release
+          path: bound
+      - name: Build and transfer
+        working-directory: control-source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SSH_STRICT_HOST_KEY_CHECKING: "yes"
+          DEPLOY_TARGET: production
+          DEPLOY_OPERATION: ${{ needs.resolve.outputs.operation }}
+          DEPLOY_SCHEMA_COMPATIBILITY: ${{ needs.resolve.outputs.schema_compatibility }}
+          DEPLOY_CALLER_SHA: ${{ github.sha }}
+          DEPLOY_CALLER_REF: ${{ github.ref }}
+          DEPLOY_CONTROL_SHA: ${{ needs.resolve.outputs.control_sha }}
+          RELEASE_SHA: ${{ needs.resolve.outputs.release_sha }}
+          DEPLOY_SSH_HOST: ${{ vars.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_USER: ${{ vars.DEPLOY_SSH_USER }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_HOST_KEY: ${{ secrets.DEPLOY_SSH_HOST_KEY }}
+        run: python3 scripts/deployment_control.py transfer-and-apply --source-repo ../release-source --bound ../bound/bound-release.json --bundle ../gym-deploy-bundle.tar

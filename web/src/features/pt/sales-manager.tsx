@@ -1,6 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type RefObject,
+} from "react";
 
 import {
   CashSessionSelect,
@@ -9,16 +15,13 @@ import {
 import {
   Alert,
   CursorControls,
-  Empty,
   Field,
-  Loading,
   ReasonField,
   SelectInput,
-  ServerFacts,
-  StatusText,
   TextInput,
 } from "@/features/finance/ui";
 import { useCursorPages } from "@/features/finance/paging";
+import { SaleCommandDialog } from "@/features/pt/sale-command-dialog";
 import {
   approvePtSale,
   cancelPtSale,
@@ -37,6 +40,7 @@ import {
 import { phase5Error } from "@/features/pt/errors";
 import { collectLookupPages, useLookupOptions } from "@/features/pt/lookup";
 import { MemberSearch, type PickedMember } from "@/features/pt/member-search";
+import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
   PTCommissionDetail,
   PTSale,
@@ -54,10 +58,96 @@ const METHODS = [
   "MOBILE_PAYMENT",
   "OTHER",
 ] as const;
+const SALE_STATUSES = [
+  "DRAFT",
+  "PENDING_APPROVAL",
+  "POSTED",
+  "REJECTED",
+  "CANCELLED",
+  "VOID",
+] as const;
+
+const cardClass =
+  "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm";
+
+type SaleMode = "create" | "edit" | "reject" | "cancel" | "approve" | "void";
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function saleStatusClass(status: string): string {
+  switch (status) {
+    case "DRAFT":
+      return "bg-slate-200 text-slate-800";
+    case "PENDING_APPROVAL":
+      return "bg-amber-100 text-amber-900";
+    case "POSTED":
+      return "bg-emerald-100 text-emerald-800";
+    case "REJECTED":
+    case "VOID":
+      return "bg-red-100 text-red-800";
+    case "CANCELLED":
+      return "bg-slate-100 text-slate-600";
+    default:
+      return "bg-slate-100 text-slate-700";
+  }
+}
+
+function saleLabel(row: PTSale): string {
+  const packagePart = row.service_package_id
+    ? ` package ${row.service_package_id}`
+    : "";
+  const paymentPart = row.payment?.method
+    ? ` payment ${row.payment.method}`
+    : "";
+  return `${row.service_date} ${row.description} ${row.gross_fee} ${row.currency} member ${row.member_id} trainer ${row.trainer_staff_profile_id}${packagePart}${paymentPart} ${row.status}`;
+}
+
+function SaleStatusBadge({ status }: { status: string }) {
+  return (
+    <span
+      className={`rounded-full px-2.5 py-1 text-xs font-bold ${saleStatusClass(status)}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function Fact({
+  label,
+  value,
+  emphasis = false,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div>
+      <dt className="text-xs font-medium text-slate-500">{label}</dt>
+      <dd
+        className={`mt-0.5 break-words text-slate-900 ${
+          emphasis ? "text-lg font-black tabular-nums" : "font-semibold"
+        }`}
+      >
+        <IdentifierValue value={value} />
+      </dd>
+    </div>
+  );
+}
+
+function NoticeBanner({ message }: { message: string }) {
+  return (
+    <p
+      aria-live="polite"
+      className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+      role="status"
+    >
+      {message}
+    </p>
+  );
 }
 
 export function SalesManager({
@@ -86,13 +176,26 @@ export function SalesManager({
   const [commissionUnresolved, setCommissionUnresolved] = useState(false);
   const [member, setMember] = useState<PickedMember | null>(null);
   const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [dialogError, setDialogError] = useState("");
+  const [detailPending, setDetailPending] = useState(false);
+  const [commandPending, setCommandPending] = useState(false);
   const [voidDate, setVoidDate] = useState(today);
-  const [mode, setMode] = useState<
-    "create" | "edit" | "reject" | "cancel" | "approve" | "void" | null
-  >(null);
+  const [mode, setMode] = useState<SaleMode | null>(null);
   const key = useRef<{ fingerprint: string; value: string } | null>(null);
+  const pendingRef = useRef(false);
+  const commandToken = useRef(0);
+  const detailToken = useRef(0);
+  const [requestedSaleId, setRequestedSaleId] = useState("");
+  const dialogRef = useRef<HTMLFormElement>(null);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const approveButtonRef = useRef<HTMLButtonElement>(null);
+  const rejectButtonRef = useRef<HTMLButtonElement>(null);
+  const voidButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreFocus = useRef<SaleMode | null>(null);
   const sales = useCursorPages<PTSale>(
     `sales:${status}:${memberFilter?.id ?? ""}`,
     (after) =>
@@ -133,6 +236,45 @@ export function SalesManager({
   const sessions = useOpenCashSessions(sessionDate);
   const sessionsBlocked =
     sessions.pending || Boolean(sessions.error) || sessionDate === "";
+  const filtered = status !== "" || memberFilter !== null;
+  const showPaging = sales.index > 0 || sales.hasMore || sales.bounded;
+  const separateActor =
+    selected !== null &&
+    selected.created_by_membership_id !== membershipId &&
+    selected.submitted_by_membership_id !== membershipId;
+
+  useEffect(() => {
+    if (mode) {
+      restoreFocus.current = mode;
+      dialogRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    const previous = restoreFocus.current;
+    if (!previous) return;
+    restoreFocus.current = null;
+    const targets: Record<SaleMode, RefObject<HTMLButtonElement | null>> = {
+      create: createButtonRef,
+      edit: editButtonRef,
+      cancel: cancelButtonRef,
+      approve: approveButtonRef,
+      reject: rejectButtonRef,
+      void: voidButtonRef,
+    };
+    targets[previous].current?.focus();
+  }, [mode]);
+
+  function beginCommand(): number {
+    const token = ++commandToken.current;
+    pendingRef.current = true;
+    setCommandPending(true);
+    return token;
+  }
+
+  function endCommand(token: number) {
+    if (commandToken.current !== token) return;
+    pendingRef.current = false;
+    setCommandPending(false);
+  }
 
   function commandKey(fingerprint: string): string {
     if (!key.current || key.current.fingerprint !== fingerprint) {
@@ -141,11 +283,28 @@ export function SalesManager({
     return key.current.value;
   }
 
+  function closeMode() {
+    if (pendingRef.current) return;
+    setDialogError("");
+    setMode(null);
+  }
+
+  function openMode(next: SaleMode) {
+    if (pendingRef.current || mode !== null) return;
+    setDialogError("");
+    if (next === "void") setVoidDate(today);
+    setMode(next);
+  }
+
   async function openSale(saleId: string) {
-    setPending(true);
-    setError("");
+    const token = ++detailToken.current;
+    setDetailPending(true);
+    setLoadError("");
+    setActionError("");
+    setRequestedSaleId(saleId);
     try {
       const sale = await getPtSale(saleId);
+      if (detailToken.current !== token) return;
       setSelected(sale);
       setCommission(null);
       setCommissionUnresolved(false);
@@ -159,21 +318,25 @@ export function SalesManager({
             ...(after ? { after } : {}),
           }),
         );
+        if (detailToken.current !== token) return;
         const match = collected.items.find((row) => row.pt_sale_id === sale.id);
         if (match) {
-          setCommission(await getPtCommission(match.id));
+          const detail = await getPtCommission(match.id);
+          if (detailToken.current !== token) return;
+          setCommission(detail);
         } else if (collected.error || collected.bounded) {
           setCommissionUnresolved(true);
-          setError(
+          setLoadError(
             collected.error ||
               "The commission list is incomplete. Refine the trainer and date, then open the sale again.",
           );
         }
       }
     } catch (caught) {
-      setError(phase5Error(caught, "The sale could not be loaded."));
+      if (detailToken.current !== token) return;
+      setLoadError(phase5Error(caught, "The sale could not be loaded."));
     } finally {
-      setPending(false);
+      if (detailToken.current === token) setDetailPending(false);
     }
   }
 
@@ -214,270 +377,885 @@ export function SalesManager({
     };
   }
 
-  const separateActor =
-    selected !== null &&
-    selected.created_by_membership_id !== membershipId &&
-    selected.submitted_by_membership_id !== membershipId;
+  function saveDraft(event: FormEvent<HTMLFormElement>) {
+    if (pendingRef.current) return;
+    if (!member && mode === "create") {
+      setDialogError("Select an active member.");
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    const body = saleBody(form);
+    if (mode === "edit" && selected && !member)
+      body.member_id = selected.member_id;
+    if (!body.trainer_staff_profile_id) {
+      setDialogError("Select a trainer.");
+      return;
+    }
+    if (!body.service_date || !body.description || !body.gross_fee) {
+      setDialogError("Enter the service date, description, and gross fee.");
+      return;
+    }
+    const fingerprint = JSON.stringify(body);
+    const token = beginCommand();
+    setDialogError("");
+    const request =
+      mode === "edit" && selected
+        ? updatePtSale(selected.id, body, commandKey(fingerprint))
+        : createPtSale(body, commandKey(fingerprint));
+    void request
+      .then(async (sale) => {
+        key.current = null;
+        setNotice(mode === "edit" ? "Draft updated." : "Draft created.");
+        setDialogError("");
+        setLoadError("");
+        setActionError("");
+        setMode(null);
+        setSelected(sale);
+        sales.reload();
+      })
+      .catch((caught: unknown) => {
+        setDialogError(phase5Error(caught, "The draft could not be saved."));
+      })
+      .finally(() => endCommand(token));
+  }
+
+  function submitSale() {
+    if (!selected || pendingRef.current) return;
+    const fingerprint = `submit:${selected.id}`;
+    const token = beginCommand();
+    setActionError("");
+    setNotice("");
+    void submitPtSale(selected.id, commandKey(fingerprint))
+      .then(async () => {
+        key.current = null;
+        setNotice("Sale submitted.");
+        await openSale(selected.id);
+        sales.reload();
+      })
+      .catch((caught: unknown) => {
+        setActionError(phase5Error(caught, "The sale could not be submitted."));
+      })
+      .finally(() => endCommand(token));
+  }
+
+  function approveSale(event: FormEvent<HTMLFormElement>) {
+    if (!selected || pendingRef.current) return;
+    const form = new FormData(event.currentTarget);
+    const cashSessionId = text(form, "cash_session_id");
+    if (cashPayment && (sessions.error || !cashSessionId)) {
+      setDialogError(sessions.error || "Select an open cash session.");
+      return;
+    }
+    const body = cashPayment ? { cash_session_id: cashSessionId } : {};
+    const token = beginCommand();
+    setDialogError("");
+    void approvePtSale(
+      selected.id,
+      body,
+      commandKey(`approve:${selected.id}:${cashSessionId}`),
+    )
+      .then(async () => {
+        key.current = null;
+        setNotice("Sale approved.");
+        setDialogError("");
+        setMode(null);
+        await openSale(selected.id);
+        sales.reload();
+      })
+      .catch((caught: unknown) => {
+        setDialogError(phase5Error(caught, "The sale could not be approved."));
+      })
+      .finally(() => endCommand(token));
+  }
+
+  function rejectSale(event: FormEvent<HTMLFormElement>) {
+    if (!selected || pendingRef.current) return;
+    const reason = text(new FormData(event.currentTarget), "rejection_reason");
+    if (!reason) {
+      setDialogError("Enter a rejection reason.");
+      return;
+    }
+    const token = beginCommand();
+    setDialogError("");
+    void rejectPtSale(
+      selected.id,
+      { rejection_reason: reason },
+      commandKey(`reject:${selected.id}:${reason}`),
+    )
+      .then(async () => {
+        key.current = null;
+        setNotice("Sale rejected.");
+        setDialogError("");
+        setMode(null);
+        await openSale(selected.id);
+        sales.reload();
+      })
+      .catch((caught: unknown) => {
+        setDialogError(phase5Error(caught, "The sale could not be rejected."));
+      })
+      .finally(() => endCommand(token));
+  }
+
+  function cancelSale(event: FormEvent<HTMLFormElement>) {
+    if (!selected || pendingRef.current) return;
+    const reason = text(new FormData(event.currentTarget), "reason");
+    if (!reason) {
+      setDialogError("Enter a cancellation reason.");
+      return;
+    }
+    const token = beginCommand();
+    setDialogError("");
+    void cancelPtSale(
+      selected.id,
+      { reason },
+      commandKey(`cancel:${selected.id}:${reason}`),
+    )
+      .then(async () => {
+        key.current = null;
+        setNotice("Draft cancelled.");
+        setDialogError("");
+        setMode(null);
+        await openSale(selected.id);
+        sales.reload();
+      })
+      .catch((caught: unknown) => {
+        setDialogError(
+          phase5Error(caught, "The draft could not be cancelled."),
+        );
+      })
+      .finally(() => endCommand(token));
+  }
+
+  function voidSale(event: FormEvent<HTMLFormElement>) {
+    if (!selected || pendingRef.current) return;
+    if (commissionUnresolved) {
+      setDialogError(
+        "The sale commission could not be loaded completely. Payout destinations are not listed, so this void was not sent.",
+      );
+      return;
+    }
+    if (voidNeedsSession && (sessions.error || !voidDate)) {
+      setDialogError(
+        sessions.error ||
+          "Choose a business date with a complete open-session list.",
+      );
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    const payouts = (commission?.payments ?? []).filter(
+      (row) => row.status === "POSTED",
+    );
+    if (cashPayment && !text(form, "cash_session_id")) {
+      setDialogError("Select an open cash session.");
+      return;
+    }
+    if (
+      payouts.some(
+        (row) =>
+          row.payment_method === "CASH" && !text(form, `payout_${row.id}`),
+      )
+    ) {
+      setDialogError("Select an open session for every cash payout.");
+      return;
+    }
+    const reason = text(form, "reason");
+    const businessDate = text(form, "business_date");
+    if (!reason || !businessDate) {
+      setDialogError("Enter a void reason and business date.");
+      return;
+    }
+    const body = {
+      reason,
+      business_date: businessDate,
+      ...(cashPayment
+        ? { cash_session_id: text(form, "cash_session_id") }
+        : {}),
+      payout_reversals: payouts.map((row) => ({
+        commission_payment_id: row.id,
+        cash_session_id:
+          row.payment_method === "CASH"
+            ? text(form, `payout_${row.id}`) || null
+            : null,
+      })),
+    };
+    const token = beginCommand();
+    setDialogError("");
+    void voidPtSale(selected.id, body, commandKey(JSON.stringify(body)))
+      .then(async () => {
+        key.current = null;
+        setNotice("Sale voided.");
+        setDialogError("");
+        setMode(null);
+        await openSale(selected.id);
+        sales.reload();
+      })
+      .catch((caught: unknown) => {
+        setDialogError(phase5Error(caught, "The sale could not be voided."));
+      })
+      .finally(() => endCommand(token));
+  }
+
+  const draftOpen =
+    (mode === "create" && canCreate) ||
+    (mode === "edit" && canUpdate && selected !== null);
+  const detailNotice = notice && selected ? notice : "";
 
   return (
-    <div className="grid gap-4">
-      <Alert message={error || sales.error} />
-      {notice ? (
-        <p aria-live="polite" role="status">
-          {notice}
-        </p>
-      ) : null}
-      <MemberSearch
-        action="Search sale members"
-        label="Filter sales by member"
-        onSelect={setMemberFilter}
-        selected={memberFilter}
-      />
-      {memberFilter ? (
-        <button
-          className="underline"
-          onClick={() => setMemberFilter(null)}
-          type="button"
+    <div className="grid gap-6">
+      <div
+        className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]"
+        inert={mode !== null}
+      >
+        {notice && !selected ? <NoticeBanner message={notice} /> : null}
+        <section
+          aria-busy={sales.pending}
+          aria-labelledby="pt-sales-list-title"
+          className={cardClass}
         >
-          Clear member filter
-        </button>
-      ) : null}
-      <Field label="Sale status">
-        <SelectInput
-          onChange={(event) => setStatus(event.target.value)}
-          value={status}
-        >
-          <option value="">All</option>
-          {[
-            "DRAFT",
-            "PENDING_APPROVAL",
-            "POSTED",
-            "REJECTED",
-            "CANCELLED",
-            "VOID",
-          ].map((value) => (
-            <option key={value} value={value}>
-              {value}
-            </option>
-          ))}
-        </SelectInput>
-      </Field>
-      {sales.pending || pending ? <Loading label="Loading sales." /> : null}
-      {!sales.pending && sales.rows.length === 0 ? (
-        <Empty label="No PT sales match." />
-      ) : (
-        <ul className="grid gap-3">
-          {sales.rows.map((row) => (
-            <li key={row.id}>
-              <button
-                className="underline"
-                onClick={() => void openSale(row.id)}
-                type="button"
+          <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div>
+              <h2
+                className="text-sm font-bold tracking-wide text-slate-700 uppercase"
+                id="pt-sales-list-title"
               >
-                {row.service_date} · {row.gross_fee} {row.currency} · member{" "}
-                {row.member_id} · trainer {row.trainer_staff_profile_id}
-              </button>{" "}
-              <StatusText status={row.status} />
-            </li>
-          ))}
-        </ul>
-      )}
-      <CursorControls
-        bounded={sales.bounded}
-        hasMore={sales.hasMore}
-        index={sales.index}
-        onNext={() => void sales.goNext()}
-        onPrevious={() => void sales.goPrevious()}
-        pending={sales.pending}
-      />
-      {canCreate ? (
-        <button
-          className="button"
-          onClick={() => setMode("create")}
-          type="button"
-        >
-          Create draft
-        </button>
-      ) : null}
-      {selected ? (
-        <section aria-labelledby="sale-detail-title" className="grid gap-3">
-          <h2 className="text-xl font-semibold" id="sale-detail-title">
-            Sale detail
-          </h2>
-          <ServerFacts
-            rows={[
-              { label: "Status", value: selected.status },
-              {
-                label: "Gross fee",
-                value: `${selected.gross_fee} ${selected.currency}`,
-              },
-              { label: "Commission", value: selected.commission_amount },
-              { label: "Gym share", value: selected.gym_share },
-              { label: "Outstanding", value: selected.outstanding_amount },
-              {
-                label: "Package",
-                value: selected.service_package_id ?? "None",
-              },
-              { label: "Payment", value: selected.payment?.method ?? "None" },
-            ]}
-          />
-          {selected.status === "DRAFT" && canUpdate ? (
-            <div className="flex gap-3">
-              <button
-                className="underline"
-                onClick={() => setMode("edit")}
-                type="button"
-              >
-                Edit draft
-              </button>
-              <button
-                className="underline"
-                onClick={() => setMode("cancel")}
-                type="button"
-              >
-                Cancel draft
-              </button>
+                Sales
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                Service date, fee, member, trainer, and status.
+              </p>
             </div>
-          ) : null}
-          {selected.status === "DRAFT" && canSubmit ? (
-            <button
-              className="button"
-              disabled={pending}
-              onClick={() => {
-                const fingerprint = `submit:${selected.id}`;
-                setPending(true);
-                setError("");
-                void submitPtSale(selected.id, commandKey(fingerprint))
-                  .then(async () => {
-                    key.current = null;
-                    setNotice("Sale submitted.");
-                    await openSale(selected.id);
-                    sales.reload();
-                  })
-                  .catch((caught: unknown) => {
-                    setError(
-                      phase5Error(caught, "The sale could not be submitted."),
-                    );
-                  })
-                  .finally(() => setPending(false));
-              }}
-              type="button"
-            >
-              Submit sale
-            </button>
-          ) : null}
-          {selected.status === "PENDING_APPROVAL" &&
-          canApprove &&
-          separateActor ? (
-            <div className="flex gap-3">
+            {canCreate ? (
               <button
-                className="button"
-                onClick={() => setMode("approve")}
+                aria-controls={
+                  draftOpen && mode === "create"
+                    ? "sale-draft-dialog"
+                    : undefined
+                }
+                aria-expanded={mode === "create"}
+                className="button button-create w-full sm:w-auto"
+                onClick={() => openMode("create")}
+                ref={createButtonRef}
                 type="button"
               >
-                Approve sale
+                <span aria-hidden="true">+</span>
+                Create draft
               </button>
-              <button
-                className="underline"
-                onClick={() => setMode("reject")}
-                type="button"
-              >
-                Reject sale
-              </button>
+            ) : null}
+          </div>
+
+          <div className="border-b border-slate-200 bg-slate-50/70 px-4 py-3 sm:px-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+              <div className="min-w-0 flex-1">
+                <MemberSearch
+                  action="Search sale members"
+                  label="Filter sales by member"
+                  onSelect={setMemberFilter}
+                  selected={memberFilter}
+                />
+              </div>
+              <label className="grid gap-1 text-xs font-semibold tracking-wide text-slate-500 uppercase sm:w-48 lg:mb-0">
+                Sale status
+                <SelectInput
+                  onChange={(event) => setStatus(event.target.value)}
+                  value={status}
+                >
+                  <option value="">All</option>
+                  {SALE_STATUSES.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </SelectInput>
+              </label>
+              {filtered ? (
+                <button
+                  className="text-sm font-semibold text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline lg:mb-2"
+                  onClick={() => {
+                    setStatus("");
+                    setMemberFilter(null);
+                  }}
+                  type="button"
+                >
+                  Clear filters
+                </button>
+              ) : null}
             </div>
-          ) : null}
-          {selected.status === "POSTED" && canVoid ? (
-            <button
-              className="button"
-              onClick={() => {
-                setVoidDate(today);
-                setMode("void");
-              }}
-              type="button"
-            >
-              Void sale
-            </button>
+          </div>
+
+          <div className="grid gap-4 p-4 sm:p-5">
+            {sales.pending && sales.rows.length === 0 ? (
+              <div className="grid gap-3" role="status">
+                <p className="text-sm font-medium text-slate-600">
+                  Loading sales.
+                </p>
+                <div className="grid gap-3">
+                  {[0, 1, 2].map((item) => (
+                    <div
+                      className="h-24 animate-pulse rounded-xl bg-slate-100"
+                      key={item}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {sales.pending && sales.rows.length > 0 ? (
+              <p className="text-sm font-medium text-slate-600" role="status">
+                Loading sales.
+              </p>
+            ) : null}
+            {!sales.pending && sales.error ? (
+              <div className="grid gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-medium text-red-800" role="alert">
+                  {sales.error}
+                </p>
+                <button
+                  className="button w-fit"
+                  onClick={() => sales.reload()}
+                  type="button"
+                >
+                  Retry loading sales
+                </button>
+              </div>
+            ) : null}
+            {!sales.pending && !sales.error && sales.rows.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
+                <p className="font-semibold text-slate-700">
+                  No PT sales match.
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {filtered
+                    ? "Try changing or clearing the current filters."
+                    : canCreate
+                      ? "Create a draft to add a sale."
+                      : "Sales will appear here when they are recorded."}
+                </p>
+              </div>
+            ) : null}
+            {sales.rows.length > 0 ? (
+              <ul aria-label="Sale list" className="grid gap-3">
+                {sales.rows.map((row) => {
+                  const active = selected?.id === row.id;
+                  return (
+                    <li key={row.id}>
+                      <button
+                        aria-label={saleLabel(row)}
+                        aria-pressed={active}
+                        className={`w-full rounded-xl border border-l-4 p-4 text-left ${
+                          active
+                            ? "border-l-teal-700 bg-teal-50 ring-2 ring-teal-600"
+                            : "border-l-slate-300 bg-white hover:bg-slate-50"
+                        } border-slate-200`}
+                        onClick={() => void openSale(row.id)}
+                        type="button"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold tracking-wide text-slate-500">
+                              <time dateTime={row.service_date}>
+                                {row.service_date}
+                              </time>
+                            </p>
+                            <h3 className="text-base font-bold break-words text-slate-900">
+                              {row.description}
+                            </h3>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-lg font-black text-slate-900 tabular-nums">
+                              {row.gross_fee}{" "}
+                              <span className="text-xs font-semibold text-slate-500">
+                                {row.currency}
+                              </span>
+                            </p>
+                            {active ? (
+                              <span className="mt-1 inline-flex rounded-full bg-teal-700 px-2.5 py-1 text-xs font-bold text-white">
+                                Selected
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <SaleStatusBadge status={row.status} />
+                        </div>
+                        <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                          <div>
+                            <dt className="text-xs text-slate-500">Member</dt>
+                            <dd className="mt-0.5 font-semibold text-slate-900">
+                              <IdentifierValue value={row.member_id} />
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-slate-500">Trainer</dt>
+                            <dd className="mt-0.5 font-semibold text-slate-900">
+                              <IdentifierValue
+                                value={row.trainer_staff_profile_id}
+                              />
+                            </dd>
+                          </div>
+                          {row.service_package_id ? (
+                            <div>
+                              <dt className="text-xs text-slate-500">
+                                Package
+                              </dt>
+                              <dd className="mt-0.5 font-semibold text-slate-900">
+                                <IdentifierValue
+                                  value={row.service_package_id}
+                                />
+                              </dd>
+                            </div>
+                          ) : null}
+                          {row.payment?.method ? (
+                            <div>
+                              <dt className="text-xs text-slate-500">
+                                Payment
+                              </dt>
+                              <dd className="mt-0.5 font-semibold text-slate-900">
+                                {row.payment.method}
+                              </dd>
+                            </div>
+                          ) : null}
+                        </dl>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+          </div>
+          {showPaging ? (
+            <div className="border-t border-slate-100 px-4 py-4 sm:px-5 [&_nav]:border-t-0 [&_nav]:pt-0">
+              <CursorControls
+                bounded={sales.bounded}
+                hasMore={sales.hasMore}
+                index={sales.index}
+                onNext={() => void sales.goNext()}
+                onPrevious={() => void sales.goPrevious()}
+                pending={sales.pending}
+              />
+            </div>
           ) : null}
         </section>
-      ) : null}
-      {(mode === "create" && canCreate) ||
-      (mode === "edit" && canUpdate && selected) ? (
-        <form
-          aria-labelledby="sale-form-title"
-          className="grid gap-3 rounded border border-slate-200 p-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!member && mode === "create") {
-              setError("Select an active member.");
-              return;
-            }
-            const form = new FormData(event.currentTarget);
-            const body = saleBody(form);
-            if (mode === "edit" && selected && !member)
-              body.member_id = selected.member_id;
-            const fingerprint = JSON.stringify(body);
-            setPending(true);
-            setError("");
-            const request =
-              mode === "edit" && selected
-                ? updatePtSale(selected.id, body, commandKey(fingerprint))
-                : createPtSale(body, commandKey(fingerprint));
-            void request
-              .then(async (sale) => {
-                key.current = null;
-                setNotice(
-                  mode === "edit" ? "Draft updated." : "Draft created.",
-                );
-                setMode(null);
-                setSelected(sale);
-                sales.reload();
-              })
-              .catch((caught: unknown) => {
-                setError(phase5Error(caught, "The draft could not be saved."));
-              })
-              .finally(() => setPending(false));
-          }}
-          role="dialog"
+
+        <section
+          aria-busy={detailPending || commandPending}
+          aria-labelledby="sale-detail-title"
+          className={cardClass}
         >
-          <h3 className="font-semibold" id="sale-form-title">
-            {mode === "edit" ? "Edit draft" : "Create draft"}
-          </h3>
+          <div className="grid gap-5 p-4 sm:p-5">
+            {selected ? (
+              <>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold tracking-wide text-slate-500">
+                      <time dateTime={selected.service_date}>
+                        {selected.service_date}
+                      </time>
+                    </p>
+                    <h2
+                      className="text-xl font-bold text-slate-900"
+                      id="sale-detail-title"
+                    >
+                      Sale detail
+                    </h2>
+                    <p className="mt-1 text-sm break-words text-slate-600">
+                      {selected.description}
+                    </p>
+                  </div>
+                  <SaleStatusBadge status={selected.status} />
+                </div>
+                {detailNotice ? <NoticeBanner message={detailNotice} /> : null}
+                {detailPending ? (
+                  <p
+                    className="text-sm font-medium text-slate-600"
+                    role="status"
+                  >
+                    Loading sale detail.
+                  </p>
+                ) : null}
+                {loadError ? (
+                  <div className="grid gap-3">
+                    <Alert message={loadError} />
+                    {requestedSaleId ? (
+                      <button
+                        className="button w-fit"
+                        onClick={() => void openSale(requestedSaleId)}
+                        type="button"
+                      >
+                        Retry loading sale
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+                {actionError ? <Alert message={actionError} /> : null}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">
+                    Financial summary
+                  </h3>
+                  <dl className="mt-3 grid grid-cols-2 gap-3">
+                    <Fact
+                      emphasis
+                      label="Gross fee"
+                      value={`${selected.gross_fee} ${selected.currency}`}
+                    />
+                    <Fact
+                      emphasis
+                      label="Outstanding"
+                      value={selected.outstanding_amount}
+                    />
+                    <Fact
+                      label="Commission"
+                      value={selected.commission_amount}
+                    />
+                    <Fact label="Gym share" value={selected.gym_share} />
+                  </dl>
+                </div>
+                <div className="border-t border-slate-100 pt-4">
+                  <h3 className="text-sm font-bold text-slate-800">
+                    Package and payment
+                  </h3>
+                  <dl className="mt-3 grid grid-cols-2 gap-3">
+                    <Fact label="Member" value={selected.member_id} />
+                    <Fact
+                      label="Trainer"
+                      value={selected.trainer_staff_profile_id}
+                    />
+                    <Fact
+                      label="Package"
+                      value={selected.service_package_id ?? "None"}
+                    />
+                    <Fact
+                      label="Payment"
+                      value={selected.payment?.method ?? "None"}
+                    />
+                    {selected.package_price_snapshot ? (
+                      <Fact
+                        label="Package price"
+                        value={selected.package_price_snapshot}
+                      />
+                    ) : null}
+                    {selected.member_service_package_id ? (
+                      <Fact
+                        label="Granted package"
+                        value={selected.member_service_package_id}
+                      />
+                    ) : null}
+                    {selected.payment?.amount ? (
+                      <Fact
+                        label="Payment amount"
+                        value={`${selected.payment.amount}${
+                          selected.payment.currency
+                            ? ` ${selected.payment.currency}`
+                            : ""
+                        }`}
+                      />
+                    ) : null}
+                    {selected.payment?.business_date ? (
+                      <Fact
+                        label="Payment date"
+                        value={selected.payment.business_date}
+                      />
+                    ) : null}
+                    {selected.payment?.reference_number ? (
+                      <Fact
+                        label="Payment reference"
+                        value={selected.payment.reference_number}
+                      />
+                    ) : null}
+                    {selected.payment?.status ? (
+                      <Fact
+                        label="Payment status"
+                        value={selected.payment.status}
+                      />
+                    ) : null}
+                  </dl>
+                </div>
+                {selected.rejection_reason ? (
+                  <p className="text-sm text-slate-700">
+                    <span className="font-semibold">Rejection reason. </span>
+                    {selected.rejection_reason}
+                  </p>
+                ) : null}
+                {selected.reason ? (
+                  <p className="text-sm text-slate-700">
+                    <span className="font-semibold">Reason. </span>
+                    {selected.reason}
+                  </p>
+                ) : null}
+                {selected.status === "POSTED" || selected.status === "VOID" ? (
+                  <div className="border-t border-slate-100 pt-4">
+                    <h3 className="text-sm font-bold text-slate-800">
+                      Commission
+                    </h3>
+                    {commission ? (
+                      <div className="mt-3 grid gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {commission.status ? (
+                            <SaleStatusBadge status={commission.status} />
+                          ) : null}
+                          {commission.commission_percent_snapshot ? (
+                            <span className="text-sm text-slate-600">
+                              {commission.commission_percent_snapshot}% of{" "}
+                              {commission.gross_fee_snapshot}{" "}
+                              {commission.currency}
+                            </span>
+                          ) : null}
+                        </div>
+                        <dl className="grid grid-cols-2 gap-3">
+                          {commission.paid_amount ? (
+                            <Fact
+                              label="Commission paid"
+                              value={commission.paid_amount}
+                            />
+                          ) : null}
+                          {commission.outstanding_amount ? (
+                            <Fact
+                              label="Commission outstanding"
+                              value={commission.outstanding_amount}
+                            />
+                          ) : null}
+                        </dl>
+                        {(commission.payments ?? []).length > 0 ? (
+                          <ul
+                            aria-label="Commission payouts"
+                            className="grid gap-2"
+                          >
+                            {commission.payments.map((row) => (
+                              <li
+                                className="rounded-xl border border-slate-200 px-3 py-2"
+                                key={row.id}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="font-semibold text-slate-900 tabular-nums">
+                                    {row.amount}
+                                  </p>
+                                  <SaleStatusBadge status={row.status} />
+                                </div>
+                                <p className="mt-1 text-sm text-slate-600">
+                                  {row.payment_method}
+                                  {row.business_date
+                                    ? ` · ${row.business_date}`
+                                    : ""}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-slate-500">
+                            No payouts are recorded.
+                          </p>
+                        )}
+                      </div>
+                    ) : !detailPending && !commissionUnresolved ? (
+                      <p className="mt-3 text-sm text-slate-500">
+                        No commission matched this sale.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+                {selected.status === "DRAFT" && (canUpdate || canSubmit) ? (
+                  <div
+                    aria-label="Sale actions"
+                    className="flex flex-wrap gap-2 border-t border-slate-100 pt-4"
+                    role="group"
+                  >
+                    {canUpdate ? (
+                      <button
+                        aria-controls={
+                          mode === "edit" ? "sale-draft-dialog" : undefined
+                        }
+                        aria-expanded={mode === "edit"}
+                        className="button button-edit"
+                        onClick={() => openMode("edit")}
+                        ref={editButtonRef}
+                        type="button"
+                      >
+                        Edit draft
+                      </button>
+                    ) : null}
+                    {canUpdate ? (
+                      <button
+                        aria-controls={
+                          mode === "cancel" ? "cancel-sale-dialog" : undefined
+                        }
+                        aria-expanded={mode === "cancel"}
+                        className="button button-warn"
+                        onClick={() => openMode("cancel")}
+                        ref={cancelButtonRef}
+                        type="button"
+                      >
+                        Cancel draft
+                      </button>
+                    ) : null}
+                    {canSubmit ? (
+                      <button
+                        className="button"
+                        disabled={detailPending || commandPending}
+                        onClick={submitSale}
+                        type="button"
+                      >
+                        Submit sale
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+                {selected.status === "PENDING_APPROVAL" && canApprove ? (
+                  <div
+                    aria-label="Sale actions"
+                    className="flex flex-wrap gap-2 border-t border-slate-100 pt-4"
+                    role="group"
+                  >
+                    {separateActor ? (
+                      <>
+                        <button
+                          aria-controls={
+                            mode === "approve"
+                              ? "approve-sale-dialog"
+                              : undefined
+                          }
+                          aria-expanded={mode === "approve"}
+                          className="button button-success"
+                          onClick={() => openMode("approve")}
+                          ref={approveButtonRef}
+                          type="button"
+                        >
+                          Approve sale
+                        </button>
+                        <button
+                          aria-controls={
+                            mode === "reject" ? "reject-sale-dialog" : undefined
+                          }
+                          aria-expanded={mode === "reject"}
+                          className="button button-warn"
+                          onClick={() => openMode("reject")}
+                          ref={rejectButtonRef}
+                          type="button"
+                        >
+                          Reject sale
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-sm text-slate-600">
+                        A different person must approve or reject this sale.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+                {selected.status === "POSTED" && canVoid ? (
+                  <div
+                    aria-label="Sale actions"
+                    className="flex flex-wrap gap-2 border-t border-slate-100 pt-4"
+                    role="group"
+                  >
+                    <button
+                      aria-controls={
+                        mode === "void" ? "void-sale-dialog" : undefined
+                      }
+                      aria-expanded={mode === "void"}
+                      className="button button-delete"
+                      onClick={() => openMode("void")}
+                      ref={voidButtonRef}
+                      type="button"
+                    >
+                      Void sale
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <h2
+                  className="text-sm font-bold tracking-wide text-slate-700 uppercase"
+                  id="sale-detail-title"
+                >
+                  Sale detail
+                </h2>
+                {loadError ? (
+                  <div className="grid gap-3">
+                    <Alert message={loadError} />
+                    {requestedSaleId ? (
+                      <button
+                        className="button w-fit"
+                        onClick={() => void openSale(requestedSaleId)}
+                        type="button"
+                      >
+                        Retry loading sale
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">
+                    Select a sale to see its fee, package, payment, and
+                    commission.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {draftOpen ? (
+        <SaleCommandDialog
+          description={
+            mode === "edit"
+              ? "Update the draft. Leave the payment draft unchanged, replace it, or remove it."
+              : "Choose the member, trainer, fee, and any package or payment draft."
+          }
+          descriptionId="sale-form-description"
+          dialogId="sale-draft-dialog"
+          dialogRef={dialogRef}
+          error={dialogError}
+          onClose={closeMode}
+          onSubmit={saveDraft}
+          pending={commandPending}
+          submitClass="button-edit"
+          submitDisabled={detailPending}
+          submitLabel="Save draft"
+          title={mode === "edit" ? "Edit draft" : "Create draft"}
+          titleId="sale-form-title"
+        >
           <MemberSearch
-            disabled={pending}
+            disabled={commandPending}
             onSelect={setMember}
             selected={member}
           />
           <Alert message={trainers.error || packages.error} />
-          <Field label="Trainer">
-            <SelectInput
-              defaultValue={selected?.trainer_staff_profile_id ?? ""}
-              name="trainer_staff_profile_id"
-              required
-            >
-              <option value="">Select a trainer</option>
-              {selected?.trainer_staff_profile_id &&
-              !trainers.items.some(
-                (trainer) => trainer.id === selected.trainer_staff_profile_id,
-              ) ? (
-                <option value={selected.trainer_staff_profile_id}>
-                  Current trainer
-                </option>
-              ) : null}
-              {trainers.items.map((trainer) => (
-                <option key={trainer.id} value={trainer.id}>
-                  {trainer.display_name} ({trainer.staff_code})
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
-          <Field label="Service date">
-            <TextInput
-              defaultValue={selected?.service_date ?? today}
-              name="service_date"
-              required
-              type="date"
-            />
-          </Field>
+          {trainers.pending || packages.pending ? (
+            <p className="text-sm text-slate-600" role="status">
+              Loading sale choices.
+            </p>
+          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Trainer">
+              <SelectInput
+                defaultValue={selected?.trainer_staff_profile_id ?? ""}
+                name="trainer_staff_profile_id"
+                required
+              >
+                <option value="">Select a trainer</option>
+                {selected?.trainer_staff_profile_id &&
+                !trainers.items.some(
+                  (trainer) => trainer.id === selected.trainer_staff_profile_id,
+                ) ? (
+                  <option value={selected.trainer_staff_profile_id}>
+                    Current trainer
+                  </option>
+                ) : null}
+                {trainers.items.map((trainer) => (
+                  <option key={trainer.id} value={trainer.id}>
+                    {trainer.display_name} ({trainer.staff_code})
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label="Service date">
+              <TextInput
+                defaultValue={selected?.service_date ?? today}
+                name="service_date"
+                required
+                type="date"
+              />
+            </Field>
+          </div>
           <Field label="Description">
             <TextInput
               defaultValue={selected?.description ?? ""}
@@ -485,105 +1263,87 @@ export function SalesManager({
               required
             />
           </Field>
-          <Field label="Gross fee">
-            <TextInput
-              defaultValue={selected?.gross_fee ?? ""}
-              name="gross_fee"
-              required
-            />
-          </Field>
-          <Field label="PT package">
-            <SelectInput
-              defaultValue={selected?.service_package_id ?? ""}
-              name="service_package_id"
-            >
-              <option value="">None</option>
-              {packages.items.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.code} · {row.name} · {row.price}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
-          <Field label="Payment draft">
-            <SelectInput defaultValue="omit" name="payment_choice">
-              <option value="omit">Leave unchanged or omit</option>
-              <option value="set">Set payment draft</option>
-              <option value="clear">Remove payment draft</option>
-            </SelectInput>
-          </Field>
-          <Field label="Payment description">
-            <TextInput name="payment_description" />
-          </Field>
-          <Field label="Payment amount">
-            <TextInput name="payment_amount" />
-          </Field>
-          <Field label="Payment method">
-            <SelectInput defaultValue="CASH" name="payment_method">
-              {METHODS.map((method) => (
-                <option key={method} value={method}>
-                  {method}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
-          <Field label="Payment business date">
-            <TextInput
-              defaultValue={today}
-              name="payment_business_date"
-              type="date"
-            />
-          </Field>
-          <Field label="Payment reference">
-            <TextInput name="reference_number" />
-          </Field>
-          <button className="button" disabled={pending} type="submit">
-            Save draft
-          </button>
-        </form>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Gross fee">
+              <TextInput
+                defaultValue={selected?.gross_fee ?? ""}
+                name="gross_fee"
+                required
+              />
+            </Field>
+            <Field label="PT package">
+              <SelectInput
+                defaultValue={selected?.service_package_id ?? ""}
+                name="service_package_id"
+              >
+                <option value="">None</option>
+                {packages.items.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.code} · {row.name} · {row.price}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+          </div>
+          <div className="grid gap-4 border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-bold text-slate-800">Payment draft</h3>
+            <Field label="Payment draft">
+              <SelectInput defaultValue="omit" name="payment_choice">
+                <option value="omit">Leave unchanged or omit</option>
+                <option value="set">Set payment draft</option>
+                <option value="clear">Remove payment draft</option>
+              </SelectInput>
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Payment description">
+                <TextInput name="payment_description" />
+              </Field>
+              <Field label="Payment amount">
+                <TextInput name="payment_amount" />
+              </Field>
+              <Field label="Payment method">
+                <SelectInput defaultValue="CASH" name="payment_method">
+                  {METHODS.map((method) => (
+                    <option key={method} value={method}>
+                      {method}
+                    </option>
+                  ))}
+                </SelectInput>
+              </Field>
+              <Field label="Payment business date">
+                <TextInput
+                  defaultValue={today}
+                  name="payment_business_date"
+                  type="date"
+                />
+              </Field>
+            </div>
+            <Field label="Payment reference">
+              <TextInput name="reference_number" />
+            </Field>
+          </div>
+        </SaleCommandDialog>
       ) : null}
+
       {mode === "approve" && selected && canApprove ? (
-        <form
-          aria-labelledby="approve-title"
-          className="grid gap-3 rounded border border-slate-200 p-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const form = new FormData(event.currentTarget);
-            const cashSessionId = text(form, "cash_session_id");
-            if (cashPayment && (sessions.error || !cashSessionId)) {
-              setError(sessions.error || "Select an open cash session.");
-              return;
-            }
-            const body = cashPayment ? { cash_session_id: cashSessionId } : {};
-            setPending(true);
-            setError("");
-            void approvePtSale(
-              selected.id,
-              body,
-              commandKey(`approve:${selected.id}:${cashSessionId}`),
-            )
-              .then(async () => {
-                key.current = null;
-                setNotice("Sale approved.");
-                setMode(null);
-                await openSale(selected.id);
-                sales.reload();
-              })
-              .catch((caught: unknown) => {
-                setError(
-                  phase5Error(caught, "The sale could not be approved."),
-                );
-              })
-              .finally(() => setPending(false));
-          }}
-          role="dialog"
+        <SaleCommandDialog
+          description="Approve this sale. A cash payment uses an open session for the payment business date."
+          descriptionId="approve-description"
+          dialogId="approve-sale-dialog"
+          dialogRef={dialogRef}
+          error={dialogError}
+          onClose={closeMode}
+          onSubmit={approveSale}
+          pending={commandPending}
+          submitClass="button-success"
+          submitDisabled={detailPending || (cashPayment && sessionsBlocked)}
+          submitLabel="Confirm approval"
+          title="Approve sale"
+          titleId="approve-title"
         >
-          <h3 className="font-semibold" id="approve-title">
-            Approve sale
-          </h3>
           {cashPayment ? (
             <>
-              <p className="muted">
+              <p className="text-sm text-slate-600">
                 {selected.payment?.business_date
                   ? `Open sessions are listed for the payment business date ${selected.payment.business_date}.`
                   : "This cash payment has no business date, so a session cannot be chosen."}
@@ -598,168 +1358,73 @@ export function SalesManager({
               />
             </>
           ) : (
-            <p className="muted">
+            <p className="text-sm text-slate-600">
               This sale has no cash payment, so no cash session is sent.
             </p>
           )}
-          <button
-            className="button"
-            disabled={pending || (cashPayment && sessionsBlocked)}
-            type="submit"
-          >
-            Confirm approval
-          </button>
-        </form>
+        </SaleCommandDialog>
       ) : null}
+
       {mode === "reject" && selected && canApprove ? (
-        <form
-          aria-labelledby="reject-title"
-          className="grid gap-3 rounded border border-slate-200 p-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const reason = text(
-              new FormData(event.currentTarget),
-              "rejection_reason",
-            );
-            setPending(true);
-            void rejectPtSale(
-              selected.id,
-              { rejection_reason: reason },
-              commandKey(`reject:${selected.id}:${reason}`),
-            )
-              .then(async () => {
-                key.current = null;
-                setNotice("Sale rejected.");
-                setMode(null);
-                await openSale(selected.id);
-                sales.reload();
-              })
-              .catch((caught: unknown) => {
-                setError(
-                  phase5Error(caught, "The sale could not be rejected."),
-                );
-              })
-              .finally(() => setPending(false));
-          }}
-          role="dialog"
+        <SaleCommandDialog
+          description="Reject this sale and record the reason."
+          descriptionId="reject-description"
+          dialogId="reject-sale-dialog"
+          dialogRef={dialogRef}
+          error={dialogError}
+          onClose={closeMode}
+          onSubmit={rejectSale}
+          pending={commandPending}
+          submitClass="button-warn"
+          submitDisabled={detailPending}
+          submitLabel="Confirm rejection"
+          title="Reject sale"
+          titleId="reject-title"
         >
-          <h3 className="font-semibold" id="reject-title">
-            Reject sale
-          </h3>
           <ReasonField label="Rejection reason" name="rejection_reason" />
-          <button className="button" disabled={pending} type="submit">
-            Confirm rejection
-          </button>
-        </form>
+        </SaleCommandDialog>
       ) : null}
+
       {mode === "cancel" && selected && canUpdate ? (
-        <form
-          aria-labelledby="cancel-sale-title"
-          className="grid gap-3 rounded border border-slate-200 p-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const reason = text(new FormData(event.currentTarget), "reason");
-            setPending(true);
-            void cancelPtSale(
-              selected.id,
-              { reason },
-              commandKey(`cancel:${selected.id}:${reason}`),
-            )
-              .then(async () => {
-                key.current = null;
-                setNotice("Draft cancelled.");
-                setMode(null);
-                await openSale(selected.id);
-                sales.reload();
-              })
-              .catch((caught: unknown) => {
-                setError(
-                  phase5Error(caught, "The draft could not be cancelled."),
-                );
-              })
-              .finally(() => setPending(false));
-          }}
-          role="dialog"
+        <SaleCommandDialog
+          description="Cancel this draft and record the reason."
+          descriptionId="cancel-sale-description"
+          dialogId="cancel-sale-dialog"
+          dialogRef={dialogRef}
+          error={dialogError}
+          onClose={closeMode}
+          onSubmit={cancelSale}
+          pending={commandPending}
+          submitClass="button-cancel"
+          submitDisabled={detailPending}
+          submitLabel="Confirm cancellation"
+          title="Cancel draft"
+          titleId="cancel-sale-title"
         >
-          <h3 className="font-semibold" id="cancel-sale-title">
-            Cancel draft
-          </h3>
           <ReasonField label="Cancellation reason" />
-          <button className="button" disabled={pending} type="submit">
-            Confirm cancellation
-          </button>
-        </form>
+        </SaleCommandDialog>
       ) : null}
+
       {mode === "void" && selected && canVoid ? (
-        <form
-          aria-labelledby="void-sale-title"
-          className="grid gap-3 rounded border border-slate-200 p-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (commissionUnresolved) {
-              setError(
-                "The sale commission could not be loaded completely. Payout destinations are not listed, so this void was not sent.",
-              );
-              return;
-            }
-            if (voidNeedsSession && (sessions.error || !voidDate)) {
-              setError(
-                sessions.error ||
-                  "Choose a business date with a complete open-session list.",
-              );
-              return;
-            }
-            const form = new FormData(event.currentTarget);
-            const payouts = (commission?.payments ?? []).filter(
-              (row) => row.status === "POSTED",
-            );
-            if (cashPayment && !text(form, "cash_session_id")) {
-              setError("Select an open cash session.");
-              return;
-            }
-            if (
-              payouts.some(
-                (row) =>
-                  row.payment_method === "CASH" &&
-                  !text(form, `payout_${row.id}`),
-              )
-            ) {
-              setError("Select an open session for every cash payout.");
-              return;
-            }
-            const body = {
-              reason: text(form, "reason"),
-              business_date: text(form, "business_date"),
-              ...(cashPayment
-                ? { cash_session_id: text(form, "cash_session_id") }
-                : {}),
-              payout_reversals: payouts.map((row) => ({
-                commission_payment_id: row.id,
-                cash_session_id:
-                  row.payment_method === "CASH"
-                    ? text(form, `payout_${row.id}`) || null
-                    : null,
-              })),
-            };
-            setPending(true);
-            void voidPtSale(selected.id, body, commandKey(JSON.stringify(body)))
-              .then(async () => {
-                key.current = null;
-                setNotice("Sale voided.");
-                setMode(null);
-                await openSale(selected.id);
-                sales.reload();
-              })
-              .catch((caught: unknown) => {
-                setError(phase5Error(caught, "The sale could not be voided."));
-              })
-              .finally(() => setPending(false));
-          }}
-          role="dialog"
+        <SaleCommandDialog
+          description="Void this posted sale. Every posted payout is reversed."
+          descriptionId="void-sale-description"
+          dialogId="void-sale-dialog"
+          dialogRef={dialogRef}
+          error={dialogError}
+          onClose={closeMode}
+          onSubmit={voidSale}
+          pending={commandPending}
+          submitClass="button-delete"
+          submitDisabled={
+            detailPending ||
+            commissionUnresolved ||
+            (voidNeedsSession && sessionsBlocked)
+          }
+          submitLabel="Confirm void"
+          title="Void sale"
+          titleId="void-sale-title"
         >
-          <h3 className="font-semibold" id="void-sale-title">
-            Void sale
-          </h3>
           {commissionUnresolved ? (
             <p className="error" role="alert">
               The sale commission could not be loaded completely. Payout
@@ -798,22 +1463,11 @@ export function SalesManager({
               sessions={sessions.sessions}
             />
           ))}
-          <p className="muted">
+          <p className="text-sm text-slate-600">
             Every posted payout is reversed. A consumed package returns
             PACKAGE_CONSUMED and changes nothing.
           </p>
-          <button
-            className="button"
-            disabled={
-              pending ||
-              commissionUnresolved ||
-              (voidNeedsSession && sessionsBlocked)
-            }
-            type="submit"
-          >
-            Confirm void
-          </button>
-        </form>
+        </SaleCommandDialog>
       ) : null}
     </div>
   );

@@ -29,6 +29,7 @@ import {
   StatusText,
   TextInput,
 } from "@/features/finance/ui";
+import { actionButtonClass } from "@/lib/ui/action-button";
 import type { MovementType, Product, StockAdjustRequest } from "@/types/api";
 
 const MANUAL_TYPES = [
@@ -197,7 +198,11 @@ export function InventoryManager({
             <Field label="Category name">
               <TextInput name="name" required />
             </Field>
-            <button className="button" disabled={pending} type="submit">
+            <button
+              className="button button-create"
+              disabled={pending}
+              type="submit"
+            >
               Create category
             </button>
           </form>
@@ -516,7 +521,13 @@ export function InventoryManager({
               Active
             </label>
           )}
-          <button className="button" disabled={pending} type="submit">
+          <button
+            className={actionButtonClass(
+              editing ? "Save product" : "Create product",
+            )}
+            disabled={pending}
+            type="submit"
+          >
             {editing ? "Save product" : "Create product"}
           </button>
         </form>
@@ -543,7 +554,7 @@ export function InventoryManager({
           </p>
           {canManage && (
             <button
-              className="underline"
+              className="underline tone-edit"
               onClick={() => setEditing(true)}
               type="button"
             >

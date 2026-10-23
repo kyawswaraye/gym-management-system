@@ -18,6 +18,12 @@ from apps.common.production import (
 
 from .base import *  # noqa: F403
 
+MIDDLEWARE = [
+    *MIDDLEWARE,  # noqa: F405
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
 required = {
     "DJANGO_SECRET_KEY": SECRET_KEY,  # noqa: F405
     "RUNTIME_DB_PASSWORD": DATABASES["default"]["PASSWORD"],  # noqa: F405
@@ -35,8 +41,6 @@ if JWT_ACCESS_TTL_SECONDS != 600:  # noqa: F405
     raise ImproperlyConfigured("Staff access TTL must be exactly 600 seconds")
 if not BFF_SHARED_SECRET or len(BFF_SHARED_SECRET) < 32:  # noqa: F405
     raise ImproperlyConfigured("BFF_SHARED_SECRET must be at least 32 characters")
-if DJANGO_LISTEN_HOST not in {"127.0.0.1", "localhost"}:  # noqa: F405
-    raise ImproperlyConfigured("Django must listen only on a loopback address")
 require_resend_backend(EMAIL_BACKEND)  # noqa: F405
 require_resend_api_key(RESEND_API_KEY)  # noqa: F405
 require_verified_sender(DEFAULT_FROM_EMAIL)  # noqa: F405
@@ -80,6 +84,53 @@ require_private_clamav_host(CLAMAV_HOST)  # noqa: F405
 if CLAMAV_PORT != 3310:  # noqa: F405
     raise ImproperlyConfigured("Production ClamAV must use the private daemon port 3310")
 
+# TLS ends at Cloudflare and Caddy. The private BFF hop is HTTP and marks
+# that original browser request with this header. The header is trustworthy
+# only while Compose publishes no API port. It does not replace that isolation.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_HTTPONLY = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_HSTS_SECONDS = 31_536_000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+X_FRAME_OPTIONS = "DENY"
+STRUCTURED_REQUEST_LOG = True
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {"()": "apps.common.observability.logging.JsonLogFormatter"},
+    },
+    "handlers": {
+        "stdout": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "stream": "ext://sys.stdout",
+        },
+    },
+    "root": {"handlers": ["stdout"], "level": "INFO"},
+    "loggers": {
+        "django.request": {
+            "handlers": ["stdout"],
+            "level": "CRITICAL",
+            "propagate": False,
+        },
+        "django.server": {
+            "handlers": ["stdout"],
+            "level": "CRITICAL",
+            "propagate": False,
+        },
+        "django.db.backends": {
+            "handlers": ["stdout"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "gym.http": {"handlers": ["stdout"], "level": "INFO", "propagate": False},
+        "apps.audit": {"handlers": ["stdout"], "level": "INFO", "propagate": False},
+    },
+}

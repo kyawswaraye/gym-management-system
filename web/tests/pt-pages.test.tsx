@@ -137,8 +137,14 @@ describe("phase 5 page gates", () => {
     );
     render(await TrainersPage());
     expect(
-      screen.getByRole("heading", { name: "Trainers" }),
+      screen.getByRole("region", { name: "Trainers" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Trainers" }),
+    ).toHaveAttribute("id", "trainers-title");
+    expect(screen.getByText("Personal training")).toBeInTheDocument();
+    expect(screen.getByText(/Review your coaching team/)).toBeInTheDocument();
+    expect(screen.queryByText("◇")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Create assignment" }),
     ).not.toBeInTheDocument();
@@ -156,8 +162,13 @@ describe("phase 5 page gates", () => {
     requireSession.mockResolvedValue(session(["pt.schedule.view"], ["DESK"]));
     render(await PackagesPage());
     expect(
-      screen.getByRole("heading", { name: "Packages" }),
+      screen.getByRole("region", { name: "Packages" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Packages" }),
+    ).toHaveAttribute("id", "packages-title");
+    expect(screen.getByText(/pricing in one place/)).toBeInTheDocument();
+    expect(screen.queryByText("◫")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Create package" }),
     ).not.toBeInTheDocument();

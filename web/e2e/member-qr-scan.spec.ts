@@ -39,10 +39,11 @@ test("a linked member redeems an onsite QR without storing member tokens", async
   );
   await page
     .getByRole("navigation", { name: "Primary" })
-    .getByRole("link", { name: "Check-in QR", exact: true })
+    .getByRole("link", { name: "Check-ins", exact: true })
     .click();
+  await page.getByRole("tab", { name: "QR display", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Check-in QR", exact: true }),
+    page.getByRole("heading", { name: "Onsite check-in code", exact: true }),
   ).toBeVisible();
   const challengeResponse = await issued;
   const challengeBody = await challengeResponse.text();

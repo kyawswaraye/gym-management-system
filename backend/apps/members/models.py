@@ -15,8 +15,8 @@ class Member(TenantModel):
 
     ``linked_user`` and ``authz_version`` identify a member session. Linking is
     not exposed on the staff or member HTTP APIs. ``authz_version`` increases
-    when the member is archived or the link changes, and those changes revoke
-    MEMBER refresh sessions. Migration 0007 adds the same-gym profile-photo
+    when the member is archived, restored, or the link changes. Archive and
+    link changes revoke MEMBER refresh sessions. Migration 0007 adds the same-gym profile-photo
     foreign key, the address shape check, and ``member_linked_user_fk`` with
     ``ON DELETE RESTRICT``. Django cannot express the composite photo
     reference, so that foreign key is declared in SQL. ``linked_user`` uses

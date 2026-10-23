@@ -7,6 +7,9 @@ import type {
   SelectHTMLAttributes,
 } from "react";
 
+import { actionButtonClass } from "@/lib/ui/action-button";
+import { IdentifierValue } from "@/lib/ui/identifier";
+
 export function Alert({ message }: { message: string }) {
   if (!message) return null;
   return (
@@ -51,28 +54,50 @@ export function CursorControls({
   onPrevious: () => void;
   onNext: () => void;
 }) {
+  const showPrevious = index > 0;
+  const showNext = hasMore;
+  if (!showPrevious && !showNext && !bounded) return null;
+
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <button
-        className="underline"
-        disabled={pending || index === 0}
-        onClick={onPrevious}
-        type="button"
-      >
-        Previous page
-      </button>
-      <button
-        className="underline"
-        disabled={pending || !hasMore}
-        onClick={onNext}
-        type="button"
-      >
-        Next page
-      </button>
+    <nav
+      aria-label="Pagination"
+      className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4"
+    >
+      <div className="flex items-center gap-2">
+        {showPrevious && (
+          <button
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={pending}
+            onClick={onPrevious}
+            type="button"
+          >
+            <span aria-hidden="true">←</span>
+            Previous page
+          </button>
+        )}
+        {showNext && (
+          <button
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-800 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={pending}
+            onClick={onNext}
+            type="button"
+          >
+            Next page
+            <span aria-hidden="true">→</span>
+          </button>
+        )}
+        {(showPrevious || showNext) && (
+          <span className="ml-1 text-xs font-medium text-slate-500">
+            Page {index + 1}
+          </span>
+        )}
+      </div>
       {bounded && (
-        <p className="muted text-sm">Refine the filters to see older rows.</p>
+        <p className="text-sm text-amber-700">
+          Refine the filters to see older rows.
+        </p>
       )}
-    </div>
+    </nav>
   );
 }
 
@@ -152,11 +177,15 @@ export function CommandForm({
       <Alert message={error} />
       {children}
       <div className="flex flex-wrap gap-3">
-        <button className="button" disabled={pending} type="submit">
+        <button
+          className={actionButtonClass(confirmLabel)}
+          disabled={pending}
+          type="submit"
+        >
           {confirmLabel}
         </button>
         <button
-          className="underline"
+          className="underline tone-cancel"
           disabled={pending}
           onClick={onCancel}
           type="button"
@@ -196,7 +225,9 @@ export function ServerFacts({
       {rows.map((row) => (
         <div key={row.label}>
           <dt className="text-sm text-slate-500">{row.label}</dt>
-          <dd className="font-medium">{row.value}</dd>
+          <dd className="font-medium">
+            <IdentifierValue value={row.value} />
+          </dd>
         </div>
       ))}
     </dl>

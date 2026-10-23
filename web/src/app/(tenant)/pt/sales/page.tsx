@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { SalesManager } from "@/features/pt/sales-manager";
 import {
   canApprovePtSale,
@@ -16,13 +17,12 @@ export default async function PtSalesPage() {
 
   return (
     <section aria-labelledby="pt-sales-title">
-      <h1 className="text-2xl font-bold" id="pt-sales-title">
-        PT sales
-      </h1>
-      <p className="muted mb-6 mt-2">
-        Draft a sale, optionally attach a package and payment, then submit it
-        for a different owner or manager to approve.
-      </p>
+      <PageHeader
+        description="Draft a sale, optionally attach a package and payment, then submit it for a different owner or manager to approve."
+        eyebrow="Personal training"
+        title="PT sales"
+        titleId="pt-sales-title"
+      />
       <SalesManager
         canApprove={canApprovePtSale(session)}
         canCreate={hasPermission(session, "pt.sales.create")}

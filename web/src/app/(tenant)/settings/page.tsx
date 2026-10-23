@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { GymSettingsManager } from "@/features/operations/gym-settings-manager";
 import { gymSettingsAccess, tenantHomePath } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -15,16 +16,13 @@ export default async function GymSettingsPage() {
 
   return (
     <section aria-labelledby="gym-settings-title">
-      <h1 id="gym-settings-title" className="text-3xl font-bold">
-        Gym settings
-      </h1>
-      <p className="muted mt-2">
-        Maintain this gym&apos;s profile and operational settings. Lifecycle and
-        subscription changes stay with platform administration.
-      </p>
-      <div className="mt-6">
-        <GymSettingsManager {...access} />
-      </div>
+      <PageHeader
+        description="Maintain this gym's profile and operational settings. Lifecycle and subscription changes stay with platform administration."
+        eyebrow="Operations"
+        title="Gym settings"
+        titleId="gym-settings-title"
+      />
+      <GymSettingsManager {...access} />
     </section>
   );
 }

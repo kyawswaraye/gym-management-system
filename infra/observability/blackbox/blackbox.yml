@@ -1,0 +1,26 @@
+modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      valid_status_codes: [200]
+      preferred_ip_protocol: ip4
+      follow_redirects: false
+  http_api_health:
+    prober: http
+    timeout: 5s
+    http:
+      valid_status_codes: [200]
+      preferred_ip_protocol: ip4
+      follow_redirects: false
+      headers:
+        X-Forwarded-Proto: https
+  tls_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      tls: true
+      tls_config:
+        # Example PUBLIC_HOST only. v0.29.0 does not expand this file.
+        server_name: app.example.com
+        insecure_skip_verify: false
