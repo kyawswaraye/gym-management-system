@@ -42,7 +42,7 @@ READ_PERMISSIONS = {"contents": "read"}
 RUNTIME_BASELINE = {
     "python": "3.14.7",
     "django": "5.2.17",
-    "drf": "3.18.0",
+    "drf": "3.18.2",
     "node": "24.20.0",
     "next": "16.4.1",
     "typescript": "7.0.2",
