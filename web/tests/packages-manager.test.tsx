@@ -118,7 +118,7 @@ describe("package catalog", () => {
     ).toBeInTheDocument();
     expect(within(catalog).getByText(/stay unchanged/)).toBeInTheDocument();
 
-    const packages = within(catalog).getAllByRole("listitem");
+    const packages = await within(catalog).findAllByRole("listitem");
     expect(packages).toHaveLength(2);
     expect(packages[0]).toHaveTextContent("Ten sessions");
     expect(packages[0]).toHaveTextContent("PT10");
