@@ -273,6 +273,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   await expect(page.getByText("Loading members.", { exact: true })).toHaveCount(
     0,
   );
+  await page.getByRole("button", { name: "Add member", exact: true }).click();
   const addMember = page.locator("form").filter({
     has: page.getByRole("heading", { name: "Add member", exact: true }),
   });
@@ -309,9 +310,8 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   });
 
   const createdRow = memberRow(page, ORIGINAL_NAME);
-  const memberNumber = (
-    await createdRow.locator("span.muted").innerText()
-  ).trim();
+  const memberCellText = await createdRow.getByRole("cell").first().innerText();
+  const memberNumber = memberCellText.match(/\bMEM-\d+\b/)?.[0] ?? "";
   expect(memberNumber).not.toBe("");
   await expect(createdRow).toContainText(PHONE);
   await expect(createdRow).toContainText("ACTIVE");
@@ -652,6 +652,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   await expect(
     page.getByText("Loading memberships.", { exact: true }),
   ).toHaveCount(0);
+  await page.getByRole("button", { name: "New plan", exact: true }).click();
   const newPlan = page.locator("form").filter({
     has: page.getByRole("heading", { name: "New plan", exact: true }),
   });
@@ -672,9 +673,8 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
       .getByRole("combobox", { name: "Unit", exact: true })
       .selectOption({ label: "Day" });
     await newPlan.getByLabel("Price", { exact: true }).fill("1500.00");
-    await newPlan
-      .getByRole("button", { name: "Save plan", exact: true })
-      .click();
+    await newPlan.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByRole("button", { name: "View plans", exact: true }).click();
     const createdPlan = plans.getByRole("row").filter({ hasText: PLAN_CODE });
     await expect(createdPlan).toContainText(PLAN_NAME);
     await expect(createdPlan).toContainText("1 Day");
@@ -706,7 +706,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     );
     await dialog
       .getByRole("button", {
-        name: `Save ${PLAN_NAME} (${PLAN_CODE}) plan`,
+        name: "Save",
         exact: true,
       })
       .click();
@@ -895,17 +895,22 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     await expect(sold).toContainText("SUSPENDED / UNPAID");
     await sold.getByRole("button", { name: "Resume", exact: true }).click();
     await expect(sold).toContainText("ACTIVE / UNPAID");
-    page.once("dialog", (dialog) => {
-      expect(dialog.type()).toBe("prompt");
-      return dialog.accept("E2E cancellation reason");
+    await sold.getByRole("button", { name: "Cancel", exact: true }).click();
+    const cancelDialog = page.getByRole("dialog", {
+      name: "Cancel this membership?",
     });
+    await cancelDialog
+      .getByLabel("Cancellation reason", { exact: true })
+      .fill("E2E cancellation reason");
     const cancelled = page.waitForResponse(
       (response) =>
         settledResponse(response) &&
         response.request().method() === "POST" &&
         /\/cancel\/?$/.test(new URL(response.url()).pathname),
     );
-    await sold.getByRole("button", { name: "Cancel", exact: true }).click();
+    await cancelDialog
+      .getByRole("button", { name: "Cancel membership", exact: true })
+      .click();
     const cancelResponse = await cancelled;
     expect(cancelResponse.ok()).toBeTruthy();
     const cancellation = await responseData(cancelResponse);
@@ -962,17 +967,22 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
 
   await test.step("archive the plan and the member", async () => {
     await openSection(page, "Memberships");
+    await page.getByRole("button", { name: "View plans", exact: true }).click();
     const planRow = plans.getByRole("row").filter({ hasText: PLAN_CODE });
-    page.once("dialog", (dialog) => {
-      expect(dialog.type()).toBe("confirm");
-      expect(dialog.message()).toContain(`${REVISED_PLAN} (${PLAN_CODE})`);
-      return dialog.accept();
-    });
     await planRow
       .getByRole("button", {
         name: `Archive ${REVISED_PLAN} (${PLAN_CODE}) plan`,
         exact: true,
       })
+      .click();
+    const planArchiveDialog = page.getByRole("dialog", {
+      name: `Archive ${REVISED_PLAN}?`,
+    });
+    await expect(planArchiveDialog).toContainText(
+      `${REVISED_PLAN} (${PLAN_CODE})`,
+    );
+    await planArchiveDialog
+      .getByRole("button", { name: "Archive", exact: true })
       .click();
     await expect(planRow).toContainText("Archived");
     const startForm = await openStartMembershipDialog(page);
@@ -983,6 +993,8 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     await expect(
       planSelect.locator("option", { hasText: REVISED_PLAN }),
     ).toHaveCount(0);
+    await startForm.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(startForm).toHaveCount(0);
 
     await openSection(page, "Members");
     const directoryRow = memberRow(page, UPDATED_NAME);
@@ -1063,6 +1075,10 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     await expect(
       archivedSearch.getByRole("list", { name: "Matching members" }),
     ).toHaveCount(0);
+    await archivedSearch
+      .getByRole("button", { name: "Close", exact: true })
+      .click();
+    await expect(archivedSearch).toHaveCount(0);
   });
 
   await test.step("show a rotating desk code without storing it", async () => {

@@ -971,9 +971,7 @@ async function submitOpenSale(page: Page): Promise<void> {
 }
 
 async function openSale(page: Page, gross: string): Promise<void> {
-  await page
-    .getByRole("button", { name: new RegExp(`· ${gross} THB ·`) })
-    .click();
+  await page.getByRole("button", { name: new RegExp(`${gross} THB`) }).click();
   await expect(saleDetail(page)).toBeVisible();
 }
 

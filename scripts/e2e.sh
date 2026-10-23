@@ -48,4 +48,4 @@ fi
 if [[ "${file_services_code}" -ne 0 ]]; then
   exit "${file_services_code}"
 fi
-npm --prefix "${ROOT}/web" run test:e2e
+npm --prefix "${ROOT}/web" run test:e2e -- "$@"

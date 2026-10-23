@@ -49,7 +49,7 @@ e2e_start_file_services() {
   fi
   echo "Starting E2E MinIO, ClamAV, and the object proxy."
   e2e_compose up -d --wait --wait-timeout 600 minio clamav object-proxy
-  e2e_compose run --rm --no-deps minio-init
+  e2e_compose run -T --rm --no-deps minio-init
   e2e_probe_url "http://127.0.0.1:${E2E_MINIO_PORT}/minio/health/live"
   e2e_probe_url \
     "http://127.0.0.1:${E2E_OBJECT_PROXY_PORT}/minio/health/live" \

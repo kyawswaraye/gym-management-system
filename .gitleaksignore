@@ -25,3 +25,42 @@ web/tests/security-boundary.test.ts:generic-api-key:359
 
 # Same fixture UUID on the current cross-origin provision test. Not an API credential.
 web/tests/security-boundary.test.ts:generic-api-key:1707
+
+# Confirmed test fixtures and dependency lock entries; not credentials.
+161d31f41fabecdb00a20c2a68bf8ddd873e2ffb:backend/tests/security/test_retail_return.py:generic-api-key:189
+1b7ca4dad3cd63e4a3ceea27afdb3bc148e31fe6:backend/tests/security/test_salaries.py:generic-api-key:230
+1b7ca4dad3cd63e4a3ceea27afdb3bc148e31fe6:backend/tests/security/test_salaries.py:generic-api-key:245
+42af64eaf0345d9df230b51fd7a0c80fb7914317:web/tests/check-ins-client.test.ts:generic-api-key:82
+42af64eaf0345d9df230b51fd7a0c80fb7914317:web/tests/security-boundary.test.ts:generic-api-key:377
+5b23257f011a8deda17fa87b3b6ce34ed9cc146a:backend/tests/security/test_inventory.py:generic-api-key:507
+5b23257f011a8deda17fa87b3b6ce34ed9cc146a:backend/tests/security/test_inventory.py:generic-api-key:583
+5b23257f011a8deda17fa87b3b6ce34ed9cc146a:backend/tests/security/test_inventory.py:generic-api-key:596
+6c17b2f3d1b800454b565d0022fb1603894e2954:.github/workflows/ci.yml:generic-api-key:169
+6c17b2f3d1b800454b565d0022fb1603894e2954:backend/tests/security/test_finance_foundation.py:generic-api-key:417
+6c17b2f3d1b800454b565d0022fb1603894e2954:backend/tests/security/test_finance_foundation.py:generic-api-key:449
+80f494c2ba5065b0d825956ad978ed4f917b3853:backend/tests/security/test_finance_corrections.py:generic-api-key:176
+80f494c2ba5065b0d825956ad978ed4f917b3853:backend/tests/security/test_finance_corrections.py:generic-api-key:325
+80f494c2ba5065b0d825956ad978ed4f917b3853:backend/tests/security/test_finance_corrections.py:generic-api-key:348
+80f494c2ba5065b0d825956ad978ed4f917b3853:backend/tests/security/test_finance_corrections.py:generic-api-key:378
+80f494c2ba5065b0d825956ad978ed4f917b3853:backend/tests/security/test_finance_corrections.py:generic-api-key:630
+80f494c2ba5065b0d825956ad978ed4f917b3853:backend/tests/security/test_finance_corrections.py:generic-api-key:665
+80f494c2ba5065b0d825956ad978ed4f917b3853:backend/tests/security/test_finance_corrections.py:generic-api-key:749
+80f494c2ba5065b0d825956ad978ed4f917b3853:backend/tests/security/test_finance_corrections.py:generic-api-key:781
+80f494c2ba5065b0d825956ad978ed4f917b3853:backend/tests/security/test_finance_corrections.py:generic-api-key:821
+cb62456597d48343a7861ae396222ced15a9020a:backend/tests/security/test_cashbook.py:generic-api-key:450
+cb62456597d48343a7861ae396222ced15a9020a:backend/tests/security/test_cashbook.py:generic-api-key:629
+d54a59c510278afd29879379752bb2c9a4d07b27:backend/tests/security/test_range_reports.py:generic-api-key:476
+d54a59c510278afd29879379752bb2c9a4d07b27:backend/tests/security/test_reports.py:generic-api-key:243
+d54a59c510278afd29879379752bb2c9a4d07b27:backend/tests/security/test_reports.py:generic-api-key:380
+d54a59c510278afd29879379752bb2c9a4d07b27:mobile/e2e/memberJourney.test.ts:generic-api-key:94
+d54a59c510278afd29879379752bb2c9a4d07b27:mobile/ios/Podfile.lock:generic-api-key:2405
+d54a59c510278afd29879379752bb2c9a4d07b27:mobile/ios/Podfile.lock:generic-api-key:2475
+d566e102458b1349da168a6a9398da6374b8a18b:backend/tests/security/test_payment_controls.py:generic-api-key:1344
+d566e102458b1349da168a6a9398da6374b8a18b:backend/tests/security/test_payment_controls.py:generic-api-key:458
+d566e102458b1349da168a6a9398da6374b8a18b:backend/tests/security/test_payment_controls.py:generic-api-key:462
+d566e102458b1349da168a6a9398da6374b8a18b:backend/tests/security/test_payment_controls.py:generic-api-key:469
+d566e102458b1349da168a6a9398da6374b8a18b:backend/tests/security/test_payment_controls.py:generic-api-key:511
+edaa4b5a31def63763183a98c45aabc2f16dc772:backend/tests/security/test_password_recovery.py:generic-api-key:215
+f6519f6f47d1ad3417a1763867520d80a11bbfe0:backend/tests/security/test_salary_retail_void.py:generic-api-key:295
+f6519f6f47d1ad3417a1763867520d80a11bbfe0:backend/tests/security/test_salary_retail_void.py:generic-api-key:316
+f6519f6f47d1ad3417a1763867520d80a11bbfe0:backend/tests/security/test_salary_retail_void.py:generic-api-key:522

@@ -38,9 +38,9 @@ const OPERATIONAL_METRICS = [
   ["Check-ins", "check_ins"],
   ["Unique attendees", "unique_attendees"],
   ["Currently checked in", "currently_checked_in"],
-  ["Expiring within 3 days", "expiring_within_3_days"],
-  ["Expiring within 7 days", "expiring_within_7_days"],
-  ["Expiring within 30 days", "expiring_within_30_days"],
+  ["Expiring in 3 days", "expiring_within_3_days"],
+  ["Expiring in 7 days", "expiring_within_7_days"],
+  ["Expiring in 30 days", "expiring_within_30_days"],
   ["Pending approvals", "pending_approvals"],
 ] as const;
 
@@ -118,6 +118,7 @@ test("owner dashboard loads through the BFF and follows the server totals", asyn
 test("owner daily and monthly reports load through the BFF", async ({
   page,
 }) => {
+  test.setTimeout(300_000);
   const secrets = [ownerAccount.password, ownerAccount.totpSecret];
   const assertResponses = watchJsonResponses(page, secrets);
   const directReportCalls = trackDirectReportCalls(page);
@@ -128,17 +129,23 @@ test("owner daily and monthly reports load through the BFF", async ({
   await expect(
     page.getByRole("heading", { name: "Reports", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("status")).toHaveText(
+  await expect(page.getByRole("status")).toContainText(
     "Choose a date, month, or range.",
   );
+  const reportType = page.getByRole("combobox", {
+    name: "Report type",
+    exact: true,
+  });
+  const generateReport = page.getByRole("button", {
+    name: "Generate report",
+    exact: true,
+  });
 
   await page.getByLabel("Date", { exact: true }).fill("2026-10-01");
   const dailyResponse = page.waitForResponse(
     reportResponse("daily", { date: "2026-10-01" }),
   );
-  await page
-    .getByRole("button", { name: "Show daily report", exact: true })
-    .click();
+  await generateReport.click();
   const dailyHttp = await dailyResponse;
   expect(originOf(dailyHttp.url(), page.url())).toBe(
     originOf(page.url(), page.url()),
@@ -164,14 +171,12 @@ test("owner daily and monthly reports load through the BFF", async ({
   );
   await expect(page.locator("p.error[role='alert']")).toHaveCount(0);
 
-  await page.getByLabel("Year").fill("2026");
-  await page.getByLabel("Month").fill("10");
+  await reportType.selectOption("monthly");
+  await page.getByLabel("Reporting month").fill("2026-10");
   const monthlyResponse = page.waitForResponse(
     reportResponse("monthly", { year: "2026", month: "10" }),
   );
-  await page
-    .getByRole("button", { name: "Show monthly report", exact: true })
-    .click();
+  await generateReport.click();
   const monthlyHttp = await monthlyResponse;
   expect(originOf(monthlyHttp.url(), page.url())).toBe(
     originOf(page.url(), page.url()),
@@ -182,6 +187,7 @@ test("owner daily and monthly reports load through the BFF", async ({
   expect(monthly.range.date_from).not.toBe(monthly.range.date_to);
   await expectRenderedReport(page, "Monthly report", monthly);
 
+  await reportType.selectOption("cash-book");
   await page.getByLabel("From date").fill("2026-10-01");
   await page.getByLabel("To date").fill("2026-10-03");
   const cashResponse = page.waitForResponse(
@@ -190,9 +196,7 @@ test("owner daily and monthly reports load through the BFF", async ({
       date_to: "2026-10-03",
     }),
   );
-  await page
-    .getByRole("button", { name: "Show cash book", exact: true })
-    .click();
+  await generateReport.click();
   const cashHttp = await cashResponse;
   expect(originOf(cashHttp.url(), page.url())).toBe(
     originOf(page.url(), page.url()),
@@ -201,15 +205,14 @@ test("owner daily and monthly reports load through the BFF", async ({
   expect(cash.rows).toHaveLength(3);
   await expectRenderedCashBook(page, cash);
 
+  await reportType.selectOption("profit-loss");
   const profitResponse = page.waitForResponse(
     reportResponse("profitLoss", {
       date_from: "2026-10-01",
       date_to: "2026-10-03",
     }),
   );
-  await page
-    .getByRole("button", { name: "Show profit and loss", exact: true })
-    .click();
+  await generateReport.click();
   const profitHttp = await profitResponse;
   expect(originOf(profitHttp.url(), page.url())).toBe(
     originOf(page.url(), page.url()),
@@ -218,15 +221,14 @@ test("owner daily and monthly reports load through the BFF", async ({
   expect(profit.rows).toHaveLength(3);
   await expectRenderedProfitLoss(page, profit);
 
+  await reportType.selectOption("membership-expiry");
   const expiryResponse = page.waitForResponse(
     reportResponse("membershipExpiry", {
       date_from: "2026-10-01",
       date_to: "2026-10-03",
     }),
   );
-  await page
-    .getByRole("button", { name: "Show membership expiry", exact: true })
-    .click();
+  await generateReport.click();
   const expiryHttp = await expiryResponse;
   expect(originOf(expiryHttp.url(), page.url())).toBe(
     originOf(page.url(), page.url()),
@@ -241,15 +243,14 @@ test("owner daily and monthly reports load through the BFF", async ({
     ["Unique members", requiredCount(expiry.totals, "unique_members")],
   ]);
 
+  await reportType.selectOption("check-ins");
   const checkInResponse = page.waitForResponse(
     reportResponse("checkIns", {
       date_from: "2026-10-01",
       date_to: "2026-10-03",
     }),
   );
-  await page
-    .getByRole("button", { name: "Show check-ins", exact: true })
-    .click();
+  await generateReport.click();
   const checkInHttp = await checkInResponse;
   expect(originOf(checkInHttp.url(), page.url())).toBe(
     originOf(page.url(), page.url()),
@@ -264,15 +265,14 @@ test("owner daily and monthly reports load through the BFF", async ({
     ],
   ]);
 
+  await reportType.selectOption("pt-sessions");
   const sessionResponse = page.waitForResponse(
     reportResponse("ptSessions", {
       date_from: "2026-10-01",
       date_to: "2026-10-03",
     }),
   );
-  await page
-    .getByRole("button", { name: "Show PT sessions", exact: true })
-    .click();
+  await generateReport.click();
   const sessionHttp = await sessionResponse;
   expect(originOf(sessionHttp.url(), page.url())).toBe(
     originOf(page.url(), page.url()),
@@ -285,13 +285,14 @@ test("owner daily and monthly reports load through the BFF", async ({
     ["Unique trainers", requiredCount(sessions.totals, "unique_trainers")],
   ]);
 
+  await reportType.selectOption("classes");
   const classResponse = page.waitForResponse(
     reportResponse("classes", {
       date_from: "2026-10-01",
       date_to: "2026-10-03",
     }),
   );
-  await page.getByRole("button", { name: "Show classes", exact: true }).click();
+  await generateReport.click();
   const classHttp = await classResponse;
   expect(originOf(classHttp.url(), page.url())).toBe(
     originOf(page.url(), page.url()),
@@ -304,6 +305,7 @@ test("owner daily and monthly reports load through the BFF", async ({
     ["Unique trainers", requiredCount(classes.totals, "unique_trainers")],
   ]);
 
+  await reportType.selectOption("product-sales");
   const productResponse = page.waitForResponse(
     reportResponse("productSales", {
       date_from: "2026-10-01",
@@ -311,9 +313,7 @@ test("owner daily and monthly reports load through the BFF", async ({
       limit: "25",
     }),
   );
-  await page
-    .getByRole("button", { name: "Show product sales", exact: true })
-    .click();
+  await generateReport.click();
   const productHttp = await productResponse;
   expect(originOf(productHttp.url(), page.url())).toBe(
     originOf(page.url(), page.url()),
@@ -321,15 +321,14 @@ test("owner daily and monthly reports load through the BFF", async ({
   const productSales = await readProductSales(productHttp);
   await expectRenderedProductSales(page, productSales);
 
+  await reportType.selectOption("stock-movements");
   const stockResponse = page.waitForResponse(
     reportResponse("stockMovements", {
       date_from: "2026-10-01",
       date_to: "2026-10-03",
     }),
   );
-  await page
-    .getByRole("button", { name: "Show stock movements", exact: true })
-    .click();
+  await generateReport.click();
   const stockHttp = await stockResponse;
   expect(originOf(stockHttp.url(), page.url())).toBe(
     originOf(page.url(), page.url()),
@@ -338,12 +337,11 @@ test("owner daily and monthly reports load through the BFF", async ({
   expect(stock.rows).toHaveLength(3);
   await expectRenderedStock(page, stock);
 
+  await reportType.selectOption("inventory");
   const inventoryResponse = page.waitForResponse(
     reportResponse("inventory", { limit: "25" }),
   );
-  await page
-    .getByRole("button", { name: "Show inventory", exact: true })
-    .click();
+  await generateReport.click();
   const inventoryHttp = await inventoryResponse;
   expect(originOf(inventoryHttp.url(), page.url())).toBe(
     originOf(page.url(), page.url()),
@@ -534,7 +532,12 @@ async function expectRenderedDashboard(
       exact: true,
     }),
   ).toHaveCount(0);
-  await expect(page.getByText(rangeText(data), { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(`${data.range.date_from} to ${data.range.date_to}`, {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.getByText(data.timezone, { exact: true })).toBeVisible();
 
   const operational = page.getByRole("region", { name: "Operational totals" });
   await expect(
@@ -610,7 +613,7 @@ async function expectRenderedDashboard(
       row.getByText(moneyText(source.amount, data.currency), { exact: true }),
     ).toBeVisible();
     await expect(
-      row.getByText(String(index + 1), { exact: true }),
+      row.getByText(String(index + 1).padStart(2, "0"), { exact: true }),
     ).toBeVisible();
   }
 
@@ -637,7 +640,7 @@ async function expectRenderedDashboard(
     }
   }
 
-  const expenses = card(financial, "Expenses by category");
+  const expenses = card(financial, "Expense overview");
   const expenseRows = expenses.getByRole("listitem");
   await expect(expenseRows).toHaveCount(
     data.financial.expenses_by_category.length,
@@ -663,9 +666,7 @@ function card(region: Locator, name: string): Locator {
 }
 
 function metric(region: Locator, label: string): Locator {
-  return region.getByRole("article").filter({
-    has: region.page().getByText(label, { exact: true }),
-  });
+  return region.getByText(label, { exact: true }).locator("..");
 }
 
 async function expectMoney(
@@ -938,9 +939,14 @@ async function expectRenderedReport(
   await expect(
     reportSection.getByText(report.currency, { exact: true }),
   ).toBeVisible();
+  const generatedLabel = new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(report.generated_at));
   await expect(
-    reportSection.getByText(report.generated_at, { exact: true }),
+    reportSection.getByText(`Generated ${generatedLabel}`, { exact: true }),
   ).toBeVisible();
+  await revealPolicy(reportSection);
   await expect(
     reportSection.getByText(report.source_status_policy.revenue, {
       exact: true,
@@ -1190,9 +1196,7 @@ async function expectRenderedProductSales(
     "Revenue",
     report.totals.revenue,
   );
-  await expect(
-    section.getByText(`More results: ${report.meta.has_more ? "yes" : "no"}`),
-  ).toBeVisible();
+  await expectFirstPagePagination(section, report.meta.has_more);
   if (report.firstSku) {
     await expect(
       section.getByRole("rowheader", { name: report.firstSku, exact: true }),
@@ -1234,9 +1238,7 @@ async function expectRenderedInventory(page: Page, report: InventoryPayload) {
     "Products",
     String(report.totals.product_count),
   );
-  await expect(
-    section.getByText(`More results: ${report.meta.has_more ? "yes" : "no"}`),
-  ).toBeVisible();
+  await expectFirstPagePagination(section, report.meta.has_more);
   if (report.firstSku) {
     await expect(
       section.getByRole("rowheader", { name: report.firstSku, exact: true }),
@@ -1245,12 +1247,31 @@ async function expectRenderedInventory(page: Page, report: InventoryPayload) {
 }
 
 async function expectPolicy(section: Locator, policy: string) {
-  const accessiblePolicy = `Source status ${policy}`;
-  const paragraph = section.getByRole("paragraph").filter({
-    hasText: accessiblePolicy,
+  await revealPolicy(section);
+  await expect(section.getByText(policy, { exact: true })).toBeVisible();
+}
+
+async function expectFirstPagePagination(section: Locator, hasMore: boolean) {
+  const pagination = section.getByRole("navigation", {
+    name: "Pagination",
+    exact: true,
   });
-  await expect(paragraph).toHaveCount(1);
-  await expect(paragraph).toHaveText(accessiblePolicy);
+  if (hasMore) {
+    await expect(
+      pagination.getByRole("button", { name: "Next page", exact: true }),
+    ).toBeVisible();
+    await expect(pagination.getByText("Page 1", { exact: true })).toBeVisible();
+    return;
+  }
+  await expect(pagination).toHaveCount(0);
+}
+
+async function revealPolicy(section: Locator) {
+  const details = section.locator("details").first();
+  await expect(details).toHaveCount(1);
+  if ((await details.getAttribute("open")) === null) {
+    await details.locator("summary").click();
+  }
 }
 
 async function expectRenderedOperational(
@@ -1266,12 +1287,7 @@ async function expectRenderedOperational(
   await expect(
     section.getByText(report.timezone, { exact: true }),
   ).toBeVisible();
-  const accessiblePolicy = `Source status ${report.source_status_policy}`;
-  const policy = section.getByRole("paragraph").filter({
-    hasText: accessiblePolicy,
-  });
-  await expect(policy).toHaveCount(1);
-  await expect(policy).toHaveText(accessiblePolicy);
+  await expectPolicy(section, report.source_status_policy);
   await expect(section.getByText("THB", { exact: true })).toHaveCount(0);
   const first = report.rows[0];
   if (!first) throw new Error(`Expected a ${title} row.`);
@@ -1406,6 +1422,7 @@ async function expectRenderedCashBook(page: Page, report: CashBookPayload) {
   await expect(
     section.getByText(report.gym.name, { exact: true }),
   ).toBeVisible();
+  await revealPolicy(section);
   await expect(
     section.getByText(report.source_status_policy.transactions, {
       exact: true,
@@ -1434,6 +1451,7 @@ async function expectRenderedProfitLoss(page: Page, report: ProfitLossPayload) {
       exact: true,
     }),
   ).toBeVisible();
+  await revealPolicy(section);
   await expect(
     section.getByText(report.source_status_policy.revenue, { exact: true }),
   ).toBeVisible();

@@ -13,7 +13,7 @@ jobs:
     name: Secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
@@ -58,7 +58,7 @@ jobs:
       JWT_MEMBER_AUDIENCE: gym-platform-member
       REFRESH_TOKEN_PEPPER: ci-refresh-pepper-not-for-production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14.7"
@@ -117,8 +117,8 @@ jobs:
       ALLOW_INSECURE_LOCALHOST_COOKIES: "true"
       BFF_SHARED_SECRET: ci-bff-shared-secret-32-chars-min
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "24.20.0"
           cache: npm
@@ -141,18 +141,18 @@ jobs:
     name: Mobile
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "24.20.0"
           cache: npm
           cache-dependency-path: mobile/package-lock.json
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
           cache: gradle
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses >/dev/null || true
@@ -180,8 +180,8 @@ jobs:
     name: Mobile iOS
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "24.20.0"
           cache: npm
@@ -238,13 +238,13 @@ jobs:
       ACCESS_EXPIRED_CODE: ACCESS_TOKEN_EXPIRED
       ALLOW_INSECURE_LOCALHOST_COOKIES: "true"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14.7"
           cache: pip
           cache-dependency-path: backend/requirements/development.txt
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "24.20.0"
           cache: npm
@@ -277,7 +277,7 @@ jobs:
     name: Production artifacts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14.7"
