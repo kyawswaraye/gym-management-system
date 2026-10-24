@@ -2157,17 +2157,11 @@ def _lint_job(job: object, name: str) -> list[str]:
         or concurrency.get("cancel-in-progress") is not False
     ):
         errors.append(f"{name} concurrency must not cancel an active deployment")
-    if name == "resolve":
-        if "environment" in job:
-            errors.append("resolve must not select a deployment environment")
-    elif job.get("environment") != name.removeprefix("deploy-") and job.get(
-        "environment"
-    ) != ("gym-staging" if name == "deploy-staging" else "gym-production"):
-        errors.append(f"{name} environment is not the protected name")
-    if name == "deploy-staging" and job.get("environment") != "gym-staging":
-        errors.append("deploy-staging environment must be gym-staging")
-    if name == "deploy-production" and job.get("environment") != "gym-production":
-        errors.append("deploy-production environment must be gym-production")
+    if "environment" in job:
+        errors.append(
+            f"{name} must not select a GitHub environment; private repositories "
+            "fail those jobs before a runner starts"
+        )
     if (
         name == "deploy-staging"
         and job.get("if") != "needs.resolve.outputs.target == 'staging'"

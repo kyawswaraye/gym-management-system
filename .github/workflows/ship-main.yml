@@ -61,8 +61,28 @@ jobs:
             return 1
           }
 
+          wait_until_complete() {
+            local run_id="$1"
+            local attempt status conclusion
+            for attempt in $(seq 1 360); do
+              status="$(gh run view "$run_id" --json status,conclusion --jq '.status')"
+              conclusion="$(gh run view "$run_id" --json status,conclusion --jq '.conclusion')"
+              if [ "$status" = "completed" ]; then
+                if [ "$conclusion" = "success" ]; then
+                  echo "run $run_id succeeded"
+                  return 0
+                fi
+                echo "run $run_id finished $conclusion" >&2
+                return 1
+              fi
+              sleep 15
+            done
+            echo "run $run_id did not finish" >&2
+            return 1
+          }
+
           ci_id="$(wait_for_run ci.yml push)"
-          gh run watch "$ci_id" --exit-status
+          wait_until_complete "$ci_id"
 
           git fetch origin --tags
           tag="$(python3 - <<'PY'
@@ -108,7 +128,7 @@ jobs:
               echo "image release did not start" >&2
               exit 1
             fi
-            gh run watch "$release_id" --exit-status
+            wait_until_complete "$release_id"
           fi
 
           stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -131,5 +151,5 @@ jobs:
             echo "production deploy run did not start" >&2
             exit 1
           fi
-          gh run watch "$deploy_id" --exit-status
+          wait_until_complete "$deploy_id"
           echo "deployed $tag $SHA"

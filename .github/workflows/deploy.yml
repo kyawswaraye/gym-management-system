@@ -110,7 +110,6 @@ jobs:
     if: needs.resolve.outputs.target == 'staging'
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    environment: gym-staging
     permissions:
       contents: read
       actions: read
@@ -169,7 +168,6 @@ jobs:
     if: needs.resolve.outputs.target == 'production'
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    environment: gym-production
     permissions:
       contents: read
       actions: read
