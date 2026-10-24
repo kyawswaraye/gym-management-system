@@ -1627,17 +1627,23 @@ def _execute_compose_step(
     if name == "skip-backup-checkpoint":
         return
     if name == "backup-checkpoint":
+        backup_service = (
+            "backup-full"
+            if (request.state_dir / ACTIVE_STATE_NAME).is_file()
+            else "backup-bootstrap"
+        )
+        profile = "backup" if backup_service == "backup-full" else "bootstrap"
         _run_checked(
             runner,
             compose_argv(
                 project,
                 compose_file,
                 "--profile",
-                "backup",
+                profile,
                 "run",
                 "--rm",
                 "--no-deps",
-                "backup-full",
+                backup_service,
             ),
             14700,
         )

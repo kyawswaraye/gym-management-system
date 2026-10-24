@@ -524,7 +524,7 @@ def test_commands_and_evidence_do_not_leak_secrets(tmp_path: Path) -> None:
     assert any("migrate" in command for command in calls)
 
 
-def test_production_checkpoint_precedes_migration_and_failure_stops(tmp_path: Path) -> None:
+def test_first_production_checkpoint_bootstraps_before_migration(tmp_path: Path) -> None:
     module = deploy()
     steps = module.deployment_steps("production", "deploy", "not-applicable")
     assert steps.index("acquire-lock") < steps.index("backup-checkpoint")
@@ -535,7 +535,7 @@ def test_production_checkpoint_precedes_migration_and_failure_stops(tmp_path: Pa
     module.build_bundle(ROOT, ROOT, payload, bundle)
     root = tmp_path / "host"
     env_file = write_host(root, "production")
-    calls, run = runner_factory(fail="backup-full")
+    calls, run = runner_factory(fail="backup-bootstrap")
     with pytest.raises(module.DeployError):
         module.execute_deployment(
             module.HostRequest(
@@ -555,7 +555,8 @@ def test_production_checkpoint_precedes_migration_and_failure_stops(tmp_path: Pa
             run,
         )
     rendered = json.dumps(calls)
-    assert "backup-full" in rendered
+    assert "backup-bootstrap" in rendered
+    assert "backup-full" not in rendered
     assert not any(command[-1] == "migrate" for command in calls if command)
 
 
