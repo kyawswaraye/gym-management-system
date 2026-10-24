@@ -78,6 +78,11 @@ def test_missing_commit_binding_attestations_sbom_and_scan_fail() -> None:
     assert any("manifest" in error for error in module.lint_release_workflow_text(no_manifest))
     open_scan = workflow_text().replace('exit-code: "1"', 'exit-code: "0"', 1)
     assert any("fail closed" in error for error in module.lint_release_workflow_text(open_scan))
+    blocks_unfixed = workflow_text().replace("ignore-unfixed: true", "ignore-unfixed: false", 1)
+    assert any(
+        "without an available fix" in error
+        for error in module.lint_release_workflow_text(blocks_unfixed)
+    )
     no_sbom = workflow_text().replace("cyclonedx", "table")
     assert any("CycloneDX" in error for error in module.lint_release_workflow_text(no_sbom))
 

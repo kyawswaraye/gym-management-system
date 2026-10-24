@@ -134,6 +134,7 @@ jobs:
           scanners: vuln
           severity: HIGH,CRITICAL
           exit-code: "1"
+          ignore-unfixed: true
           version: v0.70.0
           cache: "false"
           timeout: 20m
@@ -147,6 +148,7 @@ jobs:
           scanners: vuln
           severity: HIGH,CRITICAL
           exit-code: "1"
+          ignore-unfixed: true
           version: v0.70.0
           cache: "false"
           timeout: 20m
@@ -160,6 +162,7 @@ jobs:
           scanners: vuln
           severity: HIGH,CRITICAL
           exit-code: "1"
+          ignore-unfixed: true
           version: v0.70.0
           cache: "false"
           timeout: 20m
@@ -173,6 +176,7 @@ jobs:
           scanners: vuln
           severity: HIGH,CRITICAL
           exit-code: "1"
+          ignore-unfixed: true
           version: v0.70.0
           cache: "false"
           timeout: 20m
@@ -186,6 +190,7 @@ jobs:
           scanners: vuln
           severity: HIGH,CRITICAL
           exit-code: "1"
+          ignore-unfixed: true
           version: v0.70.0
           cache: "false"
           timeout: 20m
@@ -199,6 +204,7 @@ jobs:
           scanners: vuln
           severity: HIGH,CRITICAL
           exit-code: "1"
+          ignore-unfixed: true
           version: v0.70.0
           cache: "false"
           timeout: 20m

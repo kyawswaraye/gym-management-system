@@ -10,7 +10,13 @@ WORKDIR /app
 RUN useradd --uid 10001 --home-dir /tmp --no-create-home --shell /usr/sbin/nologin api
 
 COPY requirements/base.txt requirements/production.txt requirements/
-RUN pip install --no-cache-dir -r requirements/production.txt
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir --upgrade pip==26.2.2 \
+    && python -m pip install --no-cache-dir -r requirements/production.txt \
+    && python -m pip uninstall -y pip \
+    && rm -rf /usr/local/lib/python3.14/ensurepip
 
 COPY gunicorn.conf.py /app/gunicorn.conf.py
 COPY manage.py /app/manage.py

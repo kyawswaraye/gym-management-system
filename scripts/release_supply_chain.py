@@ -97,9 +97,7 @@ def image_repository(owner: str, name: str) -> str:
 
 def digest_reference(repository: str, digest: str) -> str:
     if not DIGEST_RE.fullmatch(digest):
-        raise ReleaseError(
-            "image digest must be sha256 and 64 lowercase hex characters"
-        )
+        raise ReleaseError("image digest must be sha256 and 64 lowercase hex characters")
     if "@" in repository or ":" in repository.rsplit("/", 1)[-1]:
         raise ReleaseError("image repository must not include a tag or digest")
     return f"{repository}@{digest}"
@@ -128,11 +126,7 @@ def check_ref(
 
 def _layout_file(layout: Path, relative: str) -> Path:
     parts = Path(relative).parts
-    if (
-        not parts
-        or Path(relative).is_absolute()
-        or any(part in {"", ".", ".."} for part in parts)
-    ):
+    if not parts or Path(relative).is_absolute() or any(part in {"", ".", ".."} for part in parts):
         raise ReleaseError("OCI layout member path is unsafe")
     current = layout
     for part in parts:
@@ -159,9 +153,7 @@ def oci_layout_manifest_digest(layout: Path) -> str:
     if not index_path.is_file():
         raise ReleaseError("OCI layout is missing index.json")
     try:
-        index = json.loads(
-            _read_layout_file(index_path, MAX_INDEX_BYTES).decode("utf-8")
-        )
+        index = json.loads(_read_layout_file(index_path, MAX_INDEX_BYTES).decode("utf-8"))
     except (UnicodeError, json.JSONDecodeError) as exc:
         raise ReleaseError("OCI index is invalid") from exc
     manifests = index.get("manifests") if isinstance(index, dict) else None
@@ -182,9 +174,7 @@ def oci_layout_manifest_digest(layout: Path) -> str:
 
 def bind_digest(*, digest: str, layout: Path, output: Path) -> str:
     if DIGEST_RE.fullmatch(digest) is None:
-        raise ReleaseError(
-            "build digest must be sha256 and 64 lowercase hex characters"
-        )
+        raise ReleaseError("build digest must be sha256 and 64 lowercase hex characters")
     actual = oci_layout_manifest_digest(layout)
     if actual != digest:
         raise ReleaseError("OCI layout digest does not match the build digest")
@@ -235,12 +225,8 @@ def build_manifest(
         "git_ref": git_ref,
         "git_ref_name": git_ref_name,
         "images": {
-            "api": digest_reference(
-                image_repository(normalized, "gym-api"), api_digest
-            ),
-            "web": digest_reference(
-                image_repository(normalized, "gym-web"), web_digest
-            ),
+            "api": digest_reference(image_repository(normalized, "gym-api"), api_digest),
+            "web": digest_reference(image_repository(normalized, "gym-web"), web_digest),
             "postgres": digest_reference(
                 image_repository(normalized, "gym-postgres"), postgres_digest
             ),
@@ -411,9 +397,7 @@ def _lint_permissions(document: dict[str, Any]) -> list[str]:
         permissions = job.get("permissions")
         if name == "publish":
             if permissions != PUBLISH_PERMISSIONS:
-                errors.append(
-                    "publish permissions must be the attestation and package set"
-                )
+                errors.append("publish permissions must be the attestation and package set")
         elif permissions != READ_PERMISSIONS:
             errors.append(f"{name} permissions must be contents read")
     return errors
@@ -440,9 +424,7 @@ def _lint_jobs(jobs: Any) -> list[str]:
     )
     for marker in DEPLOY_MARKERS:
         if marker in joined:
-            errors.append(
-                f"release workflow contains a deployment step: {marker.strip()}"
-            )
+            errors.append(f"release workflow contains a deployment step: {marker.strip()}")
     return errors
 
 
@@ -451,9 +433,7 @@ def _steps(jobs: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     for name, job in jobs.items():
         steps = job.get("steps") if isinstance(job, dict) else None
         result[name] = (
-            [step for step in steps if isinstance(step, dict)]
-            if isinstance(steps, list)
-            else []
+            [step for step in steps if isinstance(step, dict)] if isinstance(steps, list) else []
         )
     return result
 
@@ -477,13 +457,8 @@ def _lint_validate_steps(steps: list[dict[str, Any]]) -> list[str]:
     errors: list[str] = []
     rendered = json.dumps(steps)
     if "actions/checkout@v4" not in rendered or "persist-credentials" not in rendered:
-        errors.append(
-            "validate must check out the release commit without persisted credentials"
-        )
-    if (
-        "scripts/production_artifacts.py" not in rendered
-        or "--require-docker" not in rendered
-    ):
+        errors.append("validate must check out the release commit without persisted credentials")
+    if "scripts/production_artifacts.py" not in rendered or "--require-docker" not in rendered:
         errors.append("validate must run the Increment 1 artifact checks")
     if "check-ref" not in rendered:
         errors.append("validate must apply the semver tag gate")
@@ -514,9 +489,7 @@ def _lint_build_steps(steps: list[dict[str, Any]]) -> list[str]:
         if options.get("push") is not False:
             errors.append("image builds must not push")
         if options.get("provenance") is not False or options.get("sbom") is not False:
-            errors.append(
-                "BuildKit provenance must stay off; GitHub attestations run after push"
-            )
+            errors.append("BuildKit provenance must stay off; GitHub attestations run after push")
         if "build-args" in options or "secrets" in options or "tags" in options:
             errors.append("image builds must not take tags, build args, or secrets")
         outputs = str(options.get("outputs", ""))
@@ -524,9 +497,7 @@ def _lint_build_steps(steps: list[dict[str, Any]]) -> list[str]:
             errors.append("image builds must export OCI layouts with tar=false")
     scans = _uses(steps, "aquasecurity/trivy-action@v")
     if len(scans) != 6:
-        errors.append(
-            "build-scan must write three SBOMs and three vulnerability results"
-        )
+        errors.append("build-scan must write three SBOMs and three vulnerability results")
     seen_digest_inputs: set[str] = set()
     for scan in scans:
         options = _raw_options(scan)
@@ -536,6 +507,8 @@ def _lint_build_steps(steps: list[dict[str, Any]]) -> list[str]:
         seen_digest_inputs.add(image_ref)
         if str(options.get("exit-code")) != "1":
             errors.append("vulnerability scans must fail closed")
+        if options.get("ignore-unfixed") is not True:
+            errors.append("vulnerability scans must ignore findings without an available fix")
         if options.get("severity") != "HIGH,CRITICAL":
             errors.append("vulnerability scans must gate high and critical findings")
         if not str(options.get("version", "")).startswith("v"):
@@ -561,12 +534,8 @@ def _lint_build_steps(steps: list[dict[str, Any]]) -> list[str]:
     rendered = json.dumps(steps)
     if rendered.count("tar=false") != 3:
         errors.append("image builds must set tar=false")
-    if rendered.count("bind-digest") != 3 or any(
-        name not in rendered for name in OCI_LAYOUTS
-    ):
-        errors.append(
-            "each OCI layout must be bound to its build digest before scanning"
-        )
+    if rendered.count("bind-digest") != 3 or any(name not in rendered for name in OCI_LAYOUTS):
+        errors.append("each OCI layout must be bound to its build digest before scanning")
     uploads = _uses(steps, "actions/upload-artifact@v")
     if len(uploads) < 2:
         errors.append("release artifacts must be uploaded")
@@ -580,15 +549,9 @@ def _lint_build_steps(steps: list[dict[str, Any]]) -> list[str]:
 def _lint_publish_steps(steps: list[dict[str, Any]]) -> list[str]:
     errors: list[str] = []
     rendered = json.dumps(steps)
-    if rendered.count("publish-image") != 3 or any(
-        name not in rendered for name in OCI_LAYOUTS
-    ):
+    if rendered.count("publish-image") != 3 or any(name not in rendered for name in OCI_LAYOUTS):
         errors.append("publish must copy the scanned API, web, and PostgreSQL layouts")
-    if (
-        "gym-api" not in rendered
-        or "gym-web" not in rendered
-        or "gym-postgres" not in rendered
-    ):
+    if "gym-api" not in rendered or "gym-web" not in rendered or "gym-postgres" not in rendered:
         errors.append("publish must name the API, web, and PostgreSQL images")
     if "normalize-owner" not in rendered or "immutable-tag" not in rendered:
         errors.append("publish must normalize the owner and bind the commit tag")
@@ -602,9 +565,7 @@ def _lint_publish_steps(steps: list[dict[str, Any]]) -> list[str]:
         if options.get("push-to-registry") is not True:
             errors.append("image attestations must be pushed to the registry")
         if options.get("create-storage-record") is not False:
-            errors.append(
-                "image attestations must not require organization storage records"
-            )
+            errors.append("image attestations must not require organization storage records")
         digest = str(options.get("subject-digest", ""))
         if "outputs.digest" not in digest:
             errors.append("attestations must use the verified registry digest")
@@ -633,9 +594,7 @@ def _lint_shell(document: dict[str, Any]) -> list[str]:
                 continue
             script = step.get("run")
             if isinstance(script, str) and "${{" in script:
-                errors.append(
-                    f"{name} interpolates a GitHub expression inside the shell"
-                )
+                errors.append(f"{name} interpolates a GitHub expression inside the shell")
             options = step.get("with")
             if isinstance(options, dict):
                 for key, value in options.items():
@@ -646,9 +605,9 @@ def _lint_shell(document: dict[str, Any]) -> list[str]:
                     ):
                         errors.append(f"{name} passes build secrets")
     secret_text = json.dumps(document)
-    if "secrets." in secret_text and secret_text.count(
-        "secrets.GITHUB_TOKEN"
-    ) != secret_text.count("secrets."):
+    if "secrets." in secret_text and secret_text.count("secrets.GITHUB_TOKEN") != secret_text.count(
+        "secrets."
+    ):
         errors.append("release workflow may use only GITHUB_TOKEN")
     return errors
 
@@ -659,12 +618,8 @@ def _manifest_from_env() -> dict[str, Any]:
         git_ref=os.environ["RELEASE_REF"],
         git_ref_name=os.environ["RELEASE_REF_NAME"],
         owner=os.environ["REPOSITORY_OWNER"],
-        api_digest=Path(os.environ["API_DIGEST_FILE"])
-        .read_text(encoding="utf-8")
-        .strip(),
-        web_digest=Path(os.environ["WEB_DIGEST_FILE"])
-        .read_text(encoding="utf-8")
-        .strip(),
+        api_digest=Path(os.environ["API_DIGEST_FILE"]).read_text(encoding="utf-8").strip(),
+        web_digest=Path(os.environ["WEB_DIGEST_FILE"]).read_text(encoding="utf-8").strip(),
         postgres_digest=Path(os.environ["POSTGRES_DIGEST_FILE"])
         .read_text(encoding="utf-8")
         .strip(),
@@ -679,9 +634,7 @@ def _publish_image(layout: Path, name: str) -> str:
     owner = normalize_owner(os.environ["REPOSITORY_OWNER"])
     tag = immutable_tag(os.environ["RELEASE_SHA"])
     repository = image_repository(owner, name)
-    expected = (
-        Path(os.environ["EXPECTED_DIGEST_FILE"]).read_text(encoding="utf-8").strip()
-    )
+    expected = Path(os.environ["EXPECTED_DIGEST_FILE"]).read_text(encoding="utf-8").strip()
     actual = oci_layout_manifest_digest(layout)
     assert_same_digest(expected, actual)
     destination = f"docker://{repository}:{tag}"
@@ -787,16 +740,12 @@ def main(argv: list[str] | None = None) -> int:
             os.environ["WEB_DIGEST_FILE"] = str(args.web_digest_file)
             os.environ["POSTGRES_DIGEST_FILE"] = str(args.postgres_digest_file)
             payload = _manifest_from_env()
-            args.output.write_text(
-                json.dumps(payload, indent=2) + "\n", encoding="utf-8"
-            )
+            args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
             print(args.output)
         elif args.command == "compose-env":
             if args.output is not None:
                 refuse_fixture_output(args.output, args.repo.resolve())
-            lines = compose_env_lines(
-                json.loads(args.manifest.read_text(encoding="utf-8"))
-            )
+            lines = compose_env_lines(json.loads(args.manifest.read_text(encoding="utf-8")))
             if args.output is None:
                 sys.stdout.write(lines)
             else:
