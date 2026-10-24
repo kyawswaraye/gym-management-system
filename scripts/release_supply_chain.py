@@ -22,11 +22,9 @@ DIGEST_RE = re.compile(r"sha256:[0-9a-f]{64}\Z")
 SHA_RE = re.compile(r"[0-9a-f]{40}\Z")
 SEMVER_RE = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+\Z")
 OWNER_RE = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?\Z")
+REPOSITORY_NAME_RE = re.compile(r"[A-Za-z0-9_.-]{1,100}\Z")
 TIMESTAMP_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z")
 IMAGE_NAMES = ("gym-api", "gym-web", "gym-postgres")
-ATTEST_BUILD_PROVENANCE_ACTION = (
-    "actions/attest-build-provenance@00014ed6ed5efc5b1ab7f7f34a39eb55d41aa4f8"
-)
 OCI_LAYOUTS = ("release/api", "release/web", "release/postgres")
 OCI_OUTPUTS = (
     "type=oci,dest=release/api,tar=false",
@@ -39,7 +37,6 @@ PUBLISH_PERMISSIONS = {
     "contents": "read",
     "packages": "write",
     "id-token": "write",
-    "attestations": "write",
 }
 READ_PERMISSIONS = {"contents": "read"}
 RUNTIME_BASELINE = {
@@ -558,22 +555,17 @@ def _lint_publish_steps(steps: list[dict[str, Any]]) -> list[str]:
         errors.append("publish must name the API, web, and PostgreSQL images")
     if "normalize-owner" not in rendered or "immutable-tag" not in rendered:
         errors.append("publish must normalize the owner and bind the commit tag")
-    attests = _uses(steps, ATTEST_BUILD_PROVENANCE_ACTION)
-    if len(attests) != 3:
+    if rendered.count("cosign attest ") != 3:
         errors.append("publish must record build provenance for each image digest")
-    if any(str(step.get("uses", "")).startswith("actions/attest@") for step in steps):
-        errors.append("generic attestation is not build provenance")
-    for attest in attests:
-        options = _raw_options(attest)
-        if options.get("push-to-registry") is not True:
-            errors.append("image attestations must be pushed to the registry")
-        if options.get("create-storage-record") is not False:
-            errors.append("image attestations must not require organization storage records")
-        digest = str(options.get("subject-digest", ""))
-        if "outputs.digest" not in digest:
-            errors.append("attestations must use the verified registry digest")
-        if ":" in str(options.get("subject-name", "")):
-            errors.append("attestation subject names must not include a tag")
+    if "sigstore/cosign-installer@" not in rendered:
+        errors.append("publish must install the pinned Cosign verifier")
+    if "write-provenance" not in rendered or "slsaprovenance" not in rendered:
+        errors.append("image attestations must use release-bound SLSA provenance")
+    if any(
+        str(step.get("uses", "")).startswith("actions/attest")
+        for step in steps
+    ):
+        errors.append("GitHub-hosted attestations are unavailable for this repository")
     if "write-manifest" not in rendered or "postgres-digest-file" not in rendered:
         errors.append("publish must write the digest manifest, including PostgreSQL")
     if "compose.env.example" in rendered:
@@ -683,6 +675,49 @@ def _read_digest_output(value: str) -> str:
     return digest
 
 
+def build_provenance(
+    *, sha: str, git_ref: str, repository: str, run_id: str
+) -> dict[str, Any]:
+    require_sha = SHA_RE.fullmatch(sha)
+    if require_sha is None:
+        raise ReleaseError("provenance commit must be a full lowercase SHA")
+    if not git_ref.startswith("refs/tags/") or SEMVER_RE.fullmatch(git_ref[10:]) is None:
+        raise ReleaseError("provenance ref must be a semantic-version tag")
+    parts = repository.split("/")
+    if (
+        len(parts) != 2
+        or OWNER_RE.fullmatch(parts[0].lower()) is None
+        or REPOSITORY_NAME_RE.fullmatch(parts[1]) is None
+    ):
+        raise ReleaseError("provenance repository must be owner/name")
+    if not run_id.isdigit():
+        raise ReleaseError("provenance run id must be numeric")
+    source = f"git+https://github.com/{repository}@{git_ref}"
+    workflow = f"https://github.com/{repository}/.github/workflows/{WORKFLOW_NAME}@{git_ref}"
+    return {
+        "builder": {"id": workflow},
+        "buildType": "https://actions.github.io/buildtypes/workflow/v1",
+        "invocation": {
+            "configSource": {
+                "uri": source,
+                "digest": {"sha1": sha},
+                "entryPoint": f".github/workflows/{WORKFLOW_NAME}",
+            },
+            "parameters": {"repository": repository, "ref": git_ref},
+        },
+        "metadata": {
+            "buildInvocationId": f"https://github.com/{repository}/actions/runs/{run_id}",
+            "completeness": {
+                "parameters": True,
+                "environment": True,
+                "materials": True,
+            },
+            "reproducible": False,
+        },
+        "materials": [{"uri": source, "digest": {"sha1": sha}}],
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -707,6 +742,8 @@ def main(argv: list[str] | None = None) -> int:
     manifest.add_argument("--api-digest-file", type=Path, required=True)
     manifest.add_argument("--web-digest-file", type=Path, required=True)
     manifest.add_argument("--postgres-digest-file", type=Path, required=True)
+    provenance = commands.add_parser("write-provenance")
+    provenance.add_argument("--output", type=Path, required=True)
     compose = commands.add_parser("compose-env")
     compose.add_argument("--manifest", type=Path, required=True)
     compose.add_argument("--output", type=Path)
@@ -743,6 +780,15 @@ def main(argv: list[str] | None = None) -> int:
             os.environ["WEB_DIGEST_FILE"] = str(args.web_digest_file)
             os.environ["POSTGRES_DIGEST_FILE"] = str(args.postgres_digest_file)
             payload = _manifest_from_env()
+            args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            print(args.output)
+        elif args.command == "write-provenance":
+            payload = build_provenance(
+                sha=os.environ["RELEASE_SHA"],
+                git_ref=os.environ["RELEASE_REF"],
+                repository=os.environ["RELEASE_REPOSITORY"],
+                run_id=os.environ["RELEASE_RUN_ID"],
+            )
             args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
             print(args.output)
         elif args.command == "compose-env":

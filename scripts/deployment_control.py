@@ -8,6 +8,7 @@ restore, RPO, RTO, or an authorized rollback.
 from __future__ import annotations
 
 import argparse
+import base64
 import fcntl
 import hashlib
 import io
@@ -429,6 +430,16 @@ def _statement(item: object) -> dict[str, Any] | None:
         statement = verification["statement"]
         return statement if isinstance(statement, dict) else None
     statement = item.get("statement")
+    if isinstance(statement, dict):
+        return statement
+    payload = item.get("payload")
+    if not isinstance(payload, str):
+        return None
+    try:
+        decoded = base64.b64decode(payload, validate=True)
+        statement = json.loads(decoded)
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
     return statement if isinstance(statement, dict) else None
 
 
@@ -492,14 +503,20 @@ def attestation_command(image_ref: str, repository: str) -> tuple[str, ...]:
     if not image_ref.startswith("ghcr.io/"):
         raise DeployError("attestation subject must be a GHCR digest")
     return (
-        "gh",
-        "attestation",
-        "verify",
-        f"oci://{image_ref}",
-        "--repo",
-        repository,
-        "--format",
+        "cosign",
+        "verify-attestation",
+        "--type",
+        "slsaprovenance",
+        "--certificate-identity-regexp",
+        (
+            rf"^https://github\.com/{re.escape(repository)}/\.github/workflows/"
+            rf"{RELEASE_WORKFLOW}@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$"
+        ),
+        "--certificate-oidc-issuer",
+        "https://token.actions.githubusercontent.com",
+        "--output",
         "json",
+        image_ref,
     )
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import importlib.util
 import io
 import json
@@ -393,8 +394,9 @@ def test_attestation_verifier_rejects_subject_mismatch() -> None:
     module = deploy()
     image = f"ghcr.io/acme/gym-api@{API}"
     command = module.attestation_command(image, REPO)
-    assert command[:4] == ("gh", "attestation", "verify", f"oci://{image}")
-    assert "--repo" in command and REPO in command
+    assert command[:2] == ("cosign", "verify-attestation")
+    assert "--certificate-identity-regexp" in command
+    assert command[-1] == image
 
     def fake(cmd: tuple[str, ...], timeout: int = 30):
         del cmd, timeout
@@ -405,7 +407,8 @@ def test_attestation_verifier_rejects_subject_mismatch() -> None:
                 "buildDefinition": {"externalParameters": {"workflow": {"repository": REPO}}}
             },
         }
-        body = json.dumps([{"verificationResult": {"statement": statement}}])
+        payload = base64.b64encode(json.dumps(statement).encode()).decode()
+        body = json.dumps([{"payload": payload, "payloadType": "application/vnd.dsse.envelope.v1"}])
         return module.CommandResult(0, body)
 
     with pytest.raises(module.DeployError):

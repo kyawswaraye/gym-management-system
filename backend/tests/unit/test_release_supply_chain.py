@@ -66,8 +66,8 @@ def test_missing_commit_binding_attestations_sbom_and_scan_fail() -> None:
     unbound = workflow_text().replace("github.sha", "github.ref")
     assert any("commit" in error for error in module.lint_release_workflow_text(unbound))
     unattested = workflow_text().replace(
-        module.ATTEST_BUILD_PROVENANCE_ACTION,
-        "actions/attest@v4",
+        "cosign attest ",
+        "cosign sign ",
         1,
     )
     assert any(
@@ -118,6 +118,7 @@ def test_manifest_feeds_digest_only_compose_env(tmp_path: Path) -> None:
     assert manifest["git_commit"] == "a" * 40
     assert manifest["runtime_baseline"]["python"] == "3.14.7"
     assert manifest["runtime_baseline"]["pgbackrest"] == "2.60.0"
+
     lines = module.compose_env_lines(manifest)
     assert lines == (
         f"API_IMAGE=ghcr.io/acmeorg/gym-api@{API_DIGEST}\n"
@@ -150,6 +151,28 @@ def test_manifest_feeds_digest_only_compose_env(tmp_path: Path) -> None:
         == 0
     )
     assert destination.read_text(encoding="utf-8") == lines
+
+
+def test_provenance_binds_repository_tag_commit_and_workflow() -> None:
+    module = load()
+    payload = module.build_provenance(
+        sha="a" * 40,
+        git_ref="refs/tags/v1.2.3",
+        repository="acme/gym",
+        run_id="42",
+    )
+    assert payload["builder"]["id"].endswith(
+        "/acme/gym/.github/workflows/image-release.yml@refs/tags/v1.2.3"
+    )
+    assert payload["invocation"]["parameters"]["repository"] == "acme/gym"
+    assert payload["materials"][0]["digest"]["sha1"] == "a" * 40
+    with pytest.raises(module.ReleaseError):
+        module.build_provenance(
+            sha="a" * 40,
+            git_ref="refs/heads/main",
+            repository="acme/gym",
+            run_id="42",
+        )
 
 
 def test_release_ref_and_owner_controls() -> None:
@@ -306,11 +329,11 @@ def test_layout_transport_and_provenance_cannot_regress() -> None:
     archive_errors = module.lint_publish_transport(archive_transport)
     assert any("OCI archive transport" in error for error in archive_errors)
     generic = workflow_text().replace(
-        module.ATTEST_BUILD_PROVENANCE_ACTION,
-        "actions/attest@v4",
+        "cosign attest ",
+        "cosign sign ",
     )
     errors = module.lint_release_workflow_text(generic)
-    assert any("generic attestation is not build provenance" in error for error in errors)
+    assert any("build provenance" in error for error in errors)
     default_tar = workflow_text().replace(",tar=false", "", 1)
     export_errors = module.lint_release_workflow_text(default_tar)
     assert any("tar=false" in error for error in export_errors)
