@@ -529,7 +529,16 @@ def verify_image_attestation(
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        raise DeployError("attestation verification output is invalid") from exc
+        try:
+            payload = [
+                json.loads(line)
+                for line in result.stdout.splitlines()
+                if line.strip()
+            ]
+        except json.JSONDecodeError:
+            raise DeployError("attestation verification output is invalid") from exc
+    if isinstance(payload, dict):
+        payload = [payload]
     return judge_attestation_payload(
         payload, image_ref=image_ref, repository=repository
     )

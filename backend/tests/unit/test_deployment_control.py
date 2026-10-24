@@ -408,7 +408,9 @@ def test_attestation_verifier_rejects_subject_mismatch() -> None:
             },
         }
         payload = base64.b64encode(json.dumps(statement).encode()).decode()
-        body = json.dumps([{"payload": payload, "payloadType": "application/vnd.dsse.envelope.v1"}])
+        body = json.dumps(
+            {"payload": payload, "payloadType": "application/vnd.dsse.envelope.v1"}
+        )
         return module.CommandResult(0, body)
 
     with pytest.raises(module.DeployError):
