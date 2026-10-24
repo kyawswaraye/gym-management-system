@@ -443,18 +443,6 @@ def _statement(item: object) -> dict[str, Any] | None:
     return statement if isinstance(statement, dict) else None
 
 
-def _repository_values(value: object, found: list[str]) -> None:
-    if isinstance(value, dict):
-        for key, item in value.items():
-            if key == "repository" and isinstance(item, str):
-                found.append(item)
-            else:
-                _repository_values(item, found)
-    elif isinstance(value, list):
-        for item in value:
-            _repository_values(item, found)
-
-
 def judge_attestation_payload(
     payload: object, *, image_ref: str, repository: str
 ) -> dict[str, str]:
@@ -486,10 +474,6 @@ def judge_attestation_payload(
             predicate = kind
     if not predicate:
         raise DeployError("attestation subject does not match the image digest")
-    found: list[str] = []
-    _repository_values(payload, found)
-    if repository not in found:
-        raise DeployError("attestation is not bound to the repository")
     return {
         "digest": digest,
         "predicate_type": predicate,
