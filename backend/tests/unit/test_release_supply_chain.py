@@ -66,7 +66,7 @@ def test_missing_commit_binding_attestations_sbom_and_scan_fail() -> None:
     unbound = workflow_text().replace("github.sha", "github.ref")
     assert any("commit" in error for error in module.lint_release_workflow_text(unbound))
     unattested = workflow_text().replace(
-        "actions/attest-build-provenance@v3",
+        module.ATTEST_BUILD_PROVENANCE_ACTION,
         "actions/attest@v4",
         1,
     )
@@ -306,7 +306,7 @@ def test_layout_transport_and_provenance_cannot_regress() -> None:
     archive_errors = module.lint_publish_transport(archive_transport)
     assert any("OCI archive transport" in error for error in archive_errors)
     generic = workflow_text().replace(
-        "actions/attest-build-provenance@v3",
+        module.ATTEST_BUILD_PROVENANCE_ACTION,
         "actions/attest@v4",
     )
     errors = module.lint_release_workflow_text(generic)

@@ -24,6 +24,9 @@ SEMVER_RE = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+\Z")
 OWNER_RE = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?\Z")
 TIMESTAMP_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z")
 IMAGE_NAMES = ("gym-api", "gym-web", "gym-postgres")
+ATTEST_BUILD_PROVENANCE_ACTION = (
+    "actions/attest-build-provenance@00014ed6ed5efc5b1ab7f7f34a39eb55d41aa4f8"
+)
 OCI_LAYOUTS = ("release/api", "release/web", "release/postgres")
 OCI_OUTPUTS = (
     "type=oci,dest=release/api,tar=false",
@@ -555,7 +558,7 @@ def _lint_publish_steps(steps: list[dict[str, Any]]) -> list[str]:
         errors.append("publish must name the API, web, and PostgreSQL images")
     if "normalize-owner" not in rendered or "immutable-tag" not in rendered:
         errors.append("publish must normalize the owner and bind the commit tag")
-    attests = _uses(steps, "actions/attest-build-provenance@v3")
+    attests = _uses(steps, ATTEST_BUILD_PROVENANCE_ACTION)
     if len(attests) != 3:
         errors.append("publish must record build provenance for each image digest")
     if any(str(step.get("uses", "")).startswith("actions/attest@") for step in steps):

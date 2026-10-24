@@ -293,21 +293,21 @@ jobs:
           reference="$(python3 scripts/release_supply_chain.py publish-image --layout release/postgres --name gym-postgres)"
           REFERENCE="$reference" python3 -c 'import os; ref=os.environ["REFERENCE"]; repo,digest=ref.rsplit("@",1); handle=open(os.environ["GITHUB_OUTPUT"],"a",encoding="utf-8"); handle.write(f"digest={digest}\nrepository={repo}\n"); handle.close()'
       - name: Attest API image
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@00014ed6ed5efc5b1ab7f7f34a39eb55d41aa4f8
         with:
           subject-name: ${{ steps.publish-api.outputs.repository }}
           subject-digest: ${{ steps.publish-api.outputs.digest }}
           push-to-registry: true
           create-storage-record: false
       - name: Attest web image
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@00014ed6ed5efc5b1ab7f7f34a39eb55d41aa4f8
         with:
           subject-name: ${{ steps.publish-web.outputs.repository }}
           subject-digest: ${{ steps.publish-web.outputs.digest }}
           push-to-registry: true
           create-storage-record: false
       - name: Attest PostgreSQL image
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@00014ed6ed5efc5b1ab7f7f34a39eb55d41aa4f8
         with:
           subject-name: ${{ steps.publish-postgres.outputs.repository }}
           subject-digest: ${{ steps.publish-postgres.outputs.digest }}
