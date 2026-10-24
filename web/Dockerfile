@@ -23,7 +23,13 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
 
 WORKDIR /app
-RUN useradd --uid 10001 --home-dir /tmp --no-create-home --shell /usr/sbin/nologin web
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+        /usr/local/lib/node_modules/npm \
+        /usr/local/bin/npm \
+        /usr/local/bin/npx \
+    && useradd --uid 10001 --home-dir /tmp --no-create-home --shell /usr/sbin/nologin web
 COPY --from=build --chown=web:web /app/.next/standalone ./
 COPY --from=build --chown=web:web /app/.next/static ./.next/static
 ENV HOME=/tmp
