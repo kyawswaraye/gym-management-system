@@ -453,8 +453,8 @@ def test_alertmanager_delivery_gate_fails_closed(tmp_path) -> None:
         + "printf '%s\\n' \"$@\" > "
         + repr(str(marker))
         + "\n"
-        + "for item in \"$@\"; do\n"
-        + "  case \"$item\" in --config.file=*) cat \"${item#*=}\" > "
+        + 'for item in "$@"; do\n'
+        + '  case "$item" in --config.file=*) cat "${item#*=}" > '
         + repr(str(rendered))
         + ";; esac\n"
         + "done\nexit 0\n",
