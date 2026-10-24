@@ -174,7 +174,9 @@ jobs:
           git diff --exit-code -- mobile/src/types/api.generated.ts
       - run: make mobile-check
       - run: make mobile-test
-      - run: make mobile-android
+      - name: Build Android debug APK
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon -PreactNativeArchitectures=arm64-v8a
 
   mobile-ios:
     name: Mobile iOS
