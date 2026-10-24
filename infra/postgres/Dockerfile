@@ -57,7 +57,8 @@ RUN set -eu; \
       ninja-build \
       pkg-config \
       zlib1g-dev; \
-    rm -rf /var/lib/apt/lists/* /tmp/pgbackrest.tar.gz /tmp/pgbackrest-2.60.0
+    rm -rf /var/lib/apt/lists/* /tmp/pgbackrest.tar.gz /tmp/pgbackrest-2.60.0; \
+    rm -f /usr/local/bin/gosu
 
 COPY backup_policy.py /usr/local/lib/gym/backup_policy.py
 COPY bin/gym-backup /usr/local/bin/gym-backup
