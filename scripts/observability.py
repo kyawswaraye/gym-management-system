@@ -122,10 +122,20 @@ def lint_observability(repo: Path, document: dict[str, Any]) -> list[str]:
     entry = root / "alertmanager" / "entrypoint.sh"
     if entry.is_file():
         script = entry.read_text(encoding="utf-8")
-        if "delivery is not claimed" not in script or SINK not in (
+        required = (
+            "resend-email",
+            "non-production",
+            "smtp.resend.com:587",
+            "smtp_auth_password_file:",
+            "/run/secrets/alert_smtp_password",
+            "delivery is not claimed",
+        )
+        if any(item not in script for item in required):
+            errors.append("alertmanager production email gate is incomplete")
+        if SINK not in (
             root / "alertmanager" / "non-production-sink.url"
         ).read_text(encoding="utf-8"):
-            errors.append("alertmanager must refuse every live sink")
+            errors.append("alertmanager non-production sink drifted")
     dashboard = root / "grafana" / "dashboards" / "gym-baseline.json"
     if dashboard.is_file():
         errors.extend(lint_dashboard_text(dashboard.read_text(encoding="utf-8")))
@@ -450,8 +460,16 @@ def _lint_alertmanager(service: object) -> list[str]:
     test = health.get("test") if isinstance(health, dict) else None
     if test != ["CMD", "/bin/alertmanager", "--version"]:
         errors.append("alertmanager healthcheck must call /bin/alertmanager")
-    if service.get("secrets") != ["alert_sink_url"]:
-        errors.append("alertmanager must mount only the sink URL secret")
+    environment = service.get("environment")
+    expected_environment = {
+        "GYM_ALERT_DELIVERY_MODE": "${ALERT_DELIVERY_MODE:?Set ALERT_DELIVERY_MODE}",
+        "GYM_ALERT_EMAIL_FROM": "${ALERT_EMAIL_FROM:?Set ALERT_EMAIL_FROM}",
+        "GYM_ALERT_EMAIL_TO": "${ALERT_EMAIL_TO:?Set ALERT_EMAIL_TO}",
+    }
+    if environment != expected_environment:
+        errors.append("alertmanager delivery environment drifted")
+    if service.get("secrets") != ["alert_smtp_password"]:
+        errors.append("alertmanager must mount only the SMTP password secret")
     return errors
 
 
@@ -501,7 +519,7 @@ def _lint_secret_files(repo: Path) -> list[str]:
     expected = {
         "monitor-db-password.example": PLACEHOLDER + "\n",
         "grafana-admin-password.example": PLACEHOLDER + "\n",
-        "alert-sink-url.example": SINK + "\n",
+        "alert-smtp-password.example": PLACEHOLDER + "\n",
     }
     seen: set[Path] = set()
     for name, content in expected.items():

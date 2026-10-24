@@ -594,10 +594,14 @@ services:
     entrypoint:
       - /bin/sh
       - /etc/alertmanager/entrypoint.sh
+    environment:
+      GYM_ALERT_DELIVERY_MODE: ${ALERT_DELIVERY_MODE:?Set ALERT_DELIVERY_MODE}
+      GYM_ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:?Set ALERT_EMAIL_FROM}
+      GYM_ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:?Set ALERT_EMAIL_TO}
     networks:
       - observe
     secrets:
-      - alert_sink_url
+      - alert_smtp_password
     volumes:
       - ../observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - ../observability/alertmanager/entrypoint.sh:/etc/alertmanager/entrypoint.sh:ro
@@ -870,5 +874,5 @@ secrets:
     file: ${MONITOR_DB_PASSWORD_FILE:?Set MONITOR_DB_PASSWORD_FILE}
   grafana_admin_password:
     file: ${GRAFANA_ADMIN_PASSWORD_FILE:?Set GRAFANA_ADMIN_PASSWORD_FILE}
-  alert_sink_url:
-    file: ${ALERT_SINK_URL_FILE:?Set ALERT_SINK_URL_FILE}
+  alert_smtp_password:
+    file: ${ALERT_SMTP_PASSWORD_FILE:?Set ALERT_SMTP_PASSWORD_FILE}

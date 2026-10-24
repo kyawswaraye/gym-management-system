@@ -150,10 +150,15 @@ published. Opening Grafana through an SSH tunnel is an open gate, not a
 completed access path.
 
 Alertmanager's entrypoint was checked against `prom/alertmanager:v0.34.1`,
-which provides `/bin/sh`, `/bin/tr`, and `/bin/alertmanager`. The script exits
-when either tool is missing. It also exits unless the secret file matches
-`http://127.0.0.1:9/gym-observability-non-production-sink`. That address is a
-sink that is not a notification service. Clustering gossip is disabled. `python scripts/observability_canary.py` prints one synthetic alert
+which provides `/bin/sh`, `/bin/cat`, `/bin/tr`, and `/bin/alertmanager`. The
+script exits when a required tool is missing. `ALERT_DELIVERY_MODE` must be
+`non-production` or `resend-email`. Non-production uses the checked-in
+loopback sink. Production deployment control requires `resend-email`, strict
+single-address `ALERT_EMAIL_FROM` and `ALERT_EMAIL_TO` values, and a nonempty
+SMTP password from `/run/secrets/alert_smtp_password`. The generated config
+uses `smtp.resend.com:587`, STARTTLS, username `resend`, and
+`auth_password_file`; the credential is not copied into configuration or
+arguments. Clustering gossip is disabled. `python scripts/observability_canary.py` prints one synthetic alert
 and the line `alert_delivery=not_claimed`. It does not open a socket.
 
 ```bash
@@ -179,7 +184,8 @@ make validate-production
   built here.
 - `gym_monitor` has not been created on a live database.
 - External uptime is not configured.
-- No live alert receiver is configured, and no delivery has been observed.
+- The production Resend email receiver is configurable, but no live credential
+  has been installed and no delivery has been observed.
 - SLO numbers are not approved. The `for` durations and thresholds above are
   provisional.
 - Log and metric retention has no legal approval.

@@ -191,6 +191,9 @@ def write_host(root: Path, target: str, *, ghcr: bool = True) -> Path:
     secret = env_dir / "cipher"
     secret.write_text("cipher-value-not-placeholder\n", encoding="utf-8")
     os.chmod(secret, 0o600)
+    alert_secret = env_dir / "alert-smtp-password"
+    alert_secret.write_text("alert-password-not-placeholder\n", encoding="utf-8")
+    os.chmod(alert_secret, 0o600)
     third = {
         "CADDY_IMAGE": "caddy",
         "CLAMAV_IMAGE": "clamav/clamav",
@@ -212,6 +215,14 @@ def write_host(root: Path, target: str, *, ghcr: bool = True) -> Path:
         "MIGRATION_DB_PASSWORD=migration-password-value",
         "RUNTIME_DB_PASSWORD=runtime-password-value",
         f"BACKUP_REPO_CIPHER_PASS_FILE={secret}",
+        (
+            "ALERT_DELIVERY_MODE=resend-email"
+            if target == "production"
+            else "ALERT_DELIVERY_MODE=non-production"
+        ),
+        "ALERT_EMAIL_FROM=alerts@example.com",
+        "ALERT_EMAIL_TO=ops@example.com",
+        f"ALERT_SMTP_PASSWORD_FILE={alert_secret}",
     ]
     for index, (key, name) in enumerate(third.items(), start=1):
         lines.append(f"{key}={name}@sha256:{index:064x}")

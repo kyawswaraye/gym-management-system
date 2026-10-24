@@ -439,41 +439,35 @@ def test_init_script_skips_monitor_without_secret_and_creates_it_with_one(tmp_pa
     assert "must differ" in refused.stderr
 
 
-def test_alertmanager_sink_check_fails_closed(tmp_path) -> None:
+def test_alertmanager_delivery_gate_fails_closed(tmp_path) -> None:
     script = ROOT / "infra/observability/alertmanager/entrypoint.sh"
-    expected = tmp_path / "expected"
-    sink = tmp_path / "sink"
-    expected.write_text(
-        "http://127.0.0.1:9/gym-observability-non-production-sink\n",
-        encoding="utf-8",
-    )
-    sink.write_text("http://example.invalid/live\n", encoding="utf-8")
+    password = tmp_path / "smtp-password"
+    password.write_text("resend-secret-value\n", encoding="utf-8")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     marker = tmp_path / "started"
+    rendered = tmp_path / "rendered"
     fake = bin_dir / "alertmanager"
     fake.write_text(
-        "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + repr(str(marker)) + "\nexit 0\n",
+        "#!/bin/sh\n"
+        + "printf '%s\\n' \"$@\" > "
+        + repr(str(marker))
+        + "\n"
+        + "for item in \"$@\"; do\n"
+        + "  case \"$item\" in --config.file=*) cat \"${item#*=}\" > "
+        + repr(str(rendered))
+        + ";; esac\n"
+        + "done\nexit 0\n",
         encoding="utf-8",
     )
     fake.chmod(0o755)
     env = {
         "PATH": f"{bin_dir}:/usr/bin:/bin",
-        "GYM_ALERT_SINK_FILE": str(sink),
-        "GYM_ALERT_SINK_EXPECTED_FILE": str(expected),
+        "GYM_ALERT_DELIVERY_MODE": "resend-email",
+        "GYM_ALERT_EMAIL_FROM": "alerts@gympilotmm.com",
+        "GYM_ALERT_EMAIL_TO": "ops@example.com",
+        "GYM_ALERT_SMTP_PASSWORD_FILE": str(password),
     }
-    mismatched = subprocess.run(
-        ["/bin/sh", str(script)],
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert mismatched.returncode == 1
-    assert "delivery is not claimed" in mismatched.stderr
-    assert not marker.exists()
-
-    sink.write_text(expected.read_text(encoding="utf-8"), encoding="utf-8")
     matched = subprocess.run(
         ["/bin/sh", str(script)],
         env=env,
@@ -483,19 +477,47 @@ def test_alertmanager_sink_check_fails_closed(tmp_path) -> None:
     )
     assert matched.returncode == 0, matched.stderr
     started = marker.read_text(encoding="utf-8")
-    assert "--config.file=/etc/alertmanager/alertmanager.yml" in started
+    assert "--config.file=/tmp/alertmanager.yml" in started
     assert "--cluster.listen-address=" in started
-    assert "example.invalid" not in started
+    config = rendered.read_text(encoding="utf-8")
+    assert "smtp.resend.com:587" in config
+    assert "auth_password_file: " + str(password) in config
+    assert "resend-secret-value" not in config
+    assert "to: ops@example.com" in config
 
+    env["GYM_ALERT_EMAIL_TO"] = "ops@example.com\ninjected: true"
+    rejected = subprocess.run(
+        ["/bin/sh", str(script)],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert rejected.returncode == 1
+    assert "delivery is not claimed" in rejected.stderr
+
+    env["GYM_ALERT_EMAIL_TO"] = "ops@example.com"
+    password.write_text("replace-from-secret-store\n", encoding="utf-8")
+    placeholder = subprocess.run(
+        ["/bin/sh", str(script)],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert placeholder.returncode == 1
+    assert "placeholder" in placeholder.stderr
+
+    env["GYM_ALERT_DELIVERY_MODE"] = "unknown"
     bare = subprocess.run(
         ["/bin/sh", str(script)],
-        env={"PATH": str(bin_dir), "GYM_ALERT_SINK_FILE": str(sink)},
+        env=env,
         capture_output=True,
         text=True,
         check=False,
     )
     assert bare.returncode == 1
-    assert "missing tr or alertmanager" in bare.stderr
+    assert "delivery mode" in bare.stderr
 
 
 def test_synthetic_canary_does_not_open_a_socket() -> None:

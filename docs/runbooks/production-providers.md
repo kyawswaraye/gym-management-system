@@ -21,6 +21,14 @@ Scheduler jobs remain `schedule_membership_expiry_emails` and
 
 Forgot password is a constant 200. Reset is 204 and issues no session.
 
+Alertmanager also uses Resend, independently from Django. Set
+`ALERT_DELIVERY_MODE=resend-email`, use plain verified-domain addresses for
+`ALERT_EMAIL_FROM` and `ALERT_EMAIL_TO`, and point
+`ALERT_SMTP_PASSWORD_FILE` to an owner-only host file containing a Resend API
+key. The SMTP key is mounted as a Docker secret and read through
+`auth_password_file`. A successful container start is not delivery evidence;
+send a bounded synthetic alert and observe receipt before go-live.
+
 ## Object storage
 
 Apply `infra/aws/` after an AWS account exists. The template is draft-only:

@@ -83,7 +83,12 @@ EXPECTED_VALUES = {
     "GRAFANA_ADMIN_PASSWORD_FILE": (
         "../environments/production/grafana-admin-password.example"
     ),
-    "ALERT_SINK_URL_FILE": "../environments/production/alert-sink-url.example",
+    "ALERT_DELIVERY_MODE": "resend-email",
+    "ALERT_EMAIL_FROM": "alerts@example.com",
+    "ALERT_EMAIL_TO": "ops@example.com",
+    "ALERT_SMTP_PASSWORD_FILE": (
+        "../environments/production/alert-smtp-password.example"
+    ),
 }
 PLACEHOLDER = "replace-from-secret-store"
 PRIVATE_SERVICES = (

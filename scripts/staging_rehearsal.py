@@ -936,6 +936,7 @@ def _generate_secrets() -> dict[str, str]:
         "runtime",
         "monitor",
         "grafana",
+        "alert_smtp",
         "cipher",
         "object_access",
         "object_secret",
@@ -1313,12 +1314,9 @@ subjectAltName = IP:127.0.0.1,DNS:localhost
         ("backup_object_secret", "backup-s3-secret-key"),
         ("monitor", "monitor-db-password"),
         ("grafana", "grafana-admin-password"),
+        ("alert_smtp", "alert-smtp-password"),
     ):
         _write_private(secrets_dir / label, generated[name] + "\n")
-    sink = (repo / "infra/observability/alertmanager/non-production-sink.url").read_text(
-        encoding="utf-8"
-    )
-    _write_private(secrets_dir / "alert-sink.url", sink)
     source = (repo / "infra/observability/blackbox/blackbox.yml").read_text(encoding="utf-8")
     rendered = render_staging_blackbox(source)
     _write_private(state_dir / "blackbox.rendered.yml", rendered)
@@ -1586,7 +1584,10 @@ def _env_values(
         "BACKUP_S3_SECRET_KEY_FILE": str(secrets_dir / "backup-s3-secret-key"),
         "MONITOR_DB_PASSWORD_FILE": str(secrets_dir / "monitor-db-password"),
         "GRAFANA_ADMIN_PASSWORD_FILE": str(secrets_dir / "grafana-admin-password"),
-        "ALERT_SINK_URL_FILE": str(secrets_dir / "alert-sink.url"),
+        "ALERT_DELIVERY_MODE": "non-production",
+        "ALERT_EMAIL_FROM": "alerts@example.invalid",
+        "ALERT_EMAIL_TO": "ops@example.invalid",
+        "ALERT_SMTP_PASSWORD_FILE": str(secrets_dir / "alert-smtp-password"),
         "STAGING_BLACKBOX_FILE": str(state_dir / "blackbox.rendered.yml"),
         "STAGING_BACKUP_CERT_DIR": str(state_dir / "certs" / "object-backup"),
         "STAGING_BACKUP_CA_FILE": str(state_dir / "certs" / "ca" / "ca.crt"),

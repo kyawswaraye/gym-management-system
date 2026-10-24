@@ -48,6 +48,7 @@ REPO_RE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 HOST_RE = re.compile(
     r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+\Z"
 )
+ALERT_EMAIL_RE = re.compile(r"[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}\Z")
 USER_RE = re.compile(r"[a-z_][a-z0-9_-]{0,31}\Z")
 HOST_KEY_RE = re.compile(
     r"(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|"
@@ -1089,6 +1090,15 @@ def preflight(
         raise DeployError("database passwords are placeholders")
     if len(set(passwords)) != 3:
         raise DeployError("database role passwords must differ")
+    alert_mode = host_env.get("ALERT_DELIVERY_MODE", "")
+    if request.target == "production":
+        if alert_mode != "resend-email":
+            raise DeployError("production alert delivery must use resend-email")
+        for key in ("ALERT_EMAIL_FROM", "ALERT_EMAIL_TO"):
+            if ALERT_EMAIL_RE.fullmatch(host_env.get(key, "")) is None:
+                raise DeployError(f"{key} is not a valid production alert address")
+    elif alert_mode != "non-production":
+        raise DeployError("staging alert delivery must stay non-production")
     _secret_files(request.env_file, host_env, request.state_dir)
     _assert_ghcr_config(host_env, request.state_dir)
     active = None

@@ -51,6 +51,13 @@ media/
 staticfiles/
 generated/
 
+# Terraform local cache and state. Provider lock files stay tracked.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
 # Logs and runtime files
 *.log
 *.pid
