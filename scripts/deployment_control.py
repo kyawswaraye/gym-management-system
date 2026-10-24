@@ -112,6 +112,7 @@ JOB_PERMISSIONS = {
     "actions": "read",
     "attestations": "read",
     "packages": "read",
+    "deployments": "write",
 }
 THIRD_PARTY_IMAGES = {
     "CADDY_IMAGE": "caddy",

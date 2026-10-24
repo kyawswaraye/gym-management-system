@@ -61,6 +61,7 @@ jobs:
       actions: read
       attestations: read
       packages: read
+      deployments: write
     concurrency:
       group: deploy-resolve-${{ inputs.target }}
       cancel-in-progress: false
@@ -115,6 +116,7 @@ jobs:
       actions: read
       attestations: read
       packages: read
+      deployments: write
     concurrency:
       group: deploy-staging
       cancel-in-progress: false
@@ -173,6 +175,7 @@ jobs:
       actions: read
       attestations: read
       packages: read
+      deployments: write
     concurrency:
       group: deploy-production
       cancel-in-progress: false

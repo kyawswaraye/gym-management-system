@@ -1,0 +1,135 @@
+# Pushing the live app to main releases the next patch tag and deploys it.
+# A tag created with GITHUB_TOKEN does not start Image release, so this
+# workflow dispatches that workflow and then the production deploy.
+
+name: Ship main
+
+"on":
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - "web/**"
+      - "infra/**"
+      - "contracts/**"
+      - "scripts/deployment_control.py"
+      - "scripts/deployment_smoke.py"
+      - ".github/workflows/deploy.yml"
+      - ".github/workflows/image-release.yml"
+      - ".github/workflows/ship-main.yml"
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: ship-main
+  cancel-in-progress: false
+
+jobs:
+  deploy-production:
+    name: Release and deploy production
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Wait for CI, publish the patch tag, and deploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          wait_for_run() {
+            local workflow="$1"
+            local event="$2"
+            local run_id=""
+            local attempt
+            for attempt in $(seq 1 60); do
+              run_id="$(gh run list --workflow "$workflow" --commit "$SHA" --event "$event" --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+              if [ -n "$run_id" ]; then
+                printf '%s\n' "$run_id"
+                return 0
+              fi
+              sleep 10
+            done
+            echo "no $workflow run appeared for $SHA" >&2
+            return 1
+          }
+
+          ci_id="$(wait_for_run ci.yml push)"
+          gh run watch "$ci_id" --exit-status
+
+          git fetch origin --tags
+          tag="$(python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+
+          sha = os.environ["SHA"]
+          pointed = subprocess.check_output(["git", "tag", "--points-at", sha], text=True)
+          for name in pointed.splitlines():
+              if re.fullmatch(r"v\d+\.\d+\.\d+", name):
+                  print(name)
+                  raise SystemExit
+          tags = subprocess.check_output(["git", "tag", "-l", "v*.*.*"], text=True).split()
+          versions = []
+          for name in tags:
+              match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", name)
+              if match:
+                  versions.append(tuple(int(part) for part in match.groups()))
+          if not versions:
+              raise SystemExit("no semver tag exists")
+          major, minor, patch = max(versions)
+          print(f"v{major}.{minor}.{patch + 1}")
+          PY
+          )"
+          if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            git tag "$tag" "$SHA"
+            git push origin "refs/tags/$tag"
+          fi
+
+          release_id="$(gh run list --workflow image-release.yml --commit "$SHA" --json databaseId,conclusion,headBranch --jq ".[] | select(.headBranch==\"$tag\" and .conclusion==\"success\") | .databaseId" | head -n 1)"
+          if [ -z "$release_id" ]; then
+            release_stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            gh workflow run image-release.yml --ref "$tag" -f git_sha="$SHA"
+            for attempt in $(seq 1 60); do
+              release_id="$(gh run list --workflow image-release.yml --commit "$SHA" --event workflow_dispatch --limit 5 --json databaseId,createdAt --jq ".[] | select(.createdAt >= \"$release_stamp\") | .databaseId" | head -n 1)"
+              if [ -n "$release_id" ]; then
+                break
+              fi
+              sleep 10
+            done
+            if [ -z "$release_id" ]; then
+              echo "image release did not start" >&2
+              exit 1
+            fi
+            gh run watch "$release_id" --exit-status
+          fi
+
+          stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gh workflow run deploy.yml --ref main \
+            -f target=production \
+            -f release_run_id="$release_id" \
+            -f expected_sha="$SHA" \
+            -f expected_tag="$tag" \
+            -f operation=deploy \
+            -f schema_compatibility=not-applicable
+          deploy_id=""
+          for attempt in $(seq 1 30); do
+            deploy_id="$(gh run list --workflow deploy.yml --event workflow_dispatch --limit 5 --json databaseId,createdAt --jq ".[] | select(.createdAt >= \"$stamp\") | .databaseId" | head -n 1)"
+            if [ -n "$deploy_id" ]; then
+              break
+            fi
+            sleep 10
+          done
+          if [ -z "$deploy_id" ]; then
+            echo "production deploy run did not start" >&2
+            exit 1
+          fi
+          gh run watch "$deploy_id" --exit-status
+          echo "deployed $tag $SHA"
