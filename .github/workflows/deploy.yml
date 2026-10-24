@@ -117,7 +117,7 @@ jobs:
       packages: read
       deployments: write
     concurrency:
-      group: deploy-staging
+      group: deploy-staging-runner
       cancel-in-progress: false
     steps:
       - name: Check the release SHA
@@ -175,7 +175,7 @@ jobs:
       packages: read
       deployments: write
     concurrency:
-      group: deploy-production
+      group: deploy-production-runner
       cancel-in-progress: false
     steps:
       - name: Check the release SHA
