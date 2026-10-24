@@ -1190,6 +1190,17 @@ def test_pull_failure_stops_before_migration(tmp_path: Path) -> None:
     assert not any(part == "migrate" for command in calls for part in command)
 
 
+def test_preflight_restore_ignores_files_outside_the_host_env(tmp_path: Path) -> None:
+    module = deploy()
+    env_file = tmp_path / "compose.env"
+    secret = tmp_path / "secret"
+    secret.write_text("value\n", encoding="utf-8")
+    os.chmod(secret, 0o644)
+    env_file.write_text(f"BACKUP_REPO_CIPHER_PASS_FILE={secret}\n", encoding="utf-8")
+    module.restore_preflight_secret_owners(env_file)
+    assert secret.stat().st_mode & 0o077
+
+
 def test_incoming_directories_do_not_overlap() -> None:
     module = deploy()
     assert module.incoming_dir("staging").endswith("/incoming/staging")
@@ -1209,6 +1220,7 @@ def test_incoming_directories_do_not_overlap() -> None:
     production = module.transfer_commands(target="production", **shared)
     assert "/var/lib/gym-deploy/incoming/staging" in staging[-1][-1]
     assert "/var/lib/gym-deploy/incoming/production" in production[-1][-1]
+    assert production[-1][-1].startswith("PATH=/usr/local/lib/gym-deploy:$PATH ")
     assert "incoming/staging" not in production[-1][-1]
     steps = module.deployment_steps("production", "deploy", "not-applicable")
     assert steps.index("acquire-host-lock") < steps.index("verify-bundle")

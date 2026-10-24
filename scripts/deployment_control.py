@@ -969,6 +969,56 @@ def _assert_private_owner(path: Path) -> None:
         raise DeployError("host file owner must be the deployment user or root")
 
 
+def restore_preflight_secret_owners(env_file: Path) -> None:
+    """Return runtime-owned secret files to the deploy user before preflight.
+
+    After a successful start, the host docker wrapper gives backup, monitor,
+    Grafana, and alert files to their container users. The next preflight
+    rejects those owners, so restore them only inside the host env directory.
+    """
+    if not env_file.is_file() or env_file.is_symlink():
+        return
+    directory = env_file.parent.resolve()
+    try:
+        directory.relative_to(Path("/etc/gym"))
+    except ValueError:
+        return
+    host_env = parse_env_file(env_file.read_text(encoding="utf-8"))
+    uid = os.geteuid()
+    gid = os.getegid()
+    for key, value in host_env.items():
+        if not key.endswith("_FILE"):
+            continue
+        secret = Path(value)
+        if secret.is_symlink() or not secret.is_file():
+            continue
+        try:
+            resolved = secret.resolve()
+            resolved.relative_to(directory)
+        except ValueError:
+            continue
+        info = resolved.stat()
+        if info.st_uid in {uid, 0} and not (info.st_mode & 0o077):
+            continue
+        _reset_secret_owner(resolved, uid, gid)
+
+
+def _reset_secret_owner(path: Path, uid: int, gid: int) -> None:
+    commands = (
+        ["sudo", "-n", "setfacl", "-b", "--", str(path)],
+        ["sudo", "-n", "chown", f"{uid}:{gid}", "--", str(path)],
+        ["sudo", "-n", "chmod", "600", "--", str(path)],
+    )
+    for command in commands:
+        completed = subprocess.run(
+            command, check=False, capture_output=True, text=True
+        )
+        if command[2] == "setfacl":
+            continue
+        if completed.returncode != 0:
+            raise DeployError("preflight secret owner could not be restored")
+
+
 def _secret_files(env_file: Path, host_env: Mapping[str, str], state_dir: Path) -> None:
     for key, value in host_env.items():
         if not key.endswith("_FILE"):
@@ -1896,6 +1946,7 @@ def transfer_commands(
     destination = f"{user}@{host}"
     remote_dir = incoming_dir(target)
     remote = (
+        "PATH=/usr/local/lib/gym-deploy:$PATH "
         f"python3 {remote_dir}/deployment_control.py host-apply "
         f"--bundle {remote_dir}/{BUNDLE_NAME} --target {target} "
         f"--operation {operation} --schema-compatibility {schema_compatibility}"
@@ -2516,6 +2567,7 @@ def host_apply(
     meminfo = host_root / "proc" / "meminfo"
     if not meminfo.is_file():
         raise DeployError("MemAvailable is missing")
+    restore_preflight_secret_owners(env_file)
     host_env = parse_env_file(env_file.read_text(encoding="utf-8"))
     process_env = compose_process_env(host_env)
     active = runner or _env_runner(process_env)
@@ -2548,6 +2600,20 @@ def _env_runner(process_env: dict[str, str]) -> Runner:
         return CommandResult(completed.returncode, completed.stdout, completed.stderr)
 
     return run
+
+
+def _public_transfer_error(stderr: str) -> str:
+    line = ""
+    for item in reversed(stderr.splitlines()):
+        item = item.strip()
+        if item:
+            line = item
+            break
+    if not line or len(line) > 180 or any(
+        token in line for token in ("PRIVATE", "BEGIN ", "AKIA", "password")
+    ):
+        return "deployment transfer failed"
+    return f"deployment transfer failed: {line}"
 
 
 def transfer_and_apply(source_repo: Path, bound_path: Path, bundle_path: Path) -> None:
@@ -2601,7 +2667,7 @@ def transfer_and_apply(source_repo: Path, bound_path: Path, bundle_path: Path) -
             env=env,
         )
         if completed.returncode != 0:
-            raise DeployError("deployment transfer failed")
+            raise DeployError(_public_transfer_error(completed.stderr))
 
 
 def main(argv: list[str] | None = None) -> int:
