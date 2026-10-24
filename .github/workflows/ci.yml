@@ -9,6 +9,106 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.paths.outputs.backend }}
+      web: ${{ steps.paths.outputs.web }}
+      mobile: ${{ steps.paths.outputs.mobile }}
+      mobile_ios: ${{ steps.paths.outputs.mobile_ios }}
+      e2e: ${{ steps.paths.outputs.e2e }}
+      production: ${{ steps.paths.outputs.production }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Select affected jobs
+        id: paths
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          backend=false
+          web=false
+          mobile=false
+          mobile_ios=false
+          e2e=false
+          production=false
+
+          if [[ -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
+            mapfile -t files < <(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA")
+          else
+            mapfile -t files < <(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")
+          fi
+
+          for file in "${files[@]}"; do
+            case "$file" in
+              .github/workflows/ci.yml|Makefile|.nvmrc)
+                backend=true
+                web=true
+                mobile=true
+                mobile_ios=true
+                e2e=true
+                production=true
+                ;;
+              .python-version)
+                backend=true
+                e2e=true
+                production=true
+                ;;
+              .env.example|docker-compose*.yml)
+                e2e=true
+                production=true
+                ;;
+              backend/*)
+                backend=true
+                e2e=true
+                production=true
+                ;;
+              web/*)
+                web=true
+                e2e=true
+                production=true
+                ;;
+              mobile/android/*)
+                mobile=true
+                ;;
+              mobile/ios/*|mobile/Gemfile|mobile/Gemfile.lock)
+                mobile_ios=true
+                ;;
+              mobile/*)
+                mobile=true
+                mobile_ios=true
+                ;;
+              contracts/*)
+                backend=true
+                web=true
+                mobile=true
+                mobile_ios=true
+                e2e=true
+                ;;
+              infra/*)
+                e2e=true
+                production=true
+                ;;
+              scripts/e2e*.sh)
+                e2e=true
+                ;;
+              scripts/*)
+                production=true
+                ;;
+            esac
+          done
+
+          {
+            echo "backend=$backend"
+            echo "web=$web"
+            echo "mobile=$mobile"
+            echo "mobile_ios=$mobile_ios"
+            echo "e2e=$e2e"
+            echo "production=$production"
+          } >> "$GITHUB_OUTPUT"
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest
@@ -22,6 +122,8 @@ jobs:
 
   backend:
     name: Backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -106,6 +208,8 @@ jobs:
 
   web:
     name: Web
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -139,6 +243,8 @@ jobs:
 
   mobile:
     name: Mobile
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -180,6 +286,8 @@ jobs:
 
   mobile-ios:
     name: Mobile iOS
+    needs: changes
+    if: needs.changes.outputs.mobile_ios == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
@@ -198,6 +306,8 @@ jobs:
 
   e2e:
     name: Browser E2E
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -277,6 +387,8 @@ jobs:
 
   production-artifacts:
     name: Production artifacts
+    needs: changes
+    if: needs.changes.outputs.production == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
