@@ -391,7 +391,7 @@ function Fact({
 }: {
   label: string;
   value: string;
-  suffix?: string;
+  suffix?: string | undefined;
 }) {
   return (
     <div className="rounded-xl bg-slate-50 px-3 py-2.5">

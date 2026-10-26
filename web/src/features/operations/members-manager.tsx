@@ -158,6 +158,7 @@ export function MembersManager({
   const [memberNumberPreview, setMemberNumberPreview] =
     useState<MemberNumberPreview>(UNAVAILABLE_MEMBER_NUMBER);
   const createDialogRef = useRef<HTMLFormElement>(null);
+  const previewVersion = useRef(0);
   const [draft, setDraft] = useState<MemberProfileInput>(() =>
     emptyMemberProfile(defaultDate),
   );
@@ -261,17 +262,17 @@ export function MembersManager({
     createDialogRef.current?.focus({ preventScroll: true });
   }, [showCreate]);
 
-  useEffect(() => {
-    if (!showCreate) return;
+  function openCreate() {
+    setShowCreate(true);
     if (!canPreviewMemberNumber) {
       setMemberNumberPreview(UNAVAILABLE_MEMBER_NUMBER);
       return;
     }
-    let cancelled = false;
+    const version = ++previewVersion.current;
     setMemberNumberPreview({ status: "loading", value: "" });
     void getGymSettings()
       .then((settings) => {
-        if (cancelled) return;
+        if (version !== previewVersion.current) return;
         setMemberNumberPreview({
           status: "ready",
           value: assignedMemberNumber(
@@ -281,13 +282,10 @@ export function MembersManager({
         });
       })
       .catch(() => {
-        if (cancelled) return;
+        if (version !== previewVersion.current) return;
         setMemberNumberPreview(UNAVAILABLE_MEMBER_NUMBER);
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [canPreviewMemberNumber, showCreate]);
+  }
 
   async function loadMore() {
     const cursor = nextAfter;
@@ -423,6 +421,7 @@ export function MembersManager({
 
   function closeCreate() {
     if (pending || submitLock.current) return;
+    previewVersion.current += 1;
     setShowCreate(false);
     setDraft(emptyMemberProfile(defaultDate));
     if (!errorScope) setError("");
@@ -483,7 +482,7 @@ export function MembersManager({
           <button
             aria-expanded={showCreate}
             className="button button-create shrink-0"
-            onClick={() => setShowCreate(true)}
+            onClick={openCreate}
             type="button"
           >
             Add member

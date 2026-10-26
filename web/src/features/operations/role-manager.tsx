@@ -192,7 +192,10 @@ const ROLE_BRIEFS: Record<string, string> = {
 };
 
 function roleBrief(role: Role): string {
-  if (role.is_protected && ROLE_BRIEFS[role.key]) return ROLE_BRIEFS[role.key];
+  if (role.is_protected) {
+    const brief = ROLE_BRIEFS[role.key];
+    if (brief) return brief;
+  }
   return role.description.trim() || "Custom role for this gym.";
 }
 

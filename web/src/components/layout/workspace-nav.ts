@@ -26,9 +26,10 @@ export type NavEntry =
   | { kind: "folder"; label: string; links: readonly NavLinkItem[] };
 
 function add(entries: NavEntry[], label: string, links: NavLinkItem[]) {
-  if (links.length === 0) return;
+  const [only] = links;
+  if (!only) return;
   if (links.length === 1) {
-    entries.push({ kind: "link", ...links[0] });
+    entries.push({ kind: "link", href: only.href, label: only.label });
     return;
   }
   entries.push({ kind: "folder", label, links });

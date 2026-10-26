@@ -98,7 +98,9 @@ export const localEnv = {
 function main() {
   let apiBaseUrl;
   try {
-    apiBaseUrl = parseReleaseApiBaseUrl(resolveRawApiBaseUrl(process.argv.slice(2)));
+    apiBaseUrl = parseReleaseApiBaseUrl(
+      resolveRawApiBaseUrl(process.argv.slice(2)),
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     fail(
@@ -144,6 +146,9 @@ function main() {
   );
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   main();
 }
