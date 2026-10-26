@@ -79,10 +79,7 @@ async function openCreateDialog() {
   return screen.findByRole("dialog", { name: "Create package" });
 }
 
-function fillPackage(dialog: HTMLElement, code = "PT10") {
-  fireEvent.change(within(dialog).getByLabelText("Code"), {
-    target: { value: code },
-  });
+function fillPackage(dialog: HTMLElement) {
   fireEvent.change(within(dialog).getByLabelText("Name"), {
     target: { value: "Ten sessions" },
   });
@@ -357,7 +354,7 @@ describe("create package dialog", () => {
       screen.getByRole("button", { name: "Create package", hidden: true }),
     ).toHaveAttribute("aria-controls", "create-package-dialog");
 
-    fireEvent.mouseDown(within(dialog).getByLabelText("Code"));
+    fireEvent.mouseDown(within(dialog).getByLabelText("Name"));
     expect(screen.getByRole("dialog", { name: "Create package" })).toBe(dialog);
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
@@ -393,12 +390,15 @@ describe("create package dialog", () => {
     renderManager();
     await screen.findByText("Ten sessions");
     const dialog = await openCreateDialog();
-    fillPackage(dialog, "pt10");
+    fillPackage(dialog);
+    fireEvent.change(within(dialog).getByLabelText("Name"), {
+      target: { value: " " },
+    });
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Save package" }),
     );
     const codeError = within(dialog).getByRole("alert");
-    expect(codeError).toHaveTextContent("Enter an uppercase package code.");
+    expect(codeError).toHaveTextContent("Enter a package name.");
     expect(dialog).toContainElement(codeError);
     expect(screen.getAllByRole("alert")).toEqual([codeError]);
     expect(createServicePackage).not.toHaveBeenCalled();
@@ -447,7 +447,6 @@ describe("create package dialog", () => {
     await waitFor(() =>
       expect(createServicePackage).toHaveBeenCalledWith({
         type: "CLASS",
-        code: "PT10",
         name: "Ten sessions",
         session_count: 10,
         validity_value: 3,
@@ -484,7 +483,6 @@ describe("create package dialog", () => {
     await waitFor(() => expect(createServicePackage).toHaveBeenCalledTimes(1));
     expect(createServicePackage).toHaveBeenCalledWith({
       type: "PT",
-      code: "PT10",
       name: "Ten sessions",
       session_count: 10,
       validity_value: 3,
@@ -504,7 +502,7 @@ describe("create package dialog", () => {
     expect(
       within(dialog).getByRole("button", { name: "Save package" }),
     ).toBeDisabled();
-    expect(within(dialog).getByLabelText("Code")).toBeDisabled();
+    expect(within(dialog).getByLabelText("Name")).toBeDisabled();
 
     fireEvent.keyDown(dialog, { key: "Escape" });
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));

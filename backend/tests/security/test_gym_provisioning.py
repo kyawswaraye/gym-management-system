@@ -895,13 +895,13 @@ def test_provisioned_seed_is_complete_and_has_no_economic_rows() -> None:
     assert response.status_code == 201
     gym = Gym.objects.get(code="SEED-01")
     settings = GymSettings.objects.get(gym=gym)
-    assert settings.receipt_number_prefix == "SEED-01"
+    assert settings.receipt_number_prefix == "RCPT"
     categories = ExpenseCategory.objects.filter(gym=gym)
     assert set(categories.values_list("system_key", "code", "is_active")) == {
         (code, code, True) for code, _name in EXPENSE_CATEGORY_CATALOG
     }
     sequence = TenantSequence.objects.get(gym=gym, sequence_key__startswith="RECEIPT:")
-    assert (sequence.prefix, sequence.next_value, sequence.padding) == ("SEED-01", 1, 6)
+    assert (sequence.prefix, sequence.next_value, sequence.padding) == ("RCPT", 1, 6)
     assert set(Role.objects.filter(gym=gym).values_list("key", flat=True)) == set(ROLE_KEYS)
     assert GymFeatureEntitlement.objects.filter(gym=gym).count() == (
         SubscriptionPlanFeature.objects.filter(subscription_plan=plan).count()
@@ -2019,3 +2019,76 @@ def test_concurrent_owner_credential_recovery_sends_one_invitation() -> None:
         )
     )
     assert plaintext not in stored
+
+
+@override_settings(**jwt_settings())
+def test_owner_can_remove_a_pending_invitation_from_the_list() -> None:
+    client, token, plan = platform_client("cancel-invite-platform@example.test")
+    mail.outbox.clear()
+    created = provision_gym(
+        client,
+        token,
+        plan,
+        code="OWN-CANCEL",
+        owner_email="cancel-owner@example.test",
+        idempotency_key="cancel-invite-provision-0001",
+    )
+    assert created.status_code == 201
+    accepted = accept_invitation(
+        client,
+        invitation_token(message_for("cancel-owner@example.test")),
+    )
+    assert accepted.status_code == 200
+    owner_token = accepted.json()["data"]["access_token"]
+    enable_recent_mfa(client, owner_token)
+    headers = {"HTTP_AUTHORIZATION": f"Bearer {owner_token}"}
+    mail.outbox.clear()
+
+    invited = client.post(
+        "/api/v1/owners/invitations/",
+        {
+            "email": "wrong-owner@example.test",
+            "first_name": "Wrong",
+            "last_name": "Address",
+        },
+        format="json",
+        **headers,
+    )
+    assert invited.status_code == 201
+    plaintext = invitation_token(mail.outbox[0].body)
+    listed = client.get("/api/v1/owners/", **headers)
+    assert listed.status_code == 200
+    emails = {item["email"] for item in listed.json()["data"]}
+    assert "wrong-owner@example.test" in emails
+    wrong = next(
+        item for item in listed.json()["data"] if item["email"] == "wrong-owner@example.test"
+    )
+
+    removed = client.post(
+        f"/api/v1/owners/{wrong['gym_membership_id']}/cancel-invitation/",
+        format="json",
+        **headers,
+    )
+    assert removed.status_code == 200
+    assert removed.json()["message"] == "Owner invitation removed"
+
+    after = client.get("/api/v1/owners/", **headers)
+    assert "wrong-owner@example.test" not in {item["email"] for item in after.json()["data"]}
+    invitation = StaffInvitation.objects.get(id=invited.json()["data"]["id"])
+    assert invitation.status == StaffInvitation.Status.REVOKED
+    rejected = accept_invitation(client, plaintext)
+    assert rejected.status_code == 401
+    assert rejected.json()["error"]["code"] == "INVALID_INVITATION"
+
+    again = client.post(
+        "/api/v1/owners/invitations/",
+        {
+            "email": "wrong-owner@example.test",
+            "first_name": "Wrong",
+            "last_name": "Address",
+        },
+        format="json",
+        **headers,
+    )
+    assert again.status_code == 201
+    assert again.json()["data"]["id"] != invited.json()["data"]["id"]

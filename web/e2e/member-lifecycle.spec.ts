@@ -17,7 +17,7 @@ const UPDATED_FIRST = "Updatedphase";
 const LAST_NAME = "Lifecycle";
 const ORIGINAL_NAME = `${ORIGINAL_FIRST} ${LAST_NAME}`;
 const UPDATED_NAME = `${UPDATED_FIRST} ${LAST_NAME}`;
-const PLAN_CODE = "E2E1D";
+const PLAN_CODE = "E2E_ONE_DAY";
 const PLAN_NAME = "E2E One Day";
 const REVISED_PLAN = "E2E One Day Revised";
 const OPENING_NOTE = "E2E opening note";
@@ -152,10 +152,14 @@ async function openSection(
   page: Page,
   name: "Members" | "Memberships" | "Check-ins",
 ): Promise<void> {
-  await page
-    .getByRole("navigation", { name: "Primary" })
-    .getByRole("link", { name, exact: true })
-    .click();
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  if (name === "Members" || name === "Memberships") {
+    const folder = nav.getByRole("button", { name: "Members", exact: true });
+    if ((await folder.getAttribute("aria-expanded")) !== "true") {
+      await folder.click();
+    }
+  }
+  await nav.getByRole("link", { name, exact: true }).click();
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
 }
 
@@ -412,7 +416,8 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     .getByRole("link", { name: ORIGINAL_NAME, exact: true })
     .click();
   await expect(page).toHaveURL(/\/members\/[0-9a-f-]+$/);
-  const profile = page.locator("form");
+  await page.getByRole("button", { name: "Edit profile", exact: true }).click();
+  const profile = page.getByRole("dialog", { name: "Edit profile" });
   await expect(profile.getByLabel("First name", { exact: true })).toHaveValue(
     ORIGINAL_FIRST,
   );
@@ -598,9 +603,12 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     expect(data.first_name).toBe(UPDATED_FIRST);
     expect(data.last_name).toBe(LAST_NAME);
     await expect(
-      profile.getByRole("button", { name: "Save changes", exact: true }),
+      page.getByRole("button", { name: "Edit profile", exact: true }),
     ).toBeVisible();
     await page.reload();
+    await page
+      .getByRole("button", { name: "Edit profile", exact: true })
+      .click();
     await expect(profile.getByLabel("First name", { exact: true })).toHaveValue(
       UPDATED_FIRST,
     );
@@ -666,7 +674,6 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   const memberships = page.getByRole("table", { name: "Memberships" });
 
   await test.step("create and patch a one-day plan", async () => {
-    await newPlan.getByLabel("Code", { exact: true }).fill(PLAN_CODE);
     await newPlan.getByLabel("Name", { exact: true }).fill(PLAN_NAME);
     await newPlan.getByLabel("Duration", { exact: true }).fill("1");
     await newPlan
@@ -825,7 +832,9 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     await expect(
       page.getByText("No check-ins yet.", { exact: true }),
     ).toBeVisible();
-    await page.getByLabel("Note", { exact: true }).fill("E2E desk visit");
+    await page.getByRole("button", { name: "Check in", exact: true }).click();
+    const checkIn = page.getByRole("dialog", { name: "Check in" });
+    await checkIn.getByLabel("Note", { exact: true }).fill("E2E desk visit");
     const checkedIn = page.waitForResponse(
       (response) =>
         settledResponse(response) &&
@@ -834,7 +843,9 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
           new URL(response.url()).pathname,
         ),
     );
-    await page.getByRole("button", { name: "Check in", exact: true }).click();
+    await checkIn
+      .getByRole("button", { name: "Check in", exact: true })
+      .click();
     expect((await checkedIn).ok()).toBeTruthy();
     await expect(page.getByText("Checked in.", { exact: true })).toBeVisible();
     const openVisits = page.getByRole("region", {

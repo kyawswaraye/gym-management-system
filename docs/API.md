@@ -280,11 +280,16 @@ No outbox or Celery task is used. Invitation email is synchronous and is sent as
 ```text
 GET   /api/v1/gym/
 PATCH /api/v1/gym/
+GET   /api/v1/gym/logo/
+PUT   /api/v1/gym/logo/
+DELETE /api/v1/gym/logo/
 GET   /api/v1/settings/
 PATCH /api/v1/settings/
 ```
 
 Gym profile read/update requires `gym.view`/`gym.update`; settings read/update requires `settings.view`/`settings.manage`.
+
+`GET /gym/logo/` returns the gym's uploaded JPEG, PNG, or WebP, or `404` when none is stored. `PUT /gym/logo/` accepts one `multipart/form-data` field named `logo`, at most 1 MB, and replaces the current image. `DELETE /gym/logo/` removes it. Logo bytes stay off the gym profile and off audit records. The profile response includes read-only `has_logo`.
 
 `PATCH /settings/` accepts only typed operational settings: `week_starts_on`, `allow_manual_member_numbers`, `member_number_prefix`, `receipt_number_prefix`, `check_in_duplicate_window_seconds`, `check_in_challenge_ttl_seconds`, `check_in_challenge_max_uses`, `membership_expiry_warning_days`, `membership_expiry_email_enabled`, `membership_expiry_push_enabled`, `class_cancellation_cutoff_minutes`, `class_no_show_consumes_session`, and `require_separate_finance_approval`. The approval flag is read/write only for OWNER policy administration and defaults to `true`; Phase 0 requires every Payment, Expense, Retail Sale, PT Sale, and Salary record to be approved by a different authorized Manager or Owner and does not permit disabling this control through the API. The response returns those fields plus read-only `gym_id`, actors, and timestamps from the tenant-owned one-to-one `GymSettings` record. Gym identity, address, timezone, currency, lifecycle, and subscription remain fields of `/gym/`, not `/settings/`. Arbitrary client-defined keys and unbounded JSON settings are rejected.
 
@@ -383,6 +388,7 @@ POST /api/v1/staff/{id}/suspend/
 GET  /api/v1/owners/
 POST /api/v1/owners/invitations/
 POST /api/v1/owners/invitations/accept/
+POST /api/v1/owners/{gym_membership_id}/cancel-invitation/
 POST /api/v1/owners/{gym_membership_id}/revoke/
 
 GET  /api/v1/roles/
@@ -400,7 +406,7 @@ Protected role templates cannot be renamed or deleted. Assignment APIs validate 
 
 Staff listing/detail requires `staff.view`; invitation, staff lifecycle, and membership-role assignment require `staff.manage`; role and permission listing requires `roles.view`; role mutation and permission replacement require `roles.manage`.
 
-The owner endpoints are a separate OWNER-reserved workflow and are not authorized by `staff.manage` or `roles.manage`. Any active Owner may list the gym's Owners and invite an additional Owner after recent MFA/step-up verification. The invitation accepts `email`, `first_name`, `last_name`, optional `phone`, and optional `send_invitation`; email delivery is required until another secure delivery channel is approved. The server fixes `is_owner = true` and the protected OWNER role, so clients cannot submit role or permission IDs. `POST /owners/invitations/accept/` accepts the single-use invitation token plus password and confirmation through the trusted BFF, and creates or activates another same-gym Owner login without replacing existing Owners. Revocation requires a different active Owner as actor, a reason, recent MFA, row locking, and proof that at least one other active Owner will remain. All owner changes increment authorization state and create audit events. Responses expose login/role status only; no share percentage, capital contribution, profit-distribution ratio, or legal-ownership value exists in Phase 0.
+The owner endpoints are a separate OWNER-reserved workflow and are not authorized by `staff.manage` or `roles.manage`. Any active Owner may list the gym's Owners and invite an additional Owner after recent MFA/step-up verification. The invitation accepts `email`, `first_name`, `last_name`, optional `phone`, and optional `send_invitation`; email delivery is required until another secure delivery channel is approved. The server fixes `is_owner = true` and the protected OWNER role, so clients cannot submit role or permission IDs. `POST /owners/invitations/accept/` accepts the single-use invitation token plus password and confirmation through the trusted BFF, and creates or activates another same-gym Owner login without replacing existing Owners. `POST /owners/{gym_membership_id}/cancel-invitation/` requires recent MFA and withdraws a still-pending invitation: the link stops working, the invitation is retained as `REVOKED`, and that invited person leaves the owner list. An expired pending invitation also leaves the list. Revocation requires a different active Owner as actor, a reason, recent MFA, row locking, and proof that at least one other active Owner will remain. All owner changes increment authorization state and create audit events. Responses expose login/role status only; no share percentage, capital contribution, profit-distribution ratio, or legal-ownership value exists in Phase 0.
 
 `POST /api/v1/admin/gyms/{gym_id}/owners/` provides the equivalent audited Super Admin assistance path for adding an Owner. It follows the same identity-link, invitation, tenant, role, last-active-owner, authorization-version, and audit rules and does not grant the Super Admin ordinary access to gym business data. The same route can issue one replacement credential invitation for an existing active Owner of that exact gym when the user still has an unusable password and no live pending invitation remains. That recovery does not change the membership, OWNER assignment, or `authz_version` until acceptance. Its audit records `invitation_reissue` and does not store the token. A live pending invitation is returned without another email or a rotated token; its message states that a new link can be issued after expiry. Tenant owner calls cannot reinvite an existing active Owner. An active Owner who already has a usable password, and an inactive or platform-administrator identity, remain conflicts. Public results do not reveal whether an arbitrary email exists outside the target gym.
 

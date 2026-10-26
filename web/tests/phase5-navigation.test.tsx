@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -59,6 +59,14 @@ describe("phase 5 navigation", () => {
       >
         <p>Workspace</p>
       </AppShell>,
+    );
+    expect(
+      screen.queryByRole("link", { name: "Trainers" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Training" }));
+    expect(screen.getByRole("button", { name: "Training" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
     );
     for (const [name, href] of LINKS) {
       expect(screen.getByRole("link", { name })).toHaveAttribute("href", href);
@@ -135,6 +143,7 @@ describe("phase 5 navigation", () => {
         <p>Workspace</p>
       </AppShell>,
     );
+    fireEvent.click(screen.getByRole("button", { name: "Training" }));
     expect(screen.getByRole("link", { name: "Packages" })).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Member packages" }),

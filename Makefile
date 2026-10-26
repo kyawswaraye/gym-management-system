@@ -1,4 +1,4 @@
-.PHONY: check-python check-node db-up db-down db-logs migrate backend-install backend-check backend-test backend-test-pg web-install web-check web-test mobile-install mobile-check mobile-test mobile-android mobile-ios e2e openapi-export openapi-generate openapi-check check validate-production production-images
+.PHONY: check-python check-node db-up db-down db-logs migrate backend-install backend-check backend-test backend-test-pg web-install web-check web-test mobile-install mobile-check mobile-test mobile-android mobile-android-release mobile-ios e2e openapi-export openapi-generate openapi-check check validate-production production-images
 
 ifneq ($(wildcard .env),)
 include .env
@@ -78,6 +78,9 @@ mobile-test: check-node
 
 mobile-android: check-node
 	cd mobile/android && ./gradlew assembleDebug
+
+mobile-android-release: check-node
+	cd mobile && npm run android:release
 
 mobile-ios: check-node
 	cd mobile && bundle install

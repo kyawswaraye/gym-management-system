@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { MFASetup } from "@/features/auth/mfa-setup";
 import { readCurrentUser } from "@/lib/auth/session";
 
@@ -11,7 +12,8 @@ export default async function MFASetupPage() {
 
   return (
     <main className="mx-auto max-w-2xl p-6 md:p-10">
-      <h1 className="text-3xl font-bold">Security</h1>
+      <BrandLogo align="start" />
+      <h1 className="mt-6 text-3xl font-bold">Security</h1>
       <p className="muted mt-2">
         Protect sensitive Owner and platform actions.
       </p>

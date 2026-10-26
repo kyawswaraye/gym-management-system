@@ -99,8 +99,11 @@ test("a linked member redeems an onsite QR without storing member tokens", async
     await expect(recent).toContainText(`${memberLabel} · Open`);
     await expect(recent).toContainText("E2E Scan Plan");
 
-    await page
-      .getByRole("navigation", { name: "Primary" })
+    const membersNav = page.getByRole("navigation", { name: "Primary" });
+    await membersNav
+      .getByRole("button", { name: "Members", exact: true })
+      .click();
+    await membersNav
       .getByRole("link", { name: "Members", exact: true })
       .click();
     await expect(

@@ -72,6 +72,34 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { stream -> keystoreProperties.load(stream) }
+}
+
+def firstNonBlank = { Object... values ->
+    def found = values.find { value -> value != null && !value.toString().trim().isEmpty() }
+    found == null ? null : found.toString().trim()
+}
+def uploadStore = firstNonBlank(
+    System.getenv("ANDROID_UPLOAD_STORE_FILE"),
+    keystoreProperties.getProperty("storeFile"),
+)
+def uploadStorePassword = firstNonBlank(
+    System.getenv("ANDROID_UPLOAD_STORE_PASSWORD"),
+    keystoreProperties.getProperty("storePassword"),
+)
+def uploadKeyAlias = firstNonBlank(
+    System.getenv("ANDROID_UPLOAD_KEY_ALIAS"),
+    keystoreProperties.getProperty("keyAlias"),
+)
+def uploadKeyPassword = firstNonBlank(
+    System.getenv("ANDROID_UPLOAD_KEY_PASSWORD"),
+    keystoreProperties.getProperty("keyPassword"),
+)
+def releaseSigningReady = [uploadStore, uploadStorePassword, uploadKeyAlias, uploadKeyPassword].every { it }
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -93,12 +121,11 @@ android {
             keyPassword "android"
         }
         release {
-            def uploadStore = System.getenv("ANDROID_UPLOAD_STORE_FILE")
-            if (uploadStore) {
+            if (releaseSigningReady) {
                 storeFile file(uploadStore)
-                storePassword System.getenv("ANDROID_UPLOAD_STORE_PASSWORD")
-                keyAlias System.getenv("ANDROID_UPLOAD_KEY_ALIAS")
-                keyPassword System.getenv("ANDROID_UPLOAD_KEY_PASSWORD")
+                storePassword uploadStorePassword
+                keyAlias uploadKeyAlias
+                keyPassword uploadKeyPassword
             }
         }
     }
@@ -107,12 +134,25 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            if (System.getenv("ANDROID_UPLOAD_STORE_FILE")) {
+            if (releaseSigningReady) {
                 signingConfig signingConfigs.release
             }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def packagesRelease = graph.allTasks.any { task ->
+        task.name == "packageRelease" || task.name == "bundleRelease" || task.name == "signReleaseBundle"
+    }
+    if (packagesRelease && !releaseSigningReady) {
+        throw new GradleException(
+            "Release signing is not configured. From mobile/, run npm run android:release. " +
+            "CI can set ANDROID_UPLOAD_STORE_FILE, ANDROID_UPLOAD_STORE_PASSWORD, " +
+            "ANDROID_UPLOAD_KEY_ALIAS, and ANDROID_UPLOAD_KEY_PASSWORD."
+        )
     }
 }
 

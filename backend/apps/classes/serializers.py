@@ -10,6 +10,7 @@ from rest_framework import serializers
 
 from apps.classes.models import ClassBooking, ClassOccurrence, ClassSchedule, ClassType
 from apps.classes.recurrence import MAX_INCLUSIVE_DAYS
+from apps.common.codes import OptionalPatternField
 from apps.users.serializers import StrictSerializer
 
 _CODE = re.compile(r"^[A-Z][A-Z0-9_]{0,31}$")
@@ -21,7 +22,7 @@ def _collapsed(value: str) -> str:
 
 
 class ClassTypeWriteSerializer(StrictSerializer):
-    code = serializers.RegexField(_CODE, max_length=32)
+    code = OptionalPatternField(_CODE, max_length=32)
     name = serializers.CharField(max_length=120, trim_whitespace=True)
     description = serializers.CharField(
         required=False, allow_blank=True, default="", trim_whitespace=True

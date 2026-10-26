@@ -30,6 +30,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.audit.services import write_tenant_audit
 from apps.cashbook.services import revalidate_cash_actor
+from apps.common.codes import SKU_CODE, resolve_code
 from apps.common.finance.money import parse_money
 from apps.inventory.models import Product, ProductCategory, StockMovement
 from apps.inventory.normalization import canonical_category_name, canonical_display_name
@@ -76,13 +77,19 @@ def create_category(
         permission_code="inventory.manage",
     )
     display, normalized = canonical_category_name(str(fields["name"]))
+    code = resolve_code(
+        str(fields.get("code") or ""),
+        ProductCategory.objects.filter(gym=gym).values_list("code", flat=True),
+        display,
+        prefix="CATEGORY",
+    )
     active = bool(fields.get("is_active", True))
     archived_at = None if active else timezone.now()
     archived_by = None if active else actor.id
     try:
         category = ProductCategory.objects.create(
             gym=gym,
-            code=str(fields["code"]),
+            code=code,
             name=display,
             normalized_name=normalized,
             is_active=active,
@@ -126,14 +133,22 @@ def create_product(
         permission_code="inventory.manage",
     )
     category = _category(gym_id=gym.id, category_id=fields["category_id"])
+    name = canonical_display_name(str(fields["name"]))
+    sku = resolve_code(
+        str(fields.get("sku") or ""),
+        Product.objects.filter(gym=gym).values_list("sku", flat=True),
+        name,
+        prefix="SKU",
+        pattern=SKU_CODE,
+    )
     active = bool(fields.get("is_active", True))
     try:
         product = Product.objects.create(
             gym=gym,
             category=category,
-            sku=str(fields["sku"]),
+            sku=sku,
             barcode=fields.get("barcode"),
-            name=canonical_display_name(str(fields["name"])),
+            name=name,
             unit=str(fields["unit"]),
             sale_price=parse_money(fields["sale_price"]),
             current_unit_cost=parse_money(fields["current_unit_cost"]),

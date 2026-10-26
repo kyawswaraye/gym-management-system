@@ -8,6 +8,7 @@ from typing import Any, cast
 from rest_framework import serializers
 
 from apps.cashbook.serializers import ExactMoneyField
+from apps.common.codes import SKU_CODE, OptionalPatternField
 from apps.inventory.models import Product, ProductCategory, StockMovement
 from apps.inventory.normalization import (
     canonical_barcode,
@@ -59,7 +60,7 @@ class ExactQuantityField(serializers.DecimalField):
 
 
 class ProductCategoryWriteSerializer(StrictSerializer):
-    code = serializers.RegexField(_CODE, max_length=32)
+    code = OptionalPatternField(_CODE, max_length=32)
     name = serializers.CharField(max_length=120, trim_whitespace=True)
     is_active = serializers.BooleanField(required=False, default=True)
 
@@ -72,7 +73,7 @@ class ProductCategoryWriteSerializer(StrictSerializer):
 
 
 class ProductWriteSerializer(StrictSerializer):
-    sku = serializers.RegexField(_SKU, max_length=32)
+    sku = OptionalPatternField(SKU_CODE, max_length=32)
     barcode = serializers.CharField(required=False, allow_null=True, max_length=80)
     name = serializers.CharField(max_length=255, trim_whitespace=True)
     category_id = serializers.UUIDField()

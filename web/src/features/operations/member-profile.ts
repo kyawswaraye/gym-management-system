@@ -104,6 +104,11 @@ function profilePayload(input: MemberProfileInput): MemberProfilePayload {
   };
 }
 
+export function assignedMemberNumber(prefix: string, next: number): string {
+  const sequence = Number.isFinite(next) ? Math.trunc(next) : 0;
+  return `${prefix}-${String(sequence).padStart(6, "0")}`;
+}
+
 export function emptyMemberProfile(joinDate: string): MemberProfileInput {
   return {
     member_number: "",
@@ -156,7 +161,7 @@ export function memberCreatePayload(
   input: MemberProfileInput,
 ): MemberCreatePayload {
   return {
-    member_number: trimmed(input.member_number),
+    member_number: "",
     ...profilePayload(input),
   };
 }

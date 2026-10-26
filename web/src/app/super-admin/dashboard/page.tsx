@@ -6,7 +6,7 @@ import { PlatformDashboard } from "@/features/platform/platform-dashboard";
 import { hasPermission, platformHomePath } from "@/lib/auth/authorization";
 import { requirePlatformSession } from "@/lib/auth/session";
 
-export const metadata: Metadata = { title: "Platform dashboard" };
+export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 export default async function SuperAdminDashboardPage() {
@@ -18,9 +18,9 @@ export default async function SuperAdminDashboardPage() {
   return (
     <section aria-labelledby="platform-dashboard-title">
       <PageHeader
-        description="Gym, subscription, and plan status counts."
-        eyebrow="Platform"
-        title="Platform dashboard"
+        description="Gym, subscription, and plan counts. Open a section from the sidebar to act on them."
+        eyebrow="GymPilot MM"
+        title="Dashboard"
         titleId="platform-dashboard-title"
       />
       <PlatformDashboard canView />

@@ -9,7 +9,8 @@ from django.contrib.auth.password_validation import validate_password
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from apps.tenants.models import Gym, SubscriptionPlan
+from apps.common.codes import GYM_CODE, OptionalPatternField
+from apps.tenants.models import Gym, GymLogo, SubscriptionPlan
 from apps.tenants.validation import (
     SETTINGS_INTEGER_RANGES,
     normalize_currency,
@@ -21,7 +22,7 @@ from apps.users.serializers import StrictSerializer
 
 
 class AdminGymInputSerializer(StrictSerializer):
-    code = serializers.RegexField(r"^[A-Z0-9][A-Z0-9-]{1,31}$")
+    code = OptionalPatternField(GYM_CODE)
     name = serializers.CharField(max_length=150)
     legal_name = serializers.CharField(required=False, allow_blank=True, max_length=200)
     email = serializers.EmailField(required=False, allow_blank=True)
@@ -50,6 +51,9 @@ class AdminGymInputSerializer(StrictSerializer):
         except ZoneInfoNotFoundError as exc:
             raise serializers.ValidationError("Unsupported timezone.") from exc
         return value
+
+    def validate_currency(self, value: str) -> str:
+        return normalize_currency(value)
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         super().validate(attrs)
@@ -149,6 +153,9 @@ class AdminGymPatchSerializer(StrictSerializer):
         except ZoneInfoNotFoundError as exc:
             raise serializers.ValidationError("Unsupported timezone.") from exc
         return value
+
+    def validate_currency(self, value: str) -> str:
+        return normalize_currency(value)
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         super().validate(attrs)
@@ -474,6 +481,7 @@ class GymProfileSerializer(serializers.Serializer):
     subscription_ends_at = serializers.DateTimeField(allow_null=True)
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
+    has_logo = serializers.BooleanField()
 
     def to_representation(self, instance: Any) -> dict[str, Any]:
         if isinstance(instance, dict):
@@ -503,6 +511,11 @@ class GymProfileSerializer(serializers.Serializer):
                 "subscription_ends_at": instance.subscription_ends_at,
                 "created_at": instance.created_at,
                 "updated_at": instance.updated_at,
+                "has_logo": (
+                    GymLogo.objects.filter(pk=instance.id).exists()
+                    if isinstance(instance, Gym)
+                    else bool(getattr(instance, "has_logo", False))
+                ),
             }
         )
 

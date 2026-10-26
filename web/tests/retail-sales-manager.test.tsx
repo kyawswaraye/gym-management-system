@@ -246,6 +246,7 @@ describe("retail sales", () => {
       screen.queryByRole("button", { name: /partial return/i }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/partial return/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "New retail sale" }));
     await screen.findByRole("option", { name: /WATER/ });
     fireEvent.change(screen.getByRole("combobox", { name: "Product" }), {
       target: { value: PRODUCT_ID },

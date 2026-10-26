@@ -165,6 +165,9 @@ describe("salaries", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "2026-10-01 – 2026-10-31" }),
     );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit staff lines" }),
+    );
     const amounts = await screen.findAllByRole("textbox", {
       name: "Amount (THB)",
     });

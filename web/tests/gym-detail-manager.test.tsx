@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -115,7 +121,13 @@ describe("Super Admin gym detail manager", () => {
     );
     await screen.findByText("Yangon Fitness");
 
-    fireEvent.click(screen.getByRole("button", { name: "Suspend gym" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change lifecycle" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Lifecycle" })).getByRole(
+        "button",
+        { name: "Suspend gym" },
+      ),
+    );
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Enter a reason of at least 3 characters.",
     );
@@ -167,6 +179,7 @@ describe("Super Admin gym detail manager", () => {
         /A live pending invitation is not resent\. A new link is possible after expiry for a passwordless active Owner\./,
       ),
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add Owner" }));
     expect(
       screen.getByText("Required. The setup link is emailed to this address."),
     ).toBeInTheDocument();

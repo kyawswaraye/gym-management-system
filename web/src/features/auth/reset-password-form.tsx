@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { getCsrfToken, mutationHeaders } from "@/features/auth/client";
+import { PasswordInput } from "@/features/auth/password-input";
 
 type FieldErrors = Record<string, string>;
 
@@ -108,11 +109,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
       ) : null}
       <div className="field">
         <label htmlFor={passwordId}>New password</label>
-        <input
+        <PasswordInput
           id={passwordId}
-          className="input"
           name="password"
-          type="password"
           autoComplete="new-password"
           minLength={12}
           required
@@ -125,11 +124,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
       </div>
       <div className="field">
         <label htmlFor={confirmId}>Confirm password</label>
-        <input
+        <PasswordInput
           id={confirmId}
-          className="input"
           name="password_confirmation"
-          type="password"
           autoComplete="new-password"
           minLength={12}
           required

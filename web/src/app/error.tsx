@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+import { BrandLogo } from "@/components/brand-logo";
+
 export default function GlobalError({
   error,
   reset,
@@ -16,7 +18,8 @@ export default function GlobalError({
   return (
     <main className="grid min-h-screen place-items-center p-6">
       <section className="card text-center">
-        <h1 className="text-2xl font-bold">Something went wrong</h1>
+        <BrandLogo />
+        <h1 className="mt-6 text-2xl font-bold">Something went wrong</h1>
         <p className="muted mt-2">
           No sensitive details were displayed. Please try again.
         </p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -9,11 +9,14 @@ import {
   getCsrfToken,
   mutationHeaders,
 } from "@/features/auth/client";
+import { PasswordInput } from "@/features/auth/password-input";
 
 export function OwnerInvitationForm({ token }: { token: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const passwordId = useId();
+  const confirmId = useId();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,26 +61,19 @@ export function OwnerInvitationForm({ token }: { token: string }) {
           {error}
         </p>
       )}
-      <label className="field">
-        <span>Password</span>
-        <input
-          className="input"
-          name="password"
-          type="password"
-          minLength={12}
-          required
-        />
-      </label>
-      <label className="field">
-        <span>Confirm password</span>
-        <input
-          className="input"
+      <div className="field">
+        <label htmlFor={passwordId}>Password</label>
+        <PasswordInput id={passwordId} name="password" minLength={12} required />
+      </div>
+      <div className="field">
+        <label htmlFor={confirmId}>Confirm password</label>
+        <PasswordInput
+          id={confirmId}
           name="password_confirmation"
-          type="password"
           minLength={12}
           required
         />
-      </label>
+      </div>
       <button className="button" disabled={pending}>
         {pending ? "Accepting…" : "Accept Owner invitation"}
       </button>

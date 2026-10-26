@@ -6,6 +6,7 @@ import { listStaff, scanTrainerCheckIn } from "@/features/operations/client";
 import { listAssignedMembers, listTrainers } from "@/features/pt/client";
 import { phase5Error } from "@/features/pt/errors";
 import { collectLookupPages } from "@/features/pt/lookup";
+import { FormDialog } from "@/components/form-dialog";
 import { Field, Loading, TextInput } from "@/features/finance/ui";
 import type { AssignedMember } from "@/types/api";
 
@@ -60,6 +61,7 @@ export function TrainerScan({ membershipId }: { membershipId: string }) {
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -108,6 +110,7 @@ export function TrainerScan({ membershipId }: { membershipId: string }) {
       await scanTrainerCheckIn({ memberId, payload });
       setPayload("");
       setNotice("Checked in from the trainer code.");
+      setScanning(false);
     } catch (caught) {
       setError(phase5Error(caught, "The check-in code is not valid."));
     } finally {
@@ -151,47 +154,68 @@ export function TrainerScan({ membershipId }: { membershipId: string }) {
             {notice}
           </p>
         ) : null}
-        <form className="grid gap-3" onSubmit={(event) => void submit(event)}>
-          <Field label="Search assigned members">
-            <TextInput
-              onChange={(event) => setQuery(event.target.value)}
-              value={query}
-            />
-          </Field>
-          <Field label="Assigned member">
-            <select
-              className="input"
-              onChange={(event) => setMemberId(event.target.value)}
-              required
-              value={memberId}
-            >
-              <option value="">Select a member</option>
-              {visible.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {label(member)} ({member.member_number})
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Check-in code">
-            <textarea
-              autoComplete="off"
-              className="input min-h-24"
-              name="payload"
-              onChange={(event) => setPayload(event.target.value)}
-              required
-              spellCheck={false}
-              value={payload}
-            />
-          </Field>
-          <button
-            className="button w-full sm:w-fit"
-            disabled={pending || !profileId}
-            type="submit"
+        <button
+          className="button w-full sm:w-fit"
+          disabled={pending || loading || !profileId}
+          onClick={() => {
+            setError("");
+            setScanning(true);
+          }}
+          type="button"
+        >
+          Scan check-in code
+        </button>
+        {scanning ? (
+          <FormDialog
+            description="Choose an assigned member and accept the scanner text or paste the code. The code is sent once and is not kept in this browser."
+            onClose={() => {
+              if (!pending) setScanning(false);
+            }}
+            onSubmit={(event) => void submit(event)}
+            pending={pending}
+            title="Trainer QR scan"
           >
-            Scan check-in code
-          </button>
-        </form>
+            <Field label="Search assigned members">
+              <TextInput
+                onChange={(event) => setQuery(event.target.value)}
+                value={query}
+              />
+            </Field>
+            <Field label="Assigned member">
+              <select
+                className="input"
+                onChange={(event) => setMemberId(event.target.value)}
+                required
+                value={memberId}
+              >
+                <option value="">Select a member</option>
+                {visible.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {label(member)} ({member.member_number})
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Check-in code">
+              <textarea
+                autoComplete="off"
+                className="input min-h-24"
+                name="payload"
+                onChange={(event) => setPayload(event.target.value)}
+                required
+                spellCheck={false}
+                value={payload}
+              />
+            </Field>
+            <button
+              className="button w-full sm:w-fit"
+              disabled={pending || !profileId}
+              type="submit"
+            >
+              Scan check-in code
+            </button>
+          </FormDialog>
+        ) : null}
       </div>
     </section>
   );

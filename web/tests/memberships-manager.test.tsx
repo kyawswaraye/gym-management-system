@@ -242,9 +242,6 @@ describe("Memberships manager", () => {
     expect(listAllMembershipPlans).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "New plan" }));
 
-    fireEvent.change(screen.getByLabelText("Code"), {
-      target: { value: "MONTH" },
-    });
     fireEvent.change(screen.getByLabelText("Name"), {
       target: { value: "Monthly" },
     });
@@ -258,7 +255,7 @@ describe("Memberships manager", () => {
 
     await waitFor(() =>
       expect(operationMutation).toHaveBeenCalledWith("membership-plans/", {
-        code: "MONTH",
+        code: "",
         name: "Monthly",
         duration_value: 1,
         duration_unit: "MONTH",
@@ -641,9 +638,6 @@ describe("Memberships manager", () => {
       new Error("The membership plan list is too large to load."),
     );
     fireEvent.click(screen.getByRole("button", { name: "New plan" }));
-    fireEvent.change(screen.getByLabelText("Code"), {
-      target: { value: "DAY" },
-    });
     fireEvent.change(screen.getByLabelText("Name"), {
       target: { value: "Daily" },
     });
@@ -1241,9 +1235,6 @@ describe("Memberships manager", () => {
       screen.getByRole("button", { name: "Archive Monthly (MONTH) plan" }),
     ).toBeDisabled();
 
-    fireEvent.change(within(dialog).getByLabelText("Code"), {
-      target: { value: "  YEAR  " },
-    });
     fireEvent.change(within(dialog).getByLabelText("Name"), {
       target: { value: "  Annual pass  " },
     });
@@ -1261,7 +1252,7 @@ describe("Memberships manager", () => {
     });
     vi.mocked(operationMutation).mockResolvedValue(
       plan({
-        code: "YEAR",
+        code: "MONTH",
         name: "Annual pass",
         description: "Front desk",
         duration_value: 12,
@@ -1280,7 +1271,7 @@ describe("Memberships manager", () => {
       expect(operationMutation).toHaveBeenCalledWith(
         `membership-plans/${PLAN_ID}/`,
         {
-          code: "YEAR",
+          code: "MONTH",
           name: "Annual pass",
           description: "Front desk",
           duration_value: 12,
@@ -1295,7 +1286,7 @@ describe("Memberships manager", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     const planCatalog = screen.getByRole("table", { name: "Membership plans" });
     expect(
-      within(planCatalog).getByRole("cell", { name: "YEAR" }),
+      within(planCatalog).getByRole("cell", { name: "MONTH" }),
     ).toBeInTheDocument();
     expect(
       within(planCatalog).getByRole("cell", { name: "Annual pass" }),

@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -10,7 +16,7 @@ import {
   listStockMovements,
 } from "@/features/finance/client";
 import { InventoryManager } from "@/features/finance/inventory-manager";
-import type { Product } from "@/types/api";
+import type { Product, ProductCategory } from "@/types/api";
 
 vi.mock("@/features/finance/client", () => ({
   adjustStock: vi.fn(),
@@ -26,6 +32,20 @@ vi.mock("@/features/finance/client", () => ({
 
 const PRODUCT_ID = "11111111-1111-4111-8111-111111111111";
 const CATEGORY_ID = "22222222-2222-4222-8222-222222222222";
+
+function category(): ProductCategory {
+  return {
+    id: CATEGORY_ID,
+    code: "DRINKS",
+    name: "Drinks",
+    is_active: true,
+    archived_at: null,
+    created_by_membership_id: CATEGORY_ID,
+    updated_by_membership_id: CATEGORY_ID,
+    created_at: "2026-10-18T01:00:00Z",
+    updated_at: "2026-10-18T01:00:00Z",
+  };
+}
 
 function product(overrides: Partial<Product> = {}): Product {
   return {
@@ -176,5 +196,54 @@ describe("inventory", () => {
     expect(
       screen.queryByRole("button", { name: "Adjust stock" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps catalog, detail, and the other sections on separate surfaces", async () => {
+    vi.mocked(listProductCategories).mockResolvedValue({
+      data: [category()],
+      meta: { has_more: false, next_after: null },
+    });
+    vi.mocked(listProducts).mockResolvedValue({
+      data: [product()],
+      meta: { has_more: false, next_after: null },
+    });
+    render(<InventoryManager canAdjust canManage defaultDate="2026-10-18" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "New product" }));
+    expect(
+      screen.getByRole("heading", { name: "New product" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(
+      screen.queryByRole("heading", { name: "New product" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "WATER" }));
+    const detail = await screen.findByRole("region", { name: "Water" });
+    expect(within(detail).getByText("Quantity on hand")).toBeInTheDocument();
+    expect(within(detail).getByText("Drinks")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit product" }));
+    expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Water");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("tab", { name: "Categories" }));
+    expect(
+      screen.getByRole("heading", { name: "Product categories" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("DRINKS")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Stock movements" }));
+    expect(
+      screen.getByRole("heading", { name: "Stock movements" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Apply filters" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Low stock" }));
+    expect(
+      screen.getByRole("heading", { name: "Low stock" }),
+    ).toBeInTheDocument();
   });
 });

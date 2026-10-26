@@ -369,7 +369,7 @@ describe("create assignment dialog", () => {
     );
   });
 
-  it("leaves end and cancel assignment forms inline", async () => {
+  it("opens end and cancel assignment forms in dialogs", async () => {
     vi.mocked(listAssignments).mockResolvedValue(page([assignment()]));
     vi.mocked(endAssignment).mockRejectedValue(new Error("End failed."));
     renderManager();
@@ -378,9 +378,8 @@ describe("create assignment dialog", () => {
       await screen.findByRole("button", { name: "End assignment" }),
     );
     const endForm = screen.getByRole("dialog", { name: "End assignment" });
-    expect(endForm).not.toHaveAttribute("aria-modal");
-    expect(endForm.parentElement).not.toHaveClass("fixed");
-    expect(endForm).toHaveClass("rounded-2xl", "border-t-amber-500");
+    expect(endForm).toHaveAttribute("aria-modal", "true");
+    expect(endForm.parentElement).toHaveClass("fixed");
     expect(
       within(endForm).queryByRole("button", { name: "Close" }),
     ).not.toBeInTheDocument();
@@ -405,9 +404,8 @@ describe("create assignment dialog", () => {
     const cancelForm = screen.getByRole("dialog", {
       name: "Cancel assignment",
     });
-    expect(cancelForm).not.toHaveAttribute("aria-modal");
-    expect(cancelForm.parentElement).not.toHaveClass("fixed");
-    expect(cancelForm).toHaveClass("rounded-2xl", "border-t-rose-500");
+    expect(cancelForm).toHaveAttribute("aria-modal", "true");
+    expect(cancelForm.parentElement).toHaveClass("fixed");
     expect(
       within(cancelForm).getByRole("button", { name: "Confirm cancel" }),
     ).toBeInTheDocument();

@@ -5,6 +5,7 @@ from typing import Any
 
 from rest_framework import serializers
 
+from apps.common.codes import OptionalPatternField
 from apps.tenants.delegation import PROTECTED_ROLE_KEYS
 from apps.users.serializers import StrictSerializer
 
@@ -45,12 +46,14 @@ class RoleSerializer(serializers.Serializer):
 
 
 class RoleCreateSerializer(StrictSerializer):
-    key = serializers.CharField(max_length=32)
+    key = OptionalPatternField(_ROLE_KEY, max_length=32)
     name = serializers.CharField(max_length=100)
     description = serializers.CharField(required=False, allow_blank=True, max_length=255)
     is_active = serializers.BooleanField(required=False)
 
     def validate_key(self, value: str) -> str:
+        if value == "":
+            return ""
         return _role_key(value)
 
     def validate_name(self, value: str) -> str:

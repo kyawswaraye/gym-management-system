@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import {
   activateStaff,
@@ -21,6 +14,7 @@ import {
   updateStaff,
   type StaffListQuery,
 } from "@/features/operations/client";
+import { FormDialog } from "@/components/form-dialog";
 import {
   assignmentRequiresOwner,
   assignableRoles,
@@ -133,17 +127,6 @@ function emailValue(raw: FormDataEntryValue | null): Checked {
   return { ok: true, value };
 }
 
-function staffCodeValue(raw: FormDataEntryValue | null): Checked {
-  const value = String(raw ?? "").trim();
-  if (!value || /\s/u.test(value) || value.length > 32) {
-    return {
-      ok: false,
-      message: "Enter a staff code without spaces, up to 32 characters.",
-    };
-  }
-  return { ok: true, value };
-}
-
 function dateValue(raw: FormDataEntryValue | null): Checked {
   const value = String(raw ?? "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(value))) {
@@ -180,7 +163,6 @@ function readInvite(form: FormData, roles: Role[]): InviteResult {
     first_name: textValue(form.get("first_name"), "First name", 150, true),
     last_name: textValue(form.get("last_name"), "Last name", 150, true),
     phone: textValue(form.get("phone"), "Phone", 32, false),
-    staff_code: staffCodeValue(form.get("staff_code")),
     display_name: textValue(
       form.get("display_name"),
       "Display name",
@@ -223,7 +205,6 @@ function readInvite(form: FormData, roles: Role[]): InviteResult {
     !checks.first_name.ok ||
     !checks.last_name.ok ||
     !checks.phone.ok ||
-    !checks.staff_code.ok ||
     !checks.display_name.ok ||
     !checks.joined_date.ok ||
     !checks.employment_title.ok ||
@@ -235,7 +216,7 @@ function readInvite(form: FormData, roles: Role[]): InviteResult {
     email: checks.email.value,
     first_name: checks.first_name.value,
     last_name: checks.last_name.value,
-    staff_code: checks.staff_code.value,
+    staff_code: "",
     display_name: checks.display_name.value,
     joined_date: checks.joined_date.value,
     role_ids: roleIds,
@@ -252,7 +233,6 @@ function readInvite(form: FormData, roles: Role[]): InviteResult {
 
 function readProfile(form: FormData): ProfileResult {
   const checks = {
-    staff_code: staffCodeValue(form.get("staff_code")),
     display_name: textValue(
       form.get("display_name"),
       "Display name",
@@ -287,7 +267,6 @@ function readProfile(form: FormData): ProfileResult {
     };
   }
   if (
-    !checks.staff_code.ok ||
     !checks.display_name.ok ||
     !checks.phone.ok ||
     !checks.joined_date.ok ||
@@ -299,7 +278,6 @@ function readProfile(form: FormData): ProfileResult {
   return {
     ok: true,
     body: {
-      staff_code: checks.staff_code.value,
       display_name: checks.display_name.value,
       phone: checks.phone.value,
       joined_date: checks.joined_date.value,
@@ -332,7 +310,9 @@ function InputField({
   const errorId = `${id}-error`;
   return (
     <div className="field">
-      <label htmlFor={id}>{label}</label>
+      <label className="text-sm font-semibold text-slate-700" htmlFor={id}>
+        {label}
+      </label>
       <input
         id={id}
         className="input"
@@ -354,57 +334,160 @@ function InputField({
   );
 }
 
-function StaffFacts({
-  staff,
-  includeProfile,
+const STATUS_LABEL: Record<string, string> = {
+  ACTIVE: "Active",
+  ON_LEAVE: "On leave",
+  TERMINATED: "Terminated",
+  ARCHIVED: "Archived",
+  INVITED: "Invited",
+  SUSPENDED: "Suspended",
+  REVOKED: "Revoked",
+};
+
+function statusLabel(status: string): string {
+  return STATUS_LABEL[status] ?? status;
+}
+
+function statusTone(status: string): string {
+  switch (status) {
+    case "ACTIVE":
+      return "bg-emerald-50 text-emerald-700 ring-emerald-600/15";
+    case "INVITED":
+      return "bg-sky-50 text-sky-700 ring-sky-600/15";
+    case "ON_LEAVE":
+    case "SUSPENDED":
+      return "bg-amber-50 text-amber-800 ring-amber-600/15";
+    case "TERMINATED":
+    case "REVOKED":
+      return "bg-rose-50 text-rose-700 ring-rose-600/15";
+    default:
+      return "bg-slate-100 text-slate-600 ring-slate-500/10";
+  }
+}
+
+function initials(name: string): string {
+  const letters = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "");
+  return letters.join("") || "?";
+}
+
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${statusTone(status)}`}
+    >
+      {statusLabel(status)}
+    </span>
+  );
+}
+
+function Fact({
+  label,
+  value,
+  suffix,
 }: {
-  staff: StaffRecord;
-  includeProfile: boolean;
+  label: string;
+  value: string;
+  suffix?: string;
 }) {
-  const rows: { label: string; value: string }[] = [
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-2.5">
+      <dt className="text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm font-semibold break-words text-slate-900">
+        <span>{value}</span>
+        {suffix ? (
+          <span className="font-medium text-slate-400">{suffix}</span>
+        ) : null}
+      </dd>
+    </div>
+  );
+}
+
+function ProfileFacts({ staff }: { staff: StaffRecord }) {
+  const facts: { label: string; value: string; suffix?: string }[] = [
     { label: "Email", value: staff.membership.email },
+    { label: "Phone", value: staff.phone || "—" },
+    { label: "Employment title", value: staff.employment_title || "—" },
+    { label: "Joined date", value: staff.joined_date },
     {
-      label: "Name",
-      value:
-        `${staff.membership.first_name} ${staff.membership.last_name}`.trim(),
+      label: "Commission",
+      value: staff.default_commission_percent,
+      suffix: "%",
     },
-    { label: "Profile status", value: staff.status },
-    { label: "Membership status", value: staff.membership.status },
     { label: "Assigned roles", value: String(staff.role_ids.length) },
-    {
+  ];
+  if (staff.invited_role_ids.length > 0) {
+    facts.push({
       label: "Pending invitation roles",
       value: String(staff.invited_role_ids.length),
-    },
-  ];
-  if (includeProfile) {
-    rows.splice(
-      2,
-      0,
-      { label: "Staff code", value: staff.staff_code },
-      { label: "Phone", value: staff.phone || "—" },
-      { label: "Employment title", value: staff.employment_title || "—" },
-      { label: "Joined date", value: staff.joined_date },
-      {
-        label: "Default commission percent",
-        value: staff.default_commission_percent,
-      },
-    );
+    });
   }
   if (staff.terminated_date) {
-    rows.push({ label: "Terminated date", value: staff.terminated_date });
+    facts.push({ label: "Terminated date", value: staff.terminated_date });
   }
   if (staff.archived_at) {
-    rows.push({ label: "Archived at", value: staff.archived_at });
+    facts.push({ label: "Archived at", value: staff.archived_at });
   }
   return (
-    <dl className="mt-4 grid gap-2 text-sm">
-      {rows.map((row) => (
-        <div className="grid gap-1 sm:grid-cols-[12rem_1fr]" key={row.label}>
-          <dt className="muted">{row.label}</dt>
-          <dd>{row.value}</dd>
-        </div>
+    <dl className="mt-5 grid gap-2 sm:grid-cols-2">
+      {facts.map((fact) => (
+        <Fact
+          key={fact.label}
+          label={fact.label}
+          suffix={fact.suffix}
+          value={fact.value}
+        />
       ))}
     </dl>
+  );
+}
+
+function RoleOption({
+  role,
+  defaultChecked = false,
+  disabled = false,
+  note,
+}: {
+  role: { id: string; name: string; description?: string };
+  defaultChecked?: boolean;
+  disabled?: boolean;
+  note?: string;
+}) {
+  return (
+    <label
+      className={`flex items-start gap-3 rounded-xl border px-3 py-3 ${
+        disabled
+          ? "border-slate-200 bg-slate-50"
+          : "border-slate-200 bg-white has-[:checked]:border-emerald-300 has-[:checked]:bg-emerald-50"
+      }`}
+    >
+      <input
+        aria-label={role.name}
+        className="mt-1 size-4 accent-emerald-700"
+        defaultChecked={defaultChecked}
+        disabled={disabled}
+        name={disabled ? undefined : "role_ids"}
+        readOnly={disabled || undefined}
+        type="checkbox"
+        value={role.id}
+      />
+      <span className="min-w-0">
+        <span className="block font-semibold text-slate-900">{role.name}</span>
+        {role.description ? (
+          <span className="mt-0.5 block text-sm leading-5 text-slate-500">
+            {role.description}
+          </span>
+        ) : null}
+        {note ? (
+          <span className="mt-1 block text-sm text-slate-500">{note}</span>
+        ) : null}
+      </span>
+    </label>
   );
 }
 
@@ -434,92 +517,107 @@ function LifecycleDialog({
     reasonRef.current?.focus();
   }, []);
 
+  const description =
+    action === "suspend"
+      ? `Suspend login access for ${staffName}. The profile stays in place.`
+      : `Activate login access for ${staffName}. The profile stays in place.`;
+
   return (
     <div
-      className="fixed inset-0 z-20 grid place-items-center bg-slate-950/40 p-4"
-      role="presentation"
+      className="fixed inset-0 z-50 grid overflow-hidden p-2 sm:place-items-center sm:p-6"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onCancel();
+        if (event.target === event.currentTarget && !pending) onCancel();
       }}
+      role="presentation"
     >
-      <div
-        className="card w-full max-w-md"
-        role="dialog"
-        aria-modal="true"
+      <form
+        aria-describedby={`${titleId}-description`}
         aria-labelledby={titleId}
+        aria-modal="true"
+        className="flex h-full max-h-full min-h-0 w-full flex-col overflow-y-auto overscroll-contain sm:h-auto sm:max-h-[min(90dvh,32rem)] sm:max-w-lg"
+        noValidate
         onKeyDown={(event) => {
-          if (event.key === "Escape") onCancel();
+          if (event.key !== "Escape" || pending) return;
+          event.preventDefault();
+          onCancel();
         }}
+        onSubmit={onConfirm}
+        role="dialog"
       >
-        <h2 id={titleId} className="text-xl font-bold">
-          {title}
-        </h2>
-        <p className="muted mt-2">
-          {action === "suspend" ? "Suspend" : "Activate"} login access for{" "}
-          {staffName}. This does not terminate or archive the profile.
-        </p>
-        <form className="mt-4 grid gap-3" noValidate onSubmit={onConfirm}>
+        <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-bold text-slate-900" id={titleId}>
+              {title}
+            </h2>
+            <p
+              className="mt-1 text-sm leading-6 text-slate-500"
+              id={`${titleId}-description`}
+            >
+              {description}
+            </p>
+          </div>
+          <button
+            className="button button-cancel button-sm"
+            disabled={pending}
+            onClick={onCancel}
+            type="button"
+          >
+            Close
+          </button>
+        </div>
+        <div className="grid gap-4 px-5 py-4 sm:px-6">
           {error ? (
             <p className="error" id="staff-lifecycle-error" role="alert">
               {error}
             </p>
           ) : null}
           <div className="field">
-            <label htmlFor="staff-lifecycle-reason">Reason</label>
+            <label
+              className="text-sm font-semibold text-slate-700"
+              htmlFor="staff-lifecycle-reason"
+            >
+              Reason
+            </label>
             <textarea
               ref={reasonRef}
+              aria-describedby={error ? "staff-lifecycle-error" : undefined}
+              aria-invalid={error ? true : undefined}
+              className="input min-h-28"
               id="staff-lifecycle-reason"
-              className="input min-h-24"
+              maxLength={500}
+              minLength={3}
               name="reason"
               required
-              minLength={3}
-              maxLength={500}
-              aria-invalid={error ? true : undefined}
-              aria-describedby={error ? "staff-lifecycle-error" : undefined}
             />
+            <span className="text-xs text-slate-500">
+              Use 3 to 500 characters.
+            </span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button className="button" disabled={pending} type="submit">
-              {pending ? "Saving…" : confirmLabel}
-            </button>
+          <div>
             <button
               className="button button-cancel"
-              type="button"
+              disabled={pending}
               onClick={onCancel}
+              type="button"
             >
               Cancel
             </button>
+            <button
+              className={
+                action === "suspend"
+                  ? "button button-warn"
+                  : "button button-success"
+              }
+              disabled={pending}
+              type="submit"
+            >
+              {pending ? "Saving…" : confirmLabel}
+            </button>
           </div>
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
   );
-}
-
-function Banner({
-  loading,
-  error,
-  success,
-  empty,
-}: {
-  loading: boolean;
-  error: string | null;
-  success: string | null;
-  empty: boolean;
-}) {
-  let banner: ReactNode = null;
-  if (loading) banner = <p role="status">Loading staff.</p>;
-  else if (error) {
-    banner = (
-      <p className="error" role="alert">
-        {error}
-      </p>
-    );
-  } else if (success) banner = <p role="status">{success}</p>;
-  else if (empty) {
-    banner = <p role="status">No staff records match this view.</p>;
-  }
-  return banner ? <div className="mt-4">{banner}</div> : null;
 }
 
 const OWNER_REQUIRED = "An Owner is required to change this role assignment.";
@@ -557,6 +655,9 @@ export function StaffManager({
   const [rolesError, setRolesError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [inviteErrors, setInviteErrors] = useState<FieldErrors>({});
+  const [inviting, setInviting] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editingRoles, setEditingRoles] = useState(false);
   const [profileErrors, setProfileErrors] = useState<FieldErrors>({});
   const [lifecycle, setLifecycle] = useState<{
     staff: StaffRecord;
@@ -770,6 +871,7 @@ export function StaffManager({
             }
           : current,
       );
+      setEditingRoles(false);
       setAssignmentMessage(
         `Roles saved. Authorization version ${result.authz_version}.`,
       );
@@ -780,6 +882,13 @@ export function StaffManager({
     } finally {
       setPending(false);
     }
+  }
+
+  function closeInvite() {
+    if (pending) return;
+    setInviting(false);
+    setInviteErrors({});
+    setError(null);
   }
 
   async function submitInvite(event: FormEvent<HTMLFormElement>) {
@@ -799,6 +908,8 @@ export function StaffManager({
     try {
       const result = await inviteStaff(parsed.body);
       setSuccess(`Invitation sent to ${result.email}.`);
+      setInviting(false);
+      setInviteErrors({});
       form.reset();
       await reload();
     } catch (failure) {
@@ -827,6 +938,7 @@ export function StaffManager({
     try {
       const updated = await updateStaff(selected.id, parsed.body);
       setSelected(updated);
+      setEditingProfile(false);
       setSuccess("Staff profile updated.");
       await reload();
     } catch (failure) {
@@ -876,468 +988,783 @@ export function StaffManager({
     }
   }
 
+  function closeDetails() {
+    if (pending) return;
+    detailRequest.current += 1;
+    setDetailLoading(false);
+    setSelected(null);
+    setEditingProfile(false);
+    setEditingRoles(false);
+    setProfileErrors({});
+    setAssignmentError(null);
+    setAssignmentMessage(null);
+    setAssignedRoles(null);
+  }
+
   const locked = selected
     ? selected.status === "TERMINATED" || selected.status === "ARCHIVED"
     : false;
+  const shownCount = `${staff.length} ${staff.length === 1 ? "person" : "people"}`;
 
   return (
-    <div className="grid gap-6">
-      <form
-        className="flex flex-wrap items-end gap-3"
-        onSubmit={(event) => void applyFilters(event)}
-      >
-        <label className="field min-w-56 flex-1">
-          <span>Search staff</span>
-          <input className="input" name="search" maxLength={100} />
-        </label>
-        <label className="field">
-          <span>Profile status</span>
-          <select className="input" name="status" defaultValue="">
-            <option value="">All profile statuses</option>
-            {PROFILE_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Membership status</span>
-          <select className="input" name="membership_status" defaultValue="">
-            <option value="">All membership statuses</option>
-            {MEMBERSHIP_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className="button" type="submit">
-          Apply filters
-        </button>
-      </form>
-
-      <Banner
-        loading={loading && staff.length === 0}
-        error={error}
-        success={success}
-        empty={!loading && staff.length === 0 && !error && !success}
-      />
-
+    <div className="grid gap-5">
       {allowMutations && !canViewRoles ? (
-        <p className="muted">
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           Inviting staff requires permission to view roles.
         </p>
       ) : null}
-
-      {allowInvite ? (
-        <section
-          className="rounded-lg border border-slate-200 bg-white p-5"
-          role="region"
-          aria-labelledby="invite-staff-title"
+      {!inviting && !editingProfile && !editingRoles && !lifecycle && error ? (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {success ? (
+        <p
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900"
+          role="status"
         >
-          <h2 id="invite-staff-title" className="text-xl font-bold">
-            Invite staff
-          </h2>
-          {!rolesLoaded ? (
-            <p className="mt-4" role="status">
-              Loading roles.
-            </p>
-          ) : null}
-          {rolesError ? (
-            <p className="error mt-4" role="alert">
-              {rolesError}
-            </p>
-          ) : null}
-          {rolesLoaded && !rolesError && offeredRoles.length === 0 ? (
-            <p className="muted mt-4">No assignable roles are available.</p>
-          ) : null}
-          {rolesLoaded && !rolesError && offeredRoles.length > 0 ? (
-            <form
-              className="mt-4 grid gap-3 md:grid-cols-2"
-              noValidate
-              onSubmit={(event) => void submitInvite(event)}
-            >
-              <InputField
-                label="Email"
-                name="email"
-                type="email"
-                required
-                maxLength={254}
-                error={inviteErrors.email}
-                inputMode="email"
-              />
-              <InputField
-                label="First name"
-                name="first_name"
-                required
-                maxLength={150}
-                error={inviteErrors.first_name}
-              />
-              <InputField
-                label="Last name"
-                name="last_name"
-                required
-                maxLength={150}
-                error={inviteErrors.last_name}
-              />
-              <InputField
-                label="Phone"
-                name="phone"
-                type="tel"
-                maxLength={32}
-                error={inviteErrors.phone}
-                inputMode="tel"
-              />
-              <InputField
-                label="Staff code"
-                name="staff_code"
-                required
-                maxLength={32}
-                error={inviteErrors.staff_code}
-              />
-              <InputField
-                label="Display name"
-                name="display_name"
-                required
-                maxLength={150}
-                error={inviteErrors.display_name}
-              />
-              <InputField
-                label="Joined date"
-                name="joined_date"
-                type="date"
-                required
-                error={inviteErrors.joined_date}
-              />
-              <InputField
-                label="Employment title"
-                name="employment_title"
-                maxLength={100}
-                error={inviteErrors.employment_title}
-              />
-              <InputField
-                label="Default commission percent"
-                name="default_commission_percent"
-                inputMode="decimal"
-                error={inviteErrors.default_commission_percent}
-              />
-              <fieldset className="grid gap-2 md:col-span-2">
-                <legend className="font-semibold">Roles</legend>
-                {offeredRoles.map((role) => (
-                  <div key={role.id}>
-                    <label className="flex items-center gap-2">
-                      <input name="role_ids" type="checkbox" value={role.id} />
-                      <span>{role.name}</span>
-                    </label>
-                    {role.description ? (
-                      <p className="muted text-sm">{role.description}</p>
-                    ) : null}
-                  </div>
-                ))}
-                {inviteErrors.role_ids ? (
-                  <p className="error">{inviteErrors.role_ids}</p>
-                ) : null}
-              </fieldset>
-              <button
-                className="button md:col-span-2"
-                disabled={pending}
-                type="submit"
+          {success}
+        </p>
+      ) : null}
+
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]">
+        <section
+          aria-labelledby="staff-directory-title"
+          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+            <div>
+              <h2
+                className="text-lg font-bold text-slate-900"
+                id="staff-directory-title"
               >
-                {pending ? "Sending…" : "Send invitation"}
+                Directory
+              </h2>
+              <p className="mt-0.5 text-sm text-slate-500">
+                {loading && staff.length === 0
+                  ? "Fetching the latest records."
+                  : `${shownCount} shown`}
+              </p>
+            </div>
+            {allowInvite ? (
+              <button
+                className="button button-create"
+                onClick={() => setInviting(true)}
+                type="button"
+              >
+                Invite staff
               </button>
-            </form>
+            ) : null}
+          </div>
+          <form
+            className="border-b border-slate-100 bg-slate-50/80 p-4 sm:p-5"
+            onSubmit={(event) => void applyFilters(event)}
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="field sm:col-span-2">
+                <span className="text-xs font-bold tracking-wide text-slate-500 uppercase">
+                  Search staff
+                </span>
+                <input
+                  className="input"
+                  maxLength={100}
+                  name="search"
+                  placeholder="Name, email, or code"
+                  type="search"
+                />
+              </label>
+              <label className="field">
+                <span className="text-xs font-bold tracking-wide text-slate-500 uppercase">
+                  Profile status
+                </span>
+                <select className="input" defaultValue="" name="status">
+                  <option value="">All</option>
+                  {PROFILE_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {statusLabel(status)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="text-xs font-bold tracking-wide text-slate-500 uppercase">
+                  Membership status
+                </span>
+                <select
+                  className="input"
+                  defaultValue=""
+                  name="membership_status"
+                >
+                  <option value="">All</option>
+                  {MEMBERSHIP_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {statusLabel(status)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button className="button" type="submit">
+                Apply filters
+              </button>
+            </div>
+          </form>
+          {loading && staff.length === 0 ? (
+            <div className="grid gap-3 p-5">
+              <p className="text-sm font-medium text-slate-500" role="status">
+                Loading staff.
+              </p>
+              {[0, 1, 2].map((item) => (
+                <div
+                  className="h-16 animate-pulse rounded-xl bg-slate-100"
+                  key={item}
+                />
+              ))}
+            </div>
+          ) : null}
+          {!loading && staff.length === 0 && !error && !success ? (
+            <div className="px-6 py-16 text-center" role="status">
+              <p className="font-semibold text-slate-800">
+                No staff records match this view.
+              </p>
+              <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500">
+                Try another name, email, or status.
+              </p>
+            </div>
+          ) : null}
+
+          {staff.length > 0 ? (
+            <ul className="divide-y divide-slate-100">
+              {staff.map((person) => {
+                const active = selected?.id === person.id;
+                return (
+                  <li key={person.id}>
+                    <button
+                      aria-label={`View details for ${person.display_name}`}
+                      aria-pressed={active}
+                      className={`flex w-full cursor-pointer items-center gap-3 border-0 border-l-4 px-4 py-3.5 text-left font-[inherit] transition sm:px-5 ${
+                        active
+                          ? "border-emerald-600 bg-emerald-50/80"
+                          : "border-transparent bg-white hover:bg-slate-50"
+                      }`}
+                      onClick={() => void openDetails(person.id)}
+                      type="button"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`grid size-11 shrink-0 place-items-center rounded-xl text-sm font-black ${
+                          active
+                            ? "bg-emerald-600 text-white"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {initials(person.display_name)}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold text-slate-900">
+                          {person.display_name}
+                        </span>
+                        <span className="mt-0.5 block truncate text-sm text-slate-500">
+                          {person.membership.email}
+                        </span>
+                        <span className="mt-0.5 block text-xs font-medium text-slate-400">
+                          {person.staff_code}
+                        </span>
+                        <span className="mt-2 flex flex-wrap gap-2 sm:hidden">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="text-[0.62rem] font-bold tracking-wide text-slate-400 uppercase">
+                              Profile
+                            </span>
+                            <StatusBadge status={person.status} />
+                          </span>
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="text-[0.62rem] font-bold tracking-wide text-slate-400 uppercase">
+                              Access
+                            </span>
+                            <StatusBadge status={person.membership.status} />
+                          </span>
+                        </span>
+                      </span>
+                      <span className="hidden shrink-0 items-center gap-2 sm:flex">
+                        <span className="text-right">
+                          <span className="mb-1 block text-[0.62rem] font-bold tracking-wide text-slate-400 uppercase">
+                            Profile
+                          </span>
+                          <StatusBadge status={person.status} />
+                        </span>
+                        <span className="text-right">
+                          <span className="mb-1 block text-[0.62rem] font-bold tracking-wide text-slate-400 uppercase">
+                            Access
+                          </span>
+                          <StatusBadge status={person.membership.status} />
+                        </span>
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className={`text-lg ${active ? "text-emerald-600" : "text-slate-300"}`}
+                      >
+                        ›
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+          {nextAfter ? (
+            <div className="border-t border-slate-100 p-4 text-center">
+              <button
+                className="button"
+                disabled={paging || pending}
+                onClick={() => void loadMore()}
+                type="button"
+              >
+                {paging ? "Loading more…" : "Load more"}
+              </button>
+            </div>
           ) : null}
         </section>
-      ) : null}
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <table className="w-full text-left text-sm">
-          <caption className="px-4 py-3 text-left text-lg font-bold">
-            Staff records
-          </caption>
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="p-3" scope="col">
-                Staff
-              </th>
-              <th className="p-3" scope="col">
-                Email
-              </th>
-              <th className="p-3" scope="col">
-                Profile
-              </th>
-              <th className="p-3" scope="col">
-                Membership
-              </th>
-              <th className="p-3" scope="col">
-                <span className="sr-only">Details</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {staff.map((person) => (
-              <tr className="border-t border-slate-100" key={person.id}>
-                <td className="p-3">
-                  <strong>{person.display_name}</strong>
-                  <span className="muted block">{person.staff_code}</span>
-                </td>
-                <td className="p-3">{person.membership.email}</td>
-                <td className="p-3">{person.status}</td>
-                <td className="p-3">{person.membership.status}</td>
-                <td className="p-3">
-                  <button
-                    className="button"
-                    type="button"
-                    onClick={() => void openDetails(person.id)}
-                  >
-                    View details for {person.display_name}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-      {nextAfter ? (
-        <button
-          className="button"
-          type="button"
-          disabled={paging || pending}
-          onClick={() => void loadMore()}
-        >
-          {paging ? "Loading more…" : "Load more"}
-        </button>
-      ) : null}
-
-      {detailLoading ? <p role="status">Loading staff details.</p> : null}
-      {selected ? (
-        <section
-          className="rounded-lg border border-slate-200 bg-white p-5"
-          role="region"
-          aria-labelledby="staff-detail-title"
-        >
-          <h2 id="staff-detail-title" className="text-xl font-bold">
-            {selected.display_name}
-          </h2>
-          <StaffFacts staff={selected} includeProfile={!allowMutations} />
-          {allowMutations ? (
-            <form
-              className="mt-4 grid gap-3 md:grid-cols-2"
-              key={`${selected.id}:${selected.staff_code}:${selected.display_name}:${selected.phone}:${selected.joined_date}:${selected.employment_title}:${selected.default_commission_percent}`}
-              noValidate
-              onSubmit={(event) => void submitProfile(event)}
-            >
-              <InputField
-                label="Staff code"
-                name="staff_code"
-                required
-                maxLength={32}
-                defaultValue={selected.staff_code}
-                error={profileErrors.staff_code}
-              />
-              <InputField
-                label="Display name"
-                name="display_name"
-                required
-                maxLength={150}
-                defaultValue={selected.display_name}
-                error={profileErrors.display_name}
-              />
-              <InputField
-                label="Phone"
-                name="phone"
-                type="tel"
-                maxLength={32}
-                defaultValue={selected.phone}
-                error={profileErrors.phone}
-                inputMode="tel"
-              />
-              <InputField
-                label="Joined date"
-                name="joined_date"
-                type="date"
-                required
-                defaultValue={selected.joined_date}
-                error={profileErrors.joined_date}
-              />
-              <InputField
-                label="Employment title"
-                name="employment_title"
-                maxLength={100}
-                defaultValue={selected.employment_title}
-                error={profileErrors.employment_title}
-              />
-              <InputField
-                label="Default commission percent"
-                name="default_commission_percent"
-                required
-                defaultValue={selected.default_commission_percent}
-                error={profileErrors.default_commission_percent}
-                inputMode="decimal"
-              />
-              <button
-                className="button button-edit md:col-span-2"
-                disabled={pending}
-                type="submit"
-              >
-                {pending ? "Saving…" : "Save staff profile"}
-              </button>
-            </form>
-          ) : null}
-          {allowMutations &&
-          !locked &&
-          selected.membership.status === "ACTIVE" ? (
-            <button
-              className="button button-warn mt-4"
-              type="button"
-              disabled={pending}
-              onClick={() => {
-                setLifecycleError(null);
-                setLifecycle({ staff: selected, action: "suspend" });
-              }}
-            >
-              Suspend access
-            </button>
-          ) : null}
-          {allowMutations &&
-          !locked &&
-          selected.membership.status === "SUSPENDED" ? (
-            <button
-              className="button button-success mt-4"
-              type="button"
-              disabled={pending}
-              onClick={() => {
-                setLifecycleError(null);
-                setLifecycle({ staff: selected, action: "activate" });
-              }}
-            >
-              Activate access
-            </button>
-          ) : null}
-          {allowMutations && !canViewRoles ? (
-            <p className="muted mt-4">
-              Assigning roles requires permission to view roles.
+        <div className="xl:sticky xl:top-20">
+          {detailLoading ? (
+            <p className="mb-3 text-sm text-slate-500" role="status">
+              Loading staff details.
             </p>
           ) : null}
-          {allowInvite ? (
-            <section className="mt-6" aria-labelledby="assign-roles-title">
-              <h3 id="assign-roles-title" className="text-lg font-bold">
-                Assign roles
-              </h3>
-              {assignmentLoading || !rolesLoaded ? (
-                <p className="mt-3" role="status">
-                  Loading assigned roles.
+          {!selected && !detailLoading ? (
+            <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center shadow-sm">
+              <div>
+                <p className="font-semibold text-slate-800">
+                  No person selected
                 </p>
-              ) : null}
-              {assignmentError ? (
-                <p className="error mt-3" role="alert">
-                  {assignmentError}
+                <p className="mx-auto mt-1 max-w-xs text-sm leading-6 text-slate-500">
+                  Choose someone from the directory to review their profile,
+                  roles, and access.
                 </p>
-              ) : null}
-              {assignmentMessage ? (
-                <p className="mt-3" role="status">
-                  {assignmentMessage}
-                </p>
-              ) : null}
-              {rolesError ? (
-                <p className="error mt-3" role="alert">
-                  {rolesError}
-                </p>
-              ) : null}
-              {assignedRoles ? (
-                <p className="mt-3">
-                  Authorization version {assignedRoles.authz_version}
-                </p>
-              ) : null}
-              {assignedRoles &&
-              !assignmentBlocked &&
-              assignedRoles.roles.every((role) => role.key === "OWNER") ? (
-                <p className="muted mt-2">No roles are assigned.</p>
-              ) : null}
-              {assignedRoles &&
-              assignedRoles.roles.filter((role) => role.key !== "OWNER")
-                .length > 0 ? (
-                <ul className="mt-2" aria-label="Current roles">
-                  {assignedRoles.roles
-                    .filter((role) => role.key !== "OWNER")
-                    .map((role) => {
-                      const retained = !offeredRoles.some(
-                        (offered) => offered.id === role.id,
-                      );
-                      return (
-                        <li key={role.id}>
-                          {retained ? (
-                            <label className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                defaultChecked
-                                disabled
-                                readOnly
-                              />
-                              <span>{role.name}</span>
-                              <span className="muted">
-                                Outside your delegation boundary.
-                              </span>
-                            </label>
-                          ) : (
-                            role.name
-                          )}
-                        </li>
-                      );
-                    })}
-                </ul>
-              ) : null}
-              {rolesLoaded && !rolesError && assignmentBlocked ? (
-                <p className="mt-3" role="status">
-                  {OWNER_REQUIRED}
-                </p>
-              ) : null}
-              {rolesLoaded &&
-              !rolesError &&
-              !assignmentBlocked &&
-              offeredRoles.length === 0 ? (
-                <p className="muted mt-3">No assignable roles are available.</p>
-              ) : null}
-              {rolesLoaded &&
-              !rolesError &&
-              !assignmentBlocked &&
-              offeredRoles.length > 0 &&
-              assignedRoles ? (
-                <form
-                  className="mt-4 grid gap-2"
-                  key={`${selected.membership.gym_membership_id}:${assignedRoles.authz_version}:${assignedRoles.roles.map((role) => role.id).join(",")}`}
-                  noValidate
-                  onSubmit={(event) => void submitAssignment(event)}
+              </div>
+            </div>
+          ) : null}
+          {selected ? (
+            <section
+              aria-labelledby="staff-detail-title"
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              role="region"
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-600 text-sm font-black text-white"
                 >
-                  <fieldset className="grid gap-2">
-                    <legend className="font-semibold">Role choices</legend>
-                    {offeredRoles.map((role) => (
-                      <label key={role.id} className="flex items-center gap-2">
-                        <input
-                          name="role_ids"
-                          type="checkbox"
-                          value={role.id}
-                          defaultChecked={assignedRoles.roles.some(
-                            (assigned) => assigned.id === role.id,
-                          )}
-                        />
-                        <span>{role.name}</span>
-                      </label>
-                    ))}
-                  </fieldset>
-                  <button
-                    className="button button-edit"
-                    disabled={pending}
-                    type="submit"
+                  {initials(selected.display_name)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2
+                    className="truncate text-xl font-bold text-slate-900"
+                    id="staff-detail-title"
                   >
-                    {pending ? "Saving…" : "Save assigned roles"}
-                  </button>
-                </form>
+                    {selected.display_name}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    {selected.staff_code}
+                  </p>
+                </div>
+                <button
+                  className="button button-cancel button-sm"
+                  onClick={closeDetails}
+                  type="button"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-4">
+                <div>
+                  <p className="text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase">
+                    Profile
+                  </p>
+                  <div className="mt-1">
+                    <StatusBadge status={selected.status} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase">
+                    Access
+                  </p>
+                  <div className="mt-1">
+                    <StatusBadge status={selected.membership.status} />
+                  </div>
+                </div>
+              </div>
+              <ProfileFacts staff={selected} />
+              {locked ? (
+                <p className="mt-4 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
+                  Login access stays as it is while this profile is{" "}
+                  {statusLabel(selected.status).toLowerCase()}.
+                </p>
+              ) : null}
+              {allowMutations &&
+              (!editingProfile ||
+                (!locked &&
+                  (selected.membership.status === "ACTIVE" ||
+                    selected.membership.status === "SUSPENDED"))) ? (
+                <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                  {allowMutations && !editingProfile ? (
+                    <button
+                      className="button button-edit"
+                      onClick={() => setEditingProfile(true)}
+                      type="button"
+                    >
+                      Edit profile
+                    </button>
+                  ) : null}
+                  {allowMutations &&
+                  !locked &&
+                  selected.membership.status === "ACTIVE" ? (
+                    <button
+                      className="button button-warn"
+                      disabled={pending}
+                      onClick={() => {
+                        setLifecycleError(null);
+                        setLifecycle({ staff: selected, action: "suspend" });
+                      }}
+                      type="button"
+                    >
+                      Suspend access
+                    </button>
+                  ) : null}
+                  {allowMutations &&
+                  !locked &&
+                  selected.membership.status === "SUSPENDED" ? (
+                    <button
+                      className="button button-success"
+                      disabled={pending}
+                      onClick={() => {
+                        setLifecycleError(null);
+                        setLifecycle({ staff: selected, action: "activate" });
+                      }}
+                      type="button"
+                    >
+                      Activate access
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {allowMutations && editingProfile ? (
+                <FormDialog
+                  description={`Staff code ${selected.staff_code}`}
+                  key={`${selected.id}:${selected.staff_code}:${selected.display_name}:${selected.phone}:${selected.joined_date}:${selected.employment_title}:${selected.default_commission_percent}`}
+                  noValidate
+                  onClose={() => {
+                    if (!pending) setEditingProfile(false);
+                  }}
+                  onSubmit={(event) => void submitProfile(event)}
+                  pending={pending}
+                  title="Edit profile"
+                >
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {error ? (
+                      <p className="error md:col-span-2" role="alert">
+                        {error}
+                      </p>
+                    ) : null}
+                    <InputField
+                      label="Display name"
+                      name="display_name"
+                      required
+                      maxLength={150}
+                      defaultValue={selected.display_name}
+                      error={profileErrors.display_name}
+                    />
+                    <InputField
+                      label="Phone"
+                      name="phone"
+                      type="tel"
+                      maxLength={32}
+                      defaultValue={selected.phone}
+                      error={profileErrors.phone}
+                      inputMode="tel"
+                    />
+                    <InputField
+                      label="Joined date"
+                      name="joined_date"
+                      type="date"
+                      required
+                      defaultValue={selected.joined_date}
+                      error={profileErrors.joined_date}
+                    />
+                    <InputField
+                      label="Employment title"
+                      name="employment_title"
+                      maxLength={100}
+                      defaultValue={selected.employment_title}
+                      error={profileErrors.employment_title}
+                    />
+                    <InputField
+                      label="Default commission percent"
+                      name="default_commission_percent"
+                      required
+                      defaultValue={selected.default_commission_percent}
+                      error={profileErrors.default_commission_percent}
+                      inputMode="decimal"
+                    />
+                    <div className="md:col-span-2">
+                      <button
+                        className="button button-cancel"
+                        disabled={pending}
+                        onClick={() => setEditingProfile(false)}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="button button-edit"
+                        disabled={pending}
+                        type="submit"
+                      >
+                        {pending ? "Saving…" : "Save staff profile"}
+                      </button>
+                    </div>
+                  </div>
+                </FormDialog>
+              ) : null}
+              {allowMutations && !canViewRoles ? (
+                <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  Assigning roles requires permission to view roles.
+                </p>
+              ) : null}
+              {allowInvite ? (
+                <section
+                  aria-labelledby="assign-roles-title"
+                  className="mt-6 rounded-2xl bg-slate-50 p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3
+                        className="text-base font-bold text-slate-900"
+                        id="assign-roles-title"
+                      >
+                        Assign roles
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Saving replaces the roles this person can use.
+                      </p>
+                    </div>
+                    {rolesLoaded &&
+                    !rolesError &&
+                    !assignmentBlocked &&
+                    offeredRoles.length > 0 &&
+                    assignedRoles &&
+                    !editingRoles ? (
+                      <button
+                        className="button button-edit button-sm"
+                        onClick={() => setEditingRoles(true)}
+                        type="button"
+                      >
+                        Edit assigned roles
+                      </button>
+                    ) : null}
+                  </div>
+                  {assignmentLoading || !rolesLoaded ? (
+                    <p className="mt-3 text-sm text-slate-500" role="status">
+                      Loading assigned roles.
+                    </p>
+                  ) : null}
+                  {assignmentError && !editingRoles ? (
+                    <p className="error mt-3" role="alert">
+                      {assignmentError}
+                    </p>
+                  ) : null}
+                  {assignmentMessage ? (
+                    <p
+                      className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900"
+                      role="status"
+                    >
+                      {assignmentMessage}
+                    </p>
+                  ) : null}
+                  {rolesError ? (
+                    <p className="error mt-3" role="alert">
+                      {rolesError}
+                    </p>
+                  ) : null}
+                  {assignedRoles ? (
+                    <p className="mt-3 text-sm text-slate-500">
+                      Authorization version {assignedRoles.authz_version}
+                    </p>
+                  ) : null}
+                  {assignedRoles &&
+                  !assignmentBlocked &&
+                  assignedRoles.roles.every((role) => role.key === "OWNER") ? (
+                    <p className="mt-3 text-sm text-slate-500">
+                      No roles are assigned.
+                    </p>
+                  ) : null}
+                  {assignedRoles &&
+                  assignedRoles.roles.filter((role) => role.key !== "OWNER")
+                    .length > 0 ? (
+                    <ul aria-label="Current roles" className="mt-3 grid gap-2">
+                      {assignedRoles.roles
+                        .filter((role) => role.key !== "OWNER")
+                        .map((role) => {
+                          const retained = !offeredRoles.some(
+                            (offered) => offered.id === role.id,
+                          );
+                          return (
+                            <li key={role.id}>
+                              {retained ? (
+                                <RoleOption
+                                  defaultChecked
+                                  disabled
+                                  note="Outside your delegation boundary."
+                                  role={role}
+                                />
+                              ) : (
+                                <span className="inline-flex rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-800 ring-1 ring-slate-200">
+                                  {role.name}
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                    </ul>
+                  ) : null}
+                  {rolesLoaded && !rolesError && assignmentBlocked ? (
+                    <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                      {OWNER_REQUIRED}
+                    </p>
+                  ) : null}
+                  {rolesLoaded &&
+                  !rolesError &&
+                  !assignmentBlocked &&
+                  offeredRoles.length === 0 ? (
+                    <p className="mt-3 text-sm text-slate-500">
+                      No assignable roles are available.
+                    </p>
+                  ) : null}
+                  {rolesLoaded &&
+                  !rolesError &&
+                  !assignmentBlocked &&
+                  offeredRoles.length > 0 &&
+                  assignedRoles &&
+                  editingRoles ? (
+                    <FormDialog
+                      description="Choose every role this person should keep."
+                      key={`${selected.membership.gym_membership_id}:${assignedRoles.authz_version}:${assignedRoles.roles.map((role) => role.id).join(",")}`}
+                      noValidate
+                      onClose={() => {
+                        if (!pending) setEditingRoles(false);
+                      }}
+                      onSubmit={(event) => void submitAssignment(event)}
+                      pending={pending}
+                      title="Assigned roles"
+                    >
+                      {assignmentError ? (
+                        <p className="error" role="alert">
+                          {assignmentError}
+                        </p>
+                      ) : null}
+                      <fieldset className="grid gap-2">
+                        <legend className="text-sm font-semibold text-slate-700">
+                          Role choices
+                        </legend>
+                        {offeredRoles.map((role) => (
+                          <RoleOption
+                            defaultChecked={assignedRoles.roles.some(
+                              (assigned) => assigned.id === role.id,
+                            )}
+                            key={role.id}
+                            role={role}
+                          />
+                        ))}
+                      </fieldset>
+                      <div>
+                        <button
+                          className="button button-cancel"
+                          disabled={pending}
+                          onClick={() => setEditingRoles(false)}
+                          type="button"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className="button button-edit"
+                          disabled={pending}
+                          type="submit"
+                        >
+                          {pending ? "Saving…" : "Save assigned roles"}
+                        </button>
+                      </div>
+                    </FormDialog>
+                  ) : null}
+                </section>
               ) : null}
             </section>
           ) : null}
-        </section>
+        </div>
+      </div>
+
+      {allowInvite && inviting ? (
+        <div
+          className="fixed inset-0 z-50 grid overflow-hidden p-2 sm:place-items-center sm:p-6"
+          onMouseDown={(event) => {
+            if (event.target !== event.currentTarget) return;
+            closeInvite();
+          }}
+          role="presentation"
+        >
+          <form
+            aria-describedby="invite-staff-description"
+            aria-labelledby="invite-staff-title"
+            aria-modal="true"
+            className="flex h-full max-h-full min-h-0 w-full flex-col overflow-y-auto overscroll-contain sm:h-auto sm:max-h-[min(90dvh,48rem)] sm:max-w-3xl"
+            noValidate
+            onKeyDown={(event) => {
+              if (event.key !== "Escape") return;
+              event.preventDefault();
+              closeInvite();
+            }}
+            onSubmit={(event) => void submitInvite(event)}
+            role="dialog"
+            tabIndex={-1}
+          >
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
+              <div>
+                <h2 className="text-xl font-bold" id="invite-staff-title">
+                  Invite staff
+                </h2>
+                <p
+                  className="mt-1 text-sm text-slate-500"
+                  id="invite-staff-description"
+                >
+                  A staff code is assigned from the display name.
+                </p>
+              </div>
+              <button
+                className="button button-cancel button-sm"
+                disabled={pending}
+                onClick={closeInvite}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+            {!rolesLoaded ||
+            rolesError ||
+            error ||
+            (rolesLoaded && !rolesError && offeredRoles.length === 0) ? (
+              <div className="grid gap-3 px-5 py-4 sm:px-6">
+                {!rolesLoaded ? <p role="status">Loading roles.</p> : null}
+                {rolesError ? (
+                  <p className="error" role="alert">
+                    {rolesError}
+                  </p>
+                ) : null}
+                {rolesLoaded && !rolesError && offeredRoles.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    No assignable roles are available.
+                  </p>
+                ) : null}
+                {error ? (
+                  <p className="error" role="alert">
+                    {error}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {rolesLoaded && !rolesError && offeredRoles.length > 0 ? (
+              <div className="grid gap-3 px-5 py-4 md:grid-cols-2 sm:px-6">
+                <InputField
+                  label="Email"
+                  name="email"
+                  type="email"
+                  required
+                  maxLength={254}
+                  error={inviteErrors.email}
+                  inputMode="email"
+                />
+                <InputField
+                  label="First name"
+                  name="first_name"
+                  required
+                  maxLength={150}
+                  error={inviteErrors.first_name}
+                />
+                <InputField
+                  label="Last name"
+                  name="last_name"
+                  required
+                  maxLength={150}
+                  error={inviteErrors.last_name}
+                />
+                <InputField
+                  label="Phone"
+                  name="phone"
+                  type="tel"
+                  maxLength={32}
+                  error={inviteErrors.phone}
+                  inputMode="tel"
+                />
+                <InputField
+                  label="Display name"
+                  name="display_name"
+                  required
+                  maxLength={150}
+                  error={inviteErrors.display_name}
+                />
+                <InputField
+                  label="Joined date"
+                  name="joined_date"
+                  type="date"
+                  required
+                  error={inviteErrors.joined_date}
+                />
+                <InputField
+                  label="Employment title"
+                  name="employment_title"
+                  maxLength={100}
+                  error={inviteErrors.employment_title}
+                />
+                <InputField
+                  label="Default commission percent"
+                  name="default_commission_percent"
+                  inputMode="decimal"
+                  error={inviteErrors.default_commission_percent}
+                />
+                <fieldset className="grid gap-2 md:col-span-2">
+                  <legend className="text-sm font-semibold text-slate-700">
+                    Roles
+                  </legend>
+                  <p className="text-sm text-slate-500">
+                    Choose at least one role. Owner is not offered here.
+                  </p>
+                  {offeredRoles.map((role) => (
+                    <RoleOption key={role.id} role={role} />
+                  ))}
+                  {inviteErrors.role_ids ? (
+                    <p className="error">{inviteErrors.role_ids}</p>
+                  ) : null}
+                </fieldset>
+                <div className="sticky bottom-0 z-10 mt-2 flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-white py-4 md:col-span-2">
+                  <button
+                    className="button button-cancel"
+                    disabled={pending}
+                    onClick={closeInvite}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="button button-create"
+                    disabled={pending}
+                    type="submit"
+                  >
+                    {pending ? "Sending…" : "Send invitation"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </form>
+        </div>
       ) : null}
 
       {lifecycle ? (

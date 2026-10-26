@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { StaffInvitationForm } from "@/features/auth/staff-invitation-form";
 
 export const metadata: Metadata = { title: "Accept staff invitation" };
@@ -16,7 +17,8 @@ export default async function AcceptStaffInvitationPage({
         className="card w-full max-w-md"
         aria-labelledby="staff-invitation-title"
       >
-        <h1 id="staff-invitation-title" className="text-2xl font-bold">
+        <BrandLogo />
+        <h1 id="staff-invitation-title" className="mt-6 text-2xl font-bold">
           Accept staff invitation
         </h1>
         <p className="muted mt-2">

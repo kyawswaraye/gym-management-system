@@ -14,6 +14,10 @@ def default_expiry_warning_days() -> list[int]:
     return [0, 3, 7, 30]
 
 
+# Printed on membership, shop, and PT receipts. The gym code stays a separate id.
+RECEIPT_NUMBER_PREFIX = "RCPT"
+
+
 # Fernet token for a 65,536-byte plaintext. PKCS7 adds a full block when the
 # plaintext is already a multiple of 16, so the ciphertext is 65,552 bytes.
 # The token is version + timestamp + IV + ciphertext + HMAC = 65,609 bytes.
@@ -169,6 +173,25 @@ class Gym(UUIDTimestampModel):
             models.CheckConstraint(condition=~models.Q(name=""), name="gym_name_nonblank_ck"),
             models.CheckConstraint(condition=~models.Q(code=""), name="gym_code_nonblank_ck"),
         ]
+
+
+class GymLogo(models.Model):
+    """One private brand image for a gym. Kept off the gym row so auth reads stay small."""
+
+    gym = models.OneToOneField(
+        Gym,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="brand_logo",
+    )
+    content_type = models.CharField(max_length=32)
+    data = models.BinaryField()
+
+    class Meta:
+        db_table = "tenants_gym_logo"
+
+    def __str__(self) -> str:
+        return f"Logo for {self.gym_id}"
 
 
 class GymMembership(TenantModel):
@@ -448,7 +471,7 @@ class GymSettings(TenantModel):
     week_starts_on = models.PositiveSmallIntegerField(default=1)
     allow_manual_member_numbers = models.BooleanField(default=False)
     member_number_prefix = models.CharField(max_length=20, default="MEM")
-    receipt_number_prefix = models.CharField(max_length=20, default="RECEIPT")
+    receipt_number_prefix = models.CharField(max_length=20, default=RECEIPT_NUMBER_PREFIX)
     check_in_duplicate_window_seconds = models.PositiveIntegerField(default=300)
     check_in_challenge_ttl_seconds = models.PositiveIntegerField(default=120)
     check_in_challenge_max_uses = models.PositiveIntegerField(default=1)

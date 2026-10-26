@@ -25,6 +25,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.audit.services import write_tenant_audit
 from apps.common.api.exceptions import AuthenticationFailed
+from apps.common.codes import resolve_code
 from apps.common.db.tenant_context import set_gym_context
 from apps.tenants.delegation import (
     RoleGrant,
@@ -274,6 +275,13 @@ def invite_staff(
         now=now,
     )
     commission = _quantize_commission(staff_data.get("default_commission_percent", Decimal("0")))
+    if not str(staff_data.get("staff_code") or "").strip():
+        staff_data["staff_code"] = resolve_code(
+            "",
+            StaffProfile.objects.filter(gym=gym).values_list("staff_code", flat=True),
+            str(staff_data["display_name"]),
+            prefix="STAFF",
+        )
     plaintext = secrets.token_urlsafe(48)
     try:
         with transaction.atomic():

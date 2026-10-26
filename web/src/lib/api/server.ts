@@ -74,9 +74,11 @@ const FILE_DELETE_PATH = new RegExp(`^/api/v1/files/${FILE_ID}/$`);
 
 const ALLOWED_TENANT_PATHS = [
   /^\/api\/v1\/gym\/$/,
+  /^\/api\/v1\/gym\/logo\/$/,
   /^\/api\/v1\/settings\/$/,
   /^\/api\/v1\/owners\/$/,
   /^\/api\/v1\/owners\/invitations\/$/,
+  /^\/api\/v1\/owners\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/cancel-invitation\/$/,
   /^\/api\/v1\/owners\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/revoke\/$/,
   /^\/api\/v1\/staff\/$/,
   /^\/api\/v1\/staff\/invitations\/$/,
@@ -1379,6 +1381,134 @@ export function updateTenantGymProfile(
   request: NextRequest,
 ): Promise<NextResponse> {
   return authenticatedMutation(request, "/api/v1/gym/", "PATCH");
+}
+
+const LOGO_BYTES = 1_200_000;
+const LOGO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+export function getTenantGymLogo(request: NextRequest): Promise<NextResponse> {
+  return runWithBffRequest(request, "/api/v1/gym/logo/", () =>
+    getTenantGymLogoBound(request),
+  );
+}
+
+async function getTenantGymLogoBound(
+  request: NextRequest,
+): Promise<NextResponse> {
+  const access = request.cookies.get(AUTH_COOKIES.access)?.value;
+  if (!access) {
+    return responseFromUpstream(401, {
+      success: false,
+      error: { code: "AUTHENTICATION_REQUIRED", message: "Please sign in." },
+    });
+  }
+  try {
+    const upstream = await callDjango("/api/v1/gym/logo/", {
+      method: "GET",
+      headers: {
+        Accept: "image/jpeg, image/png, image/webp, application/json",
+        Authorization: `Bearer ${access}`,
+      },
+    });
+    const type = (
+      (upstream.headers.get("content-type") ?? "").split(";")[0] ?? ""
+    )
+      .trim()
+      .toLowerCase();
+    if (upstream.ok && LOGO_TYPES.has(type)) {
+      return finishBffResponse(
+        new NextResponse(await upstream.arrayBuffer(), {
+          status: 200,
+          headers: {
+            "Cache-Control": "no-store, private",
+            "Content-Type": type,
+            "X-Content-Type-Options": "nosniff",
+          },
+        }),
+        null,
+      );
+    }
+    return responseFromUpstream(upstream.status, await parseJson(upstream));
+  } catch {
+    return responseFromUpstream(503, {
+      success: false,
+      error: {
+        code: "UPSTREAM_UNAVAILABLE",
+        message: "The service is temporarily unavailable. Please try again.",
+      },
+    });
+  }
+}
+
+export function updateTenantGymLogo(
+  request: NextRequest,
+): Promise<NextResponse> {
+  return runWithBffRequest(request, "/api/v1/gym/logo/", () =>
+    updateTenantGymLogoBound(request),
+  );
+}
+
+async function updateTenantGymLogoBound(
+  request: NextRequest,
+): Promise<NextResponse> {
+  const env = getServerEnv();
+  const verified = verifyMutationRequest(request, env.allowedOrigins);
+  if (!verified.ok) {
+    return responseFromUpstream(403, {
+      success: false,
+      error: { code: "CSRF_FAILED", message: verified.message },
+    });
+  }
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+    return responseFromUpstream(400, {
+      success: false,
+      error: { code: "INVALID_REQUEST", message: "Choose a logo image." },
+    });
+  }
+  const body = await request.arrayBuffer();
+  if (body.byteLength < 1 || body.byteLength > LOGO_BYTES) {
+    return responseFromUpstream(400, {
+      success: false,
+      error: {
+        code: "INVALID_REQUEST",
+        message: "The logo must be a JPEG, PNG, or WebP under 1 MB.",
+      },
+    });
+  }
+  const access = request.cookies.get(AUTH_COOKIES.access)?.value;
+  if (!access) {
+    return responseFromUpstream(401, {
+      success: false,
+      error: { code: "AUTHENTICATION_REQUIRED", message: "Please sign in." },
+    });
+  }
+  try {
+    const upstream = await callDjango("/api/v1/gym/logo/", {
+      method: "PUT",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${access}`,
+        "Content-Type": contentType,
+      },
+      body,
+    });
+    return responseFromUpstream(upstream.status, await parseJson(upstream));
+  } catch {
+    return responseFromUpstream(503, {
+      success: false,
+      error: {
+        code: "UPSTREAM_UNAVAILABLE",
+        message: "The service is temporarily unavailable. Please try again.",
+      },
+    });
+  }
+}
+
+export function deleteTenantGymLogo(
+  request: NextRequest,
+): Promise<NextResponse> {
+  return authenticatedMutation(request, "/api/v1/gym/logo/", "DELETE");
 }
 
 export function getTenantGymSettings(

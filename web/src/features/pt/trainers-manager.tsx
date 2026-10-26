@@ -626,74 +626,92 @@ export function TrainersManager({
       ) : null}
 
       {mode === "end" && active && canClose ? (
-        <form
-          aria-labelledby="end-assignment-title"
-          className="grid gap-4 rounded-2xl border border-amber-200 border-t-4 border-t-amber-500 bg-white p-5 shadow-sm sm:p-6"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const form = new FormData(event.currentTarget);
-            void run(
-              () =>
-                endAssignment(active.id, {
-                  effective_until: String(form.get("effective_until") ?? ""),
-                  reason: String(form.get("reason") ?? ""),
-                }),
-              "Assignment ended.",
-            );
+        <div
+          className="fixed inset-0 z-50 grid overflow-hidden p-2 sm:place-items-center sm:p-6"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !pending) setMode(null);
           }}
-          role="dialog"
+          role="presentation"
         >
-          <h3 className="font-semibold" id="end-assignment-title">
-            End assignment
-          </h3>
-          <Field label="Effective until">
-            <TextInput
-              defaultValue={today}
-              name="effective_until"
-              required
-              type="date"
-            />
-          </Field>
-          <ReasonField label="Reason for ending" />
-          <button
-            className="button button-warn"
-            disabled={pending}
-            type="submit"
+          <form
+            aria-labelledby="end-assignment-title"
+            aria-modal="true"
+            className="grid w-full gap-4 sm:max-w-lg"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const form = new FormData(event.currentTarget);
+              void run(
+                () =>
+                  endAssignment(active.id, {
+                    effective_until: String(form.get("effective_until") ?? ""),
+                    reason: String(form.get("reason") ?? ""),
+                  }),
+                "Assignment ended.",
+              );
+            }}
+            role="dialog"
           >
-            Confirm end
-          </button>
-        </form>
+            <h3 className="font-semibold" id="end-assignment-title">
+              End assignment
+            </h3>
+            <Field label="Effective until">
+              <TextInput
+                defaultValue={today}
+                name="effective_until"
+                required
+                type="date"
+              />
+            </Field>
+            <ReasonField label="Reason for ending" />
+            <button
+              className="button button-warn"
+              disabled={pending}
+              type="submit"
+            >
+              Confirm end
+            </button>
+          </form>
+        </div>
       ) : null}
 
       {mode === "cancel" && active && canClose ? (
-        <form
-          aria-labelledby="cancel-assignment-title"
-          className="grid gap-4 rounded-2xl border border-rose-200 border-t-4 border-t-rose-500 bg-white p-5 shadow-sm sm:p-6"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const form = new FormData(event.currentTarget);
-            void run(
-              () =>
-                cancelAssignment(active.id, {
-                  reason: String(form.get("reason") ?? ""),
-                }),
-              "Assignment cancelled.",
-            );
+        <div
+          className="fixed inset-0 z-50 grid overflow-hidden p-2 sm:place-items-center sm:p-6"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !pending) setMode(null);
           }}
-          role="dialog"
+          role="presentation"
         >
-          <h3 className="font-semibold" id="cancel-assignment-title">
-            Cancel assignment
-          </h3>
-          <ReasonField label="Reason for cancelling" />
-          <button
-            className="button button-cancel"
-            disabled={pending}
-            type="submit"
+          <form
+            aria-labelledby="cancel-assignment-title"
+            aria-modal="true"
+            className="grid w-full gap-4 sm:max-w-lg"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const form = new FormData(event.currentTarget);
+              void run(
+                () =>
+                  cancelAssignment(active.id, {
+                    reason: String(form.get("reason") ?? ""),
+                  }),
+                "Assignment cancelled.",
+              );
+            }}
+            role="dialog"
           >
-            Confirm cancel
-          </button>
-        </form>
+            <h3 className="font-semibold" id="cancel-assignment-title">
+              Cancel assignment
+            </h3>
+            <ReasonField label="Reason for cancelling" />
+            <button
+              className="button button-cancel"
+              disabled={pending}
+              type="submit"
+            >
+              Confirm cancel
+            </button>
+          </form>
+        </div>
       ) : null}
     </div>
   );

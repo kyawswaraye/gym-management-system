@@ -3,16 +3,34 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
+import { DialogFrame, FormDialog } from "@/components/form-dialog";
 import {
   platformGet,
   platformGetCollection,
   platformMutation,
 } from "@/features/platform/client";
+import { compareSubscriptionPlans } from "@/features/platform/subscription-policy";
 import type {
   PlatformAuditItem,
   PlatformGymDetail,
   PlatformSubscription,
 } from "@/types/api";
+
+const panelClass =
+  "w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6";
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-2.5">
+      <dt className="text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm font-semibold break-words text-slate-900">
+        {value || "—"}
+      </dd>
+    </div>
+  );
+}
 
 type Capabilities = {
   canUpdate: boolean;
@@ -46,6 +64,9 @@ export function GymDetailManager({
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [pending, setPending] = useState(false);
+  const [editingSettings, setEditingSettings] = useState(false);
+  const [lifecycleOpen, setLifecycleOpen] = useState(false);
+  const [invitingOwner, setInvitingOwner] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -74,7 +95,7 @@ export function GymDetailManager({
       .then((data) => {
         if (active) {
           setGym(data.detail);
-          setPlans(data.subscriptions);
+          setPlans([...data.subscriptions].sort(compareSubscriptionPlans));
           setAudits(data.audits);
         }
       })
@@ -98,7 +119,6 @@ export function GymDetailManager({
     if (capabilities.canUpdate) {
       for (const field of [
         "name",
-        "legal_name",
         "email",
         "phone",
         "address_line1",
@@ -112,6 +132,7 @@ export function GymDetailManager({
       ]) {
         request[field] = String(values.get(field) ?? "").trim();
       }
+      request.legal_name = request.name;
     }
     if (capabilities.canManageSubscriptions) {
       request.subscription_plan_id = String(
@@ -135,10 +156,11 @@ export function GymDetailManager({
         request,
       );
       setGym(updated);
+      setEditingSettings(false);
       setSuccess("Gym settings saved.");
       const data = await fetchData();
       setGym(data.detail);
-      setPlans(data.subscriptions);
+      setPlans([...data.subscriptions].sort(compareSubscriptionPlans));
       setAudits(data.audits);
     } catch (reason) {
       setError(
@@ -170,10 +192,11 @@ export function GymDetailManager({
       setGym(updated);
       setReason("");
       setConfirmed(false);
+      setLifecycleOpen(false);
       setSuccess(`Gym ${action} request completed.`);
       const data = await fetchData();
       setGym(data.detail);
-      setPlans(data.subscriptions);
+      setPlans([...data.subscriptions].sort(compareSubscriptionPlans));
       setAudits(data.audits);
     } catch (failure) {
       setError(
@@ -199,6 +222,7 @@ export function GymDetailManager({
         phone: String(values.get("owner_phone") ?? "").trim(),
         send_invitation: true,
       });
+      setInvitingOwner(false);
       setSuccess(
         "Owner invitation request accepted. A live pending invitation is not resent. A new link is possible after expiry for a passwordless active Owner.",
       );
@@ -217,7 +241,7 @@ export function GymDetailManager({
   return (
     <div className="grid gap-6">
       <Link
-        className="text-sm text-blue-700 hover:underline"
+        className="w-fit text-sm font-semibold text-[#0866ff] hover:underline"
         href="/super-admin/gyms"
       >
         ← Back to gyms
@@ -234,183 +258,266 @@ export function GymDetailManager({
       )}
       {gym && (
         <>
-          <section className="card">
+          <section className={panelClass}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-2xl font-bold">{gym.name}</h2>
-                <p className="muted mt-1">
+                <p className="text-xs font-bold tracking-[0.16em] text-[#0866ff] uppercase">
+                  Gyms
+                </p>
+                <h2
+                  className="mt-2 text-3xl font-black tracking-tight text-slate-900"
+                  id="platform-gym-title"
+                >
+                  {gym.name}
+                </h2>
+                <p className="muted mt-2">
                   {gym.code} · {gym.status}
                 </p>
               </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
                 {gym.subscription_status}
               </span>
             </div>
+            <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Fact label="Plan" value={gym.subscription_plan_name ?? ""} />
+              <Fact label="Timezone" value={gym.timezone} />
+              <Fact label="Currency" value={gym.currency} />
+              <Fact label="City" value={gym.city} />
+            </dl>
           </section>
 
           {(capabilities.canUpdate || capabilities.canManageSubscriptions) && (
-            <section className="card" aria-labelledby="gym-settings-title">
-              <h2 id="gym-settings-title" className="text-xl font-bold">
-                Gym settings
-              </h2>
-              <form className="mt-5 grid gap-4 md:grid-cols-2" onSubmit={save}>
-                {capabilities.canUpdate && (
-                  <>
-                    {[
-                      ["name", "Name"],
-                      ["legal_name", "Legal name"],
-                      ["email", "Email"],
-                      ["phone", "Phone"],
-                      ["address_line1", "Address line 1"],
-                      ["address_line2", "Address line 2"],
-                      ["city", "City"],
-                      ["region", "Region"],
-                      ["postal_code", "Postal code"],
-                      ["country_code", "Country code"],
-                      ["timezone", "Timezone"],
-                      ["currency", "Currency"],
-                    ].map(([field, label]) => (
-                      <label className="field" key={field}>
-                        <span>{label}</span>
-                        <input
-                          className="input"
-                          name={field}
-                          defaultValue={String(
-                            gym[field as keyof PlatformGymDetail] ?? "",
-                          )}
-                          disabled={pending}
-                        />
-                      </label>
-                    ))}
-                  </>
-                )}
-                {capabilities.canManageSubscriptions && (
-                  <>
-                    <label className="field">
-                      <span>Subscription plan</span>
-                      <select
-                        className="input"
-                        name="subscription_plan_id"
-                        defaultValue={gym.subscription_plan_id ?? ""}
-                        disabled={pending}
-                      >
-                        {plans.map((plan) => (
-                          <option key={plan.id} value={plan.id}>
-                            {plan.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="field">
-                      <span>Subscription status</span>
-                      <select
-                        className="input"
-                        name="subscription_status"
-                        defaultValue={gym.subscription_status}
-                        disabled={pending}
-                      >
-                        {["TRIAL", "ACTIVE", "PAST_DUE", "CANCELLED"].map(
-                          (status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ),
-                        )}
-                      </select>
-                    </label>
-                    <label className="field">
-                      <span>Subscription starts</span>
-                      <input
-                        className="input"
-                        name="subscription_starts_at"
-                        type="datetime-local"
-                        defaultValue={dateTimeInput(
-                          gym.subscription_starts_at ?? null,
-                        )}
-                        disabled={pending}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Subscription ends</span>
-                      <input
-                        className="input"
-                        name="subscription_ends_at"
-                        type="datetime-local"
-                        defaultValue={dateTimeInput(
-                          gym.subscription_ends_at ?? null,
-                        )}
-                        disabled={pending}
-                      />
-                    </label>
-                  </>
-                )}
-                <button
-                  className="button button-edit md:col-span-2"
-                  disabled={pending}
+            <>
+              <section
+                className={panelClass}
+                aria-labelledby="gym-settings-title"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 id="gym-settings-title" className="text-xl font-bold">
+                    Gym settings
+                  </h2>
+                  <button
+                    className="button button-edit"
+                    onClick={() => setEditingSettings(true)}
+                    type="button"
+                  >
+                    Edit gym settings
+                  </button>
+                </div>
+              </section>
+              {editingSettings ? (
+                <FormDialog
+                  onClose={() => {
+                    if (!pending) setEditingSettings(false);
+                  }}
+                  onSubmit={save}
+                  pending={pending}
+                  title="Gym settings"
+                  wide
                 >
-                  {pending ? "Saving…" : "Save changes"}
-                </button>
-              </form>
-            </section>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {capabilities.canUpdate && (
+                      <>
+                        {[
+                          ["name", "Name"],
+                          ["email", "Email"],
+                          ["phone", "Phone"],
+                          ["address_line1", "Address line 1"],
+                          ["address_line2", "Address line 2"],
+                          ["city", "City"],
+                          ["region", "Region"],
+                          ["postal_code", "Postal code"],
+                          ["country_code", "Country code"],
+                          ["timezone", "Timezone"],
+                        ].map(([field, label]) => (
+                          <label className="field" key={field}>
+                            <span>{label}</span>
+                            <input
+                              className="input"
+                              name={field}
+                              defaultValue={String(
+                                gym[field as keyof PlatformGymDetail] ?? "",
+                              )}
+                              disabled={pending}
+                            />
+                          </label>
+                        ))}
+                        <label className="field">
+                          <span>Currency</span>
+                          <select
+                            className="input"
+                            name="currency"
+                            defaultValue={
+                              gym.currency === "MMK" ? "MMK" : "THB"
+                            }
+                            disabled={pending}
+                          >
+                            <option value="THB">THB</option>
+                            <option value="MMK">MMK</option>
+                          </select>
+                        </label>
+                      </>
+                    )}
+                    {capabilities.canManageSubscriptions && (
+                      <>
+                        <label className="field">
+                          <span>Subscription plan</span>
+                          <select
+                            className="input"
+                            name="subscription_plan_id"
+                            defaultValue={gym.subscription_plan_id ?? ""}
+                            disabled={pending}
+                          >
+                            {plans.map((plan) => (
+                              <option key={plan.id} value={plan.id}>
+                                {plan.name} ({plan.currency})
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span>Subscription status</span>
+                          <select
+                            className="input"
+                            name="subscription_status"
+                            defaultValue={gym.subscription_status}
+                            disabled={pending}
+                          >
+                            {["TRIAL", "ACTIVE", "PAST_DUE", "CANCELLED"].map(
+                              (status) => (
+                                <option key={status} value={status}>
+                                  {status}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span>Subscription starts</span>
+                          <input
+                            className="input"
+                            name="subscription_starts_at"
+                            type="datetime-local"
+                            defaultValue={dateTimeInput(
+                              gym.subscription_starts_at ?? null,
+                            )}
+                            disabled={pending}
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Subscription ends</span>
+                          <input
+                            className="input"
+                            name="subscription_ends_at"
+                            type="datetime-local"
+                            defaultValue={dateTimeInput(
+                              gym.subscription_ends_at ?? null,
+                            )}
+                            disabled={pending}
+                          />
+                        </label>
+                      </>
+                    )}
+                    <button
+                      className="button button-edit md:col-span-2"
+                      disabled={pending}
+                    >
+                      {pending ? "Saving…" : "Save changes"}
+                    </button>
+                  </div>
+                </FormDialog>
+              ) : null}
+            </>
           )}
 
           {(capabilities.canActivate || capabilities.canSuspend) && (
-            <section className="card" aria-labelledby="lifecycle-title">
-              <h2 id="lifecycle-title" className="text-xl font-bold">
-                Lifecycle
-              </h2>
-              <p className="muted mt-2 text-sm">
-                Suspending immediately revokes tenant staff sessions.
-              </p>
-              <label className="field mt-4">
-                <span>Reason *</span>
-                <textarea
-                  className="input min-h-24"
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  maxLength={500}
-                  disabled={pending}
-                />
-              </label>
-              <label className="mt-3 flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={(event) => setConfirmed(event.target.checked)}
-                  disabled={pending}
-                />
-                I confirm this lifecycle change.
-              </label>
-              <div className="mt-4 flex flex-wrap gap-3">
-                {capabilities.canActivate && (
-                  <button
-                    className="button button-success"
-                    type="button"
-                    disabled={pending}
-                    onClick={() => void transition("activate")}
-                  >
-                    Activate gym
-                  </button>
-                )}
-                {capabilities.canSuspend && (
-                  <button
-                    className="button button-warn"
-                    type="button"
-                    disabled={pending}
-                    onClick={() => void transition("suspend")}
-                  >
-                    Suspend gym
-                  </button>
-                )}
-              </div>
-            </section>
+            <>
+              <section className={panelClass} aria-labelledby="lifecycle-title">
+                <h2 id="lifecycle-title" className="text-xl font-bold">
+                  Lifecycle
+                </h2>
+                <p className="muted mt-2 text-sm">
+                  Suspending immediately revokes tenant staff sessions.
+                </p>
+                <button
+                  className="button button-warn mt-4"
+                  onClick={() => setLifecycleOpen(true)}
+                  type="button"
+                >
+                  Change lifecycle
+                </button>
+              </section>
+              {lifecycleOpen ? (
+                <DialogFrame
+                  description="Suspending immediately revokes tenant staff sessions."
+                  onClose={() => {
+                    if (!pending) setLifecycleOpen(false);
+                  }}
+                  pending={pending}
+                  title="Lifecycle"
+                >
+                  <label className="field">
+                    <span>Reason *</span>
+                    <textarea
+                      className="input min-h-24"
+                      value={reason}
+                      onChange={(event) => setReason(event.target.value)}
+                      maxLength={500}
+                      disabled={pending}
+                    />
+                  </label>
+                  <label className="mt-3 flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={confirmed}
+                      onChange={(event) => setConfirmed(event.target.checked)}
+                      disabled={pending}
+                    />
+                    I confirm this lifecycle change.
+                  </label>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {capabilities.canActivate && (
+                      <button
+                        className="button button-success"
+                        type="button"
+                        disabled={pending}
+                        onClick={() => void transition("activate")}
+                      >
+                        Activate gym
+                      </button>
+                    )}
+                    {capabilities.canSuspend && (
+                      <button
+                        className="button button-warn"
+                        type="button"
+                        disabled={pending}
+                        onClick={() => void transition("suspend")}
+                      >
+                        Suspend gym
+                      </button>
+                    )}
+                  </div>
+                </DialogFrame>
+              ) : null}
+            </>
           )}
 
           {capabilities.canCreateOwner && (
-            <section className="card" aria-labelledby="add-owner-title">
-              <h2 id="add-owner-title" className="text-xl font-bold">
-                Add Owner
-              </h2>
+            <section className={panelClass} aria-labelledby="add-owner-title">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 id="add-owner-title" className="text-xl font-bold">
+                  Add Owner
+                </h2>
+                {capabilities.mfaRecent ? (
+                  <button
+                    className="button button-create"
+                    onClick={() => setInvitingOwner(true)}
+                    type="button"
+                  >
+                    Add Owner
+                  </button>
+                ) : null}
+              </div>
               <p className="muted mt-2 text-sm">
                 Email delivery is required. A live pending invitation is not
                 resent. A new link is possible after expiry for a passwordless
@@ -426,70 +533,76 @@ export function GymDetailManager({
                     Set up or verify MFA
                   </Link>
                 </p>
-              ) : (
-                <form
-                  className="mt-4 grid gap-3 md:grid-cols-2"
+              ) : invitingOwner ? (
+                <FormDialog
+                  onClose={() => {
+                    if (!pending) setInvitingOwner(false);
+                  }}
                   onSubmit={inviteOwner}
+                  pending={pending}
+                  title="Add Owner"
                 >
-                  <div className="field">
-                    <label>
-                      <span>Email</span>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="field">
+                      <label>
+                        <span>Email</span>
+                        <input
+                          className="input"
+                          name="owner_email"
+                          type="email"
+                          required
+                          disabled={pending}
+                          aria-describedby="platform-owner-email-delivery"
+                        />
+                      </label>
+                      <p
+                        id="platform-owner-email-delivery"
+                        className="muted text-sm"
+                      >
+                        Required. The setup link is emailed to this address.
+                      </p>
+                    </div>
+                    <label className="field">
+                      <span>Phone</span>
                       <input
                         className="input"
-                        name="owner_email"
-                        type="email"
-                        required
+                        name="owner_phone"
                         disabled={pending}
-                        aria-describedby="platform-owner-email-delivery"
                       />
                     </label>
-                    <p
-                      id="platform-owner-email-delivery"
-                      className="muted text-sm"
+                    <label className="field">
+                      <span>First name</span>
+                      <input
+                        className="input"
+                        name="owner_first_name"
+                        required
+                        disabled={pending}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Last name</span>
+                      <input
+                        className="input"
+                        name="owner_last_name"
+                        required
+                        disabled={pending}
+                      />
+                    </label>
+                    <button
+                      className="button md:col-span-2"
+                      type="submit"
+                      disabled={pending}
                     >
-                      Required. The setup link is emailed to this address.
-                    </p>
+                      {pending ? "Sending…" : "Send Owner invitation"}
+                    </button>
                   </div>
-                  <label className="field">
-                    <span>Phone</span>
-                    <input
-                      className="input"
-                      name="owner_phone"
-                      disabled={pending}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>First name</span>
-                    <input
-                      className="input"
-                      name="owner_first_name"
-                      required
-                      disabled={pending}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Last name</span>
-                    <input
-                      className="input"
-                      name="owner_last_name"
-                      required
-                      disabled={pending}
-                    />
-                  </label>
-                  <button
-                    className="button md:col-span-2"
-                    type="submit"
-                    disabled={pending}
-                  >
-                    {pending ? "Sending…" : "Send Owner invitation"}
-                  </button>
-                </form>
-              )}
+                </FormDialog>
+              ) : null}
             </section>
           )}
 
           {capabilities.canViewAudit && (
-            <section className="card" aria-labelledby="audit-title">
+            <section className={panelClass} aria-labelledby="audit-title">
               <h2 id="audit-title" className="text-xl font-bold">
                 Audit timeline
               </h2>

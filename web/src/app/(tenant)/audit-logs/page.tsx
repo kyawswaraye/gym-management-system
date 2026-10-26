@@ -19,7 +19,7 @@ export default async function AuditLogsPage() {
   return (
     <section aria-labelledby="audit-logs-title">
       <PageHeader
-        description="Review redacted audit events available to your account."
+        description="Open an event to see who changed it and what changed. Sensitive values stay hidden."
         eyebrow="Operations"
         title="Audit logs"
         titleId="audit-logs-title"

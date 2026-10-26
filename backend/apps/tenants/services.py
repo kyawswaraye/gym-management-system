@@ -22,6 +22,7 @@ from rest_framework import serializers
 from apps.audit.models import Outcome
 from apps.audit.services import redact_audit_values, write_platform_audit, write_tenant_audit
 from apps.common.api.exceptions import AuthenticationFailed
+from apps.common.codes import GYM_CODE, resolve_code
 from apps.common.db.tenant_context import set_gym_context
 from apps.tenants.exceptions import (
     IdempotencyKeyReused,
@@ -35,6 +36,7 @@ from apps.tenants.exceptions import (
     SubscriptionPlanInUse,
 )
 from apps.tenants.models import (
+    RECEIPT_NUMBER_PREFIX,
     ExpenseCategory,
     Feature,
     Gym,
@@ -219,6 +221,22 @@ def owner_invitation_data(invitation: StaffInvitation) -> dict[str, object]:
         "status": invitation.status,
         "expires_at": invitation.expires_at,
     }
+
+
+def visible_owner_memberships(gym: Gym) -> list[GymMembership]:
+    """List owners, keeping an invite only while its link can still be accepted."""
+
+    pending_membership_ids = StaffInvitation.objects.filter(
+        gym=gym,
+        status=StaffInvitation.Status.PENDING,
+        expires_at__gt=timezone.now(),
+    ).values("gym_membership_id")
+    return list(
+        GymMembership.objects.filter(gym=gym, is_owner=True)
+        .select_related("user")
+        .filter(~Q(status=GymMembership.Status.INVITED) | Q(id__in=pending_membership_ids))
+        .order_by("user__normalized_email", "id")
+    )
 
 
 def owner_membership_data(membership: GymMembership) -> dict[str, object]:
@@ -524,6 +542,82 @@ def revoke_owner(
     return target
 
 
+CANCELLED_INVITATION_REASON = "Cancelled before acceptance."
+
+
+@transaction.atomic
+def cancel_owner_invitation(
+    *,
+    gym_id: uuid.UUID,
+    target_membership_id: uuid.UUID,
+    actor: Any,
+    actor_membership_id: uuid.UUID,
+    request_id: str,
+    ip_address: str | None = None,
+    user_agent: str = "",
+) -> GymMembership:
+    """Stop a pending owner invitation and drop that person from the owner list."""
+
+    Gym.objects.select_for_update().get(id=gym_id)
+    set_gym_context(gym_id=gym_id)
+    GymMembership.objects.select_for_update().get(
+        id=actor_membership_id,
+        gym_id=gym_id,
+        user=actor,
+        is_owner=True,
+        status=GymMembership.Status.ACTIVE,
+    )
+    target = (
+        GymMembership.objects.select_for_update()
+        .select_related("user", "gym")
+        .get(
+            gym_id=gym_id,
+            id=target_membership_id,
+            is_owner=True,
+            status=GymMembership.Status.INVITED,
+        )
+    )
+    now = timezone.now()
+    pending = list(
+        StaffInvitation.objects.select_for_update().filter(
+            gym_id=gym_id,
+            gym_membership=target,
+            status=StaffInvitation.Status.PENDING,
+        )
+    )
+    for invitation in pending:
+        invitation.status = StaffInvitation.Status.REVOKED
+        invitation.revoked_at = now
+        invitation.revoked_by_membership_id = actor_membership_id
+        invitation.revocation_reason = CANCELLED_INVITATION_REASON
+        invitation.save(
+            update_fields=[
+                "status",
+                "revoked_at",
+                "revoked_by_membership_id",
+                "revocation_reason",
+                "updated_at",
+            ]
+        )
+    if pending:
+        write_tenant_audit(
+            gym=target.gym,
+            actor_user=actor,
+            actor_membership_id=actor_membership_id,
+            action="OWNER_INVITATION_CANCELLED",
+            target_type="GymMembership",
+            target_id=target.id,
+            request_id=request_id,
+            new_values={
+                "email": target.user.email,
+                "status": StaffInvitation.Status.REVOKED,
+            },
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+    return target
+
+
 def canonical_provisioning_hash(data: dict[str, object]) -> str:
     canonical = json.dumps(
         data,
@@ -728,7 +822,16 @@ def provision_gym_from_admin(
     if replayed:
         return AdminProvisioningResult(data=dict(record.response_body), replayed=True)
 
-    code = str(gym_data["code"]).strip().upper()
+    code = str(gym_data.get("code") or "").strip().upper()
+    if not code:
+        code = resolve_code(
+            "",
+            Gym.objects.values_list("code", flat=True),
+            str(gym_data["name"]),
+            prefix="GYM",
+            separator="-",
+            pattern=GYM_CODE,
+        )
     timezone_name = str(gym_data["timezone"])
     try:
         ZoneInfo(timezone_name)
@@ -813,7 +916,7 @@ def provision_gym_from_admin(
     )
     settings = GymSettings.objects.create(
         gym=gym,
-        receipt_number_prefix=code,
+        receipt_number_prefix=RECEIPT_NUMBER_PREFIX,
         created_by_membership_id=membership.id,
     )
     roles = _copy_roles(gym=gym, owner_membership=membership)
@@ -1301,7 +1404,7 @@ def provision_gym(*, code: str, name: str, owner_email: str) -> ProvisionedGym:
     settings, _ = GymSettings.objects.get_or_create(
         gym=gym,
         defaults={
-            "receipt_number_prefix": gym.code,
+            "receipt_number_prefix": RECEIPT_NUMBER_PREFIX,
             "created_by_membership_id": membership.id,
         },
     )

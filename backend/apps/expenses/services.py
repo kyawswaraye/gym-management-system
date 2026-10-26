@@ -23,6 +23,7 @@ from apps.audit.services import write_tenant_audit
 from apps.cashbook.models import CashSession, CashTransaction
 from apps.cashbook.selectors import holds_protected_role, membership_has_permission
 from apps.cashbook.services import record_cash_movement, revalidate_cash_actor
+from apps.common.codes import resolve_code
 from apps.expenses.exceptions import ExpensePostingConflict, ProtectedExpenseCategory
 from apps.expenses.models import Expense
 from apps.expenses.serializers import merged_expense_fields, money_amount
@@ -61,7 +62,13 @@ def create_category(
     gym, actor = _reload(
         gym_id=gym.id, membership_id=actor.id, permission_code="expense_categories.manage"
     )
-    code = str(fields["code"])
+    code = resolve_code(
+        str(fields.get("code") or ""),
+        ExpenseCategory.objects.filter(gym=gym).values_list("code", flat=True),
+        str(fields["name"]),
+        prefix="EXPENSE",
+        reserved=_RESERVED_CODES,
+    )
     if code in _RESERVED_CODES:
         raise ProtectedExpenseCategory()
     name = str(fields["name"])

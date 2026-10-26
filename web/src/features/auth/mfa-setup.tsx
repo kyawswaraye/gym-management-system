@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 
+import { PasswordInput } from "@/features/auth/password-input";
 import { platformMutation } from "@/features/platform/client";
 
 type Enrollment = {
@@ -17,6 +18,7 @@ type Enrollment = {
 export function MFASetup() {
   const router = useRouter();
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
+  const passwordId = useId();
   const [qr, setQr] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -88,15 +90,10 @@ export function MFASetup() {
       )}
       {!enrollment ? (
         <form className="mt-5 grid gap-4" onSubmit={begin}>
-          <label className="field">
-            <span>Current password</span>
-            <input
-              className="input"
-              name="current_password"
-              type="password"
-              required
-            />
-          </label>
+          <div className="field">
+            <label htmlFor={passwordId}>Current password</label>
+            <PasswordInput id={passwordId} name="current_password" required />
+          </div>
           <button className="button" disabled={pending}>
             {pending ? "Preparing…" : "Set up authenticator"}
           </button>

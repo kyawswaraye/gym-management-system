@@ -17,6 +17,7 @@ from rest_framework.exceptions import ValidationError
 from apps.audit.services import write_tenant_audit
 from apps.classes.exceptions import ClassTypeInactive
 from apps.classes.models import ClassType
+from apps.common.codes import resolve_code
 from apps.common.db.tenant_context import set_gym_context
 from apps.members.models import Member
 from apps.tenants.models import Gym, GymMembership, Role, StaffProfile
@@ -355,6 +356,12 @@ def create_service_package(
             raise ClassTypeInactive()
     elif package_type != ServicePackage.PackageType.PT:
         raise ValidationError({"type": ["Select a valid package type."]})
+    code = resolve_code(
+        code,
+        ServicePackage.objects.filter(gym=gym).values_list("code", flat=True),
+        name,
+        prefix="PACKAGE",
+    )
     if _PACKAGE_CODE.fullmatch(code) is None:
         raise ValidationError({"code": ["Enter an uppercase package code."]})
     stored_name, normalized_name = canonical_package_name(name)

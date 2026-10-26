@@ -28,7 +28,7 @@ npm run env:sync
 
 Android debug cleartext is allowed only for `10.0.2.2`, which is the emulator alias for the host machine. iOS debug App Transport Security allows insecure HTTP only for `localhost`. Release builds use HTTPS on both platforms.
 
-The debug keystore is created by Gradle when it is missing. It is not committed. Release signing reads `ANDROID_UPLOAD_STORE_FILE`, `ANDROID_UPLOAD_STORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS`, and `ANDROID_UPLOAD_KEY_PASSWORD`. Those values stay outside the repository.
+The debug keystore is created by Gradle when it is missing. It is not committed. `npm run android:release` creates a local upload keystore at `android/app/release.keystore` and writes its passwords to `android/keystore.properties`. Keep those two files together. Neither is committed. CI release signing still uses `ANDROID_UPLOAD_STORE_FILE`, `ANDROID_UPLOAD_STORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS`, and `ANDROID_UPLOAD_KEY_PASSWORD`. Those values override the local file and stay outside the repository.
 
 ## Run
 
@@ -113,6 +113,22 @@ Android debug compile:
 cd android
 ./gradlew assembleDebug
 ```
+
+Android release APK for a phone, from `mobile`. The origin must be `https` and must not include a path. The script signs the APK, bundles that origin with `APP_ENV=release`, then restores `src/config/env.local.ts`.
+
+```bash
+API_BASE_URL=https://api.example.com npm run android:release
+```
+
+The same command reads `API_BASE_URL` from `mobile/.env.release` when the shell variable and `--api` are absent. Copy `release.env.example` to `.env.release` for that. The APK is `android/app/build/outputs/apk/release/app-release.apk` and contains `armeabi-v7a` and `arm64-v8a`.
+
+Install it with USB debugging:
+
+```bash
+adb install -r android/app/build/outputs/apk/release/app-release.apk
+```
+
+If a debug build of `com.gymplatform.member` is already on the phone, uninstall that package first. The release key is a different signature. From the repository root, `make mobile-android-release` runs the same script and needs `API_BASE_URL` in the environment.
 
 iOS simulator build, without signing:
 

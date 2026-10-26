@@ -3,9 +3,17 @@
 import { Fragment, type FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-import { listMembers, operationMutation } from "@/features/operations/client";
-import { MemberProfileFields } from "@/features/operations/member-profile-fields";
 import {
+  getGymSettings,
+  listMembers,
+  operationMutation,
+} from "@/features/operations/client";
+import {
+  MemberProfileFields,
+  type MemberNumberPreview,
+} from "@/features/operations/member-profile-fields";
+import {
+  assignedMemberNumber,
   emptyMemberProfile,
   memberCreatePayload,
   type MemberProfileInput,
@@ -100,7 +108,7 @@ function directoryButtonClass(
   }
   return selected
     ? `${base} border border-slate-900 bg-slate-900 text-white`
-    : `${base} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`;
+    : `${base} border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200`;
 }
 
 function applyCursor(
@@ -113,14 +121,21 @@ function applyCursor(
   return { hasMore: !stop, nextAfter: stop ? null : next };
 }
 
+const UNAVAILABLE_MEMBER_NUMBER: MemberNumberPreview = {
+  status: "unavailable",
+  value: "",
+};
+
 export function MembersManager({
   canArchive = false,
   canCreate,
+  canPreviewMemberNumber = false,
   canRestore = false,
   defaultDate,
 }: {
   canArchive?: boolean;
   canCreate: boolean;
+  canPreviewMemberNumber?: boolean;
   canRestore?: boolean;
   defaultDate: string;
 }) {
@@ -130,7 +145,9 @@ export function MembersManager({
   const [loading, setLoading] = useState(true);
   const [paging, setPaging] = useState(false);
   const [error, setError] = useState("");
-  const [errorScope, setErrorScope] = useState<"list" | "page" | null>(null);
+  const [errorScope, setErrorScope] = useState<
+    "list" | "page" | "action" | null
+  >(null);
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState("");
   const [archiveTarget, setArchiveTarget] = useState<Member | null>(null);
@@ -138,6 +155,9 @@ export function MembersManager({
   const [restoreTarget, setRestoreTarget] = useState<Member | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [memberNumberPreview, setMemberNumberPreview] =
+    useState<MemberNumberPreview>(UNAVAILABLE_MEMBER_NUMBER);
+  const createDialogRef = useRef<HTMLFormElement>(null);
   const [draft, setDraft] = useState<MemberProfileInput>(() =>
     emptyMemberProfile(defaultDate),
   );
@@ -236,6 +256,39 @@ export function MembersManager({
     };
   }, [joinedFrom, joinedTo, ptClient, search, status]);
 
+  useEffect(() => {
+    if (!showCreate) return;
+    createDialogRef.current?.focus({ preventScroll: true });
+  }, [showCreate]);
+
+  useEffect(() => {
+    if (!showCreate) return;
+    if (!canPreviewMemberNumber) {
+      setMemberNumberPreview(UNAVAILABLE_MEMBER_NUMBER);
+      return;
+    }
+    let cancelled = false;
+    setMemberNumberPreview({ status: "loading", value: "" });
+    void getGymSettings()
+      .then((settings) => {
+        if (cancelled) return;
+        setMemberNumberPreview({
+          status: "ready",
+          value: assignedMemberNumber(
+            settings.member_number_prefix,
+            settings.next_member_number,
+          ),
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setMemberNumberPreview(UNAVAILABLE_MEMBER_NUMBER);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canPreviewMemberNumber, showCreate]);
+
   async function loadMore() {
     const cursor = nextAfter;
     if (
@@ -321,7 +374,7 @@ export function MembersManager({
     } catch (caught) {
       if (version !== requestVersion.current) return;
       setError(errorText(caught, "Unable to archive member."));
-      setErrorScope(null);
+      setErrorScope("action");
     } finally {
       archiveLock.current = false;
       setArchiving(false);
@@ -361,17 +414,24 @@ export function MembersManager({
     } catch (caught) {
       if (version !== requestVersion.current) return;
       setError(errorText(caught, "Unable to restore member."));
-      setErrorScope(null);
+      setErrorScope("action");
     } finally {
       restoreLock.current = false;
       setRestoring(false);
     }
   }
 
+  function closeCreate() {
+    if (pending || submitLock.current) return;
+    setShowCreate(false);
+    setDraft(emptyMemberProfile(defaultDate));
+    if (!errorScope) setError("");
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitLock.current) return;
-    const payload = memberCreatePayload(draft);
+    const payload = memberCreatePayload({ ...draft, member_number: "" });
     if (!payload.first_name || !payload.last_name || !payload.join_date) {
       setError("Enter a first name, last name, and join date.");
       setErrorScope(null);
@@ -422,50 +482,91 @@ export function MembersManager({
         {canCreate && (
           <button
             aria-expanded={showCreate}
-            className={actionButtonClass(
-              showCreate ? "Close form" : "Add member",
-            )}
-            onClick={() => setShowCreate((current) => !current)}
+            className="button button-create shrink-0"
+            onClick={() => setShowCreate(true)}
             type="button"
           >
-            {showCreate ? "Close form" : "Add member"}
+            Add member
           </button>
         )}
       </div>
-      {canCreate && (
-        <form
-          className={
-            showCreate
-              ? "grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
-              : "hidden"
-          }
-          onSubmit={submit}
+      {canCreate && showCreate ? (
+        <div
+          className="fixed inset-0 z-50 grid overflow-hidden p-2 sm:place-items-center sm:p-6"
+          onMouseDown={(event) => {
+            if (event.target !== event.currentTarget) return;
+            closeCreate();
+          }}
+          role="presentation"
         >
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="text-xl font-bold text-slate-900">Add member</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Enter the member&apos;s personal and contact information.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 [&>fieldset]:sm:col-span-2 [&>label:last-child]:sm:col-span-2">
-            <MemberProfileFields
-              disabled={pending}
-              includeMemberNumber
-              onChange={setDraft}
-              value={draft}
-            />
-          </div>
-          <div className="flex justify-end border-t border-slate-100 pt-4">
-            <button
-              className="button button-edit"
-              disabled={pending}
-              type="submit"
-            >
-              {pending ? "Saving…" : "Save member"}
-            </button>
-          </div>
-        </form>
-      )}
+          <form
+            aria-describedby="add-member-description"
+            aria-labelledby="add-member-title"
+            aria-modal="true"
+            className="flex h-full max-h-full min-h-0 w-full flex-col overflow-y-auto overscroll-contain sm:h-auto sm:max-h-[min(90dvh,52rem)] sm:max-w-3xl"
+            onKeyDown={(event) => {
+              if (event.key !== "Escape") return;
+              event.preventDefault();
+              closeCreate();
+            }}
+            onSubmit={submit}
+            ref={createDialogRef}
+            role="dialog"
+            tabIndex={-1}
+          >
+            <div className="sticky top-0 z-10 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
+              <h2
+                className="text-xl font-bold text-slate-900"
+                id="add-member-title"
+              >
+                Add member
+              </h2>
+              <p
+                className="mt-1 text-sm text-slate-500"
+                id="add-member-description"
+              >
+                Enter the member&apos;s personal and contact information.
+              </p>
+            </div>
+            <div className="grid gap-4 px-5 py-4 sm:grid-cols-2 sm:px-6 [&>fieldset]:sm:col-span-2 [&>label:last-child]:sm:col-span-2">
+              <MemberProfileFields
+                disabled={pending}
+                includeMemberNumber
+                memberNumberPreview={memberNumberPreview}
+                onChange={setDraft}
+                value={draft}
+              />
+            </div>
+            <div className="sticky bottom-0 z-10 mt-auto border-t border-slate-100 bg-white px-5 py-4 sm:px-6">
+              {error && !errorScope ? (
+                <p
+                  className="mb-3 text-sm font-medium text-red-800"
+                  role="alert"
+                >
+                  {error}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap justify-end gap-2">
+                <button
+                  className="button button-cancel"
+                  disabled={pending}
+                  onClick={closeCreate}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="button button-edit"
+                  disabled={pending}
+                  type="submit"
+                >
+                  {pending ? "Saving…" : "Save member"}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      ) : null}
       <section
         aria-busy={loading || paging}
         className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
@@ -593,12 +694,12 @@ export function MembersManager({
             ))}
           </div>
         ) : null}
-        {error ? (
+        {error && errorScope ? (
           <div className="m-4 grid gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
             <p className="text-sm font-medium text-red-800" role="alert">
               {error}
             </p>
-            {errorScope ? (
+            {errorScope === "list" || errorScope === "page" ? (
               <button className="button w-fit" onClick={retry} type="button">
                 {errorScope === "page" ? "Retry loading members" : "Retry"}
               </button>
@@ -615,7 +716,7 @@ export function MembersManager({
         ) : null}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-800 text-white">
+            <thead>
               <tr>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Member
@@ -661,11 +762,7 @@ export function MembersManager({
                         </span>
                         <span>
                           <Link
-                            className={
-                              archived
-                                ? "font-bold text-slate-700 underline decoration-slate-400 underline-offset-2 hover:text-amber-700"
-                                : "font-bold text-slate-900 hover:text-amber-700 hover:underline"
-                            }
+                            className="font-bold"
                             href={`/members/${member.id}`}
                           >
                             {`${member.first_name} ${member.last_name}`.trim()}

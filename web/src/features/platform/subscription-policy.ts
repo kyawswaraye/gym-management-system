@@ -6,6 +6,24 @@ import type {
 const PRICE_PATTERN = /^(?:0|[1-9]\d{0,15})(?:\.\d{1,2})?$/;
 const INTERVAL_PATTERN = /^[A-Z][A-Z0-9_]{0,19}$/;
 
+const INTERVAL_ORDER = ["TRIAL", "MONTHLY", "QUARTERLY", "YEARLY", "LIFETIME"];
+const CURRENCY_ORDER = ["THB", "MMK"];
+
+export function compareSubscriptionPlans(
+  left: PlatformSubscription,
+  right: PlatformSubscription,
+): number {
+  const interval =
+    (INTERVAL_ORDER.indexOf(left.billing_interval) + 1 || 99) -
+    (INTERVAL_ORDER.indexOf(right.billing_interval) + 1 || 99);
+  if (interval !== 0) return interval;
+  const currency =
+    (CURRENCY_ORDER.indexOf(left.currency) + 1 || 99) -
+    (CURRENCY_ORDER.indexOf(right.currency) + 1 || 99);
+  if (currency !== 0) return currency;
+  return left.name.localeCompare(right.name);
+}
+
 export type SubscriptionDraft = {
   name: string;
   price: string;

@@ -1,13 +1,25 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-
 import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+
+import { FormDialog } from "@/components/form-dialog";
+import { GymLogo } from "@/components/gym-logo";
+import {
+  deleteGymLogo,
   getGymProfile,
   getGymSettings,
   updateGymProfile,
   updateGymSettings,
+  uploadGymLogo,
 } from "@/features/operations/client";
+import { assignedMemberNumber } from "@/features/operations/member-profile";
 import type { GymSettingsAccess } from "@/lib/auth/authorization";
 import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
@@ -29,7 +41,6 @@ const WEEKDAYS = [
 
 const PROFILE_LIMITS = {
   name: 150,
-  legal_name: 200,
   phone: 32,
   address_line1: 255,
   address_line2: 255,
@@ -41,16 +52,50 @@ const PROFILE_LIMITS = {
 
 type ProfileTextField = keyof typeof PROFILE_LIMITS;
 
-const PROFILE_FIELDS: { name: ProfileTextField; label: string }[] = [
-  { name: "name", label: "Name" },
-  { name: "legal_name", label: "Legal name" },
-  { name: "phone", label: "Phone" },
-  { name: "address_line1", label: "Address line 1" },
-  { name: "address_line2", label: "Address line 2" },
-  { name: "city", label: "City" },
-  { name: "region", label: "Region" },
-  { name: "postal_code", label: "Postal code" },
-  { name: "timezone", label: "Timezone" },
+const PROFILE_FIELDS: {
+  name: ProfileTextField;
+  label: string;
+  group: "identity" | "contact" | "address" | "locale";
+  autoComplete?: string;
+}[] = [
+  {
+    name: "name",
+    label: "Name",
+    group: "identity",
+    autoComplete: "organization",
+  },
+  { name: "phone", label: "Phone", group: "contact", autoComplete: "tel" },
+  {
+    name: "address_line1",
+    label: "Address line 1",
+    group: "address",
+    autoComplete: "address-line1",
+  },
+  {
+    name: "address_line2",
+    label: "Address line 2",
+    group: "address",
+    autoComplete: "address-line2",
+  },
+  {
+    name: "city",
+    label: "City",
+    group: "address",
+    autoComplete: "address-level2",
+  },
+  {
+    name: "region",
+    label: "Region",
+    group: "address",
+    autoComplete: "address-level1",
+  },
+  {
+    name: "postal_code",
+    label: "Postal code",
+    group: "address",
+    autoComplete: "postal-code",
+  },
+  { name: "timezone", label: "Timezone", group: "locale" },
 ];
 
 const INTEGER_FIELDS = [
@@ -137,12 +182,13 @@ function readProfile(form: FormData): GymProfileUpdate {
   const currency = String(form.get("currency") ?? "")
     .trim()
     .toUpperCase();
-  if (!/^[A-Z]{3}$/.test(currency)) {
-    throw new Error("Enter a three-letter currency code.");
+  if (currency !== "THB" && currency !== "MMK") {
+    throw new Error("Choose THB or MMK.");
   }
+  const name = limitedText(form, "name", "Name", true);
   return {
-    name: limitedText(form, "name", "Name", true),
-    legal_name: limitedText(form, "legal_name", "Legal name"),
+    name,
+    legal_name: name,
     email,
     phone: limitedText(form, "phone", "Phone"),
     address_line1: limitedText(form, "address_line1", "Address line 1"),
@@ -262,6 +308,32 @@ function readSettings(form: FormData): GymSettingsUpdate {
   };
 }
 
+const INTEGER_HINTS: Record<(typeof INTEGER_FIELDS)[number]["name"], string> = {
+  check_in_duplicate_window_seconds:
+    "A second scan inside this window is ignored.",
+  check_in_challenge_ttl_seconds: "How long a check-in code stays valid.",
+  check_in_challenge_max_uses: "How many times one code can be used.",
+  class_cancellation_cutoff_minutes:
+    "How close to the start a member can still cancel.",
+};
+
+const panelClass =
+  "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm";
+
+function tabClass(selected: boolean): string {
+  return selected
+    ? "min-h-10 rounded-lg bg-white px-4 text-sm font-bold text-slate-900 shadow-sm"
+    : "min-h-10 rounded-lg px-4 text-sm font-bold text-slate-500 hover:text-slate-800";
+}
+
+function receiptExample(prefix: string): string {
+  return `${prefix}-${new Date().getFullYear()}-000001`;
+}
+
+function profileFields(group: (typeof PROFILE_FIELDS)[number]["group"]) {
+  return PROFILE_FIELDS.filter((field) => field.group === group);
+}
+
 function Notice({
   error,
   success,
@@ -269,19 +341,159 @@ function Notice({
   error: string | null;
   success: string | null;
 }) {
+  if (!error && !success) return null;
   return (
     <>
-      {error && (
-        <p className="error mt-4" role="alert">
+      {error ? (
+        <p className="error" role="alert">
           {error}
         </p>
-      )}
-      {success && (
-        <p className="mt-4 text-sm text-emerald-700" role="status">
+      ) : null}
+      {success ? (
+        <p
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900"
+          role="status"
+        >
           {success}
         </p>
-      )}
+      ) : null}
     </>
+  );
+}
+
+function profileHasLogo(profile: GymProfile): boolean {
+  return profile.has_logo;
+}
+
+function profileWhen(value: string | null | undefined): ReactNode {
+  if (!value) return textValue("");
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return textValue(value);
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function Pill({ children, tone }: { children: ReactNode; tone: string }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${tone}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function recordTone(status: string): string {
+  switch (status) {
+    case "ACTIVE":
+      return "bg-emerald-50 text-emerald-700 ring-emerald-600/15";
+    case "TRIAL":
+      return "bg-sky-50 text-sky-700 ring-sky-600/15";
+    case "PAST_DUE":
+    case "SUSPENDED":
+      return "bg-amber-50 text-amber-800 ring-amber-600/15";
+    case "CANCELLED":
+      return "bg-rose-50 text-rose-700 ring-rose-600/15";
+    default:
+      return "bg-slate-100 text-slate-600 ring-slate-500/10";
+  }
+}
+
+function textValue(value: string | number | null | undefined): ReactNode {
+  if (value === null || value === undefined || value === "") {
+    return <span className="font-medium text-slate-400">—</span>;
+  }
+  if (typeof value === "number") return value;
+  return <IdentifierValue value={value} />;
+}
+
+function Fact({
+  label,
+  children,
+  wide = false,
+}: {
+  label: string;
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl bg-slate-50 px-3 py-2.5 ${wide ? "sm:col-span-2" : ""}`}
+    >
+      <dt className="text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm font-semibold break-words text-slate-900">
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+function ProfileBlock({
+  title,
+  hint,
+  rows,
+}: {
+  title: string;
+  hint?: string;
+  rows: { label: string; value: ReactNode }[];
+}) {
+  return (
+    <div>
+      <h3 className="text-base font-bold text-[#050505]">{title}</h3>
+      {hint ? <p className="mt-1 text-sm text-[#65676b]">{hint}</p> : null}
+      <dl className="mt-3 border-t border-[#e4e6eb]">
+        {rows.map((row) => (
+          <div
+            className="grid gap-1 border-b border-[#e4e6eb] py-3 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-baseline sm:gap-6"
+            key={row.label}
+          >
+            <dt className="text-sm text-[#65676b]">{row.label}</dt>
+            <dd className="min-w-0 text-sm font-semibold break-words text-[#050505]">
+              {row.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function SettingGroup({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+      {hint ? <p className="mt-0.5 text-sm text-slate-500">{hint}</p> : null}
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2">{children}</dl>
+    </div>
+  );
+}
+
+function Choice({ on }: { on: boolean }) {
+  return (
+    <Pill
+      tone={
+        on
+          ? "bg-emerald-50 text-emerald-700 ring-emerald-600/15"
+          : "bg-slate-100 text-slate-600 ring-slate-500/10"
+      }
+    >
+      {on ? "Yes" : "No"}
+    </Pill>
   );
 }
 
@@ -291,11 +503,13 @@ function ReadOnlyRows({
   rows: { label: string; value: ReactNode }[];
 }) {
   return (
-    <dl className="mt-4 grid gap-3">
+    <dl className="grid gap-2 sm:grid-cols-3">
       {rows.map((row) => (
-        <div key={row.label}>
-          <dt className="text-sm font-semibold">{row.label}</dt>
-          <dd>
+        <div className="rounded-xl bg-slate-50 px-3 py-2.5" key={row.label}>
+          <dt className="text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase">
+            {row.label}
+          </dt>
+          <dd className="mt-1 text-sm font-semibold text-slate-900">
             {row.value === "" ||
             row.value === null ||
             row.value === undefined ? (
@@ -312,35 +526,337 @@ function ReadOnlyRows({
   );
 }
 
-function profileMetadata(profile: GymProfile) {
-  return [
-    { label: "Code", value: profile.code },
-    { label: "Status", value: profile.status },
-    { label: "Subscription plan", value: profile.subscription_plan_name ?? "" },
-    {
-      label: "Subscription plan ID",
-      value: profile.subscription_plan_id ?? "",
-    },
-    { label: "Subscription status", value: profile.subscription_status },
-    {
-      label: "Subscription starts",
-      value: profile.subscription_starts_at ?? "",
-    },
-    { label: "Subscription ends", value: profile.subscription_ends_at ?? "" },
-    { label: "Created", value: profile.created_at },
-    { label: "Updated", value: profile.updated_at },
-  ];
+function FormSection({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <fieldset className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+      <legend className="px-1 text-sm font-bold text-slate-900">{title}</legend>
+      {hint ? (
+        <p className="mb-3 text-xs leading-5 text-slate-500">{hint}</p>
+      ) : null}
+      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+    </fieldset>
+  );
 }
 
-function ProfileMetadata({ profile }: { profile: GymProfile }) {
+function TextControl({
+  label,
+  name,
+  defaultValue,
+  maxLength,
+  required,
+  type = "text",
+  hint,
+  autoComplete,
+  className,
+  min,
+  max,
+  step,
+  spellCheck,
+  uppercase = false,
+}: {
+  label: string;
+  name: string;
+  defaultValue: string | number;
+  maxLength?: number;
+  required?: boolean;
+  type?: string;
+  hint?: string;
+  autoComplete?: string;
+  className?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  spellCheck?: boolean;
+  uppercase?: boolean;
+}) {
+  const hintId = hint ? `${name}-hint` : undefined;
+  return (
+    <div className={className}>
+      <label className="field">
+        <span className="text-sm font-semibold text-slate-700">{label}</span>
+        <input
+          aria-describedby={hintId}
+          autoComplete={autoComplete}
+          className={uppercase ? "input uppercase" : "input"}
+          defaultValue={defaultValue}
+          max={max}
+          maxLength={maxLength}
+          min={min}
+          name={name}
+          required={required}
+          spellCheck={spellCheck}
+          step={step}
+          type={type}
+        />
+      </label>
+      {hint ? (
+        <p className="mt-1 text-xs leading-5 text-slate-500" id={hintId}>
+          {hint}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function ToggleRow({
+  name,
+  label,
+  defaultChecked,
+  hint,
+}: {
+  name: string;
+  label: string;
+  defaultChecked: boolean;
+  hint: string;
+}) {
+  const hintId = `${name}-hint`;
+  return (
+    <div className="sm:col-span-2">
+      <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-3 py-3">
+        <span className="text-sm font-semibold text-slate-800">{label}</span>
+        <input
+          aria-describedby={hintId}
+          className="size-4 shrink-0 accent-indigo-600"
+          defaultChecked={defaultChecked}
+          name={name}
+          type="checkbox"
+        />
+      </label>
+      <p className="mt-1 px-1 text-xs leading-5 text-slate-500" id={hintId}>
+        {hint}
+      </p>
+    </div>
+  );
+}
+
+function ProfileControl({
+  profile,
+  name,
+  className,
+  hint,
+}: {
+  profile: GymProfile;
+  name: ProfileTextField;
+  className?: string;
+  hint?: string;
+}) {
+  const field = PROFILE_FIELDS.find((item) => item.name === name);
+  if (!field) return null;
+  return (
+    <TextControl
+      defaultValue={profile[name]}
+      label={field.label}
+      maxLength={PROFILE_LIMITS[name]}
+      name={name}
+      required={name === "name" || name === "timezone"}
+      {...(field.autoComplete ? { autoComplete: field.autoComplete } : {})}
+      {...(className ? { className } : {})}
+      {...(hint ? { hint } : {})}
+    />
+  );
+}
+
+function SettingToggle({
+  settings,
+  name,
+  hint,
+}: {
+  settings: GymSettings;
+  name: (typeof BOOLEAN_FIELDS)[number]["name"];
+  hint: string;
+}) {
+  const field = BOOLEAN_FIELDS.find((item) => item.name === name);
+  if (!field) return null;
+  return (
+    <ToggleRow
+      defaultChecked={settings[name]}
+      hint={hint}
+      label={field.label}
+      name={name}
+    />
+  );
+}
+
+function IntegerControl({
+  settings,
+  name,
+}: {
+  settings: GymSettings;
+  name: (typeof INTEGER_FIELDS)[number]["name"];
+}) {
+  const field = INTEGER_FIELDS.find((item) => item.name === name);
+  if (!field) return null;
+  return (
+    <TextControl
+      defaultValue={settings[name]}
+      hint={INTEGER_HINTS[name]}
+      label={field.label}
+      max={field.max}
+      min={field.min}
+      name={name}
+      required
+      step={1}
+      type="number"
+    />
+  );
+}
+
+function approvalCopy() {
+  return "Separate finance approval is mandatory and cannot be turned off. Payments, expenses, retail sales, PT sales, and salary records must be approved by a different authorized manager or owner.";
+}
+
+function ImageFrameIcon() {
+  return (
+    <svg aria-hidden="true" className="size-7" fill="none" viewBox="0 0 24 24">
+      <rect
+        height="14"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        width="18"
+        x="3"
+        y="5"
+      />
+      <path
+        d="M7 15.5 10.2 12l2.1 2.2L15 11.5 17.5 15"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.6"
+      />
+      <circle cx="9" cy="9" fill="currentColor" r="1" />
+    </svg>
+  );
+}
+
+function UploadArrowIcon() {
+  return (
+    <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 16 16">
+      <path
+        d="M8 12.5V3.5M8 3.5 4.5 7M8 3.5 11.5 7"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.6"
+      />
+    </svg>
+  );
+}
+
+function RemoveIcon() {
+  return (
+    <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 16 16">
+      <path
+        d="M4.5 4.5 11.5 11.5M11.5 4.5 4.5 11.5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.6"
+      />
+    </svg>
+  );
+}
+
+function LogoFileInput({
+  pending,
+  onFile,
+}: {
+  pending: boolean;
+  onFile: (event: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <input
+      accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+      className="absolute inset-0 z-10 cursor-pointer opacity-0 disabled:cursor-not-allowed"
+      disabled={pending}
+      type="file"
+      onChange={onFile}
+    />
+  );
+}
+
+function GymLogoPicker({
+  hasLogo,
+  canUpdate,
+  pending,
+  previewUrl,
+  onFile,
+  onRemove,
+}: {
+  hasLogo: boolean;
+  canUpdate: boolean;
+  pending: boolean;
+  previewUrl: string | null;
+  onFile: (event: ChangeEvent<HTMLInputElement>) => void;
+  onRemove: () => void;
+}) {
+  if (!canUpdate && !hasLogo && !previewUrl) return null;
+  const preview = previewUrl ? (
+    <img
+      alt=""
+      className="max-h-40 max-w-full rounded-md object-contain"
+      src={previewUrl}
+    />
+  ) : hasLogo ? (
+    <GymLogo
+      className="max-h-40 max-w-full rounded-md object-contain"
+      fallback={
+        <span className="h-28 w-28 animate-pulse rounded-md bg-white" />
+      }
+    />
+  ) : null;
   return (
     <div>
-      <h3 className="mt-4 text-sm font-semibold">Platform-managed record</h3>
-      <p className="muted text-sm">
-        Code, lifecycle, and subscription are read-only. Platform administration
-        changes them.
-      </p>
-      <ReadOnlyRows rows={profileMetadata(profile)} />
+      <div className="flex items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#e7f3ff] text-[#0866ff]">
+          <ImageFrameIcon />
+        </span>
+        <div>
+          <p className="text-sm font-bold text-[#050505]">Gym logo</p>
+          <p className="text-sm text-[#65676b]">Max 1 MB · PNG, JPEG, WebP.</p>
+        </div>
+      </div>
+      <p className="mt-4 text-sm font-semibold text-[#65676b]">Image</p>
+      {preview ? (
+        <div className="mt-2">
+          <div className="grid min-h-40 place-items-center rounded-xl bg-[#f0f2f5] p-4">
+            {preview}
+          </div>
+          {canUpdate ? (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <label
+                className={`button button-sm relative w-full ${pending ? "pointer-events-none opacity-55" : ""}`}
+              >
+                <UploadArrowIcon /> Change
+                <LogoFileInput pending={pending} onFile={onFile} />
+              </label>
+              <button
+                className="button button-delete button-sm w-full"
+                disabled={pending}
+                type="button"
+                onClick={onRemove}
+              >
+                <RemoveIcon /> Remove
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <label
+          className={`relative mt-2 flex min-h-40 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#c5cad3] bg-[#f0f2f5] px-4 py-6 text-sm font-semibold text-[#65676b] hover:border-[#0866ff] hover:text-[#0866ff] ${pending ? "pointer-events-none opacity-55" : ""}`}
+        >
+          <ImageFrameIcon />
+          Click to select an image
+          <LogoFileInput pending={pending} onFile={onFile} />
+        </label>
+      )}
     </div>
   );
 }
@@ -355,9 +871,12 @@ function ProfileSection({
   onPending: (value: boolean) => void;
 }) {
   const [profile, setProfile] = useState<GymProfile | null>(null);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -380,9 +899,10 @@ function ProfileSection({
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSuccess(null);
+    const form = new FormData(event.currentTarget);
     let payload: GymProfileUpdate;
     try {
-      payload = readProfile(new FormData(event.currentTarget));
+      payload = readProfile(form);
     } catch (failure) {
       setError(failureMessage(failure, "Check the gym profile and try again."));
       return;
@@ -391,6 +911,7 @@ function ProfileSection({
     setError(null);
     try {
       setProfile(await updateGymProfile(payload));
+      setEditing(false);
       setSuccess("Gym profile saved.");
     } catch (failure) {
       setError(failureMessage(failure, "Unable to save the gym profile."));
@@ -399,96 +920,288 @@ function ProfileSection({
     }
   }
 
+  function replacePreview(file: File | null) {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    if (!file) {
+      previewUrlRef.current = null;
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    previewUrlRef.current = url;
+    setPreviewUrl(url);
+  }
+
+  async function changeLogo(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+    if (!file) return;
+    replacePreview(file);
+    setSuccess(null);
+    onPending(true);
+    setError(null);
+    try {
+      setProfile(await uploadGymLogo(file));
+      setSuccess("Gym logo saved.");
+    } catch (failure) {
+      replacePreview(null);
+      setError(failureMessage(failure, "Unable to save the gym logo."));
+    } finally {
+      onPending(false);
+    }
+  }
+
+  async function removeLogo() {
+    setSuccess(null);
+    onPending(true);
+    setError(null);
+    try {
+      setProfile(await deleteGymLogo());
+      replacePreview(null);
+      setSuccess("Gym logo removed.");
+    } catch (failure) {
+      setError(failureMessage(failure, "Unable to remove the gym logo."));
+    } finally {
+      onPending(false);
+    }
+  }
+
   return (
-    <section
-      aria-labelledby="gym-profile-title"
-      className="card w-auto max-w-none"
-    >
-      <h2 className="text-xl font-bold" id="gym-profile-title">
-        Gym profile
-      </h2>
-      {loading && (
-        <p className="muted mt-4" role="status">
-          Loading gym profile.
-        </p>
-      )}
-      <Notice error={error} success={success} />
-      {profile && <ProfileMetadata profile={profile} />}
-      {profile && !canUpdate && (
-        <ReadOnlyRows
-          rows={[
-            ...PROFILE_FIELDS.map((field) => ({
-              label: field.label,
-              value: profile[field.name],
-            })),
-            { label: "Email", value: profile.email },
-            { label: "Country code", value: profile.country_code },
-            { label: "Currency", value: profile.currency },
-          ]}
-        />
-      )}
-      {profile && canUpdate && (
-        <form
-          className="mt-4 grid gap-3"
-          key={JSON.stringify(profile)}
-          onSubmit={save}
-        >
-          {PROFILE_FIELDS.map((field) => (
-            <label className="field" key={field.name}>
-              <span>{field.label}</span>
-              <input
-                className="input"
-                defaultValue={profile[field.name]}
-                maxLength={PROFILE_LIMITS[field.name]}
-                name={field.name}
-                required={field.name === "name" || field.name === "timezone"}
-              />
-            </label>
+    <section aria-labelledby="gym-profile-title" className={panelClass}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+        <div>
+          <h2
+            className="text-lg font-bold text-slate-900"
+            id="gym-profile-title"
+          >
+            Gym profile
+          </h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Name, contact, and address for this gym.
+          </p>
+        </div>
+        {profile && canUpdate ? (
+          <button
+            className="button button-edit"
+            onClick={() => setEditing(true)}
+            type="button"
+          >
+            Edit gym profile
+          </button>
+        ) : null}
+      </div>
+      {loading ? (
+        <div className="grid gap-3 p-5">
+          <p className="text-sm font-medium text-slate-500" role="status">
+            Loading gym profile.
+          </p>
+          {[0, 1, 2].map((item) => (
+            <div
+              className="h-16 animate-pulse rounded-xl bg-slate-100"
+              key={item}
+            />
           ))}
-          <label className="field">
-            <span>Email</span>
-            <input
-              className="input"
+        </div>
+      ) : (
+        <div className="grid gap-5 p-4 sm:p-5">
+          <Notice error={editing ? null : error} success={success} />
+          {profile ? (
+            <>
+              <div className="grid items-start gap-8 lg:grid-cols-[20rem_minmax(0,1fr)]">
+                <GymLogoPicker
+                  canUpdate={canUpdate}
+                  hasLogo={profileHasLogo(profile)}
+                  pending={pending}
+                  previewUrl={previewUrl}
+                  onFile={(event) => void changeLogo(event)}
+                  onRemove={() => void removeLogo()}
+                />
+                <div className="min-w-0 lg:pt-1">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="truncate text-2xl font-bold text-[#050505]">
+                      {profile.name}
+                    </p>
+                    <Pill tone={recordTone(profile.status)}>
+                      {profile.status}
+                    </Pill>
+                  </div>
+                  <p className="mt-1 text-sm text-[#65676b]">{profile.code}</p>
+                  <div className="mt-6">
+                    <ProfileBlock
+                      hint="How members and staff reach this gym."
+                      rows={[
+                        ...profileFields("contact").map((field) => ({
+                          label: field.label,
+                          value: textValue(profile[field.name]),
+                        })),
+                        { label: "Email", value: textValue(profile.email) },
+                      ]}
+                      title="Contact"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-8 lg:grid-cols-2">
+                <ProfileBlock
+                  rows={[
+                    ...profileFields("address").map((field) => ({
+                      label: field.label,
+                      value: textValue(profile[field.name]),
+                    })),
+                    {
+                      label: "Country code",
+                      value: textValue(profile.country_code),
+                    },
+                  ]}
+                  title="Address"
+                />
+                <ProfileBlock
+                  hint="Schedules, receipts, and reports use these."
+                  rows={[
+                    ...profileFields("locale").map((field) => ({
+                      label: field.label,
+                      value: textValue(profile[field.name]),
+                    })),
+                    { label: "Currency", value: textValue(profile.currency) },
+                  ]}
+                  title="Time and currency"
+                />
+              </div>
+              <ProfileBlock
+                hint="Lifecycle and subscription stay with platform administration."
+                rows={[
+                  {
+                    label: "Subscription plan",
+                    value: textValue(profile.subscription_plan_name ?? ""),
+                  },
+                  {
+                    label: "Subscription plan ID",
+                    value: textValue(profile.subscription_plan_id ?? ""),
+                  },
+                  {
+                    label: "Subscription status",
+                    value: (
+                      <Pill tone={recordTone(profile.subscription_status)}>
+                        {profile.subscription_status}
+                      </Pill>
+                    ),
+                  },
+                  {
+                    label: "Subscription starts",
+                    value: profileWhen(profile.subscription_starts_at),
+                  },
+                  {
+                    label: "Subscription ends",
+                    value: profileWhen(profile.subscription_ends_at),
+                  },
+                  {
+                    label: "Created",
+                    value: profileWhen(profile.created_at),
+                  },
+                  {
+                    label: "Updated",
+                    value: profileWhen(profile.updated_at),
+                  },
+                ]}
+                title="Platform record"
+              />
+            </>
+          ) : null}
+        </div>
+      )}
+      {profile && canUpdate && editing ? (
+        <FormDialog
+          description="Name, contact, address, and locale for this gym."
+          key={JSON.stringify(profile)}
+          onClose={() => {
+            if (!pending) setEditing(false);
+          }}
+          onSubmit={save}
+          pending={pending}
+          title="Gym profile"
+          wide
+        >
+          <FormSection title="Identity">
+            <ProfileControl name="name" profile={profile} />
+          </FormSection>
+          <FormSection
+            hint="Leave email blank if this gym has none."
+            title="Contact"
+          >
+            <ProfileControl name="phone" profile={profile} />
+            <TextControl
+              autoComplete="email"
               defaultValue={profile.email}
+              label="Email"
               maxLength={254}
               name="email"
               type="email"
             />
-          </label>
-          <label className="field">
-            <span>Country code</span>
-            <input
-              className="input"
+          </FormSection>
+          <FormSection title="Address">
+            {profileFields("address").map((field) => (
+              <ProfileControl
+                key={field.name}
+                name={field.name}
+                profile={profile}
+                {...(field.name.startsWith("address_line")
+                  ? { className: "sm:col-span-2" }
+                  : {})}
+              />
+            ))}
+            <TextControl
+              autoComplete="country"
               defaultValue={profile.country_code}
+              hint="Two letters, such as MM. Leave blank if unknown."
+              label="Country code"
               maxLength={2}
               name="country_code"
+              spellCheck={false}
+              uppercase
             />
-          </label>
-          <label className="field">
-            <span>Currency</span>
-            <input
-              className="input"
-              defaultValue={profile.currency}
-              maxLength={3}
-              name="currency"
-              required
+          </FormSection>
+          <FormSection title="Time and currency">
+            <ProfileControl
+              hint="Example: Asia/Yangon"
+              name="timezone"
+              profile={profile}
             />
-          </label>
-          <button
-            className="button button-edit"
-            disabled={pending}
-            type="submit"
-          >
-            Save gym profile
-          </button>
-        </form>
-      )}
+            <div>
+              <label className="field">
+                <span>Currency</span>
+                <select
+                  className="input"
+                  defaultValue={profile.currency === "MMK" ? "MMK" : "THB"}
+                  name="currency"
+                  required
+                >
+                  <option value="THB">THB</option>
+                  <option value="MMK">MMK</option>
+                </select>
+              </label>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                THB or MMK. It must match the subscription plan.
+              </p>
+            </div>
+          </FormSection>
+          {error ? (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div>
+            <button
+              className="button button-edit"
+              disabled={pending}
+              type="submit"
+            >
+              Save gym profile
+            </button>
+          </div>
+        </FormDialog>
+      ) : null}
     </section>
   );
-}
-
-function approvalCopy() {
-  return "Separate finance approval is mandatory and cannot be turned off. Payments, expenses, retail sales, PT sales, and salary records must be approved by a different authorized manager or owner.";
 }
 
 function SettingsSection({
@@ -501,6 +1214,7 @@ function SettingsSection({
   onPending: (value: boolean) => void;
 }) {
   const [settings, setSettings] = useState<GymSettings | null>(null);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -544,6 +1258,7 @@ function SettingsSection({
     setError(null);
     try {
       setSettings(await updateGymSettings(payload));
+      setEditing(false);
       setSuccess("Operational settings saved.");
     } catch (failure) {
       setError(failureMessage(failure, "Unable to save operational settings."));
@@ -560,168 +1275,286 @@ function SettingsSection({
   return (
     <section
       aria-labelledby="operational-settings-title"
-      className="card w-auto max-w-none"
+      className={panelClass}
     >
-      <h2 className="text-xl font-bold" id="operational-settings-title">
-        Operational settings
-      </h2>
-      {loading && (
-        <p className="muted mt-4" role="status">
-          Loading operational settings.
-        </p>
-      )}
-      <Notice error={error} success={success} />
-      {settings && !canManage && (
-        <>
-          <ReadOnlyRows
-            rows={[
-              { label: "Week starts on", value: weekday },
-              {
-                label: "Allow manual member numbers",
-                value: settings.allow_manual_member_numbers ? "Yes" : "No",
-              },
-              {
-                label: "Member number prefix",
-                value: settings.member_number_prefix,
-              },
-              {
-                label: "Receipt number prefix",
-                value: settings.receipt_number_prefix,
-              },
-              {
-                label: "Check-in duplicate window (seconds)",
-                value: settings.check_in_duplicate_window_seconds,
-              },
-              {
-                label: "Check-in challenge lifetime (seconds)",
-                value: settings.check_in_challenge_ttl_seconds,
-              },
-              {
-                label: "Check-in challenge maximum uses",
-                value: settings.check_in_challenge_max_uses,
-              },
-              {
-                label: "Membership expiry warning days",
-                value: settings.membership_expiry_warning_days.join(", "),
-              },
-              {
-                label: "Email membership expiry warnings",
-                value: settings.membership_expiry_email_enabled ? "Yes" : "No",
-              },
-              {
-                label: "Push membership expiry warnings",
-                value: settings.membership_expiry_push_enabled ? "Yes" : "No",
-              },
-              {
-                label: "Class cancellation cutoff (minutes)",
-                value: settings.class_cancellation_cutoff_minutes,
-              },
-              {
-                label: "A class no-show consumes a session",
-                value: settings.class_no_show_consumes_session ? "Yes" : "No",
-              },
-              { label: "Separate finance approval", value: "Required" },
-              {
-                label: "Next member number",
-                value: settings.next_member_number,
-              },
-              { label: "Created", value: settings.created_at },
-              { label: "Updated", value: settings.updated_at },
-            ]}
-          />
-          <p className="muted mt-4 text-sm">{approvalCopy()}</p>
-        </>
-      )}
-      {settings && canManage && (
-        <form
-          className="mt-4 grid gap-3"
-          key={settings.updated_at}
-          onSubmit={save}
-        >
-          <label className="field">
-            <span>Week starts on</span>
-            <select
-              className="input"
-              defaultValue={String(settings.week_starts_on)}
-              name="week_starts_on"
-            >
-              {WEEKDAYS.map((day, index) => (
-                <option key={day} value={index}>
-                  {day}
-                </option>
-              ))}
-            </select>
-          </label>
-          {BOOLEAN_FIELDS.map((field) => (
-            <label className="flex items-start gap-3" key={field.name}>
-              <input
-                className="mt-1"
-                defaultChecked={settings[field.name]}
-                name={field.name}
-                type="checkbox"
-              />
-              <span>{field.label}</span>
-            </label>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+        <div>
+          <h2
+            className="text-lg font-bold text-slate-900"
+            id="operational-settings-title"
+          >
+            Operational settings
+          </h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Check-in, numbers, classes, and reminders.
+          </p>
+        </div>
+        {settings && canManage ? (
+          <button
+            className="button button-edit"
+            onClick={() => setEditing(true)}
+            type="button"
+          >
+            Edit operational settings
+          </button>
+        ) : null}
+      </div>
+      {loading ? (
+        <div className="grid gap-3 p-5">
+          <p className="text-sm font-medium text-slate-500" role="status">
+            Loading operational settings.
+          </p>
+          {[0, 1, 2].map((item) => (
+            <div
+              className="h-16 animate-pulse rounded-xl bg-slate-100"
+              key={item}
+            />
           ))}
-          <label className="field">
-            <span>Member number prefix</span>
-            <input
-              className="input"
+        </div>
+      ) : (
+        <div className="grid gap-5 p-4 sm:p-5">
+          <Notice error={editing ? null : error} success={success} />
+          {settings ? (
+            <>
+              <SettingGroup
+                hint="Weekly schedules and reports start on this day."
+                title="Calendar"
+              >
+                <Fact label="Week starts on">{textValue(weekday)}</Fact>
+              </SettingGroup>
+              <SettingGroup
+                hint="New members receive the next number unless manual numbers are allowed."
+                title="Member numbers"
+              >
+                <Fact label="Next member number">
+                  {assignedMemberNumber(
+                    settings.member_number_prefix,
+                    settings.next_member_number,
+                  )}
+                </Fact>
+                <Fact label="Allow manual member numbers">
+                  <Choice on={settings.allow_manual_member_numbers} />
+                </Fact>
+              </SettingGroup>
+              <SettingGroup
+                hint="Example of the printed number. The sequence increases with each receipt."
+                title="Receipts"
+              >
+                <Fact label="Receipt number">
+                  {receiptExample(settings.receipt_number_prefix)}
+                </Fact>
+              </SettingGroup>
+              <SettingGroup
+                hint="How the front desk accepts a check-in code."
+                title="Check-in"
+              >
+                <Fact label="Check-in duplicate window (seconds)">
+                  {textValue(settings.check_in_duplicate_window_seconds)}
+                </Fact>
+                <Fact label="Check-in challenge lifetime (seconds)">
+                  {textValue(settings.check_in_challenge_ttl_seconds)}
+                </Fact>
+                <Fact label="Check-in challenge maximum uses">
+                  {textValue(settings.check_in_challenge_max_uses)}
+                </Fact>
+              </SettingGroup>
+              <SettingGroup
+                hint="Days before a membership ends. Example: 7 means one week before."
+                title="Membership reminders"
+              >
+                <Fact label="Membership expiry warning days" wide>
+                  {settings.membership_expiry_warning_days.length === 0 ? (
+                    textValue("")
+                  ) : (
+                    <span className="flex flex-wrap gap-2">
+                      {settings.membership_expiry_warning_days.map((day) => (
+                        <Pill
+                          key={day}
+                          tone="bg-slate-100 text-slate-700 ring-slate-500/10"
+                        >
+                          {day}
+                        </Pill>
+                      ))}
+                    </span>
+                  )}
+                </Fact>
+                <Fact label="Email membership expiry warnings">
+                  <Choice on={settings.membership_expiry_email_enabled} />
+                </Fact>
+                <Fact label="Push membership expiry warnings">
+                  <Choice on={settings.membership_expiry_push_enabled} />
+                </Fact>
+              </SettingGroup>
+              <SettingGroup title="Classes">
+                <Fact label="Class cancellation cutoff (minutes)">
+                  {textValue(settings.class_cancellation_cutoff_minutes)}
+                </Fact>
+                <Fact label="A class no-show consumes a session">
+                  <Choice on={settings.class_no_show_consumes_session} />
+                </Fact>
+              </SettingGroup>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-sm font-bold text-amber-950">
+                    Finance approval
+                  </h3>
+                  <Pill tone="bg-amber-50 text-amber-800 ring-amber-600/15">
+                    Required
+                  </Pill>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-amber-950">
+                  {approvalCopy()}
+                </p>
+              </div>
+              <SettingGroup title="Record">
+                <Fact label="Created">{textValue(settings.created_at)}</Fact>
+                <Fact label="Updated">{textValue(settings.updated_at)}</Fact>
+              </SettingGroup>
+            </>
+          ) : null}
+        </div>
+      )}
+      {settings && canManage && editing ? (
+        <FormDialog
+          description="Check-in, numbers, classes, and reminders for this gym."
+          key={settings.updated_at}
+          onClose={() => {
+            if (!pending) setEditing(false);
+          }}
+          onSubmit={save}
+          pending={pending}
+          title="Operational settings"
+          wide
+        >
+          <FormSection
+            hint="Weekly schedules and reports start on this day."
+            title="Calendar"
+          >
+            <div>
+              <label className="field">
+                <span className="text-sm font-semibold text-slate-700">
+                  Week starts on
+                </span>
+                <select
+                  className="input"
+                  defaultValue={String(settings.week_starts_on)}
+                  name="week_starts_on"
+                >
+                  {WEEKDAYS.map((day, index) => (
+                    <option key={day} value={index}>
+                      {day}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </FormSection>
+          <FormSection title="Member numbers">
+            <TextControl
               defaultValue={settings.member_number_prefix}
+              hint={`The next member number will look like ${assignedMemberNumber(
+                settings.member_number_prefix,
+                settings.next_member_number,
+              )}. Use 1–20 letters, digits, or hyphens.`}
+              label="Member number prefix"
               maxLength={20}
               name="member_number_prefix"
               required
+              spellCheck={false}
+              uppercase
             />
-          </label>
-          <label className="field">
-            <span>Receipt number prefix</span>
-            <input
-              className="input"
+            <SettingToggle
+              hint="Staff can type a member number instead of taking the next one."
+              name="allow_manual_member_numbers"
+              settings={settings}
+            />
+          </FormSection>
+          <FormSection title="Receipts">
+            <TextControl
               defaultValue={settings.receipt_number_prefix}
+              hint={`A receipt will look like ${receiptExample(
+                settings.receipt_number_prefix,
+              )}. Use 1–20 letters, digits, or hyphens.`}
+              label="Receipt number prefix"
               maxLength={20}
               name="receipt_number_prefix"
               required
+              spellCheck={false}
+              uppercase
             />
-          </label>
-          {INTEGER_FIELDS.map((field) => (
-            <label className="field" key={field.name}>
-              <span>{field.label}</span>
-              <input
-                className="input"
-                defaultValue={settings[field.name]}
-                max={field.max}
-                min={field.min}
-                name={field.name}
-                required
-                step={1}
-                type="number"
-              />
-            </label>
-          ))}
-          <label className="field">
-            <span>Membership expiry warning days</span>
-            <input
-              className="input"
+          </FormSection>
+          <FormSection
+            hint="How the front desk accepts a check-in code."
+            title="Check-in"
+          >
+            <IntegerControl
+              name="check_in_duplicate_window_seconds"
+              settings={settings}
+            />
+            <IntegerControl
+              name="check_in_challenge_ttl_seconds"
+              settings={settings}
+            />
+            <IntegerControl
+              name="check_in_challenge_max_uses"
+              settings={settings}
+            />
+          </FormSection>
+          <FormSection
+            hint="Comma-separated days before expiry, from 0 to 365."
+            title="Membership reminders"
+          >
+            <TextControl
+              className="sm:col-span-2"
               defaultValue={settings.membership_expiry_warning_days.join(", ")}
+              hint="Example: 3, 7, 14"
+              label="Membership expiry warning days"
               name="membership_expiry_warning_days"
+              spellCheck={false}
             />
-          </label>
-          <fieldset className="rounded-lg border border-slate-200 p-3">
-            <legend className="px-1 text-sm font-semibold">
+            <SettingToggle
+              hint="Send an email on each warning day."
+              name="membership_expiry_email_enabled"
+              settings={settings}
+            />
+            <SettingToggle
+              hint="Send a push notification on each warning day."
+              name="membership_expiry_push_enabled"
+              settings={settings}
+            />
+          </FormSection>
+          <FormSection title="Classes">
+            <IntegerControl
+              name="class_cancellation_cutoff_minutes"
+              settings={settings}
+            />
+            <SettingToggle
+              hint="A missed class still uses one booked session."
+              name="class_no_show_consumes_session"
+              settings={settings}
+            />
+          </FormSection>
+          <fieldset className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+            <legend className="px-1 text-sm font-bold text-amber-950">
               Finance approval
             </legend>
-            <label className="mt-2 flex items-start gap-3">
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-white px-3 py-3">
+              <span className="text-sm font-semibold text-slate-800">
+                Require separate finance approval
+              </span>
               <input
                 aria-describedby="finance-approval-note"
-                className="mt-1"
+                className="size-4 shrink-0 accent-indigo-600"
                 defaultChecked
                 disabled
                 name="require_separate_finance_approval"
                 type="checkbox"
               />
-              <span>Require separate finance approval</span>
             </label>
-            <p className="muted mt-2 text-sm" id="finance-approval-note">
+            <p
+              className="mt-2 text-xs leading-5 text-amber-950/80"
+              id="finance-approval-note"
+            >
               {approvalCopy()}
             </p>
           </fieldset>
@@ -735,15 +1568,22 @@ function SettingsSection({
               { label: "Updated", value: settings.updated_at },
             ]}
           />
-          <button
-            className="button button-edit"
-            disabled={pending}
-            type="submit"
-          >
-            Save operational settings
-          </button>
-        </form>
-      )}
+          {error ? (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div>
+            <button
+              className="button button-edit"
+              disabled={pending}
+              type="submit"
+            >
+              Save operational settings
+            </button>
+          </div>
+        </FormDialog>
+      ) : null}
     </section>
   );
 }
@@ -755,23 +1595,67 @@ export function GymSettingsManager({
   canManageSettings,
 }: GymSettingsAccess) {
   const [pending, setPending] = useState(false);
+  const [tab, setTab] = useState<"profile" | "operations">(
+    canViewProfile ? "profile" : "operations",
+  );
+  const both = canViewProfile && canViewSettings;
+  const tabs = [
+    canViewProfile ? (["profile", "Profile"] as const) : null,
+    canViewSettings ? (["operations", "Operations"] as const) : null,
+  ].filter((item) => item !== null);
 
   return (
-    <div className="grid items-start gap-6 xl:grid-cols-2">
-      {canViewProfile && (
-        <ProfileSection
-          canUpdate={canUpdateProfile}
-          onPending={setPending}
-          pending={pending}
-        />
-      )}
-      {canViewSettings && (
-        <SettingsSection
-          canManage={canManageSettings}
-          onPending={setPending}
-          pending={pending}
-        />
-      )}
+    <div className="grid gap-5">
+      {both ? (
+        <div
+          aria-label="Gym settings sections"
+          className="inline-flex w-fit rounded-xl bg-slate-200/70 p-1"
+          role="tablist"
+        >
+          {tabs.map(([id, label]) => (
+            <button
+              aria-controls={`${id}-panel`}
+              aria-selected={tab === id}
+              className={tabClass(tab === id)}
+              id={`${id}-tab`}
+              key={id}
+              onClick={() => setTab(id)}
+              role="tab"
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {canViewProfile ? (
+        <div
+          aria-labelledby={both ? "profile-tab" : undefined}
+          hidden={both && tab !== "profile"}
+          id={both ? "profile-panel" : undefined}
+          role={both ? "tabpanel" : undefined}
+        >
+          <ProfileSection
+            canUpdate={canUpdateProfile}
+            onPending={setPending}
+            pending={pending}
+          />
+        </div>
+      ) : null}
+      {canViewSettings ? (
+        <div
+          aria-labelledby={both ? "operations-tab" : undefined}
+          hidden={both && tab !== "operations"}
+          id={both ? "operations-panel" : undefined}
+          role={both ? "tabpanel" : undefined}
+        >
+          <SettingsSection
+            canManage={canManageSettings}
+            onPending={setPending}
+            pending={pending}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

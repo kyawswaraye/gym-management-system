@@ -6,7 +6,7 @@ import { PlatformAuditLog } from "@/features/platform/audit-log-manager";
 import { hasPermission, platformHomePath } from "@/lib/auth/authorization";
 import { requirePlatformSession } from "@/lib/auth/session";
 
-export const metadata: Metadata = { title: "Platform audit logs" };
+export const metadata: Metadata = { title: "Audit logs" };
 export const dynamic = "force-dynamic";
 
 export default async function SuperAdminAuditLogsPage() {
@@ -18,9 +18,9 @@ export default async function SuperAdminAuditLogsPage() {
   return (
     <section aria-labelledby="platform-audit-title">
       <PageHeader
-        description="Review redacted platform audit events."
-        eyebrow="Platform"
-        title="Platform audit logs"
+        description="Newest events first. Open one to see who changed it and what changed. Sensitive values stay hidden."
+        eyebrow="GymPilot MM"
+        title="Audit logs"
         titleId="platform-audit-title"
       />
       <PlatformAuditLog canView />

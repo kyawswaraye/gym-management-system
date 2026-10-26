@@ -5,8 +5,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Gym Management",
-    template: "%s | Gym Management",
+    default: "GymPilot MM",
+    template: "%s | GymPilot MM",
   },
   description: "Secure gym staff workspace",
 };

@@ -20,6 +20,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.audit.services import write_tenant_audit
 from apps.common.api.exceptions import AuthenticationFailed
+from apps.common.codes import resolve_code
 from apps.common.db.tenant_context import set_gym_context
 from apps.tenants.delegation import (
     PROTECTED_ROLE_KEYS,
@@ -232,6 +233,14 @@ def create_role(
         expected_authz_version=expected_authz_version,
         required_permission="roles.manage",
     )
+    if not key:
+        key = resolve_code(
+            "",
+            Role.objects.filter(gym=gym).values_list("key", flat=True),
+            name,
+            prefix="ROLE",
+            reserved=PROTECTED_ROLE_KEYS,
+        )
     if key in PROTECTED_ROLE_KEYS:
         raise RoleWorkflowConflict("This role key is reserved.")
     if gym.status != Gym.Status.ACTIVE:

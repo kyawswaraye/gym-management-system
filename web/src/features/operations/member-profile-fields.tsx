@@ -11,16 +11,23 @@ const GENDER_LABELS: Record<(typeof MEMBER_GENDERS)[number], string> = {
   UNSPECIFIED: "Unspecified",
 };
 
+export type MemberNumberPreview = {
+  status: "loading" | "ready" | "unavailable";
+  value: string;
+};
+
 export function MemberProfileFields({
   value,
   onChange,
   disabled,
   includeMemberNumber,
+  memberNumberPreview = { status: "unavailable", value: "" },
 }: {
   value: MemberProfileInput;
   onChange: (next: MemberProfileInput) => void;
   disabled: boolean;
   includeMemberNumber: boolean;
+  memberNumberPreview?: MemberNumberPreview;
 }) {
   function update<K extends keyof MemberProfileInput>(
     key: K,
@@ -36,16 +43,31 @@ export function MemberProfileFields({
           <label className="field">
             Member number
             <input
+              aria-busy={memberNumberPreview.status === "loading"}
               aria-describedby="member-number-hint"
-              className="input"
-              disabled={disabled}
-              maxLength={32}
-              onChange={(event) => update("member_number", event.target.value)}
-              value={value.member_number}
+              className="input bg-slate-50 text-slate-500"
+              disabled
+              placeholder={
+                memberNumberPreview.status === "ready"
+                  ? undefined
+                  : memberNumberPreview.status === "loading"
+                    ? "Assigning…"
+                    : "Assigned on save"
+              }
+              readOnly
+              value={
+                memberNumberPreview.status === "ready"
+                  ? memberNumberPreview.value
+                  : ""
+              }
             />
           </label>
           <span className="muted" id="member-number-hint">
-            Leave blank to let the gym assign the next number.
+            {memberNumberPreview.status === "loading"
+              ? "Loading the next member number."
+              : memberNumberPreview.status === "ready"
+                ? "Assigned by the gym."
+                : "The gym assigns the next number when you save."}
           </span>
         </div>
       ) : null}

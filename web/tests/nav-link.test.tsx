@@ -38,16 +38,16 @@ function renderLinks() {
 function expectCurrent(name: string) {
   const current = screen.getByRole("link", { name });
   expect(current).toHaveAttribute("aria-current", "page");
-  expect(current.className).toContain("bg-amber-400/20");
-  expect(current.className).toContain("shadow-[inset_3px_0_0_#fbbf24]");
+  expect(current.className).toContain("bg-[#e7f3ff]");
+  expect(current.className).not.toContain("shadow-[inset_");
   return current;
 }
 
 function expectIdle(name: string) {
   const link = screen.getByRole("link", { name });
   expect(link).not.toHaveAttribute("aria-current");
-  expect(link.className).toContain("hover:bg-white/10");
-  expect(link.className).toContain("focus-visible:outline-amber-300");
+  expect(link.className).toContain("hover:bg-[#f2f2f2]");
+  expect(link.className).toContain("focus-visible:outline-[#0866ff]");
 }
 
 function session(
@@ -193,7 +193,7 @@ describe("navigation link active state", () => {
     expectIdle("PT sales");
     expectIdle("Check-ins");
     expect(
-      screen.getByRole("link", { name: "Gym Management" }),
+      screen.getByRole("link", { name: "Yangon Fitness" }),
     ).not.toHaveAttribute("aria-current");
     tenant.unmount();
 
@@ -265,7 +265,7 @@ describe("navigation link active state", () => {
     expectCurrent("Gyms");
     expectIdle("Dashboard");
     expect(
-      screen.getByRole("link", { name: "Gym Management" }),
+      screen.getByRole("link", { name: "GymPilot MM" }),
     ).not.toHaveAttribute("aria-current");
   });
 

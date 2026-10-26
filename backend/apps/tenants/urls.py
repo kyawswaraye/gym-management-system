@@ -25,9 +25,11 @@ from apps.tenants.views import (
     AdminGymSuspendView,
     AdminSubscriptionDetailView,
     AdminSubscriptionListView,
+    GymLogoView,
     GymProfileView,
     GymSettingsView,
     OwnerInvitationAcceptView,
+    OwnerInvitationCancelView,
     OwnerInvitationCreateView,
     OwnerListView,
     OwnerRevokeView,
@@ -35,6 +37,7 @@ from apps.tenants.views import (
 
 urlpatterns = [
     path("gym/", GymProfileView.as_view(), name="gym-profile"),
+    path("gym/logo/", GymLogoView.as_view(), name="gym-logo"),
     path("settings/", GymSettingsView.as_view(), name="gym-settings"),
     path("admin/dashboard/", AdminDashboardView.as_view(), name="admin-dashboard"),
     path("admin/gyms/", AdminGymListCreateView.as_view(), name="admin-gyms"),
@@ -78,6 +81,11 @@ urlpatterns = [
         "owners/invitations/accept/",
         OwnerInvitationAcceptView.as_view(),
         name="owner-invitation-accept",
+    ),
+    path(
+        "owners/<uuid:gym_membership_id>/cancel-invitation/",
+        OwnerInvitationCancelView.as_view(),
+        name="owner-invitation-cancel",
     ),
     path(
         "owners/<uuid:gym_membership_id>/revoke/",

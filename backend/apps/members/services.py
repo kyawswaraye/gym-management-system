@@ -28,6 +28,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.audit.services import write_tenant_audit
+from apps.common.codes import resolve_code
 from apps.common.db.tenant_context import set_gym_context
 from apps.files.models import FileAsset
 from apps.members.checkin_services import member_check_in_summary
@@ -904,6 +905,13 @@ def create_plan(
     duration_unit: str,
     price: Decimal,
 ) -> MembershipPlan:
+    if not code.strip():
+        code = resolve_code(
+            "",
+            MembershipPlan.objects.filter(gym=gym).values_list("code", flat=True),
+            name,
+            prefix="PLAN",
+        )
     try:
         with transaction.atomic():
             return MembershipPlan.objects.create(

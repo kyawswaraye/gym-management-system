@@ -15,7 +15,7 @@ export default async function InventoryPage() {
   return (
     <section aria-labelledby="inventory-title">
       <PageHeader
-        description="Maintain the product catalog and record manual stock movements. On-hand quantity and sales totals come from the server."
+        description="Browse the catalog, restock from a product, and keep categories on their own tab. On-hand quantity and sales totals come from the server."
         eyebrow="Finance"
         title="Inventory"
         titleId="inventory-title"

@@ -14,26 +14,27 @@ test("super admin provisions a gym through the browser", async ({ page }) => {
   await signIn(page, platformAccount);
   await expect(page).toHaveURL(/\/super-admin\/dashboard$/);
   await expect(
-    page.getByRole("heading", { name: "Platform dashboard", exact: true }),
+    page.getByRole("heading", { name: "Dashboard", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("Platform workspace", { exact: true }),
+    page.getByRole("link", { name: "GymPilot MM", exact: true }),
   ).toBeVisible();
   await expectNoBrowserSecrets(page, secrets);
 
   await page.getByRole("link", { name: "Gyms", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Gym administration", exact: true }),
+    page.getByRole("heading", { name: "Gyms", exact: true }),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Provision gym", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Provision gym", exact: true }),
   ).toBeVisible();
 
-  await page.getByLabel("Gym code *", { exact: true }).fill("E2EPROV");
   await page
     .getByLabel("Gym name *", { exact: true })
     .fill("E2E Provision Gym");
-  await page.getByLabel("Legal name", { exact: true }).fill("E2E Provision Co");
   await page
     .getByRole("combobox", { name: "Subscription *", exact: true })
     .selectOption({ label: "Trial (THB)" });

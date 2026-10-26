@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { PageHeader } from "@/components/layout/page-header";
 import { GymDetailManager } from "@/features/platform/gym-detail-manager";
 import { hasPermission, platformHomePath } from "@/lib/auth/authorization";
 import { requirePlatformSession } from "@/lib/auth/session";
@@ -20,12 +19,6 @@ export default async function SuperAdminGymDetailPage({
 
   return (
     <section aria-labelledby="platform-gym-title">
-      <PageHeader
-        description="Review and manage this gym's profile, subscription and lifecycle."
-        eyebrow="Platform"
-        title="Gym administration"
-        titleId="platform-gym-title"
-      />
       <GymDetailManager
         gymId={gymId}
         capabilities={{

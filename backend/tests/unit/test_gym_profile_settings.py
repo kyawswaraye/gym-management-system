@@ -110,7 +110,9 @@ def test_profile_response_includes_read_only_lifecycle_and_subscription() -> Non
         "subscription_ends_at",
         "created_at",
         "updated_at",
+        "has_logo",
     }
+    assert data["has_logo"] is False
     assert data["code"] == "SET-A"
     assert data["status"] == "ACTIVE"
     assert data["subscription_plan_id"] == str(plan_id)
@@ -214,6 +216,40 @@ def test_audit_redaction_removes_credential_keys_only() -> None:
     assert redacted["password"] == "[REDACTED]"
     assert redacted["nested"]["refresh_token"] == "[REDACTED]"
     assert redacted["nested"]["timezone"] == "Asia/Yangon"
+
+
+def test_logo_upload_accepts_png_and_rejects_a_mismatched_file() -> None:
+    from apps.tenants.logo import read_logo_upload
+
+    png = b"\x89PNG\r\n\x1a\n" + b"logo"
+    stored, content_type = read_logo_upload(
+        SimpleNamespace(content_type="image/png", read=lambda _limit: png)
+    )
+    assert stored == png
+    assert content_type == "image/png"
+
+    try:
+        read_logo_upload(
+            SimpleNamespace(content_type="image/png", read=lambda _limit: b"not-a-png")
+        )
+    except Exception as exc:
+        assert "logo" in getattr(exc, "detail", {})
+    else:
+        raise AssertionError("mismatched logo was accepted")
+
+
+def test_gym_logo_permissions_follow_profile_policy() -> None:
+    from apps.tenants.views import GymLogoView
+
+    logo_read = GymLogoView()
+    logo_read.request = SimpleNamespace(method="GET")
+    logo_read.get_permissions()
+    assert logo_read.required_permission == "gym.view"
+
+    logo_write = GymLogoView()
+    logo_write.request = SimpleNamespace(method="PUT")
+    logo_write.get_permissions()
+    assert logo_write.required_permission == "gym.update"
 
 
 def test_gym_and_settings_permissions_follow_owner_policy() -> None:

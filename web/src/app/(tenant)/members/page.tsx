@@ -23,6 +23,7 @@ export default async function MembersPage() {
       <MembersManager
         canArchive={session.permissions.includes("members.archive")}
         canCreate={session.permissions.includes("members.create")}
+        canPreviewMemberNumber={session.permissions.includes("settings.view")}
         canRestore={session.permissions.includes("members.restore")}
         defaultDate={todayInTimezone(session.gym?.timezone ?? "UTC")}
       />

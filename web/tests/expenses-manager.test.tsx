@@ -160,13 +160,17 @@ describe("expenses", () => {
         defaultDate="2026-10-18"
       />,
     );
+    fireEvent.click(await screen.findByRole("tab", { name: "Categories" }));
     expect(
       await screen.findByRole("button", { name: "Edit Supplies" }),
     ).toBeVisible();
     expect(
       screen.queryByRole("button", { name: "Edit Staff salary" }),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Cleaning supplies" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Expenses" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Cleaning supplies" }),
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm approval" }));
     expect(approveExpense).not.toHaveBeenCalled();

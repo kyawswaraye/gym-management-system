@@ -8,6 +8,7 @@ import {
   getCsrfToken,
   mutationHeaders,
 } from "@/features/auth/client";
+import { PasswordInput } from "@/features/auth/password-input";
 import type { StaffAcceptInput } from "@/types/api";
 
 type FieldErrors = Record<string, string>;
@@ -85,18 +86,31 @@ function Field({
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        className="input"
-        name={name}
-        type={type}
-        required={required}
-        autoComplete={autoComplete}
-        minLength={minLength}
-        maxLength={maxLength}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
-      />
+      {type === "password" ? (
+        <PasswordInput
+          id={id}
+          name={name}
+          required={required}
+          autoComplete={autoComplete}
+          minLength={minLength}
+          maxLength={maxLength}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+        />
+      ) : (
+        <input
+          id={id}
+          className="input"
+          name={name}
+          type={type}
+          required={required}
+          autoComplete={autoComplete}
+          minLength={minLength}
+          maxLength={maxLength}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+        />
+      )}
       {error ? (
         <span id={errorId} className="error">
           {error}

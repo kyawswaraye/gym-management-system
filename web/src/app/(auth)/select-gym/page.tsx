@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { GymSelectionForm } from "@/features/auth/gym-selection-form";
 import { AUTH_COOKIES } from "@/lib/auth/cookies";
 import type { GymSummary } from "@/types/api";
@@ -35,8 +36,8 @@ export default async function SelectGymPage() {
   return (
     <main className="grid min-h-screen place-items-center p-6">
       <section className="card" aria-labelledby="select-gym-title">
-        <p className="font-bold text-emerald-700">Gym Management</p>
-        <h1 id="select-gym-title" className="mt-2 text-3xl font-bold">
+        <BrandLogo />
+        <h1 id="select-gym-title" className="mt-6 text-3xl font-bold">
           Choose a gym
         </h1>
         <p className="muted mt-2">

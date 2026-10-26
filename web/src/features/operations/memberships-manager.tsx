@@ -720,7 +720,7 @@ export function MembershipsManager({
     const form = new FormData(formElement);
     try {
       await operationMutation<MembershipPlan>("membership-plans/", {
-        code: form.get("code"),
+        code: "",
         name: form.get("name"),
         duration_value: Number(form.get("duration_value")),
         duration_unit: form.get("duration_unit"),
@@ -933,11 +933,11 @@ export function MembershipsManager({
                       : "Open start membership form"
                   }
                   aria-expanded={showMembershipForm}
-                  className={actionButtonClass(
+                  className={
                     showMembershipForm
-                      ? "Close membership form"
-                      : "Start membership",
-                  )}
+                      ? actionButtonClass("Close membership form")
+                      : "button button-success"
+                  }
                   onClick={() => {
                     if (showMembershipForm) {
                       closeStartMembershipForm();
@@ -1007,7 +1007,7 @@ export function MembershipsManager({
                 aria-label="Membership plans"
                 className="w-full text-left text-sm"
               >
-                <thead className="bg-slate-800 text-white">
+                <thead>
                   <tr>
                     <th className="px-5 py-3 text-xs font-semibold" scope="col">
                       Code
@@ -1131,20 +1131,12 @@ export function MembershipsManager({
                       New plan
                     </h2>
                     <p className="mt-1 text-sm text-slate-500">
-                      Define the price and membership duration.
+                      Define the price and membership duration. A code is
+                      assigned from the name.
                     </p>
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 [&_.field]:text-sm [&_.field]:font-semibold [&_.field]:text-slate-700">
-                  <label className="field sm:col-span-2">
-                    Code
-                    <input
-                      className="input"
-                      name="code"
-                      placeholder="e.g. MONTHLY"
-                      required
-                    />
-                  </label>
                   <label className="field sm:col-span-2">
                     Name
                     <input
@@ -1303,7 +1295,7 @@ export function MembershipsManager({
         ) : null}
         <div className="overflow-x-auto">
           <table aria-label="Memberships" className="w-full text-left text-sm">
-            <thead className="bg-slate-800 text-white">
+            <thead>
               <tr>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   Member
@@ -1700,7 +1692,7 @@ export function MembershipsManager({
                   Cancel
                 </button>
                 <button
-                  className="button button-create w-full sm:w-auto"
+                  className="button button-success w-full sm:w-auto"
                   disabled={pending}
                   type="submit"
                 >
@@ -1961,15 +1953,7 @@ function PlanEditorDialog({
           <div className="grid gap-4 sm:grid-cols-2 [&_.field]:text-sm [&_.field]:font-semibold [&_.field]:text-slate-700">
             <label className="field">
               Code
-              <input
-                className="input"
-                maxLength={PLAN_CODE_MAX}
-                onChange={(event) =>
-                  onDraft({ ...draft, code: event.target.value })
-                }
-                required
-                value={draft.code}
-              />
+              <input className="input" readOnly value={draft.code} />
             </label>
             <label className="field">
               Name

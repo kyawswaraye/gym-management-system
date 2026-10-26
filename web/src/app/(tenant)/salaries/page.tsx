@@ -15,7 +15,7 @@ export default async function SalariesPage() {
   return (
     <section aria-labelledby="salaries-title">
       <PageHeader
-        description="Enter each staff amount for the period. Posted periods are corrected only by a full void."
+        description="Save a draft for the pay period and submit it for approval. A posted period is corrected only by a full void."
         eyebrow="Finance"
         title="Salaries"
         titleId="salaries-title"

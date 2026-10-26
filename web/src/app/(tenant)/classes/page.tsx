@@ -16,11 +16,12 @@ export default async function ClassesPage() {
   const session = await requireTenantSession();
   if (!canOpenClasses(session)) redirect(tenantHomePath(session));
   const canManage = hasPermission(session, "classes.manage");
+  const timeZone = session.gym?.timezone ?? "UTC";
 
   return (
     <section aria-labelledby="classes-title">
       <PageHeader
-        description="Maintain class types, weekly schedules, occurrences, and bookings. Capacity, attendance, no-show, and cutoff cancellation follow the published class rules."
+        description="Publish class types, repeat them through the week, and book members onto each occurrence."
         eyebrow="Personal training"
         title="Classes"
         titleId="classes-title"
@@ -31,7 +32,8 @@ export default async function ClassesPage() {
         canLateCancel={canManage && holdsProtectedManagement(session)}
         canManage={canManage}
         canUnmetered={canOfferUnmeteredBooking(session)}
-        today={todayInTimezone(session.gym?.timezone ?? "UTC")}
+        timeZone={timeZone}
+        today={todayInTimezone(timeZone)}
       />
     </section>
   );

@@ -11,6 +11,7 @@ from django.db.models import Sum
 from rest_framework import serializers
 
 from apps.cashbook.serializers import CashSessionSerializer, CashTransactionSerializer
+from apps.common.codes import OptionalPatternField
 from apps.expenses.serializers import ExpenseSerializer
 from apps.members.models import Member, Payment
 from apps.members.payment_serializers import PaymentSerializer, ReceiptSerializer, payment_payload
@@ -203,7 +204,7 @@ class PackagePriceField(serializers.DecimalField):
 
 class ServicePackageWriteSerializer(StrictSerializer):
     type = serializers.ChoiceField(choices=ServicePackage.PackageType.choices)
-    code = serializers.RegexField(_PACKAGE_CODE, max_length=32)
+    code = OptionalPatternField(_PACKAGE_CODE, max_length=32)
     name = serializers.CharField(max_length=120, trim_whitespace=True)
     session_count = serializers.IntegerField(min_value=1)
     validity_value = serializers.IntegerField(min_value=1)

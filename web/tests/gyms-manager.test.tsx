@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GymsManager } from "@/features/platform/gyms-manager";
@@ -76,22 +82,19 @@ describe("Super Admin gyms manager", () => {
     render(<GymsManager canProvision />);
     await screen.findByText("Yangon Fitness");
     expect(getPlans).toHaveBeenCalledWith("admin/subscriptions?status=ACTIVE");
+    fireEvent.click(screen.getByRole("button", { name: "Provision gym" }));
+    const provision = screen.getByRole("dialog", { name: "Provision gym" });
     expect(
-      screen.getByRole("option", { name: "Trial (THB)" }),
+      within(provision).getByRole("option", { name: "Trial (THB)" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("option", { name: "Legacy (THB)" }),
+      within(provision).queryByRole("option", { name: "Legacy (THB)" }),
     ).not.toBeInTheDocument();
-    const form = screen
-      .getByRole("heading", { name: "Provision gym" })
-      .closest("section")
-      ?.querySelector("form");
-    expect(form).not.toBeNull();
-    fireEvent.change(screen.getByLabelText("Subscription *"), {
+    fireEvent.change(within(provision).getByLabelText("Subscription *"), {
       target: { value: "plan-1" },
     });
 
-    fireEvent.submit(form!);
+    fireEvent.submit(provision);
 
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(
@@ -125,6 +128,7 @@ describe("Super Admin gyms manager", () => {
 
     render(<GymsManager canProvision />);
     await screen.findByText("Yangon Fitness");
+    provisionForm();
     expect(
       screen.getByText(/An Owner setup email is sent to the address below/),
     ).toBeInTheDocument();
@@ -149,7 +153,6 @@ describe("Super Admin gyms manager", () => {
     expect(createGym).toHaveBeenCalledTimes(1);
     expect(createGym.mock.calls[0]?.[0]).toEqual(provisionRequest);
     expect(createGym.mock.calls[0]?.[1]).toBe(keys[0]);
-    expect(screen.getByLabelText("Gym code *")).toHaveValue("ygn-02");
     expect(screen.getByLabelText("Owner email *")).toHaveValue(
       "owner@example.test",
     );
@@ -163,18 +166,18 @@ describe("Super Admin gyms manager", () => {
     expect(createGym).toHaveBeenCalledTimes(2);
     expect(createGym.mock.calls[1]?.[0]).toEqual(provisionRequest);
     expect(createGym.mock.calls[1]?.[1]).toBe(keys[0]);
-    expect(screen.getByLabelText("Gym code *")).toHaveValue("");
-    expect(screen.getByLabelText("Owner email *")).toHaveValue("");
+    expect(
+      screen.queryByRole("dialog", { name: "Provision gym" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Owner email *")).not.toBeInTheDocument();
     expect(document.body.innerHTML).not.toContain("super-secret-password");
     expect(document.body.innerHTML).not.toContain("plain-invite-token");
     expect(JSON.stringify(createGym.mock.calls)).not.toContain(
       '"send_invitation":false',
     );
 
+    provisionForm();
     fillProvisionForm();
-    fireEvent.change(screen.getByLabelText("Gym code *"), {
-      target: { value: "ygn-03" },
-    });
     fireEvent.submit(provisionForm());
 
     await waitFor(() => expect(createGym).toHaveBeenCalledTimes(3));
@@ -226,9 +229,8 @@ const provisioned = {
 
 const provisionRequest = {
   gym: {
-    code: "YGN-02",
     name: "Second Gym",
-    legal_name: "",
+    legal_name: "Second Gym",
     email: "",
     phone: "",
     address_line1: "",
@@ -249,10 +251,10 @@ const provisionRequest = {
 };
 
 function provisionForm() {
-  const form = screen
-    .getByRole("heading", { name: "Provision gym" })
-    .closest("section")
-    ?.querySelector("form");
+  if (!screen.queryByRole("dialog", { name: "Provision gym" })) {
+    fireEvent.click(screen.getByRole("button", { name: "Provision gym" }));
+  }
+  const form = screen.getByRole("dialog", { name: "Provision gym" });
   if (!(form instanceof HTMLFormElement)) {
     throw new Error("Provision form was not rendered.");
   }
@@ -260,9 +262,6 @@ function provisionForm() {
 }
 
 function fillProvisionForm() {
-  fireEvent.change(screen.getByLabelText("Gym code *"), {
-    target: { value: "ygn-02" },
-  });
   fireEvent.change(screen.getByLabelText("Gym name *"), {
     target: { value: "Second Gym" },
   });

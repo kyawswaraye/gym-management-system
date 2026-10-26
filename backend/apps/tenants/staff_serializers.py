@@ -62,7 +62,7 @@ class StaffInviteInputSerializer(StrictSerializer):
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150)
     phone = serializers.CharField(required=False, allow_blank=True, max_length=32)
-    staff_code = serializers.CharField(max_length=32)
+    staff_code = serializers.CharField(required=False, allow_blank=True, default="", max_length=32)
     display_name = serializers.CharField(max_length=150)
     joined_date = serializers.DateField()
     employment_title = serializers.CharField(required=False, allow_blank=True, max_length=100)
@@ -88,6 +88,8 @@ class StaffInviteInputSerializer(StrictSerializer):
         return name
 
     def validate_staff_code(self, value: str) -> str:
+        if value.strip() == "":
+            return ""
         return _staff_code(value)
 
     def validate_phone(self, value: str) -> str:

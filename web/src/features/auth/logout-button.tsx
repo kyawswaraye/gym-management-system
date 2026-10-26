@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { getCsrfToken, mutationHeaders } from "@/features/auth/client";
 
-export function LogoutButton() {
+export function LogoutButton({ className = "" }: { className?: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -28,7 +28,7 @@ export function LogoutButton() {
 
   return (
     <button
-      className="button button-sm button-cancel"
+      className={`text-xs font-medium text-[#65676b] underline-offset-2 transition-colors hover:text-[#0866ff] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0866ff] disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
       type="button"
       onClick={logout}
       disabled={pending}

@@ -463,6 +463,80 @@ export function updateGymProfile(body: GymProfileUpdate): Promise<GymProfile> {
   return operationMutation<GymProfile>("gym", body, "PATCH");
 }
 
+const GYM_LOGO_MAX_BYTES = 1_048_576;
+
+function notifyGymLogoChanged(): void {
+  window.dispatchEvent(new Event("gym-logo-updated"));
+}
+
+async function normalizedLogoFile(file: File): Promise<File> {
+  if (file.size < 1 || file.size > GYM_LOGO_MAX_BYTES) {
+    throw new OperationError(
+      "The logo must be a JPEG, PNG, or WebP under 1 MB.",
+    );
+  }
+  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const jpeg = header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
+  const png =
+    header[0] === 0x89 &&
+    header[1] === 0x50 &&
+    header[2] === 0x4e &&
+    header[3] === 0x47;
+  const webp =
+    header[0] === 0x52 &&
+    header[1] === 0x49 &&
+    header[2] === 0x46 &&
+    header[3] === 0x46 &&
+    header[8] === 0x57 &&
+    header[9] === 0x45 &&
+    header[10] === 0x42 &&
+    header[11] === 0x50;
+  const type = jpeg
+    ? "image/jpeg"
+    : png
+      ? "image/png"
+      : webp
+        ? "image/webp"
+        : "";
+  if (!type) {
+    throw new OperationError(
+      "The logo must be a JPEG, PNG, or WebP under 1 MB.",
+    );
+  }
+  if (file.type === type) return file;
+  return new File([file], file.name || "logo", { type });
+}
+
+export async function uploadGymLogo(file: File): Promise<GymProfile> {
+  const logo = await normalizedLogoFile(file);
+  const csrf = await getCsrfToken();
+  const body = new FormData();
+  body.set("logo", logo);
+  const response = await fetch("/api/operations/gym/logo", {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: { "X-CSRF-Token": csrf },
+    body,
+  });
+  const responseBody: unknown = await response.json();
+  if (!response.ok) throw readOperationError(responseBody);
+  notifyGymLogoChanged();
+  return (responseBody as ApiEnvelope<GymProfile>).data;
+}
+
+export async function deleteGymLogo(): Promise<GymProfile> {
+  const csrf = await getCsrfToken();
+  const response = await fetch("/api/operations/gym/logo", {
+    method: "DELETE",
+    credentials: "same-origin",
+    headers: { "X-CSRF-Token": csrf },
+  });
+  const responseBody: unknown = await response.json();
+  if (!response.ok) throw readOperationError(responseBody);
+  notifyGymLogoChanged();
+  return (responseBody as ApiEnvelope<GymProfile>).data;
+}
+
 export function getGymSettings(): Promise<GymSettings> {
   return operationGet<GymSettings>("settings");
 }

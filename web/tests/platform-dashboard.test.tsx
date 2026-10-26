@@ -51,49 +51,49 @@ describe("platform dashboard", () => {
     render(<PlatformDashboard canView />);
 
     expect(screen.getByText("Loading platform summary.")).toBeInTheDocument();
-    const gyms = await screen.findByRole("table", { name: "Gym statuses" });
-    const subscriptions = screen.getByRole("table", {
+    const gyms = await screen.findByRole("region", { name: "Gym statuses" });
+    const subscriptions = screen.getByRole("region", {
       name: "Gym subscription statuses",
     });
-    const plans = screen.getByRole("table", {
+    const plans = screen.getByRole("region", {
       name: "Subscription plan statuses",
     });
 
     expect(getDashboard).toHaveBeenCalledTimes(1);
     expect(getDashboard).toHaveBeenCalledWith("admin/dashboard");
+    expect(within(gyms).getByText("Total").parentElement).toHaveTextContent(
+      "4",
+    );
+    expect(within(gyms).getByText("Pending").parentElement).toHaveTextContent(
+      "1",
+    );
+    expect(within(gyms).getByText("Active").parentElement).toHaveTextContent(
+      "2",
+    );
+    expect(within(gyms).getByText("Suspended").parentElement).toHaveTextContent(
+      "1",
+    );
+    expect(within(gyms).getByText("Closed").parentElement).toHaveTextContent(
+      "0",
+    );
     expect(
-      within(gyms).getByRole("row", { name: /^total\b/ }),
-    ).toHaveTextContent("4");
-    expect(
-      within(gyms).getByRole("row", { name: /^PENDING\b/ }),
+      within(subscriptions).getByText("Trial").parentElement,
     ).toHaveTextContent("1");
     expect(
-      within(gyms).getByRole("row", { name: /^ACTIVE\b/ }),
+      within(subscriptions).getByText("Active").parentElement,
     ).toHaveTextContent("2");
     expect(
-      within(gyms).getByRole("row", { name: /^SUSPENDED\b/ }),
+      within(subscriptions).getByText("Past due").parentElement,
     ).toHaveTextContent("1");
     expect(
-      within(gyms).getByRole("row", { name: /^CLOSED\b/ }),
+      within(subscriptions).getByText("Cancelled").parentElement,
     ).toHaveTextContent("0");
-    expect(
-      within(subscriptions).getByRole("row", { name: /^TRIAL\b/ }),
-    ).toHaveTextContent("1");
-    expect(
-      within(subscriptions).getByRole("row", { name: /^ACTIVE\b/ }),
-    ).toHaveTextContent("2");
-    expect(
-      within(subscriptions).getByRole("row", { name: /^PAST_DUE\b/ }),
-    ).toHaveTextContent("1");
-    expect(
-      within(subscriptions).getByRole("row", { name: /^CANCELLED\b/ }),
-    ).toHaveTextContent("0");
-    expect(
-      within(plans).getByRole("row", { name: /^ACTIVE\b/ }),
-    ).toHaveTextContent("3");
-    expect(
-      within(plans).getByRole("row", { name: /^RETIRED\b/ }),
-    ).toHaveTextContent("1");
+    expect(within(plans).getByText("Active").parentElement).toHaveTextContent(
+      "3",
+    );
+    expect(within(plans).getByText("Retired").parentElement).toHaveTextContent(
+      "1",
+    );
     expect(screen.queryByText(/revenue|member|@/i)).not.toBeInTheDocument();
   });
 

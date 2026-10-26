@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+
+import { FormDialog } from "@/components/form-dialog";
 
 import {
   CashSessionSelect,
@@ -11,6 +20,7 @@ import {
   cancelRetailSale,
   createRetailSale,
   getRetailSale,
+  listProducts,
   listRetailSales,
   rejectRetailSale,
   returnRetailSale,
@@ -22,24 +32,22 @@ import { fieldMap, financeError } from "@/features/finance/errors";
 import {
   canonicalMoney,
   canonicalQuantity,
+  formatCents,
+  moneyCents,
   previewLineAmount,
 } from "@/features/finance/money";
 import { useCursorPages } from "@/features/finance/paging";
 import {
   Alert,
-  CommandForm,
   CursorControls,
-  Empty,
   Field,
-  Loading,
   ReasonField,
   SelectInput,
-  ServerFacts,
-  StatusText,
   TextInput,
 } from "@/features/finance/ui";
 import { listMembers } from "@/features/operations/client";
-import { listProducts } from "@/features/finance/client";
+import { actionButtonClass } from "@/lib/ui/action-button";
+import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
   Member,
   PaymentMethod,
@@ -61,6 +69,19 @@ const METHODS = [
   "OTHER",
 ] as const;
 const PAGE = "25";
+const cardClass =
+  "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm";
+const fieldTone =
+  "[&_.field]:text-sm [&_.field]:font-medium [&_.field]:text-slate-600";
+const STATUS_FILTERS = [
+  ["", "All"],
+  ["DRAFT", "Draft"],
+  ["PENDING_APPROVAL", "Pending"],
+  ["POSTED", "Posted"],
+  ["REJECTED", "Rejected"],
+  ["CANCELLED", "Cancelled"],
+  ["VOID", "Void"],
+] as const;
 
 type LineDraft = {
   key: string;
@@ -68,6 +89,45 @@ type LineDraft = {
   quantity: string;
   discount: string;
 };
+
+type SaleAction =
+  "submit" | "approve" | "reject" | "cancel" | "void" | "return" | null;
+
+function pretty(value: string): string {
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function statusTone(status: string): string {
+  const tones: Record<string, string> = {
+    DRAFT: "bg-slate-100 text-slate-700",
+    PENDING_APPROVAL: "bg-amber-100 text-amber-800",
+    POSTED: "bg-emerald-100 text-emerald-800",
+    REJECTED: "bg-red-100 text-red-700",
+    CANCELLED: "bg-slate-200 text-slate-600",
+    VOID: "bg-rose-100 text-rose-700",
+  };
+  return tones[status] ?? "bg-slate-100 text-slate-600";
+}
+
+function statusLabel(status: string): string {
+  if (status === "PENDING_APPROVAL") return "Pending";
+  return pretty(status);
+}
+
+function StatusPill({ status }: { status: string }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ${statusTone(status)}`}
+    >
+      <span className="sr-only">{status}</span>
+      {statusLabel(status)}
+    </span>
+  );
+}
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
@@ -89,6 +149,206 @@ function blankLine(): LineDraft {
   };
 }
 
+function memberLabel(
+  members: readonly Member[],
+  memberId: string | null,
+): string {
+  if (!memberId) return "Walk-in";
+  const member = members.find((item) => item.id === memberId);
+  if (!member) return "Member";
+  return `${member.member_number} · ${member.first_name} ${member.last_name}`;
+}
+
+function lineSummary(sale: RetailSale): string {
+  const names = sale.lines
+    .map((line) => line.product_name)
+    .filter((name) => name.trim());
+  if (names.length === 0) return "No products";
+  if (names.length === 1) return names[0] ?? "1 product";
+  return `${names[0]} + ${names.length - 1} more`;
+}
+
+function previewTotal(
+  lines: readonly LineDraft[],
+  products: readonly Product[],
+): string | null {
+  let total = 0n;
+  let count = 0;
+  for (const line of lines) {
+    const product = products.find((item) => item.id === line.productId);
+    if (!product) continue;
+    const preview = previewLineAmount(
+      line.quantity,
+      product.sale_price,
+      line.discount,
+    );
+    const cents = preview ? moneyCents(preview) : null;
+    if (cents === null) continue;
+    total += cents;
+    count += 1;
+  }
+  if (count === 0) return null;
+  return formatCents(total);
+}
+
+function FactGrid({ rows }: { rows: Array<{ label: string; value: string }> }) {
+  return (
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
+      {rows.map((row) => (
+        <div key={row.label}>
+          <dt className="text-xs text-slate-500">{row.label}</dt>
+          <dd className="mt-0.5 text-sm font-semibold break-words text-slate-900">
+            <IdentifierValue value={row.value} />
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function ActionPanel({
+  title,
+  hint,
+  pending,
+  error,
+  confirmLabel,
+  onSubmit,
+  onCancel,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  pending: boolean;
+  error: string;
+  confirmLabel: string;
+  onSubmit: (form: FormData) => void;
+  onCancel: () => void;
+  children?: ReactNode;
+}) {
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSubmit(new FormData(event.currentTarget));
+  }
+
+  return (
+    <FormDialog
+      description={hint}
+      onClose={onCancel}
+      onSubmit={submit}
+      pending={pending}
+      title={title}
+    >
+      <Alert message={error} />
+      <div className={fieldTone}>{children}</div>
+      <div>
+        <button
+          className="button button-cancel"
+          disabled={pending}
+          onClick={onCancel}
+          type="button"
+        >
+          Back
+        </button>
+        <button
+          className={actionButtonClass(confirmLabel)}
+          disabled={pending}
+          type="submit"
+        >
+          {confirmLabel}
+        </button>
+      </div>
+    </FormDialog>
+  );
+}
+
+function StatusFilter({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const groupRef = useRef<HTMLDivElement>(null);
+
+  function move(event: KeyboardEvent<HTMLDivElement>, delta: number) {
+    event.preventDefault();
+    const index = STATUS_FILTERS.findIndex(([item]) => item === value);
+    const next =
+      STATUS_FILTERS[
+        (index + delta + STATUS_FILTERS.length) % STATUS_FILTERS.length
+      ]?.[0] ?? "";
+    onChange(next);
+    window.requestAnimationFrame(() => {
+      groupRef.current
+        ?.querySelector<HTMLButtonElement>('[aria-checked="true"]')
+        ?.focus();
+    });
+  }
+
+  return (
+    <div
+      aria-label="Status"
+      className="flex flex-wrap gap-1.5"
+      onKeyDown={(event) => {
+        if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+          move(event, 1);
+        }
+        if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+          move(event, -1);
+        }
+      }}
+      ref={groupRef}
+      role="radiogroup"
+    >
+      {STATUS_FILTERS.map(([item, label]) => {
+        const selected = value === item;
+        return (
+          <button
+            aria-checked={selected}
+            className={
+              selected
+                ? "rounded-full bg-slate-900 px-3 py-1.5 text-xs font-bold text-white shadow-sm"
+                : "rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-200"
+            }
+            key={label}
+            onClick={() => onChange(item)}
+            role="radio"
+            tabIndex={selected ? 0 : -1}
+            type="button"
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function LoadingRows({ label }: { label: string }) {
+  return (
+    <div className="grid gap-3 p-4 sm:p-5" role="status">
+      <p className="text-sm font-medium text-slate-600">{label}</p>
+      <div className="grid gap-2">
+        {[0, 1, 2].map((item) => (
+          <div
+            className="h-14 animate-pulse rounded-xl bg-slate-100"
+            key={item}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="px-5 py-14 text-center">
+      <p className="font-semibold text-slate-800">{title}</p>
+      <p className="mt-1 text-sm text-slate-500">{detail}</p>
+    </div>
+  );
+}
+
 export function RetailSalesManager({
   canCreate,
   canUpdate,
@@ -106,7 +366,6 @@ export function RetailSalesManager({
   currency: string;
   defaultDate: string;
 }) {
-  const [status, setStatus] = useState("");
   const [applied, setApplied] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [sale, setSale] = useState<RetailSale | null>(null);
@@ -118,9 +377,8 @@ export function RetailSalesManager({
   const [businessDate, setBusinessDate] = useState(defaultDate);
   const [reference, setReference] = useState("");
   const [editing, setEditing] = useState(false);
-  const [action, setAction] = useState<
-    "submit" | "approve" | "reject" | "cancel" | "void" | "return" | null
-  >(null);
+  const [creatingSale, setCreatingSale] = useState(false);
+  const [action, setAction] = useState<SaleAction>(null);
   const [correctionDate, setCorrectionDate] = useState(defaultDate);
   const [approval, setApproval] = useState<RetailSaleApproval | null>(null);
   const [voidResult, setVoidResult] = useState<RetailSaleVoid | null>(null);
@@ -208,6 +466,37 @@ export function RetailSalesManager({
     setFormError(financeError(caught, fallback));
   }
 
+  function clearOutcome() {
+    setApproval(null);
+    setVoidResult(null);
+    setReturnResult(null);
+  }
+
+  function selectSale(id: string) {
+    if (id !== selectedId) clearOutcome();
+    setSelectedId(id);
+    setAction(null);
+    setEditing(false);
+    setFormError("");
+    setFields({});
+  }
+
+  function startCreate() {
+    setEditing(false);
+    setCreatingSale(true);
+    setAction(null);
+    setFormError("");
+    setFields({});
+    setLines([blankLine()]);
+    setMemberId("");
+    setMethod("CASH");
+    setBusinessDate(defaultDate);
+    setReference("");
+    setSelectedId("");
+    setSale(null);
+    clearOutcome();
+  }
+
   function linePayload(): RetailSaleLineWriteRequest[] | null {
     if (lines.length < 1 || lines.length > 100) {
       setFormError("Enter from 1 to 100 product lines.");
@@ -234,94 +523,42 @@ export function RetailSalesManager({
     return payload;
   }
 
+  const editorOpen =
+    (canCreate && creatingSale && !editing) ||
+    (editing && canUpdate && sale?.status === "DRAFT");
+  const showPaging = sales.index > 0 || sales.hasMore || sales.bounded;
+  const estimate = previewTotal(lines, products);
+  const canEditDraft = sale?.status === "DRAFT" && canUpdate;
+  const canSubmitDraft = sale?.status === "DRAFT" && canSubmit;
+  const canDecide = sale?.status === "PENDING_APPROVAL" && canApprove;
+  const canCancelDraft = sale?.status === "DRAFT" && canUpdate;
+  const canVoidPosted =
+    sale?.status === "POSTED" && canVoid && sale.return_count === 0;
+  const canReturnPosted = sale?.status === "POSTED" && canVoid;
+  const hasActions = Boolean(
+    canEditDraft ||
+    canSubmitDraft ||
+    canDecide ||
+    canCancelDraft ||
+    canVoidPosted ||
+    canReturnPosted,
+  );
+
   return (
     <div className="grid gap-6">
-      <form
-        className="flex flex-wrap gap-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setApplied(status);
-        }}
-      >
-        <Field label="Status">
-          <SelectInput
-            onChange={(event) => setStatus(event.target.value)}
-            value={status}
-          >
-            <option value="">Any status</option>
-            {[
-              "DRAFT",
-              "PENDING_APPROVAL",
-              "POSTED",
-              "REJECTED",
-              "CANCELLED",
-              "VOID",
-            ].map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </SelectInput>
-        </Field>
-        <button className="button self-end" type="submit">
-          Apply filters
-        </button>
-      </form>
-      <Alert message={sales.error || formError} />
-      {sales.pending && <Loading label="Loading retail sales." />}
-      {!sales.pending && sales.rows.length === 0 && (
-        <Empty label="No retail sales were returned." />
-      )}
-      {sales.rows.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <caption className="sr-only">Retail sales</caption>
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="p-3">Date</th>
-                <th className="p-3">Server total</th>
-                <th className="p-3">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sales.rows.map((row) => (
-                <tr className="border-t border-slate-100" key={row.id}>
-                  <td className="p-3">
-                    <button
-                      className="underline"
-                      onClick={() => {
-                        setSelectedId(row.id);
-                        setAction(null);
-                        setEditing(false);
-                      }}
-                      type="button"
-                    >
-                      {row.business_date}
-                    </button>
-                  </td>
-                  <td className="p-3">
-                    {row.total_amount} {row.currency}
-                  </td>
-                  <td className="p-3">
-                    <StatusText status={row.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <CursorControls
-        bounded={sales.bounded}
-        hasMore={sales.hasMore}
-        index={sales.index}
-        onNext={() => void sales.goNext()}
-        onPrevious={() => void sales.goPrevious()}
-        pending={sales.pending}
-      />
-      {(canCreate || (editing && canUpdate && sale?.status === "DRAFT")) && (
-        <form
-          className="grid gap-3"
+      {editorOpen ? (
+        <FormDialog
+          description={
+            editing
+              ? "Changes stay on this draft until you submit it."
+              : "Save a draft first. Prices and totals are calculated by the server."
+          }
+          onClose={() => {
+            if (pending) return;
+            setCreatingSale(false);
+            setEditing(false);
+            setFormError("");
+          }}
           onSubmit={(event) => {
             event.preventDefault();
             const payload = linePayload();
@@ -349,6 +586,8 @@ export function RetailSalesManager({
                 setSale(saved);
                 setSelectedId(saved.id);
                 setEditing(false);
+                setCreatingSale(false);
+                clearOutcome();
                 sales.reload();
               })
               .catch((caught: unknown) =>
@@ -356,631 +595,1042 @@ export function RetailSalesManager({
               )
               .finally(() => setPending(false));
           }}
+          pending={pending}
+          title={editing ? "Edit draft sale" : "New retail sale"}
+          wide
         >
-          <h2 className="text-lg font-bold">
-            {editing ? "Edit draft sale" : "New retail sale"}
-          </h2>
-          <Field label="Member">
-            <SelectInput
-              onChange={(event) => setMemberId(event.target.value)}
-              value={memberId}
-            >
-              <option value="">Walk-in</option>
-              {members.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.member_number} — {member.first_name}{" "}
-                  {member.last_name}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
-          <Field label="Business date">
-            <TextInput
-              onChange={(event) => setBusinessDate(event.target.value)}
-              type="date"
-              value={businessDate}
-            />
-          </Field>
-          <Field label="Payment method">
-            <SelectInput
-              onChange={(event) =>
-                setMethod(event.target.value as PaymentMethod)
-              }
-              value={method}
-            >
-              {METHODS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
-          <Field label="Reference">
-            <TextInput
-              onChange={(event) => setReference(event.target.value)}
-              value={reference}
-            />
-          </Field>
-          {lines.map((line) => {
-            const product = products.find((item) => item.id === line.productId);
-            const preview = product
-              ? previewLineAmount(
-                  line.quantity,
-                  product.sale_price,
-                  line.discount,
-                )
-              : null;
-            return (
-              <div
-                className="grid gap-3 rounded-lg border border-slate-200 p-3 md:grid-cols-2"
-                key={line.key}
-              >
-                <Field label="Product">
+          <div className={`grid gap-4 ${fieldTone}`}>
+            <Alert message={formError} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Field label="Member">
                   <SelectInput
-                    onChange={(event) =>
-                      setLines((current) =>
-                        current.map((item) =>
-                          item.key === line.key
-                            ? { ...item, productId: event.target.value }
-                            : item,
-                        ),
-                      )
-                    }
-                    value={line.productId}
+                    onChange={(event) => setMemberId(event.target.value)}
+                    value={memberId}
                   >
-                    <option value="">Select a product</option>
-                    {products.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.sku} — {item.name}
+                    <option value="">Walk-in</option>
+                    {members.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.member_number} — {member.first_name}{" "}
+                        {member.last_name}
                       </option>
                     ))}
                   </SelectInput>
                 </Field>
-                <Field error={fields.quantity} label="Quantity">
+              </div>
+              <Field label="Business date">
+                <TextInput
+                  onChange={(event) => setBusinessDate(event.target.value)}
+                  type="date"
+                  value={businessDate}
+                />
+              </Field>
+              <Field label="Payment method">
+                <SelectInput
+                  onChange={(event) =>
+                    setMethod(event.target.value as PaymentMethod)
+                  }
+                  value={method}
+                >
+                  {METHODS.map((item) => (
+                    <option key={item} value={item}>
+                      {pretty(item)}
+                    </option>
+                  ))}
+                </SelectInput>
+              </Field>
+              <div className="sm:col-span-2">
+                <Field label="Reference">
                   <TextInput
-                    inputMode="decimal"
-                    onChange={(event) =>
-                      setLines((current) =>
-                        current.map((item) =>
-                          item.key === line.key
-                            ? { ...item, quantity: event.target.value }
-                            : item,
-                        ),
-                      )
-                    }
-                    value={line.quantity}
+                    onChange={(event) => setReference(event.target.value)}
+                    value={reference}
                   />
                 </Field>
-                <Field label={`Discount (${currency})`}>
-                  <TextInput
-                    inputMode="decimal"
-                    onChange={(event) =>
-                      setLines((current) =>
-                        current.map((item) =>
-                          item.key === line.key
-                            ? { ...item, discount: event.target.value }
-                            : item,
-                        ),
-                      )
-                    }
-                    value={line.discount}
-                  />
-                </Field>
-                {preview && (
-                  <p className="text-sm text-slate-600">
-                    Preview only: {preview}. The server calculates the line
-                    snapshots and sale totals.
-                  </p>
-                )}
+              </div>
+            </div>
+            <div className="grid gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase">
+                  Products
+                </p>
                 <button
-                  className="underline tone-delete"
+                  className="button button-cancel button-sm"
+                  disabled={lines.length >= 100}
                   onClick={() =>
-                    setLines((current) =>
-                      current.filter((item) => item.key !== line.key),
-                    )
+                    setLines((current) => [...current, blankLine()])
                   }
                   type="button"
                 >
-                  Remove line
+                  Add product line
                 </button>
               </div>
-            );
-          })}
-          <button
-            className="underline tone-create"
-            disabled={lines.length >= 100}
-            onClick={() => setLines((current) => [...current, blankLine()])}
-            type="button"
-          >
-            Add product line
-          </button>
-          <button
-            className="button button-edit"
-            disabled={pending}
-            type="submit"
-          >
-            {editing ? "Save sale changes" : "Save draft"}
-          </button>
-        </form>
-      )}
-      {sale && (
-        <section aria-labelledby="sale-detail-title" className="grid gap-3">
-          <h2 className="text-lg font-bold" id="sale-detail-title">
-            Sale detail
-          </h2>
-          <ServerFacts
-            rows={[
-              { label: "Status", value: sale.status },
-              { label: "Subtotal", value: sale.subtotal },
-              { label: "Discount total", value: sale.discount_total },
-              {
-                label: "Total",
-                value: `${sale.total_amount} ${sale.currency}`,
-              },
-              { label: "COGS", value: sale.cogs_total },
-              { label: "Gross profit", value: sale.gross_profit_total },
-              { label: "Returned amount", value: sale.returned_amount },
-              { label: "Returns", value: String(sale.return_count) },
-              { label: "Payment", value: sale.payment_id ?? "None" },
-              { label: "Receipt", value: sale.receipt_id ?? "None" },
-            ]}
-          />
-          <ul>
-            {sale.lines.map((line) => (
-              <li key={line.id}>
-                {line.product_name}: sold {line.quantity}, returned{" "}
-                {line.returned_quantity}, remaining {line.remaining_quantity},
-                revenue {line.line_revenue}
-              </li>
-            ))}
-          </ul>
-          <div className="flex flex-wrap gap-3">
-            {sale.status === "DRAFT" && canUpdate && (
-              <button
-                className="underline tone-edit"
-                onClick={() => setEditing(true)}
-                type="button"
-              >
-                Edit draft
-              </button>
-            )}
-            {sale.status === "DRAFT" && canSubmit && (
-              <button
-                className="underline"
-                onClick={() => setAction("submit")}
-                type="button"
-              >
-                Submit
-              </button>
-            )}
-            {sale.status === "PENDING_APPROVAL" && canApprove && (
-              <button
-                className="underline tone-success"
-                onClick={() => setAction("approve")}
-                type="button"
-              >
-                Approve
-              </button>
-            )}
-            {sale.status === "PENDING_APPROVAL" && canApprove && (
-              <button
-                className="underline tone-warn"
-                onClick={() => setAction("reject")}
-                type="button"
-              >
-                Reject
-              </button>
-            )}
-            {sale.status === "DRAFT" && canUpdate && (
-              <button
-                className="underline tone-cancel"
-                onClick={() => setAction("cancel")}
-                type="button"
-              >
-                Cancel draft
-              </button>
-            )}
-            {sale.status === "POSTED" && canVoid && sale.return_count === 0 && (
-              <button
-                className="underline tone-delete"
-                onClick={() => {
-                  setCorrectionDate(defaultDate);
-                  setAction("void");
-                }}
-                type="button"
-              >
-                Void sale
-              </button>
-            )}
-            {sale.status === "POSTED" && canVoid && (
-              <button
-                className="underline tone-delete"
-                onClick={() => {
-                  setCorrectionDate(defaultDate);
-                  setAction("return");
-                }}
-                type="button"
-              >
-                Partial return
-              </button>
-            )}
-          </div>
-          {action === "submit" && (
-            <CommandForm
-              confirmLabel="Confirm submit"
-              error={formError}
-              onCancel={() => setAction(null)}
-              onSubmit={() => {
-                setPending(true);
-                void submitRetailSale(sale.id)
-                  .then((row) => {
-                    setSale(row);
-                    setAction(null);
-                    sales.reload();
-                  })
-                  .catch((caught: unknown) =>
-                    fail(caught, "The sale could not be submitted."),
-                  )
-                  .finally(() => setPending(false));
-              }}
-              pending={pending}
-              title="Submit this sale?"
-            />
-          )}
-          {action === "approve" && (
-            <CommandForm
-              confirmLabel="Confirm approval"
-              error={formError}
-              onCancel={() => setAction(null)}
-              onSubmit={(form) => {
-                const body =
-                  sale.payment_method === "CASH"
-                    ? { cash_session_id: text(form, "cash_session_id") }
-                    : {};
-                if (sale.payment_method === "CASH" && !body.cash_session_id) {
-                  setFields({
-                    cash_session_id: "Select an open cash session.",
-                  });
-                  return;
-                }
-                setPending(true);
-                void approveRetailSale(sale.id, body)
-                  .then((result) => {
-                    setApproval(result);
-                    setSale(result.retail_sale);
-                    setAction(null);
-                    sales.reload();
-                  })
-                  .catch((caught: unknown) =>
-                    fail(caught, "The sale could not be approved."),
-                  )
-                  .finally(() => setPending(false));
-              }}
-              pending={pending}
-              title="Approve retail sale"
-            >
-              {sale.payment_method === "CASH" ? (
-                <CashSessionSelect
-                  collectionError={sessions.error}
-                  currency={sale.currency}
-                  error={fields.cash_session_id}
-                  label="Open cash session"
-                  pending={sessions.pending}
-                  sessions={sessions.sessions}
-                />
-              ) : (
-                <p>No cash session is sent for this method.</p>
-              )}
-            </CommandForm>
-          )}
-          {action === "reject" && (
-            <CommandForm
-              confirmLabel="Confirm rejection"
-              error={formError}
-              onCancel={() => setAction(null)}
-              onSubmit={(form) => {
-                setPending(true);
-                void rejectRetailSale(sale.id, {
-                  rejection_reason: text(form, "rejection_reason"),
-                })
-                  .then((row) => {
-                    setSale(row);
-                    setAction(null);
-                    sales.reload();
-                  })
-                  .catch((caught: unknown) =>
-                    fail(caught, "The sale could not be rejected."),
-                  )
-                  .finally(() => setPending(false));
-              }}
-              pending={pending}
-              title="Reject sale"
-            >
-              <ReasonField label="Rejection reason" name="rejection_reason" />
-            </CommandForm>
-          )}
-          {action === "cancel" && (
-            <CommandForm
-              confirmLabel="Confirm cancellation"
-              error={formError}
-              onCancel={() => setAction(null)}
-              onSubmit={(form) => {
-                setPending(true);
-                void cancelRetailSale(sale.id, { reason: text(form, "reason") })
-                  .then((row) => {
-                    setSale(row);
-                    setAction(null);
-                    sales.reload();
-                  })
-                  .catch((caught: unknown) =>
-                    fail(caught, "The draft could not be cancelled."),
-                  )
-                  .finally(() => setPending(false));
-              }}
-              pending={pending}
-              title="Cancel sale draft"
-            >
-              <ReasonField label="Cancellation reason" />
-            </CommandForm>
-          )}
-          {action === "void" && (
-            <CommandForm
-              confirmLabel="Confirm void"
-              error={formError}
-              onCancel={() => setAction(null)}
-              onSubmit={(form) => {
-                const body: VoidRetailSaleRequest = {
-                  reason: text(form, "reason"),
-                };
-                const date = text(form, "business_date");
-                if (date) body.business_date = date;
-                if (sale.payment_method === "CASH") {
-                  const sessionId = text(form, "cash_session_id");
-                  if (!sessionId) {
-                    setFields({
-                      cash_session_id: "Select the destination open session.",
-                    });
-                    return;
-                  }
-                  body.cash_session_id = sessionId;
-                }
-                setPending(true);
-                void voidRetailSale(sale.id, body)
-                  .then((result) => {
-                    setVoidResult(result);
-                    setSale(result.retail_sale);
-                    setAction(null);
-                    sales.reload();
-                  })
-                  .catch((caught: unknown) =>
-                    fail(caught, "The sale could not be voided."),
-                  )
-                  .finally(() => setPending(false));
-              }}
-              pending={pending}
-              title="Void the full sale"
-            >
-              <ReasonField label="Void reason" />
-              <Field label="Correction date">
-                <TextInput
-                  defaultValue={defaultDate}
-                  name="business_date"
-                  onChange={(event) => setCorrectionDate(event.target.value)}
-                  type="date"
-                />
-              </Field>
-              {sale.payment_method === "CASH" && (
-                <CashSessionSelect
-                  collectionError={sessions.error}
-                  currency={sale.currency}
-                  error={fields.cash_session_id}
-                  label="Destination open session"
-                  pending={sessions.pending}
-                  sessions={sessions.sessions}
-                />
-              )}
-            </CommandForm>
-          )}
-          {action === "return" && (
-            <CommandForm
-              confirmLabel="Confirm return"
-              error={formError}
-              onCancel={() => setAction(null)}
-              onSubmit={(form) => {
-                setFields({});
-                setFormError("");
-                const chosen: ReturnRetailSaleRequest["lines"] = [];
-                const nextFields: Record<string, string> = {};
-                for (const line of sale.lines) {
-                  const raw = text(form, `quantity_${line.id}`);
-                  if (!raw) continue;
-                  const quantity = canonicalQuantity(raw);
-                  const entered = quantity ? quantityScale(quantity) : null;
-                  const remaining = quantityScale(line.remaining_quantity);
-                  if (!quantity || entered === null || remaining === null) {
-                    nextFields[line.id] =
-                      "Enter a positive quantity with up to three decimal places.";
-                    continue;
-                  }
-                  if (entered > remaining) {
-                    nextFields[line.id] =
-                      `Enter no more than the remaining ${line.remaining_quantity}.`;
-                    continue;
-                  }
-                  chosen.push({ line_id: line.id, quantity });
-                }
-                if (Object.keys(nextFields).length > 0) {
-                  setFields(nextFields);
-                  return;
-                }
-                if (chosen.length < 1) {
-                  setFormError(
-                    "Enter a quantity for at least one remaining line.",
-                  );
-                  return;
-                }
-                const body: ReturnRetailSaleRequest = {
-                  reason: text(form, "reason"),
-                  lines: chosen,
-                };
-                const date = text(form, "business_date");
-                if (date) body.business_date = date;
-                if (sale.payment_method === "CASH") {
-                  const sessionId = text(form, "cash_session_id");
-                  if (sessionId) body.cash_session_id = sessionId;
-                }
-                setPending(true);
-                void returnRetailSale(sale.id, body)
-                  .then((result) => {
-                    setReturnResult(result);
-                    setSale(result.retail_sale);
-                    setAction(null);
-                    sales.reload();
-                  })
-                  .catch((caught: unknown) =>
-                    fail(caught, "The return could not be recorded."),
-                  )
-                  .finally(() => setPending(false));
-              }}
-              pending={pending}
-              title="Return part of the sale"
-            >
-              <p>
-                Enter a quantity for each line you are returning. Leave a line
-                blank to keep it. The server calculates the refund.
-              </p>
-              {sale.lines.map((line) => {
-                const remaining = quantityScale(line.remaining_quantity);
-                const descriptionId = `return-line-${line.id}`;
-                const inputId = `return-quantity-${line.id}`;
-                const errorId = `return-error-${line.id}`;
-                const error = fields[line.id];
+              {lines.map((line, index) => {
+                const product = products.find(
+                  (item) => item.id === line.productId,
+                );
+                const preview = product
+                  ? previewLineAmount(
+                      line.quantity,
+                      product.sale_price,
+                      line.discount,
+                    )
+                  : null;
                 return (
-                  <div key={line.id}>
-                    <p id={descriptionId}>
-                      Sold {line.quantity}, returned {line.returned_quantity},
-                      remaining {line.remaining_quantity}
-                    </p>
-                    <label className="field" htmlFor={inputId}>
-                      Return quantity for {line.product_name}
-                    </label>
-                    <TextInput
-                      aria-describedby={
-                        error ? `${descriptionId} ${errorId}` : descriptionId
-                      }
-                      aria-invalid={error ? true : undefined}
-                      disabled={remaining === 0n}
-                      id={inputId}
-                      inputMode="decimal"
-                      name={`quantity_${line.id}`}
-                    />
-                    {error && (
-                      <span
-                        className="text-sm text-red-700"
-                        id={errorId}
-                        role="alert"
+                  <div
+                    className="rounded-xl border border-slate-200 bg-slate-50/80 p-3"
+                    key={line.key}
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <p className="text-xs font-bold tracking-wide text-slate-400 uppercase">
+                        Line {index + 1}
+                      </p>
+                      <button
+                        className="button button-delete button-sm"
+                        disabled={lines.length === 1}
+                        onClick={() =>
+                          setLines((current) =>
+                            current.filter((item) => item.key !== line.key),
+                          )
+                        }
+                        type="button"
                       >
-                        {error}
-                      </span>
-                    )}
+                        Remove line
+                      </button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <Field label="Product">
+                          <SelectInput
+                            onChange={(event) =>
+                              setLines((current) =>
+                                current.map((item) =>
+                                  item.key === line.key
+                                    ? { ...item, productId: event.target.value }
+                                    : item,
+                                ),
+                              )
+                            }
+                            value={line.productId}
+                          >
+                            <option value="">Select a product</option>
+                            {products.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.sku} — {item.name} · {item.sale_price}
+                              </option>
+                            ))}
+                          </SelectInput>
+                        </Field>
+                      </div>
+                      <Field error={fields.quantity} label="Quantity">
+                        <TextInput
+                          inputMode="decimal"
+                          onChange={(event) =>
+                            setLines((current) =>
+                              current.map((item) =>
+                                item.key === line.key
+                                  ? { ...item, quantity: event.target.value }
+                                  : item,
+                              ),
+                            )
+                          }
+                          value={line.quantity}
+                        />
+                      </Field>
+                      <Field label={`Discount (${currency})`}>
+                        <TextInput
+                          inputMode="decimal"
+                          onChange={(event) =>
+                            setLines((current) =>
+                              current.map((item) =>
+                                item.key === line.key
+                                  ? { ...item, discount: event.target.value }
+                                  : item,
+                              ),
+                            )
+                          }
+                          value={line.discount}
+                        />
+                      </Field>
+                    </div>
+                    {preview ? (
+                      <p className="mt-3 text-sm text-slate-600">
+                        {product ? (
+                          <span className="mr-2 font-medium text-slate-500">
+                            {product.sale_price} {currency} each.
+                          </span>
+                        ) : null}
+                        Preview only: {preview}. The server calculates the line
+                        snapshots and sale totals.
+                      </p>
+                    ) : null}
                   </div>
                 );
               })}
-              <ReasonField error={fields.reason} label="Return reason" />
-              <Field error={fields.business_date} label="Business date">
-                <TextInput
-                  defaultValue={defaultDate}
-                  name="business_date"
-                  onChange={(event) => setCorrectionDate(event.target.value)}
-                  type="date"
-                />
-              </Field>
-              {sale.payment_method === "CASH" && (
-                <CashSessionSelect
-                  collectionError={sessions.error}
-                  currency={sale.currency}
-                  error={fields.cash_session_id}
-                  label="Destination open session"
-                  pending={sessions.pending}
-                  required={false}
-                  sessions={sessions.sessions}
-                />
-              )}
-              {sale.payment_method === "CASH" && (
-                <p>
-                  Choose an open session only when this return refunds cash.
-                  Leave it blank when the server refund is zero.
+              {estimate ? (
+                <div className="flex items-end justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/80">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">
+                      Estimated total
+                    </p>
+                    <p className="mt-1 text-2xl font-black tracking-tight text-slate-900 tabular-nums">
+                      {estimate}
+                    </p>
+                  </div>
+                  <p className="pb-1 text-sm font-semibold text-slate-500">
+                    {currency}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div>
+            <button
+              className="button button-edit"
+              disabled={pending}
+              type="submit"
+            >
+              {editing ? "Save sale changes" : "Save draft"}
+            </button>
+          </div>
+        </FormDialog>
+      ) : null}
+
+      <div
+        className={
+          sale || selectedId
+            ? "grid items-start gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(22rem,0.9fr)]"
+            : "grid"
+        }
+      >
+        <section
+          aria-busy={sales.pending}
+          aria-labelledby="retail-ledger-title"
+          className={cardClass}
+        >
+          <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2
+                  className="text-lg font-bold text-slate-900"
+                  id="retail-ledger-title"
+                >
+                  Sales
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  Select a sale to review, submit, or approve it.
                 </p>
-              )}
-              {pending && <Loading label="Returning the sale" />}
-            </CommandForm>
-          )}
-          {approval && (
-            <ServerFacts
-              rows={[
-                { label: "Posted payment", value: approval.payment.id },
-                {
-                  label: "Issued receipt",
-                  value: approval.receipt.receipt_number,
-                },
-                {
-                  label: "Cash movement",
-                  value: approval.cash_transaction?.id ?? "None",
-                },
-              ]}
+              </div>
+              {canCreate ? (
+                <button
+                  className="button button-create shrink-0"
+                  onClick={startCreate}
+                  type="button"
+                >
+                  New retail sale
+                </button>
+              ) : null}
+            </div>
+            <div className="mt-4">
+              <StatusFilter onChange={setApplied} value={applied} />
+            </div>
+          </div>
+
+          {sales.pending && sales.rows.length === 0 ? (
+            <LoadingRows label="Loading retail sales." />
+          ) : null}
+          {sales.pending && sales.rows.length > 0 ? (
+            <p
+              className="px-5 pt-4 text-sm font-medium text-slate-600"
+              role="status"
+            >
+              Loading retail sales.
+            </p>
+          ) : null}
+          {!sales.pending && sales.error ? (
+            <div className="p-4 sm:p-5">
+              <Alert message={sales.error} />
+            </div>
+          ) : null}
+          {!sales.pending && !sales.error && sales.rows.length === 0 ? (
+            <EmptyState
+              detail={
+                applied
+                  ? "Try another status."
+                  : "Drafts you save will show up here."
+              }
+              title={
+                applied ? "No sales match this status." : "No retail sales yet."
+              }
             />
-          )}
-          {voidResult && (
-            <ServerFacts
-              rows={[
-                {
-                  label: "Reversal payment",
-                  value: voidResult.reversal_payment.id,
-                },
-                {
-                  label: "Reversal receipt",
-                  value: voidResult.reversal_receipt.receipt_number,
-                },
-                {
-                  label: "Cash movement",
-                  value: voidResult.cash_transaction?.id ?? "None",
-                },
-                {
-                  label: "Stock returns",
-                  value: String(voidResult.stock_movements.length),
-                },
-              ]}
-            />
-          )}
-          {returnResult && (
-            <ServerFacts
-              rows={[
-                {
-                  label: "Refund amount",
-                  value: returnResult.retail_return.refund_amount,
-                },
-                {
-                  label: "Refund payment",
-                  value: returnResult.refund_payment?.id ?? "None",
-                },
-                {
-                  label: "Correction receipt",
-                  value:
-                    returnResult.correction_receipt?.receipt_number ?? "None",
-                },
-                {
-                  label: "Cash movement",
-                  value: returnResult.cash_transaction?.id ?? "None",
-                },
-                {
-                  label: "Stock returns",
-                  value: String(returnResult.stock_movements.length),
-                },
-              ]}
-            />
-          )}
+          ) : null}
+          {sales.rows.length > 0 ? (
+            <div
+              className={`overflow-x-auto ${sales.pending ? "opacity-60" : ""}`}
+            >
+              <table className="w-full text-left text-sm">
+                <caption className="sr-only">Retail sales</caption>
+                <thead className="border-b border-slate-200 text-slate-500">
+                  <tr>
+                    <th
+                      className="px-5 py-2.5 text-xs font-semibold"
+                      scope="col"
+                    >
+                      Sale
+                    </th>
+                    <th
+                      className="px-5 py-2.5 text-right text-xs font-semibold"
+                      scope="col"
+                    >
+                      Total
+                    </th>
+                    <th
+                      className="hidden px-5 py-2.5 text-xs font-semibold md:table-cell"
+                      scope="col"
+                    >
+                      Method
+                    </th>
+                    <th
+                      className="px-5 py-2.5 text-xs font-semibold"
+                      scope="col"
+                    >
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {sales.rows.map((row) => {
+                    const selected = selectedId === row.id;
+                    return (
+                      <tr
+                        className={
+                          selected
+                            ? "bg-[#e7f3ff] shadow-[inset_3px_0_0_#0866ff]"
+                            : "hover:bg-slate-50"
+                        }
+                        key={row.id}
+                      >
+                        <td className="px-5 py-3">
+                          <button
+                            aria-current={selected ? "true" : undefined}
+                            aria-label={row.business_date}
+                            className="block text-left font-semibold"
+                            onClick={() => selectSale(row.id)}
+                            type="button"
+                          >
+                            <span className="font-semibold">
+                              {row.business_date}
+                            </span>
+                            <span className="mt-0.5 block text-xs font-normal">
+                              {lineSummary(row)}
+                            </span>
+                          </button>
+                        </td>
+                        <td className="px-5 py-3 text-right font-semibold whitespace-nowrap text-slate-900 tabular-nums">
+                          {row.total_amount}{" "}
+                          <span className="font-medium text-slate-400">
+                            {row.currency}
+                          </span>
+                        </td>
+                        <td className="hidden px-5 py-3 whitespace-nowrap text-slate-600 md:table-cell">
+                          {pretty(row.payment_method)}
+                        </td>
+                        <td className="px-5 py-3">
+                          <StatusPill status={row.status} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          {showPaging ? (
+            <div className="border-t border-slate-100 px-4 py-4 sm:px-5 [&_nav]:border-t-0 [&_nav]:pt-0">
+              <CursorControls
+                bounded={sales.bounded}
+                hasMore={sales.hasMore}
+                index={sales.index}
+                onNext={() => void sales.goNext()}
+                onPrevious={() => void sales.goPrevious()}
+                pending={sales.pending}
+              />
+            </div>
+          ) : null}
         </section>
-      )}
+
+        {sale || selectedId ? (
+          <section
+            aria-labelledby="sale-detail-title"
+            className={`${cardClass} border-t-[3px] border-t-amber-500 xl:sticky xl:top-4`}
+          >
+            <h2 className="sr-only" id="sale-detail-title">
+              Sale detail
+            </h2>
+            {!sale && !formError ? (
+              <div className="grid gap-3 p-5" role="status">
+                <p className="text-sm font-medium text-slate-600">
+                  Loading the sale.
+                </p>
+                <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+                  <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+                </div>
+              </div>
+            ) : null}
+            {!sale && formError ? (
+              <div className="p-5">
+                <Alert message={formError} />
+              </div>
+            ) : null}
+            {sale ? (
+              <>
+                <div className="px-5 pt-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
+                        Sale
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {sale.business_date} · {pretty(sale.payment_method)} ·{" "}
+                        {memberLabel(members, sale.member_id)}
+                      </p>
+                    </div>
+                    <StatusPill status={sale.status} />
+                  </div>
+                  <div className="mt-4 flex items-end justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/80">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">
+                        Total
+                      </p>
+                      <p className="mt-1 text-2xl font-black tracking-tight text-slate-900 tabular-nums">
+                        {sale.total_amount}
+                      </p>
+                    </div>
+                    <p className="pb-1 text-sm font-semibold text-slate-500">
+                      {sale.currency}
+                    </p>
+                  </div>
+                </div>
+                {formError && action === null && !editorOpen ? (
+                  <div className="px-5 pt-4">
+                    <Alert message={formError} />
+                  </div>
+                ) : null}
+                <div className="px-5 py-4">
+                  <FactGrid
+                    rows={[
+                      { label: "Subtotal", value: sale.subtotal },
+                      { label: "Discount", value: sale.discount_total },
+                      { label: "COGS", value: sale.cogs_total },
+                      { label: "Gross profit", value: sale.gross_profit_total },
+                      { label: "Returned amount", value: sale.returned_amount },
+                      { label: "Returns", value: String(sale.return_count) },
+                      { label: "Payment", value: sale.payment_id ?? "None" },
+                      { label: "Receipt", value: sale.receipt_id ?? "None" },
+                      ...(sale.reference_number
+                        ? [
+                            {
+                              label: "Reference",
+                              value: sale.reference_number,
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
+                </div>
+                <div className="border-t border-slate-100 px-5 py-4">
+                  <p className="mb-3 text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase">
+                    Products
+                  </p>
+                  <ul className="grid gap-2">
+                    {sale.lines.map((line) => (
+                      <li
+                        className="rounded-xl bg-slate-50 px-3 py-3 ring-1 ring-slate-200/80"
+                        key={line.id}
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className="font-semibold text-slate-900">
+                            {line.product_name}
+                          </p>
+                          <p className="text-sm font-semibold text-slate-900 tabular-nums">
+                            {line.line_revenue}
+                          </p>
+                        </div>
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          {line.sku}
+                        </p>
+                        <p className="mt-2 text-xs leading-5 text-slate-600">
+                          sold {line.quantity}
+                          <span className="px-1.5 text-slate-300">·</span>
+                          returned {line.returned_quantity}
+                          <span className="px-1.5 text-slate-300">·</span>
+                          remaining {line.remaining_quantity}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {sale.rejection_reason ? (
+                  <div className="px-5 pb-4">
+                    <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-900">
+                      <span className="mb-1 block text-xs font-semibold text-red-700">
+                        Rejection reason
+                      </span>
+                      {sale.rejection_reason}
+                    </p>
+                  </div>
+                ) : null}
+                {sale.void_reason ? (
+                  <div className="px-5 pb-4">
+                    <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+                      <span className="mb-1 block text-xs font-medium text-slate-500">
+                        Void reason
+                      </span>
+                      {sale.void_reason}
+                    </p>
+                  </div>
+                ) : null}
+                {hasActions ? (
+                  <div className="flex flex-wrap gap-2 border-t border-slate-100 px-5 py-4">
+                    {canEditDraft ? (
+                      <button
+                        className="button button-edit"
+                        onClick={() => {
+                          setEditing(true);
+                          setCreatingSale(false);
+                          setAction(null);
+                          setFormError("");
+                        }}
+                        type="button"
+                      >
+                        Edit draft
+                      </button>
+                    ) : null}
+                    {canSubmitDraft ? (
+                      <button
+                        className="button"
+                        onClick={() => {
+                          setAction("submit");
+                          setFormError("");
+                        }}
+                        type="button"
+                      >
+                        Submit
+                      </button>
+                    ) : null}
+                    {canDecide ? (
+                      <button
+                        className="button button-success"
+                        onClick={() => {
+                          setAction("approve");
+                          setFormError("");
+                        }}
+                        type="button"
+                      >
+                        Approve
+                      </button>
+                    ) : null}
+                    {canDecide ? (
+                      <button
+                        className="button button-warn"
+                        onClick={() => {
+                          setAction("reject");
+                          setFormError("");
+                        }}
+                        type="button"
+                      >
+                        Reject
+                      </button>
+                    ) : null}
+                    {canCancelDraft ? (
+                      <button
+                        className="button button-cancel"
+                        onClick={() => {
+                          setAction("cancel");
+                          setFormError("");
+                        }}
+                        type="button"
+                      >
+                        Cancel draft
+                      </button>
+                    ) : null}
+                    {canVoidPosted ? (
+                      <button
+                        className="button button-delete"
+                        onClick={() => {
+                          setCorrectionDate(defaultDate);
+                          setAction("void");
+                          setFormError("");
+                        }}
+                        type="button"
+                      >
+                        Void sale
+                      </button>
+                    ) : null}
+                    {canReturnPosted ? (
+                      <button
+                        className="button button-warn"
+                        onClick={() => {
+                          setCorrectionDate(defaultDate);
+                          setAction("return");
+                          setFormError("");
+                        }}
+                        type="button"
+                      >
+                        Partial return
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+                {action === "submit" ? (
+                  <ActionPanel
+                    confirmLabel="Confirm submit"
+                    error={formError}
+                    hint="This sends the draft for approval."
+                    onCancel={() => setAction(null)}
+                    onSubmit={() => {
+                      setPending(true);
+                      void submitRetailSale(sale.id)
+                        .then((row) => {
+                          setSale(row);
+                          setAction(null);
+                          clearOutcome();
+                          sales.reload();
+                        })
+                        .catch((caught: unknown) =>
+                          fail(caught, "The sale could not be submitted."),
+                        )
+                        .finally(() => setPending(false));
+                    }}
+                    pending={pending}
+                    title="Submit this sale?"
+                  />
+                ) : null}
+                {action === "approve" ? (
+                  <ActionPanel
+                    confirmLabel="Confirm approval"
+                    error={formError}
+                    hint="Approval posts the sale, the payment, and the receipt."
+                    onCancel={() => setAction(null)}
+                    onSubmit={(form) => {
+                      const body =
+                        sale.payment_method === "CASH"
+                          ? { cash_session_id: text(form, "cash_session_id") }
+                          : {};
+                      if (
+                        sale.payment_method === "CASH" &&
+                        !body.cash_session_id
+                      ) {
+                        setFields({
+                          cash_session_id: "Select an open cash session.",
+                        });
+                        return;
+                      }
+                      setPending(true);
+                      void approveRetailSale(sale.id, body)
+                        .then((result) => {
+                          setApproval(result);
+                          setVoidResult(null);
+                          setReturnResult(null);
+                          setSale(result.retail_sale);
+                          setAction(null);
+                          sales.reload();
+                        })
+                        .catch((caught: unknown) =>
+                          fail(caught, "The sale could not be approved."),
+                        )
+                        .finally(() => setPending(false));
+                    }}
+                    pending={pending}
+                    title="Approve retail sale"
+                  >
+                    {sale.payment_method === "CASH" ? (
+                      <CashSessionSelect
+                        collectionError={sessions.error}
+                        currency={sale.currency}
+                        error={fields.cash_session_id}
+                        label="Open cash session"
+                        pending={sessions.pending}
+                        sessions={sessions.sessions}
+                      />
+                    ) : (
+                      <p className="text-sm text-slate-600">
+                        No cash session is sent for this method.
+                      </p>
+                    )}
+                  </ActionPanel>
+                ) : null}
+                {action === "reject" ? (
+                  <ActionPanel
+                    confirmLabel="Confirm rejection"
+                    error={formError}
+                    hint="The sale stays unposted and keeps your reason."
+                    onCancel={() => setAction(null)}
+                    onSubmit={(form) => {
+                      setPending(true);
+                      void rejectRetailSale(sale.id, {
+                        rejection_reason: text(form, "rejection_reason"),
+                      })
+                        .then((row) => {
+                          setSale(row);
+                          setAction(null);
+                          clearOutcome();
+                          sales.reload();
+                        })
+                        .catch((caught: unknown) =>
+                          fail(caught, "The sale could not be rejected."),
+                        )
+                        .finally(() => setPending(false));
+                    }}
+                    pending={pending}
+                    title="Reject sale"
+                  >
+                    <ReasonField
+                      label="Rejection reason"
+                      name="rejection_reason"
+                    />
+                  </ActionPanel>
+                ) : null}
+                {action === "cancel" ? (
+                  <ActionPanel
+                    confirmLabel="Confirm cancellation"
+                    error={formError}
+                    hint="A cancelled draft cannot be submitted."
+                    onCancel={() => setAction(null)}
+                    onSubmit={(form) => {
+                      setPending(true);
+                      void cancelRetailSale(sale.id, {
+                        reason: text(form, "reason"),
+                      })
+                        .then((row) => {
+                          setSale(row);
+                          setAction(null);
+                          clearOutcome();
+                          sales.reload();
+                        })
+                        .catch((caught: unknown) =>
+                          fail(caught, "The draft could not be cancelled."),
+                        )
+                        .finally(() => setPending(false));
+                    }}
+                    pending={pending}
+                    title="Cancel sale draft"
+                  >
+                    <ReasonField label="Cancellation reason" />
+                  </ActionPanel>
+                ) : null}
+                {action === "void" ? (
+                  <ActionPanel
+                    confirmLabel="Confirm void"
+                    error={formError}
+                    hint="This reverses the full sale, including stock."
+                    onCancel={() => setAction(null)}
+                    onSubmit={(form) => {
+                      const body: VoidRetailSaleRequest = {
+                        reason: text(form, "reason"),
+                      };
+                      const date = text(form, "business_date");
+                      if (date) body.business_date = date;
+                      if (sale.payment_method === "CASH") {
+                        const sessionId = text(form, "cash_session_id");
+                        if (!sessionId) {
+                          setFields({
+                            cash_session_id:
+                              "Select the destination open session.",
+                          });
+                          return;
+                        }
+                        body.cash_session_id = sessionId;
+                      }
+                      setPending(true);
+                      void voidRetailSale(sale.id, body)
+                        .then((result) => {
+                          setVoidResult(result);
+                          setApproval(null);
+                          setReturnResult(null);
+                          setSale(result.retail_sale);
+                          setAction(null);
+                          sales.reload();
+                        })
+                        .catch((caught: unknown) =>
+                          fail(caught, "The sale could not be voided."),
+                        )
+                        .finally(() => setPending(false));
+                    }}
+                    pending={pending}
+                    title="Void the full sale"
+                  >
+                    <ReasonField label="Void reason" />
+                    <Field label="Correction date">
+                      <TextInput
+                        defaultValue={defaultDate}
+                        name="business_date"
+                        onChange={(event) =>
+                          setCorrectionDate(event.target.value)
+                        }
+                        type="date"
+                      />
+                    </Field>
+                    {sale.payment_method === "CASH" ? (
+                      <CashSessionSelect
+                        collectionError={sessions.error}
+                        currency={sale.currency}
+                        error={fields.cash_session_id}
+                        label="Destination open session"
+                        pending={sessions.pending}
+                        sessions={sessions.sessions}
+                      />
+                    ) : null}
+                  </ActionPanel>
+                ) : null}
+                {action === "return" ? (
+                  <ActionPanel
+                    confirmLabel="Confirm return"
+                    error={formError}
+                    hint="Enter a quantity for each line you are returning. Leave a line blank to keep it. The server calculates the refund."
+                    onCancel={() => setAction(null)}
+                    onSubmit={(form) => {
+                      setFields({});
+                      setFormError("");
+                      const chosen: ReturnRetailSaleRequest["lines"] = [];
+                      const nextFields: Record<string, string> = {};
+                      for (const line of sale.lines) {
+                        const raw = text(form, `quantity_${line.id}`);
+                        if (!raw) continue;
+                        const quantity = canonicalQuantity(raw);
+                        const entered = quantity
+                          ? quantityScale(quantity)
+                          : null;
+                        const remaining = quantityScale(
+                          line.remaining_quantity,
+                        );
+                        if (
+                          !quantity ||
+                          entered === null ||
+                          remaining === null
+                        ) {
+                          nextFields[line.id] =
+                            "Enter a positive quantity with up to three decimal places.";
+                          continue;
+                        }
+                        if (entered > remaining) {
+                          nextFields[line.id] =
+                            `Enter no more than the remaining ${line.remaining_quantity}.`;
+                          continue;
+                        }
+                        chosen.push({ line_id: line.id, quantity });
+                      }
+                      if (Object.keys(nextFields).length > 0) {
+                        setFields(nextFields);
+                        return;
+                      }
+                      if (chosen.length < 1) {
+                        setFormError(
+                          "Enter a quantity for at least one remaining line.",
+                        );
+                        return;
+                      }
+                      const body: ReturnRetailSaleRequest = {
+                        reason: text(form, "reason"),
+                        lines: chosen,
+                      };
+                      const date = text(form, "business_date");
+                      if (date) body.business_date = date;
+                      if (sale.payment_method === "CASH") {
+                        const sessionId = text(form, "cash_session_id");
+                        if (sessionId) body.cash_session_id = sessionId;
+                      }
+                      setPending(true);
+                      void returnRetailSale(sale.id, body)
+                        .then((result) => {
+                          setReturnResult(result);
+                          setApproval(null);
+                          setVoidResult(null);
+                          setSale(result.retail_sale);
+                          setAction(null);
+                          sales.reload();
+                        })
+                        .catch((caught: unknown) =>
+                          fail(caught, "The return could not be recorded."),
+                        )
+                        .finally(() => setPending(false));
+                    }}
+                    pending={pending}
+                    title="Return part of the sale"
+                  >
+                    {pending ? (
+                      <p
+                        className="text-sm font-medium text-slate-600"
+                        role="status"
+                      >
+                        Returning the sale
+                      </p>
+                    ) : null}
+                    {sale.lines.map((line) => {
+                      const remaining = quantityScale(line.remaining_quantity);
+                      const descriptionId = `return-line-${line.id}`;
+                      const inputId = `return-quantity-${line.id}`;
+                      const errorId = `return-error-${line.id}`;
+                      const error = fields[line.id];
+                      return (
+                        <div
+                          className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                          key={line.id}
+                        >
+                          <p className="text-sm font-semibold text-slate-900">
+                            {line.product_name}
+                          </p>
+                          <p
+                            className="mt-1 text-xs text-slate-500"
+                            id={descriptionId}
+                          >
+                            Sold {line.quantity}, returned{" "}
+                            {line.returned_quantity}, remaining{" "}
+                            {line.remaining_quantity}
+                          </p>
+                          <label className="field mt-3" htmlFor={inputId}>
+                            Return quantity for {line.product_name}
+                          </label>
+                          <TextInput
+                            aria-describedby={
+                              error
+                                ? `${descriptionId} ${errorId}`
+                                : descriptionId
+                            }
+                            aria-invalid={error ? true : undefined}
+                            disabled={remaining === 0n}
+                            id={inputId}
+                            inputMode="decimal"
+                            name={`quantity_${line.id}`}
+                          />
+                          {error ? (
+                            <span
+                              className="text-sm text-red-700"
+                              id={errorId}
+                              role="alert"
+                            >
+                              {error}
+                            </span>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                    <ReasonField error={fields.reason} label="Return reason" />
+                    <Field error={fields.business_date} label="Business date">
+                      <TextInput
+                        defaultValue={defaultDate}
+                        name="business_date"
+                        onChange={(event) =>
+                          setCorrectionDate(event.target.value)
+                        }
+                        type="date"
+                      />
+                    </Field>
+                    {sale.payment_method === "CASH" ? (
+                      <CashSessionSelect
+                        collectionError={sessions.error}
+                        currency={sale.currency}
+                        error={fields.cash_session_id}
+                        label="Destination open session"
+                        pending={sessions.pending}
+                        required={false}
+                        sessions={sessions.sessions}
+                      />
+                    ) : null}
+                    {sale.payment_method === "CASH" ? (
+                      <p className="text-sm leading-6 text-slate-500">
+                        Choose an open session only when this return refunds
+                        cash. Leave it blank when the server refund is zero.
+                      </p>
+                    ) : null}
+                  </ActionPanel>
+                ) : null}
+                {approval ? (
+                  <div className="border-t border-emerald-100 bg-emerald-50/60 px-5 py-4">
+                    <p className="mb-3 text-xs font-semibold tracking-[0.14em] text-emerald-700 uppercase">
+                      Posted
+                    </p>
+                    <FactGrid
+                      rows={[
+                        { label: "Posted payment", value: approval.payment.id },
+                        {
+                          label: "Issued receipt",
+                          value: approval.receipt.receipt_number,
+                        },
+                        {
+                          label: "Cash movement",
+                          value: approval.cash_transaction?.id ?? "None",
+                        },
+                      ]}
+                    />
+                  </div>
+                ) : null}
+                {voidResult ? (
+                  <div className="border-t border-slate-100 bg-slate-50/80 px-5 py-4">
+                    <p className="mb-3 text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase">
+                      Void result
+                    </p>
+                    <FactGrid
+                      rows={[
+                        {
+                          label: "Reversal payment",
+                          value: voidResult.reversal_payment.id,
+                        },
+                        {
+                          label: "Reversal receipt",
+                          value: voidResult.reversal_receipt.receipt_number,
+                        },
+                        {
+                          label: "Cash movement",
+                          value: voidResult.cash_transaction?.id ?? "None",
+                        },
+                        {
+                          label: "Stock returns",
+                          value: String(voidResult.stock_movements.length),
+                        },
+                      ]}
+                    />
+                  </div>
+                ) : null}
+                {returnResult ? (
+                  <div className="border-t border-amber-100 bg-amber-50/50 px-5 py-4">
+                    <p className="mb-3 text-xs font-semibold tracking-[0.14em] text-amber-800 uppercase">
+                      Return result
+                    </p>
+                    <FactGrid
+                      rows={[
+                        {
+                          label: "Refund amount",
+                          value: returnResult.retail_return.refund_amount,
+                        },
+                        {
+                          label: "Refund payment",
+                          value: returnResult.refund_payment?.id ?? "None",
+                        },
+                        {
+                          label: "Correction receipt",
+                          value:
+                            returnResult.correction_receipt?.receipt_number ??
+                            "None",
+                        },
+                        {
+                          label: "Cash movement",
+                          value: returnResult.cash_transaction?.id ?? "None",
+                        },
+                        {
+                          label: "Stock returns",
+                          value: String(returnResult.stock_movements.length),
+                        },
+                      ]}
+                    />
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </section>
+        ) : null}
+      </div>
     </div>
   );
 }

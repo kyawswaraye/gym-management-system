@@ -15,7 +15,7 @@ export default async function RetailSalesPage() {
   return (
     <section aria-labelledby="retail-sales-title">
       <PageHeader
-        description="Build a draft sale and submit it for approval. A posted sale can be returned in part, or voided in full while nothing has been returned."
+        description="Save a draft and submit it for approval. A posted sale can be returned in part, or voided in full before anything is returned."
         eyebrow="Finance"
         title="Retail sales"
         titleId="retail-sales-title"

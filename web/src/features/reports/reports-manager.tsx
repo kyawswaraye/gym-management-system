@@ -1376,7 +1376,7 @@ function CatalogTable<Row extends { product_id: string; sku: string }>({
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
           <caption className="sr-only">Report rows</caption>
-          <thead className="bg-slate-800 text-white">
+          <thead>
             <tr>
               {columns.map((column) => (
                 <th
@@ -1435,7 +1435,7 @@ function RowsTable<Row extends { date: string }>({
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
           <caption className="sr-only">Report rows</caption>
-          <thead className="bg-slate-800 text-white">
+          <thead>
             <tr>
               {columns.map((column) => (
                 <th

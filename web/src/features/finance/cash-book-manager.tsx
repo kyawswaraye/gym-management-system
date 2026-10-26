@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import {
   adjustCashSession,
@@ -10,29 +10,163 @@ import {
   openCashSession,
   reconcileCashSession,
 } from "@/features/finance/client";
+import { FormDialog } from "@/components/form-dialog";
 import { fieldMap, financeError } from "@/features/finance/errors";
 import { canonicalMoney, subtractMoney } from "@/features/finance/money";
 import { useCursorPages } from "@/features/finance/paging";
 import {
   Alert,
-  CommandForm,
   CursorControls,
-  Empty,
   Field,
-  Loading,
   ReasonField,
   SelectInput,
-  ServerFacts,
-  StatusText,
   TextInput,
 } from "@/features/finance/ui";
 import type { CashSession, Direction } from "@/types/api";
 
 const PAGE = "25";
+const cardClass =
+  "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm";
+const fieldTone =
+  "[&_.field]:text-sm [&_.field]:font-medium [&_.field]:text-slate-600";
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function pretty(value: string): string {
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function statusTone(status: string): string {
+  const tones: Record<string, string> = {
+    OPEN: "bg-emerald-100 text-emerald-800",
+    CLOSED: "bg-slate-200 text-slate-700",
+    VOID: "bg-rose-100 text-rose-700",
+  };
+  return tones[status] ?? "bg-slate-100 text-slate-600";
+}
+
+function quietFigure(value: string): boolean {
+  return value === "0.00" || value === "0" || value === "0.0";
+}
+
+function figureClass(
+  value: string,
+  tone: "neutral" | "in" | "out" | "difference",
+): string {
+  if (value === "Not closed" || value === "None") return "text-slate-500";
+  if (tone === "difference") {
+    if (value.startsWith("-")) return "text-rose-700";
+    if (!quietFigure(value)) return "text-emerald-700";
+  }
+  if (!quietFigure(value) && tone === "in") return "text-emerald-700";
+  if (!quietFigure(value) && tone === "out") return "text-rose-700";
+  return "text-slate-900";
+}
+
+function StatusPill({ status }: { status: string }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ${statusTone(status)}`}
+    >
+      {pretty(status)}
+    </span>
+  );
+}
+
+function DirectionPill({ direction }: { direction: string }) {
+  const inbound = direction === "IN";
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-[0.68rem] font-bold tracking-wide ${
+        inbound
+          ? "bg-emerald-100 text-emerald-800"
+          : "bg-rose-100 text-rose-700"
+      }`}
+    >
+      {inbound ? "In" : direction === "OUT" ? "Out" : pretty(direction)}
+    </span>
+  );
+}
+
+function MoneyFigure({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "neutral" | "in" | "out" | "difference";
+}) {
+  return (
+    <div>
+      <dt className="text-xs text-slate-500">{label}</dt>
+      <dd
+        className={`mt-0.5 text-sm font-semibold tabular-nums ${figureClass(value, tone)}`}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function ActionPanel({
+  title,
+  hint,
+  pending,
+  error,
+  confirmLabel,
+  confirmClass,
+  onSubmit,
+  onCancel,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  pending: boolean;
+  error: string;
+  confirmLabel: string;
+  confirmClass: string;
+  onSubmit: (form: FormData) => void;
+  onCancel: () => void;
+  children?: ReactNode;
+}) {
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSubmit(new FormData(event.currentTarget));
+  }
+
+  return (
+    <FormDialog
+      description={hint}
+      onClose={onCancel}
+      onSubmit={submit}
+      pending={pending}
+      title={title}
+    >
+      <Alert message={error} />
+      <div className={`grid gap-4 ${fieldTone}`}>{children}</div>
+      <div>
+        <button
+          className="button button-cancel"
+          disabled={pending}
+          onClick={onCancel}
+          type="button"
+        >
+          Back
+        </button>
+        <button className={confirmClass} disabled={pending} type="submit">
+          {confirmLabel}
+        </button>
+      </div>
+    </FormDialog>
+  );
 }
 
 export function CashBookManager({
@@ -59,6 +193,7 @@ export function CashBookManager({
   const [fields, setFields] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
   const [mode, setMode] = useState<"adjust" | "reconcile" | null>(null);
+  const [opening, setOpening] = useState(false);
   const [actualClosing, setActualClosing] = useState("");
 
   const sessions = useCursorPages(applied, (after) => {
@@ -124,110 +259,712 @@ export function CashBookManager({
     movements.reload();
   }
 
+  function begin(next: "adjust" | "reconcile") {
+    setMode(next);
+    setFormError("");
+    setFields({});
+    if (next === "reconcile") setActualClosing("");
+  }
+
+  const filtered = applied !== "||";
+  const showSessionPaging =
+    sessions.index > 0 || sessions.hasMore || sessions.bounded;
+  const showMovementPaging =
+    movements.index > 0 || movements.hasMore || movements.bounded;
+  const closed =
+    session !== null &&
+    (session.status !== "OPEN" ||
+      Boolean(session.actual_closing) ||
+      Boolean(session.difference) ||
+      Boolean(session.difference_reason));
+
   return (
     <div className="grid gap-6">
-      <p className="max-w-3xl text-sm text-slate-600">
-        Sessions shown are only those the server returns for your access.
-        Reception staff see sessions they opened. Totals below are the
-        server&apos;s figures.
-      </p>
-      <form
-        className="grid gap-3 md:grid-cols-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setApplied(
-            `${status}|${registerCode.trim().toUpperCase()}|${businessDate}`,
-          );
-        }}
+      <div
+        className={
+          selectedId
+            ? "grid items-start gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(22rem,0.82fr)]"
+            : "grid gap-6"
+        }
       >
-        <Field label="Status">
-          <SelectInput
-            name="status"
-            onChange={(event) => setStatus(event.target.value)}
-            value={status}
-          >
-            <option value="">Any status</option>
-            <option value="OPEN">Open</option>
-            <option value="CLOSED">Closed</option>
-            <option value="VOID">Void</option>
-          </SelectInput>
-        </Field>
-        <Field label="Register code">
-          <TextInput
-            name="register_code"
-            onChange={(event) => setRegisterCode(event.target.value)}
-            value={registerCode}
-          />
-        </Field>
-        <Field label="Business date">
-          <TextInput
-            name="business_date"
-            onChange={(event) => setBusinessDate(event.target.value)}
-            type="date"
-            value={businessDate}
-          />
-        </Field>
-        <button className="button self-end" type="submit">
-          Apply filters
-        </button>
-      </form>
-      <Alert message={sessions.error} />
-      {sessions.pending && <Loading label="Loading cash sessions." />}
-      {!sessions.pending && sessions.rows.length === 0 && (
-        <Empty label="No cash sessions were returned." />
-      )}
-      {sessions.rows.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <caption className="sr-only">Cash sessions</caption>
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="p-3">Register</th>
-                <th className="p-3">Business date</th>
-                <th className="p-3">Expected closing</th>
-                <th className="p-3">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sessions.rows.map((row) => (
-                <tr className="border-t border-slate-100" key={row.id}>
-                  <td className="p-3">
-                    <button
-                      className="underline"
-                      onClick={() => {
-                        setSelectedId(row.id);
-                        setMode(null);
-                        setFormError("");
-                      }}
-                      type="button"
+        <section
+          aria-busy={sessions.pending}
+          aria-labelledby="cash-sessions-title"
+          className={cardClass}
+        >
+          <div className="flex flex-col gap-4 border-b border-slate-100 px-4 py-4 sm:px-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <h2
+                className="text-lg font-bold text-slate-900"
+                id="cash-sessions-title"
+              >
+                Sessions
+              </h2>
+              {canOpen ? (
+                <button
+                  className="button button-create"
+                  onClick={() => {
+                    setOpening(true);
+                    setFormError("");
+                    setFields({});
+                  }}
+                  type="button"
+                >
+                  Open session
+                </button>
+              ) : null}
+            </div>
+            <p className="max-w-2xl text-sm leading-6 text-slate-500">
+              You see the sessions your access allows. Reception staff see the
+              sessions they opened. Totals are the server&apos;s figures.
+            </p>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                setApplied(
+                  `${status}|${registerCode.trim().toUpperCase()}|${businessDate}`,
+                );
+              }}
+            >
+              <div
+                className={`grid gap-3 sm:grid-cols-2 sm:items-end [&_.field]:text-xs [&_.field]:font-medium [&_.field]:text-slate-500 ${
+                  selectedId ? "" : "xl:grid-cols-[1fr_1fr_1fr_auto]"
+                }`}
+              >
+                <Field label="Status">
+                  <SelectInput
+                    name="status"
+                    onChange={(event) => setStatus(event.target.value)}
+                    value={status}
+                  >
+                    <option value="">Any status</option>
+                    <option value="OPEN">Open</option>
+                    <option value="CLOSED">Closed</option>
+                    <option value="VOID">Void</option>
+                  </SelectInput>
+                </Field>
+                <Field label="Register code">
+                  <TextInput
+                    name="register_code"
+                    onChange={(event) => setRegisterCode(event.target.value)}
+                    value={registerCode}
+                  />
+                </Field>
+                <Field label="Business date">
+                  <TextInput
+                    name="business_date"
+                    onChange={(event) => setBusinessDate(event.target.value)}
+                    type="date"
+                    value={businessDate}
+                  />
+                </Field>
+                <button
+                  className="button w-full sm:w-auto sm:justify-self-start"
+                  type="submit"
+                >
+                  Apply filters
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {sessions.pending && sessions.rows.length === 0 ? (
+            <div className="grid gap-3 p-4 sm:p-5" role="status">
+              <p className="text-sm font-medium text-slate-600">
+                Loading cash sessions.
+              </p>
+              <div className="grid gap-2">
+                {[0, 1, 2].map((item) => (
+                  <div
+                    className="h-14 animate-pulse rounded-xl bg-slate-100"
+                    key={item}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {sessions.pending && sessions.rows.length > 0 ? (
+            <p
+              className="px-5 pt-4 text-sm font-medium text-slate-600"
+              role="status"
+            >
+              Loading cash sessions.
+            </p>
+          ) : null}
+          {!sessions.pending && sessions.error ? (
+            <div className="p-4 sm:p-5">
+              <Alert message={sessions.error} />
+            </div>
+          ) : null}
+          {!sessions.pending &&
+          !sessions.error &&
+          sessions.rows.length === 0 ? (
+            <div className="px-4 py-16 text-center sm:px-5">
+              <p className="font-semibold text-slate-800">
+                No cash sessions were returned.
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {filtered
+                  ? "Try another status, register, or date."
+                  : "Open a session to start the register."}
+              </p>
+            </div>
+          ) : null}
+          {sessions.rows.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[36rem] text-left text-sm">
+                <caption className="sr-only">Cash sessions</caption>
+                <thead className="border-b border-slate-200 text-slate-500">
+                  <tr>
+                    <th
+                      className="px-5 py-2.5 text-xs font-semibold"
+                      scope="col"
                     >
-                      {row.register_code}
-                    </button>
-                  </td>
-                  <td className="p-3">{row.business_date}</td>
-                  <td className="p-3">
-                    {row.expected_closing} {row.currency}
-                  </td>
-                  <td className="p-3">
-                    <StatusText status={row.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <CursorControls
-        bounded={sessions.bounded}
-        hasMore={sessions.hasMore}
-        index={sessions.index}
-        onNext={() => void sessions.goNext()}
-        onPrevious={() => void sessions.goPrevious()}
-        pending={sessions.pending}
-      />
-      {canOpen && (
-        <form
-          className="grid gap-3 rounded-lg border border-slate-200 p-4 md:grid-cols-2"
+                      Register
+                    </th>
+                    <th
+                      className="px-5 py-2.5 text-xs font-semibold"
+                      scope="col"
+                    >
+                      Business date
+                    </th>
+                    <th
+                      className="px-5 py-2.5 text-right text-xs font-semibold"
+                      scope="col"
+                    >
+                      Expected closing
+                    </th>
+                    <th
+                      className="px-5 py-2.5 text-xs font-semibold"
+                      scope="col"
+                    >
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {sessions.rows.map((row) => {
+                    const selected = selectedId === row.id;
+                    return (
+                      <tr
+                        className={
+                          selected
+                            ? "bg-[#e7f3ff] shadow-[inset_3px_0_0_#0866ff]"
+                            : "hover:bg-slate-50"
+                        }
+                        key={row.id}
+                      >
+                        <td className="px-5 py-3">
+                          <button
+                            aria-current={selected ? "true" : undefined}
+                            className="text-left font-semibold tracking-wide"
+                            onClick={() => {
+                              setSelectedId(row.id);
+                              setMode(null);
+                              setFormError("");
+                              setFields({});
+                            }}
+                            type="button"
+                          >
+                            {row.register_code}
+                          </button>
+                        </td>
+                        <td className="px-5 py-3 whitespace-nowrap text-slate-600">
+                          {row.business_date}
+                        </td>
+                        <td className="px-5 py-3 text-right font-semibold whitespace-nowrap text-slate-900 tabular-nums">
+                          {row.expected_closing}{" "}
+                          <span className="font-medium text-slate-400">
+                            {row.currency}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3">
+                          <StatusPill status={row.status} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          {showSessionPaging ? (
+            <div className="border-t border-slate-100 px-4 py-4 sm:px-5 [&_nav]:border-t-0 [&_nav]:pt-0">
+              <CursorControls
+                bounded={sessions.bounded}
+                hasMore={sessions.hasMore}
+                index={sessions.index}
+                onNext={() => void sessions.goNext()}
+                onPrevious={() => void sessions.goPrevious()}
+                pending={sessions.pending}
+              />
+            </div>
+          ) : null}
+        </section>
+
+        {selectedId ? (
+          <section
+            aria-labelledby="session-detail-title"
+            className={`${cardClass} border-t-[3px] border-t-amber-500`}
+          >
+            {session ? null : (
+              <h2 className="sr-only" id="session-detail-title">
+                Session detail
+              </h2>
+            )}
+            {!session && !detailError ? (
+              <div className="grid gap-3 p-5" role="status">
+                <p className="text-sm font-medium text-slate-600">
+                  Loading the session.
+                </p>
+                <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+                  <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+                </div>
+              </div>
+            ) : null}
+            {detailError ? (
+              <div className="p-5">
+                <Alert message={detailError} />
+              </div>
+            ) : null}
+            {session ? (
+              <>
+                <div className="px-5 pt-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2
+                        className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase"
+                        id="session-detail-title"
+                      >
+                        Session detail
+                      </h2>
+                      <p className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+                        {session.register_code}
+                      </p>
+                      <p className="mt-0.5 text-sm text-slate-500">
+                        {session.business_date}
+                      </p>
+                    </div>
+                    <StatusPill status={session.status} />
+                  </div>
+                  <div className="mt-4 flex items-end justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/80">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">
+                        Expected closing
+                      </p>
+                      <p className="mt-1 text-2xl font-black tracking-tight text-slate-900 tabular-nums">
+                        {session.expected_closing}
+                      </p>
+                    </div>
+                    <p className="pb-1 text-sm font-semibold text-slate-500">
+                      {session.currency}
+                    </p>
+                  </div>
+                </div>
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 px-5 py-4 sm:grid-cols-4 xl:grid-cols-2">
+                  <MoneyFigure
+                    label="Opening cash"
+                    tone="neutral"
+                    value={session.opening_cash}
+                  />
+                  <MoneyFigure
+                    label="Cash sales"
+                    tone="in"
+                    value={session.cash_sales}
+                  />
+                  <MoneyFigure
+                    label="Cash expenses"
+                    tone="out"
+                    value={session.cash_expenses}
+                  />
+                  <MoneyFigure label="Manual net" value={session.manual_net} />
+                </dl>
+                {closed ? (
+                  <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-slate-100 px-5 py-4">
+                    <MoneyFigure
+                      label="Actual closing"
+                      value={session.actual_closing ?? "Not closed"}
+                    />
+                    <MoneyFigure
+                      label="Difference"
+                      tone="difference"
+                      value={session.difference ?? "Not closed"}
+                    />
+                    <div className="col-span-2">
+                      <dt className="text-xs text-slate-500">
+                        Difference reason
+                      </dt>
+                      <dd className="mt-0.5 text-sm font-medium break-words text-slate-800">
+                        {session.difference_reason || "None"}
+                      </dd>
+                    </div>
+                  </dl>
+                ) : null}
+                {session.status === "OPEN" && (canAdjust || canReconcile) ? (
+                  <div className="grid gap-3 border-t border-slate-100 px-5 py-4">
+                    <div className="flex flex-wrap gap-2">
+                      {canAdjust && mode !== "adjust" ? (
+                        <button
+                          className="button button-edit"
+                          onClick={() => begin("adjust")}
+                          type="button"
+                        >
+                          Manual adjustment
+                        </button>
+                      ) : null}
+                      {canReconcile && mode !== "reconcile" ? (
+                        <button
+                          className="button button-success"
+                          onClick={() => begin("reconcile")}
+                          type="button"
+                        >
+                          Reconcile and close
+                        </button>
+                      ) : null}
+                    </div>
+                    {mode === "adjust" && canAdjust ? (
+                      <ActionPanel
+                        confirmClass="button"
+                        confirmLabel="Confirm adjustment"
+                        error={formError}
+                        hint="The amount is recorded on this open session. The server updates the totals."
+                        onCancel={() => setMode(null)}
+                        onSubmit={(form) => {
+                          const amount = canonicalMoney(text(form, "amount"));
+                          const direction = text(form, "direction");
+                          if (
+                            !amount ||
+                            (direction !== "IN" && direction !== "OUT")
+                          ) {
+                            setFields({
+                              amount: "Enter an exact amount such as 1.00.",
+                            });
+                            return;
+                          }
+                          const body = {
+                            direction: direction as Direction,
+                            amount,
+                            currency: text(form, "currency").toUpperCase(),
+                            business_date: text(form, "business_date"),
+                            description: text(form, "description"),
+                            reason: text(form, "reason"),
+                          };
+                          setPending(true);
+                          void adjustCashSession(session.id, body)
+                            .then(async () => {
+                              setMode(null);
+                              setFormError("");
+                              setFields({});
+                              await refreshSelected(session.id);
+                            })
+                            .catch((caught: unknown) => {
+                              setFields(fieldMap(caught));
+                              setFormError(
+                                financeError(
+                                  caught,
+                                  "The adjustment could not be recorded.",
+                                ),
+                              );
+                            })
+                            .finally(() => setPending(false));
+                        }}
+                        pending={pending}
+                        title="Manual adjustment"
+                      >
+                        <Field error={fields.direction} label="Direction">
+                          <SelectInput name="direction" required>
+                            <option value="">Select direction</option>
+                            <option value="IN">In</option>
+                            <option value="OUT">Out</option>
+                          </SelectInput>
+                        </Field>
+                        <Field error={fields.amount} label="Amount">
+                          <TextInput
+                            inputMode="decimal"
+                            name="amount"
+                            required
+                          />
+                        </Field>
+                        <Field error={fields.currency} label="Currency">
+                          <TextInput
+                            defaultValue={session.currency}
+                            name="currency"
+                            required
+                          />
+                        </Field>
+                        <Field
+                          error={fields.business_date}
+                          label="Business date"
+                        >
+                          <TextInput
+                            defaultValue={session.business_date}
+                            name="business_date"
+                            required
+                            type="date"
+                          />
+                        </Field>
+                        <Field error={fields.description} label="Description">
+                          <TextInput name="description" />
+                        </Field>
+                        <ReasonField error={fields.reason} label="Reason" />
+                      </ActionPanel>
+                    ) : null}
+                    {mode === "reconcile" && canReconcile ? (
+                      <ActionPanel
+                        confirmClass="button button-success"
+                        confirmLabel="Confirm close"
+                        error={formError}
+                        hint={`Server expected closing: ${session.expected_closing} ${session.currency}.`}
+                        onCancel={() => {
+                          setMode(null);
+                          setActualClosing("");
+                        }}
+                        onSubmit={(form) => {
+                          const actual = canonicalMoney(
+                            text(form, "actual_closing"),
+                            { allowZero: true },
+                          );
+                          if (!actual) {
+                            setFields({
+                              actual_closing:
+                                "Enter an exact amount such as 0.00.",
+                            });
+                            return;
+                          }
+                          const difference = subtractMoney(
+                            actual,
+                            session.expected_closing,
+                          );
+                          const reason = text(form, "difference_reason");
+                          if (difference && difference !== "0.00" && !reason) {
+                            setFields({
+                              difference_reason:
+                                "Enter the reason for the difference.",
+                            });
+                            return;
+                          }
+                          setPending(true);
+                          void reconcileCashSession(session.id, {
+                            actual_closing: actual,
+                            difference_reason: reason,
+                          })
+                            .then(async (result) => {
+                              setMode(null);
+                              setFormError("");
+                              setFields({});
+                              setActualClosing("");
+                              setSession(result.session);
+                              sessions.reload();
+                            })
+                            .catch((caught: unknown) => {
+                              setFields(fieldMap(caught));
+                              setFormError(
+                                financeError(
+                                  caught,
+                                  "The session could not be closed.",
+                                ),
+                              );
+                            })
+                            .finally(() => setPending(false));
+                        }}
+                        pending={pending}
+                        title="Reconcile and close"
+                      >
+                        <Field
+                          error={fields.actual_closing}
+                          label="Actual closing"
+                        >
+                          <TextInput
+                            inputMode="decimal"
+                            name="actual_closing"
+                            onChange={(event) =>
+                              setActualClosing(event.target.value)
+                            }
+                            required
+                            value={actualClosing}
+                          />
+                        </Field>
+                        {preview ? (
+                          <p className="rounded-xl bg-white px-3 py-2.5 text-sm text-slate-600 ring-1 ring-slate-200">
+                            Preview difference:{" "}
+                            <span
+                              className={`font-semibold tabular-nums ${figureClass(preview, "difference")}`}
+                            >
+                              {preview}
+                            </span>
+                            . The server calculates the difference when the
+                            session closes.
+                          </p>
+                        ) : null}
+                        <Field
+                          error={fields.difference_reason}
+                          label="Difference reason"
+                        >
+                          <textarea
+                            className="input min-h-24"
+                            name="difference_reason"
+                          />
+                        </Field>
+                      </ActionPanel>
+                    ) : null}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </section>
+        ) : null}
+
+        {selectedId ? (
+          <section
+            aria-busy={movements.pending}
+            aria-labelledby="movement-history-title"
+            className={`${cardClass} xl:col-span-2`}
+          >
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h2
+                className="text-base font-bold text-slate-900"
+                id="movement-history-title"
+              >
+                Movement history
+              </h2>
+              {session ? (
+                <p className="mt-1 text-sm text-slate-500">
+                  {session.register_code} · {session.business_date}
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-slate-500">
+                  Sales, expenses, and manual adjustments for this session.
+                </p>
+              )}
+            </div>
+            {movements.pending && movements.rows.length === 0 ? (
+              <div className="grid gap-3 p-4 sm:p-5" role="status">
+                <p className="text-sm font-medium text-slate-600">
+                  Loading movements.
+                </p>
+                <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+              </div>
+            ) : null}
+            {movements.pending && movements.rows.length > 0 ? (
+              <p
+                className="px-5 pt-4 text-sm font-medium text-slate-600"
+                role="status"
+              >
+                Loading movements.
+              </p>
+            ) : null}
+            {!movements.pending && movements.error ? (
+              <div className="p-4 sm:p-5">
+                <Alert message={movements.error} />
+              </div>
+            ) : null}
+            {!movements.pending &&
+            !movements.error &&
+            movements.rows.length === 0 ? (
+              <div className="px-4 py-14 text-center sm:px-5">
+                <p className="font-semibold text-slate-800">
+                  No movements were returned for this session.
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Sales, expenses, and manual adjustments will show up here.
+                </p>
+              </div>
+            ) : null}
+            {movements.rows.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[40rem] text-left text-sm">
+                  <caption className="sr-only">Cash movements</caption>
+                  <thead className="border-b border-slate-200 text-slate-500">
+                    <tr>
+                      <th
+                        className="px-5 py-2.5 text-xs font-semibold"
+                        scope="col"
+                      >
+                        Movement
+                      </th>
+                      <th
+                        className="px-5 py-2.5 text-right text-xs font-semibold"
+                        scope="col"
+                      >
+                        Amount
+                      </th>
+                      <th
+                        className="px-5 py-2.5 text-xs font-semibold"
+                        scope="col"
+                      >
+                        Business date
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {movements.rows.map((row) => {
+                      const note = row.description || row.reason;
+                      const outbound = row.direction === "OUT";
+                      return (
+                        <tr className="hover:bg-slate-50" key={row.id}>
+                          <td className="px-5 py-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <DirectionPill direction={row.direction} />
+                              <span className="font-medium text-slate-800">
+                                {pretty(row.source_type)}
+                              </span>
+                            </div>
+                            {note ? (
+                              <p className="mt-1 max-w-xl text-slate-500">
+                                {note}
+                              </p>
+                            ) : null}
+                          </td>
+                          <td className="px-5 py-3 text-right whitespace-nowrap">
+                            <span
+                              className={`font-semibold tabular-nums ${
+                                outbound ? "text-rose-700" : "text-emerald-700"
+                              }`}
+                            >
+                              {outbound ? "−" : "+"}
+                              {row.amount}
+                            </span>
+                            <span className="ml-1.5 text-xs font-medium text-slate-400">
+                              {row.currency}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 whitespace-nowrap text-slate-600">
+                            {row.business_date}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            {showMovementPaging ? (
+              <div className="border-t border-slate-100 px-4 py-4 sm:px-5 [&_nav]:border-t-0 [&_nav]:pt-0">
+                <CursorControls
+                  bounded={movements.bounded}
+                  hasMore={movements.hasMore}
+                  index={movements.index}
+                  onNext={() => void movements.goNext()}
+                  onPrevious={() => void movements.goPrevious()}
+                  pending={movements.pending}
+                />
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+      </div>
+
+      {canOpen && opening ? (
+        <FormDialog
+          description={`The session opens on the main register. Currency is the gym currency, ${currency}, and the server records it.`}
+          onClose={() => {
+            if (pending) return;
+            setOpening(false);
+            setFormError("");
+            setFields({});
+          }}
           onSubmit={(event) => {
             event.preventDefault();
             const formElement = event.currentTarget;
@@ -243,7 +980,6 @@ export function CashBookManager({
             }
             setPending(true);
             void openCashSession({
-              register_code: text(form, "register_code").toUpperCase(),
               business_date: text(form, "business_date"),
               opening_cash: opening,
             })
@@ -251,6 +987,7 @@ export function CashBookManager({
                 setFormError("");
                 setFields({});
                 formElement.reset();
+                setOpening(false);
                 setSelectedId(result.session.id);
                 await refreshSelected(result.session.id);
               })
@@ -262,278 +999,41 @@ export function CashBookManager({
               })
               .finally(() => setPending(false));
           }}
+          pending={pending}
+          title="Open session"
         >
-          <h2 className="text-lg font-bold md:col-span-2">Open session</h2>
-          <Alert message={formError} />
-          <Field error={fields.register_code} label="Register code">
-            <TextInput name="register_code" required />
-          </Field>
-          <Field error={fields.business_date} label="Business date">
-            <TextInput
-              defaultValue={defaultDate}
-              name="business_date"
-              required
-              type="date"
-            />
-          </Field>
-          <Field
-            error={fields.opening_cash}
-            label={`Opening cash (${currency})`}
-          >
-            <TextInput inputMode="decimal" name="opening_cash" required />
-          </Field>
-          <p className="text-sm text-slate-500">
-            Currency is the gym currency, {currency}. The server records it.
-          </p>
-          <button className="button" disabled={pending} type="submit">
-            Open session
-          </button>
-        </form>
-      )}
-      {selectedId && (
-        <section aria-labelledby="session-detail-title" className="grid gap-4">
-          <h2 className="text-lg font-bold" id="session-detail-title">
-            Session detail
-          </h2>
-          <Alert message={detailError} />
-          {session && (
-            <ServerFacts
-              rows={[
-                { label: "Register", value: session.register_code },
-                { label: "Business date", value: session.business_date },
-                { label: "Status", value: session.status },
-                { label: "Currency", value: session.currency },
-                { label: "Opening cash", value: session.opening_cash },
-                { label: "Cash sales", value: session.cash_sales },
-                { label: "Cash expenses", value: session.cash_expenses },
-                { label: "Manual net", value: session.manual_net },
-                { label: "Expected closing", value: session.expected_closing },
-                {
-                  label: "Actual closing",
-                  value: session.actual_closing ?? "Not closed",
-                },
-                {
-                  label: "Difference",
-                  value: session.difference ?? "Not closed",
-                },
-                {
-                  label: "Difference reason",
-                  value: session.difference_reason || "None",
-                },
-              ]}
-            />
-          )}
-          <h3 className="font-semibold">Movement history</h3>
-          <Alert message={movements.error} />
-          {movements.pending && <Loading label="Loading movements." />}
-          {!movements.pending && movements.rows.length === 0 && (
-            <Empty label="No movements were returned for this session." />
-          )}
-          {movements.rows.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <caption className="sr-only">Cash movements</caption>
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="p-3">Direction</th>
-                    <th className="p-3">Source</th>
-                    <th className="p-3">Amount</th>
-                    <th className="p-3">Business date</th>
-                    <th className="p-3">Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {movements.rows.map((row) => (
-                    <tr className="border-t border-slate-100" key={row.id}>
-                      <td className="p-3">{row.direction}</td>
-                      <td className="p-3">{row.source_type}</td>
-                      <td className="p-3">
-                        {row.amount} {row.currency}
-                      </td>
-                      <td className="p-3">{row.business_date}</td>
-                      <td className="p-3">{row.description || row.reason}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <CursorControls
-            bounded={movements.bounded}
-            hasMore={movements.hasMore}
-            index={movements.index}
-            onNext={() => void movements.goNext()}
-            onPrevious={() => void movements.goPrevious()}
-            pending={movements.pending}
-          />
-          {session?.status === "OPEN" && canAdjust && mode !== "adjust" && (
+          <div className={`grid gap-4 sm:grid-cols-2 ${fieldTone}`}>
+            {formError ? (
+              <div className="sm:col-span-2">
+                <Alert message={formError} />
+              </div>
+            ) : null}
+            <Field error={fields.business_date} label="Business date">
+              <TextInput
+                defaultValue={defaultDate}
+                name="business_date"
+                required
+                type="date"
+              />
+            </Field>
+            <Field
+              error={fields.opening_cash}
+              label={`Opening cash (${currency})`}
+            >
+              <TextInput inputMode="decimal" name="opening_cash" required />
+            </Field>
+          </div>
+          <div className="flex justify-end border-t border-slate-100 px-5 py-3">
             <button
-              className="underline"
-              onClick={() => setMode("adjust")}
-              type="button"
+              className="button button-create"
+              disabled={pending}
+              type="submit"
             >
-              Manual adjustment
+              Open session
             </button>
-          )}
-          {session?.status === "OPEN" &&
-            canReconcile &&
-            mode !== "reconcile" && (
-              <button
-                className="underline"
-                onClick={() => setMode("reconcile")}
-                type="button"
-              >
-                Reconcile and close
-              </button>
-            )}
-          {mode === "adjust" && session && canAdjust && (
-            <CommandForm
-              confirmLabel="Confirm adjustment"
-              error={formError}
-              onCancel={() => setMode(null)}
-              onSubmit={(form) => {
-                const amount = canonicalMoney(text(form, "amount"));
-                const direction = text(form, "direction");
-                if (!amount || (direction !== "IN" && direction !== "OUT")) {
-                  setFields({ amount: "Enter an exact amount such as 1.00." });
-                  return;
-                }
-                const body = {
-                  direction: direction as Direction,
-                  amount,
-                  currency: text(form, "currency").toUpperCase(),
-                  business_date: text(form, "business_date"),
-                  description: text(form, "description"),
-                  reason: text(form, "reason"),
-                };
-                setPending(true);
-                void adjustCashSession(session.id, body)
-                  .then(async () => {
-                    setMode(null);
-                    setFormError("");
-                    setFields({});
-                    await refreshSelected(session.id);
-                  })
-                  .catch((caught: unknown) => {
-                    setFields(fieldMap(caught));
-                    setFormError(
-                      financeError(
-                        caught,
-                        "The adjustment could not be recorded.",
-                      ),
-                    );
-                  })
-                  .finally(() => setPending(false));
-              }}
-              pending={pending}
-              title="Manual adjustment"
-            >
-              <Field error={fields.direction} label="Direction">
-                <SelectInput name="direction" required>
-                  <option value="">Select direction</option>
-                  <option value="IN">In</option>
-                  <option value="OUT">Out</option>
-                </SelectInput>
-              </Field>
-              <Field error={fields.amount} label="Amount">
-                <TextInput inputMode="decimal" name="amount" required />
-              </Field>
-              <Field error={fields.currency} label="Currency">
-                <TextInput
-                  defaultValue={session.currency}
-                  name="currency"
-                  required
-                />
-              </Field>
-              <Field error={fields.business_date} label="Business date">
-                <TextInput
-                  defaultValue={session.business_date}
-                  name="business_date"
-                  required
-                  type="date"
-                />
-              </Field>
-              <Field error={fields.description} label="Description">
-                <TextInput name="description" />
-              </Field>
-              <ReasonField error={fields.reason} label="Reason" />
-            </CommandForm>
-          )}
-          {mode === "reconcile" && session && canReconcile && (
-            <CommandForm
-              confirmLabel="Confirm close"
-              error={formError}
-              onCancel={() => setMode(null)}
-              onSubmit={(form) => {
-                const actual = canonicalMoney(text(form, "actual_closing"), {
-                  allowZero: true,
-                });
-                if (!actual) {
-                  setFields({
-                    actual_closing: "Enter an exact amount such as 0.00.",
-                  });
-                  return;
-                }
-                const difference = subtractMoney(
-                  actual,
-                  session.expected_closing,
-                );
-                const reason = text(form, "difference_reason");
-                if (difference && difference !== "0.00" && !reason) {
-                  setFields({
-                    difference_reason: "Enter the reason for the difference.",
-                  });
-                  return;
-                }
-                setPending(true);
-                void reconcileCashSession(session.id, {
-                  actual_closing: actual,
-                  difference_reason: reason,
-                })
-                  .then(async (result) => {
-                    setMode(null);
-                    setFormError("");
-                    setFields({});
-                    setActualClosing("");
-                    setSession(result.session);
-                    sessions.reload();
-                  })
-                  .catch((caught: unknown) => {
-                    setFields(fieldMap(caught));
-                    setFormError(
-                      financeError(caught, "The session could not be closed."),
-                    );
-                  })
-                  .finally(() => setPending(false));
-              }}
-              pending={pending}
-              title="Reconcile and close"
-            >
-              <p className="text-sm text-slate-600">
-                Server expected closing: {session.expected_closing}{" "}
-                {session.currency}.
-              </p>
-              <Field error={fields.actual_closing} label="Actual closing">
-                <TextInput
-                  inputMode="decimal"
-                  name="actual_closing"
-                  onChange={(event) => setActualClosing(event.target.value)}
-                  required
-                />
-              </Field>
-              {preview && (
-                <p className="text-sm text-slate-600">
-                  Preview difference: {preview}. The server calculates the
-                  difference when the session closes.
-                </p>
-              )}
-              <Field error={fields.difference_reason} label="Difference reason">
-                <textarea className="input min-h-24" name="difference_reason" />
-              </Field>
-            </CommandForm>
-          )}
-        </section>
-      )}
+          </div>
+        </FormDialog>
+      ) : null}
     </div>
   );
 }

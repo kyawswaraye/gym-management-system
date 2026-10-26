@@ -162,15 +162,17 @@ describe("Check-ins manager", () => {
     });
     expect(await screen.findByText("No check-ins yet.")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Note"), {
+    fireEvent.click(screen.getByRole("button", { name: "Check in" }));
+    const checkIn = within(screen.getByRole("dialog", { name: "Check in" }));
+    fireEvent.change(checkIn.getByLabelText("Note"), {
       target: { value: "Front desk" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Check in" }));
+    fireEvent.click(checkIn.getByRole("button", { name: "Check in" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "No eligible membership.",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Check in" }));
+    fireEvent.click(checkIn.getByRole("button", { name: "Check in" }));
     expect(await screen.findByText("Checked in.")).toBeInTheDocument();
     expect(createCheckIn).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -180,6 +182,12 @@ describe("Check-ins manager", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Check out" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Check out" })).getByRole(
+        "button",
+        { name: "Check out" },
+      ),
+    );
     await waitFor(() => {
       expect(checkOutCheckIn).toHaveBeenCalledWith(CHECK_IN_ID, undefined);
     });

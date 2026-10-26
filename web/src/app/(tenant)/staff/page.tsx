@@ -18,7 +18,7 @@ export default async function StaffPage() {
   return (
     <section aria-labelledby="staff-title">
       <PageHeader
-        description="Review non-owner staff records for this gym. Access changes stay separate from profile edits."
+        description="Look up a person, then update their profile or login access. Those two actions stay separate."
         eyebrow="Operations"
         title="Staff"
         titleId="staff-title"

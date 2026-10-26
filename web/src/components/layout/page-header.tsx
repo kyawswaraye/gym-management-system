@@ -23,7 +23,7 @@ export function PageHeader({
   const copy = (
     <>
       {eyebrow ? (
-        <p className="text-xs font-bold tracking-[0.18em] text-amber-600 uppercase">
+        <p className="text-xs font-bold tracking-[0.18em] text-[#0866ff] uppercase">
           {eyebrow}
         </p>
       ) : null}

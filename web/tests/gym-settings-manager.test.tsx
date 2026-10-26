@@ -11,10 +11,12 @@ import { GymSettingsManager } from "@/features/operations/gym-settings-manager";
 import type { GymProfile, GymSettings } from "@/types/api";
 
 vi.mock("@/features/operations/client", () => ({
+  deleteGymLogo: vi.fn(),
   getGymProfile: vi.fn(),
   getGymSettings: vi.fn(),
   updateGymProfile: vi.fn(),
   updateGymSettings: vi.fn(),
+  uploadGymLogo: vi.fn(),
 }));
 
 const loadProfile = vi.mocked(getGymProfile);
@@ -45,6 +47,7 @@ const profile: GymProfile = {
   subscription_ends_at: null,
   created_at: "2026-09-01T00:00:00Z",
   updated_at: "2026-09-02T00:00:00Z",
+  has_logo: false,
 };
 
 const settings: GymSettings = {
@@ -100,7 +103,7 @@ describe("Gym settings manager", () => {
     resolveProfile(profile);
 
     expect(
-      await screen.findByRole("button", { name: "Save gym profile" }),
+      await screen.findByRole("button", { name: "Edit gym profile" }),
     ).toBeInTheDocument();
     expect(loadSettings).not.toHaveBeenCalled();
   });
@@ -123,9 +126,10 @@ describe("Gym settings manager", () => {
     expect(
       screen.getByTitle("39f07d2b-bbd8-43d2-9c18-e4cbf3af131e"),
     ).toHaveTextContent("af131e");
+    fireEvent.click(screen.getByRole("tab", { name: "Operations" }));
     expect(screen.getByText("Monday")).toBeInTheDocument();
     expect(screen.getByText("Required")).toBeInTheDocument();
-    expect(screen.getByText("41")).toBeInTheDocument();
+    expect(screen.getByText("MEM-000041")).toBeInTheDocument();
     expect(screen.getByText("2026-10-02T00:00:00Z")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Save gym profile" }),
@@ -170,9 +174,9 @@ describe("Gym settings manager", () => {
 
   it("saves a normalized profile payload", async () => {
     render(<GymSettingsManager {...fullAccess} canViewSettings={false} />);
-    expect(
-      await screen.findByRole("button", { name: "Save gym profile" }),
-    ).toBeInTheDocument();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit gym profile" }),
+    );
     expect(screen.getByText("SET-A")).toBeInTheDocument();
     expect(screen.getByText("Trial")).toBeInTheDocument();
     expect(
@@ -186,14 +190,14 @@ describe("Gym settings manager", () => {
       target: { value: "Updated Gym" },
     });
     fireEvent.change(screen.getByLabelText("Currency"), {
-      target: { value: "thb" },
+      target: { value: "THB" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save gym profile" }));
 
     await waitFor(() =>
       expect(saveProfile).toHaveBeenCalledWith({
         name: "Updated Gym",
-        legal_name: "Yangon Fitness Co",
+        legal_name: "Updated Gym",
         email: "gym@example.test",
         phone: "01",
         address_line1: "1 Main",
@@ -224,13 +228,17 @@ describe("Gym settings manager", () => {
 
   it("keeps finance approval mandatory and omits read-only settings fields", async () => {
     render(<GymSettingsManager {...fullAccess} canViewProfile={false} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit operational settings" }),
+    );
     const approval = await screen.findByRole("checkbox", {
       name: "Require separate finance approval",
     });
 
     expect(approval).toBeChecked();
     expect(approval).toBeDisabled();
-    expect(screen.getByText("41")).toBeInTheDocument();
+    expect(screen.getAllByText("41")).toHaveLength(1);
+    expect(screen.getByText("MEM-000041")).toBeInTheDocument();
     expect(
       screen.queryByRole("spinbutton", { name: "Next member number" }),
     ).not.toBeInTheDocument();
@@ -273,6 +281,10 @@ describe("Gym settings manager", () => {
 
   it("shows validation and upstream errors without saving invalid settings", async () => {
     render(<GymSettingsManager {...fullAccess} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Operations" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit operational settings" }),
+    );
     const prefix = await screen.findByLabelText("Member number prefix");
     fireEvent.change(prefix, { target: { value: "bad prefix" } });
     fireEvent.click(
@@ -286,15 +298,14 @@ describe("Gym settings manager", () => {
     ).toBeInTheDocument();
     expect(saveSettings).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByLabelText("Currency"), {
-      target: { value: "US" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Save gym profile" }));
-    expect(
-      await screen.findByText("Enter a three-letter currency code."),
-    ).toBeInTheDocument();
-    expect(saveProfile).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("tab", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit gym profile" }));
+    const currency = screen.getByLabelText("Currency");
+    expect(currency).toHaveValue("THB");
+    expect(currency).toHaveTextContent("MMK");
+    expect(currency).not.toHaveTextContent("USD");
 
+    fireEvent.click(screen.getByRole("tab", { name: "Operations" }));
     fireEvent.change(prefix, { target: { value: "MEM" } });
     saveSettings.mockRejectedValueOnce(
       new Error(

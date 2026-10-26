@@ -19,9 +19,9 @@ export default async function SuperAdminGymsPage() {
   return (
     <section aria-labelledby="platform-gyms-title">
       <PageHeader
-        description="Provision tenant gyms and review their platform lifecycle state."
-        eyebrow="Platform"
-        title="Gym administration"
+        description="Search the directory, filter by status, or provision a new gym."
+        eyebrow="GymPilot MM"
+        title="Gyms"
         titleId="platform-gyms-title"
       />
       <GymsManager canProvision={canProvision} />

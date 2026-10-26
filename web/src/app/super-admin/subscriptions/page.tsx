@@ -6,7 +6,7 @@ import { SubscriptionsManager } from "@/features/platform/subscriptions-manager"
 import { hasPermission, platformHomePath } from "@/lib/auth/authorization";
 import { requirePlatformSession } from "@/lib/auth/session";
 
-export const metadata: Metadata = { title: "Subscription plans" };
+export const metadata: Metadata = { title: "Subscriptions" };
 export const dynamic = "force-dynamic";
 
 export default async function SuperAdminSubscriptionsPage() {
@@ -18,9 +18,9 @@ export default async function SuperAdminSubscriptionsPage() {
   return (
     <section aria-labelledby="platform-subscriptions-title">
       <PageHeader
-        description="Review and update plan name, price, billing interval, and status."
-        eyebrow="Platform"
-        title="Subscription plans"
+        description="Update a plan's name, price, billing interval, or status. Retired plans stay on gyms that already use them."
+        eyebrow="GymPilot MM"
+        title="Subscriptions"
         titleId="platform-subscriptions-title"
       />
       <SubscriptionsManager canManage />

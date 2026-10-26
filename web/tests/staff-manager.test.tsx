@@ -289,6 +289,9 @@ describe("Staff manager", () => {
   it("invites a non-owner role and reports field errors", async () => {
     render(<StaffManager {...manager} />);
 
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Invite staff" }),
+    );
     expect(
       await screen.findByRole("checkbox", { name: "Trainer" }),
     ).toBeInTheDocument();
@@ -297,7 +300,7 @@ describe("Staff manager", () => {
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
 
-    const invite = within(screen.getByRole("region", { name: "Invite staff" }));
+    const invite = within(screen.getByRole("dialog", { name: "Invite staff" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Enter a valid email address.",
     );
@@ -311,9 +314,6 @@ describe("Staff manager", () => {
     });
     fireEvent.change(invite.getByLabelText("Last name"), {
       target: { value: "Coach" },
-    });
-    fireEvent.change(invite.getByLabelText("Staff code"), {
-      target: { value: "TR-2" },
     });
     fireEvent.change(invite.getByLabelText("Display name"), {
       target: { value: "New Coach" },
@@ -337,7 +337,7 @@ describe("Staff manager", () => {
       email: "new@example.test",
       first_name: "New",
       last_name: "Coach",
-      staff_code: "TR-2",
+      staff_code: "",
       display_name: "New Coach",
       joined_date: "2026-10-17",
       default_commission_percent: "5.50",
@@ -470,6 +470,7 @@ describe("Staff manager", () => {
     const detail = within(
       await screen.findByRole("region", { name: "Ada Trainer" }),
     );
+    fireEvent.click(detail.getByRole("button", { name: "Edit profile" }));
     fireEvent.change(detail.getByLabelText("Display name"), {
       target: { value: "Ada Coach" },
     });
@@ -477,7 +478,6 @@ describe("Staff manager", () => {
 
     await waitFor(() =>
       expect(updateStaff).toHaveBeenCalledWith(staff().id, {
-        staff_code: "TR-1",
         display_name: "Ada Coach",
         phone: "555",
         joined_date: "2026-01-15",
@@ -589,6 +589,9 @@ describe("Staff manager", () => {
     expect(
       await assignment.findByText("Authorization version 2"),
     ).toBeInTheDocument();
+    fireEvent.click(
+      assignment.getByRole("button", { name: "Edit assigned roles" }),
+    );
     expect(
       await assignment.findByRole("checkbox", { name: "Trainer" }),
     ).toBeChecked();
@@ -658,8 +661,11 @@ describe("Staff manager", () => {
     ]);
     render(<StaffManager {...manager} />);
 
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Invite staff" }),
+    );
     const invite = within(
-      await screen.findByRole("region", { name: "Invite staff" }),
+      await screen.findByRole("dialog", { name: "Invite staff" }),
     );
     expect(
       await invite.findByRole("checkbox", { name: "Trainer" }),
@@ -694,8 +700,11 @@ describe("Staff manager", () => {
     ]);
     render(<StaffManager {...manager} isOwner />);
 
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Invite staff" }),
+    );
     const invite = within(
-      await screen.findByRole("region", { name: "Invite staff" }),
+      await screen.findByRole("dialog", { name: "Invite staff" }),
     );
     expect(
       await invite.findByRole("checkbox", { name: "Manager" }),
@@ -723,6 +732,9 @@ describe("Staff manager", () => {
       />,
     );
 
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Invite staff" }),
+    );
     expect(
       await screen.findByText("No assignable roles are available."),
     ).toBeInTheDocument();

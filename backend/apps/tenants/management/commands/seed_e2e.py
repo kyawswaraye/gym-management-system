@@ -57,6 +57,7 @@ from apps.tenants.e2e import (
 )
 from apps.tenants.e2e_runtime import e2e_reuses_storage_keys
 from apps.tenants.models import (
+    RECEIPT_NUMBER_PREFIX,
     ExpenseCategory,
     Gym,
     GymFeatureEntitlement,
@@ -650,7 +651,7 @@ def _seed_owner_gym(
         settings.week_starts_on = 1
         settings.allow_manual_member_numbers = False
         settings.member_number_prefix = "MEM"
-        settings.receipt_number_prefix = SEEDED_GYM_CODE
+        settings.receipt_number_prefix = RECEIPT_NUMBER_PREFIX
         settings.check_in_duplicate_window_seconds = 300
         settings.check_in_challenge_ttl_seconds = 300
         settings.check_in_challenge_max_uses = 1

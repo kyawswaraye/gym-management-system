@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import QRCode from "qrcode";
 
+import { FormDialog } from "@/components/form-dialog";
 import {
   OperationError,
   issueCheckInChallenge,
@@ -59,6 +60,7 @@ function rotationDot(phase: RotationPhase): string {
 export function CheckInDisplay() {
   const [location, setLocation] = useState("Front desk");
   const [draft, setDraft] = useState("Front desk");
+  const [editingLocation, setEditingLocation] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +115,7 @@ export function CheckInDisplay() {
     event.preventDefault();
     setPending(true);
     setLocation(draft);
+    setEditingLocation(false);
   }
 
   const phase = rotationPhase({
@@ -191,10 +194,7 @@ export function CheckInDisplay() {
           </div>
         </div>
       </section>
-      <form
-        className="mx-auto grid w-full max-w-lg content-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:mx-0 xl:max-w-none"
-        onSubmit={saveLocation}
-      >
+      <section className="mx-auto grid w-full max-w-lg content-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:mx-0 xl:max-w-none">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
             Location
@@ -205,7 +205,27 @@ export function CheckInDisplay() {
           <p className="mt-1 text-2xl font-black tracking-tight text-slate-900">
             {location}
           </p>
-          <label className="mt-5 grid gap-2 text-sm font-semibold text-slate-800">
+        </div>
+        <p className="text-sm leading-6 text-slate-500">
+          Each new code uses this location. The code itself stays on this
+          screen.
+        </p>
+        <button
+          className="button button-edit w-full"
+          onClick={() => setEditingLocation(true)}
+          type="button"
+        >
+          Update location
+        </button>
+      </section>
+      {editingLocation ? (
+        <FormDialog
+          description="Each new code uses this location. The code itself stays on this screen."
+          onClose={() => setEditingLocation(false)}
+          onSubmit={saveLocation}
+          title="Display location"
+        >
+          <label className="grid gap-2 text-sm font-semibold text-slate-800">
             Display location
             <input
               className="input"
@@ -215,15 +235,11 @@ export function CheckInDisplay() {
               value={draft}
             />
           </label>
-        </div>
-        <p className="text-sm leading-6 text-slate-500">
-          Each new code uses this location. The code itself stays on this
-          screen.
-        </p>
-        <button className="button button-edit w-full" type="submit">
-          Update location
-        </button>
-      </form>
+          <button className="button button-edit" type="submit">
+            Update location
+          </button>
+        </FormDialog>
+      ) : null}
     </div>
   );
 }

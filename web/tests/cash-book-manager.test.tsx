@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -118,21 +124,19 @@ describe("cash book", () => {
       transactions: [],
     });
     renderBook(true);
-    const register = screen.getAllByRole("textbox", {
-      name: "Register code",
-    })[1];
-    if (!register) throw new Error("Open-session register field is missing.");
-    fireEvent.change(register, { target: { value: "front" } });
+    fireEvent.click(screen.getByRole("button", { name: "Open session" }));
+    const openDialog = screen.getByRole("dialog", { name: "Open session" });
     fireEvent.change(
-      screen.getByRole("textbox", { name: "Opening cash (THB)" }),
+      within(openDialog).getByRole("textbox", { name: "Opening cash (THB)" }),
       {
         target: { value: "50" },
       },
     );
-    fireEvent.click(screen.getByRole("button", { name: "Open session" }));
+    fireEvent.click(
+      within(openDialog).getByRole("button", { name: "Open session" }),
+    );
     await waitFor(() => {
       expect(openCashSession).toHaveBeenCalledWith({
-        register_code: "FRONT",
         business_date: "2026-10-18",
         opening_cash: "50.00",
       });

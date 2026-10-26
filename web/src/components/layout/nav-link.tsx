@@ -34,11 +34,11 @@ export function navLinkIsCurrent(
 
 function navLinkClass(current: boolean): string {
   const shared =
-    "shrink-0 rounded-xl border px-3 py-2.5 text-sm transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300";
+    "shrink-0 rounded-xl border px-3 py-2.5 text-sm transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0866ff]";
   if (current) {
-    return `${shared} border-amber-300/50 bg-amber-400/20 font-semibold text-amber-50 shadow-[inset_3px_0_0_#fbbf24] hover:border-amber-300/70 hover:bg-amber-400/30 hover:text-white`;
+    return `${shared} border-transparent bg-[#e7f3ff] font-semibold text-[#0866ff] hover:bg-[#d6e9ff]`;
   }
-  return `${shared} border-transparent font-medium text-slate-200 hover:border-amber-300/20 hover:bg-white/10 hover:text-white`;
+  return `${shared} border-transparent font-medium text-[#050505] hover:bg-[#f2f2f2]`;
 }
 
 export function NavLink({

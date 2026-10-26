@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -128,9 +128,10 @@ describe("tenant settings navigation", () => {
       </AppShell>,
     );
 
-    expect(
-      screen.getByRole("link", { name: "Gym Management" }),
-    ).toHaveAttribute("href", "/super-admin/subscriptions");
+    expect(screen.getByRole("link", { name: "GymPilot MM" })).toHaveAttribute(
+      "href",
+      "/super-admin/subscriptions",
+    );
     expect(screen.getByRole("link", { name: "Subscriptions" })).toHaveAttribute(
       "href",
       "/super-admin/subscriptions",
@@ -164,18 +165,20 @@ describe("tenant settings navigation", () => {
       "href",
       "/super-admin/audit-logs",
     );
-    expect(
-      screen.getByRole("link", { name: "Gym Management" }),
-    ).toHaveAttribute("href", "/super-admin/dashboard");
+    expect(screen.getByRole("link", { name: "GymPilot MM" })).toHaveAttribute(
+      "href",
+      "/super-admin/dashboard",
+    );
 
     rerender(
       <AppShell platform session={session(["platform.settings.manage"], true)}>
         <p>Workspace</p>
       </AppShell>,
     );
-    expect(
-      screen.getByRole("link", { name: "Gym Management" }),
-    ).toHaveAttribute("href", "/super-admin");
+    expect(screen.getByRole("link", { name: "GymPilot MM" })).toHaveAttribute(
+      "href",
+      "/super-admin",
+    );
     expect(
       screen.queryByRole("link", { name: "Dashboard" }),
     ).not.toBeInTheDocument();
@@ -218,7 +221,7 @@ describe("tenant settings navigation", () => {
       "/audit-logs",
     );
     expect(
-      screen.getByRole("link", { name: "Gym Management" }),
+      screen.getByRole("link", { name: "Yangon Fitness" }),
     ).toHaveAttribute("href", "/audit-logs");
 
     rerender(
@@ -230,7 +233,7 @@ describe("tenant settings navigation", () => {
       screen.queryByRole("link", { name: "Audit logs" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Gym Management" }),
+      screen.getByRole("link", { name: "Yangon Fitness" }),
     ).toHaveAttribute("href", "/staff");
 
     rerender(
@@ -278,6 +281,7 @@ describe("tenant settings navigation", () => {
         <p>Workspace</p>
       </AppShell>,
     );
+    fireEvent.click(screen.getByRole("button", { name: "Finance" }));
     expect(screen.getByRole("link", { name: "Payments" })).toHaveAttribute(
       "href",
       "/payments",
@@ -313,6 +317,27 @@ describe("tenant settings navigation", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: "Retail sales" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the sidebar and shows it again", () => {
+    render(
+      <AppShell session={session(["members.view"])}>
+        <p>Workspace</p>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole("navigation", { name: "Primary" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }));
+    expect(
+      screen.queryByRole("navigation", { name: "Primary" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Workspace")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
+    expect(screen.getByRole("navigation", { name: "Primary" })).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Show sidebar" }),
     ).not.toBeInTheDocument();
   });
 });

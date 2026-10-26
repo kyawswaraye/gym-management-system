@@ -8,7 +8,7 @@ from typing import Any
 
 from django.core import signing
 from django.db.models import Q
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -21,7 +21,8 @@ from rest_framework.views import APIView
 from apps.common.api.exceptions import AuthenticationFailed
 from apps.common.api.responses import success_response
 from apps.common.api.schema import ErrorEnvelopeSerializer
-from apps.tenants.models import Gym, GymMembership, GymSettings, SubscriptionPlan
+from apps.tenants.logo import clear_gym_logo, read_logo_upload, replace_gym_logo
+from apps.tenants.models import Gym, GymLogo, GymMembership, GymSettings, SubscriptionPlan
 from apps.tenants.serializers import (
     SUBSCRIPTION_LIST_STATUS_ALL,
     AdminDashboardEnvelopeSerializer,
@@ -56,6 +57,7 @@ from apps.tenants.services import (
     OWNER_INVITATION_PENDING_MESSAGE,
     accept_owner_invitation,
     admin_gym_detail,
+    cancel_owner_invitation,
     canonical_provisioning_hash,
     invite_owner,
     owner_invitation_data,
@@ -68,6 +70,7 @@ from apps.tenants.services import (
     update_gym_profile,
     update_gym_settings,
     update_subscription_plan_from_admin,
+    visible_owner_memberships,
 )
 from apps.users.authentication import PlatformJWTAuthentication, StaffJWTAuthentication
 from apps.users.models import RefreshSession
@@ -458,11 +461,7 @@ class OwnerListView(APIView):
     )
     def get(self, request: Request) -> Response:
         gym = request.gym
-        owners = (
-            GymMembership.objects.filter(gym=gym, is_owner=True)
-            .select_related("user")
-            .order_by("user__normalized_email", "id")
-        )
+        owners = visible_owner_memberships(gym)
         return success_response([owner_membership_data(owner) for owner in owners])
 
 
@@ -576,6 +575,38 @@ class OwnerRevokeView(APIView):
         return success_response(owner_membership_data(owner), message="Owner revoked")
 
 
+class OwnerInvitationCancelView(APIView):
+    authentication_classes = [StaffJWTAuthentication]
+    permission_classes = [IsAuthenticated, IsActiveOwner, RequiresRecentMFA]
+
+    @extend_schema(
+        operation_id="owners_invitation_cancel",
+        request=None,
+        responses={
+            200: OwnerItemEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, gym_membership_id: uuid.UUID) -> Response:
+        gym = request.gym
+        membership = request.gym_membership
+        try:
+            owner = cancel_owner_invitation(
+                gym_id=gym.id,
+                target_membership_id=gym_membership_id,
+                actor=request.user,
+                actor_membership_id=membership.id,
+                request_id=getattr(request, "request_id", "req_unknown"),
+                ip_address=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            )
+        except GymMembership.DoesNotExist:
+            raise Http404 from None
+        return success_response(owner_membership_data(owner), message="Owner invitation removed")
+
+
 class AdminGymOwnerCreateView(APIView):
     authentication_classes = [PlatformJWTAuthentication]
     permission_classes = [
@@ -678,6 +709,93 @@ class GymProfileView(APIView):
             user_agent=request.META.get("HTTP_USER_AGENT", ""),
         )
         return success_response(GymProfileSerializer(updated).data, message="Gym profile updated")
+
+
+class GymLogoView(APIView):
+    authentication_classes = [StaffJWTAuthentication]
+    permission_classes = [IsAuthenticated, RequiresPermission]
+    required_permission = "gym.view"
+
+    def get_permissions(self) -> Sequence[Any]:
+        self.required_permission = "gym.view" if self.request.method == "GET" else "gym.update"
+        return super().get_permissions()
+
+    @extend_schema(
+        operation_id="gym_logo_retrieve",
+        responses={
+            200: OpenApiTypes.BINARY,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request) -> HttpResponse:
+        gym, _membership = _tenant_actor(request)
+        logo = GymLogo.objects.filter(pk=gym.id).first()
+        if logo is None or logo.content_type not in (
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+        ):
+            raise Http404
+        response = HttpResponse(bytes(logo.data), content_type=logo.content_type)
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    @extend_schema(
+        operation_id="gym_logo_update",
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {"logo": {"type": "string", "format": "binary"}},
+                "required": ["logo"],
+            }
+        },
+        responses={
+            200: GymProfileEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+        },
+    )
+    def put(self, request: Request) -> Response:
+        upload = request.FILES.get("logo")
+        if upload is None:
+            raise serializers.ValidationError({"logo": ["Choose a logo image."]})
+        data, content_type = read_logo_upload(upload)
+        gym, membership = _tenant_actor(request)
+        replace_gym_logo(
+            gym_id=gym.id,
+            data=data,
+            content_type=content_type,
+            actor=request.user,
+            actor_membership_id=membership.id,
+            request_id=getattr(request, "request_id", "req_unknown"),
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+        return success_response(GymProfileSerializer(gym).data, message="Gym logo updated")
+
+    @extend_schema(
+        operation_id="gym_logo_destroy",
+        responses={
+            200: GymProfileEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+        },
+    )
+    def delete(self, request: Request) -> Response:
+        gym, membership = _tenant_actor(request)
+        clear_gym_logo(
+            gym_id=gym.id,
+            actor=request.user,
+            actor_membership_id=membership.id,
+            request_id=getattr(request, "request_id", "req_unknown"),
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+        return success_response(GymProfileSerializer(gym).data, message="Gym logo removed")
 
 
 class GymSettingsView(APIView):

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -10,6 +10,7 @@ import {
   getCsrfToken,
   mutationHeaders,
 } from "@/features/auth/client";
+import { PasswordInput } from "@/features/auth/password-input";
 
 export function LoginForm({
   sessionExpired = false,
@@ -22,6 +23,8 @@ export function LoginForm({
   );
   const [pending, setPending] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
+  const emailId = useId();
+  const passwordId = useId();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -86,9 +89,10 @@ export function LoginForm({
         </p>
       )}
       {!mfaRequired && (
-        <label className="field">
-          <span>Email</span>
+        <div className="field">
+          <label htmlFor={emailId}>Email</label>
           <input
+            id={emailId}
             className="input"
             name="email"
             type="email"
@@ -96,20 +100,19 @@ export function LoginForm({
             required
             disabled={pending}
           />
-        </label>
+        </div>
       )}
       {!mfaRequired && (
-        <label className="field">
-          <span>Password</span>
-          <input
-            className="input"
+        <div className="field">
+          <label htmlFor={passwordId}>Password</label>
+          <PasswordInput
+            id={passwordId}
             name="password"
-            type="password"
             autoComplete="current-password"
             required
             disabled={pending}
           />
-        </label>
+        </div>
       )}
       {mfaRequired && (
         <label className="field">

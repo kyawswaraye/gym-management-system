@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { FormDialog } from "@/components/form-dialog";
 import {
   OperationError,
   checkOutCheckIn,
@@ -158,6 +159,8 @@ export function CheckInsManager({
   const [history, setHistory] = useState<CheckInRecord[]>([]);
   const [openVisits, setOpenVisits] = useState<CheckInRecord[]>([]);
   const [note, setNote] = useState("");
+  const [checkInOpen, setCheckInOpen] = useState(false);
+  const [checkOutOpen, setCheckOutOpen] = useState(false);
   const [occurredAt, setOccurredAt] = useState("");
   const [checkoutAt, setCheckoutAt] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -414,7 +417,7 @@ export function CheckInsManager({
                         aria-pressed={active}
                         className={`button button-cancel w-full justify-start text-left ${
                           active
-                            ? "outline outline-2 outline-offset-2 outline-amber-400"
+                            ? "outline outline-2 outline-offset-2 outline-[#0866ff]"
                             : ""
                         }`}
                         disabled={pending}
@@ -489,12 +492,26 @@ export function CheckInsManager({
                 }`}
               >
                 {showCheckout && openForSelected ? (
-                  <form
-                    className="grid content-start gap-3 rounded-xl bg-slate-50 p-4"
+                  <button
+                    className="button w-full sm:w-fit"
+                    onClick={() => setCheckOutOpen(true)}
+                    type="button"
+                  >
+                    Check out
+                  </button>
+                ) : null}
+                {showCheckout && openForSelected && checkOutOpen ? (
+                  <FormDialog
+                    description={`Leave blank to check out at the current time. A time is read in ${timeZone}.`}
+                    onClose={() => {
+                      if (!pending) setCheckOutOpen(false);
+                    }}
                     onSubmit={(event) => {
                       event.preventDefault();
                       void submitCheckout(openForSelected.id, checkoutAt);
                     }}
+                    pending={pending}
+                    title="Check out"
                   >
                     <label className="grid gap-2 text-sm font-semibold text-slate-800">
                       Check-out time
@@ -505,10 +522,6 @@ export function CheckInsManager({
                         value={checkoutAt}
                       />
                     </label>
-                    <p className="text-sm leading-5 text-slate-500">
-                      Leave blank to check out at the current time. A time is
-                      read in {timeZone}.
-                    </p>
                     <button
                       className="button w-full sm:w-fit"
                       disabled={pending}
@@ -516,12 +529,30 @@ export function CheckInsManager({
                     >
                       Check out
                     </button>
-                  </form>
+                  </FormDialog>
                 ) : null}
                 {showCheckIn ? (
-                  <form
-                    className="grid content-start gap-3 rounded-xl bg-slate-50 p-4"
+                  <button
+                    className="button button-create w-full sm:w-fit"
+                    onClick={() => setCheckInOpen(true)}
+                    type="button"
+                  >
+                    Check in
+                  </button>
+                ) : null}
+                {showCheckIn && checkInOpen ? (
+                  <FormDialog
+                    description={
+                      canUpdate
+                        ? `Leave blank to use the current time. A time is read in ${timeZone} and can be up to 24 hours earlier.`
+                        : undefined
+                    }
+                    onClose={() => {
+                      if (!pending) setCheckInOpen(false);
+                    }}
                     onSubmit={submitCheckIn}
+                    pending={pending}
+                    title="Check in"
                   >
                     <label className="grid gap-2 text-sm font-semibold text-slate-800">
                       Note
@@ -545,12 +576,6 @@ export function CheckInsManager({
                         />
                       </label>
                     ) : null}
-                    {canUpdate ? (
-                      <p className="text-sm leading-5 text-slate-500">
-                        Leave blank to use the current time. A time is read in{" "}
-                        {timeZone} and can be up to 24 hours earlier.
-                      </p>
-                    ) : null}
                     <button
                       className="button button-create w-full sm:w-fit"
                       disabled={pending}
@@ -558,7 +583,7 @@ export function CheckInsManager({
                     >
                       Check in
                     </button>
-                  </form>
+                  </FormDialog>
                 ) : null}
               </div>
             ) : null}

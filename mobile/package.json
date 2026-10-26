@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "android:release": "node scripts/android-release.mjs",
     "ios": "react-native run-ios",
     "start": "react-native start",
     "lint": "ESLINT_USE_FLAT_CONFIG=true eslint . --max-warnings=0",
@@ -38,6 +39,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-export-namespace-from": "^7.25.0",
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
     "@react-native-community/cli": "20.2.0",

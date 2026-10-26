@@ -7,6 +7,7 @@ import type {
   SelectHTMLAttributes,
 } from "react";
 
+import { FormDialog } from "@/components/form-dialog";
 import { actionButtonClass } from "@/lib/ui/action-button";
 import { IdentifierValue } from "@/lib/ui/identifier";
 
@@ -66,7 +67,7 @@ export function CursorControls({
       <div className="flex items-center gap-2">
         {showPrevious && (
           <button
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="button button-cancel"
             disabled={pending}
             onClick={onPrevious}
             type="button"
@@ -77,7 +78,7 @@ export function CursorControls({
         )}
         {showNext && (
           <button
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-800 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="button"
             disabled={pending}
             onClick={onNext}
             type="button"
@@ -168,15 +169,23 @@ export function CommandForm({
   }
 
   return (
-    <form
-      aria-busy={pending}
-      className="grid gap-3 rounded-lg border border-slate-200 p-4"
+    <FormDialog
+      onClose={onCancel}
       onSubmit={submit}
+      pending={pending}
+      title={title}
     >
-      <h3 className="text-base font-semibold">{title}</h3>
       <Alert message={error} />
       {children}
-      <div className="flex flex-wrap gap-3">
+      <div>
+        <button
+          className="button button-cancel"
+          disabled={pending}
+          onClick={onCancel}
+          type="button"
+        >
+          Back
+        </button>
         <button
           className={actionButtonClass(confirmLabel)}
           disabled={pending}
@@ -184,16 +193,8 @@ export function CommandForm({
         >
           {confirmLabel}
         </button>
-        <button
-          className="underline tone-cancel"
-          disabled={pending}
-          onClick={onCancel}
-          type="button"
-        >
-          Back
-        </button>
       </div>
-    </form>
+    </FormDialog>
   );
 }
 

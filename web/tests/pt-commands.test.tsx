@@ -1364,6 +1364,7 @@ describe("phase 5 command coverage", () => {
         today="2026-10-19"
       />,
     );
+    fireEvent.click(await screen.findByRole("tab", { name: "Class types" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "Edit class type" }),
     );
@@ -1389,7 +1390,10 @@ describe("phase 5 command coverage", () => {
       "code",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Update schedule" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Schedules" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Update schedule" }),
+    );
     const scheduleDialog = screen.getByRole("dialog", {
       name: "Update schedule",
     });
@@ -1416,7 +1420,10 @@ describe("phase 5 command coverage", () => {
     );
     expect(vi.mocked(updateClassSchedule).mock.calls[0]?.[2]).toMatch(KEY);
 
-    fireEvent.click(screen.getByRole("button", { name: "Cancel occurrence" }));
+    fireEvent.click(screen.getByRole("tab", { name: "This week" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Cancel occurrence" }),
+    );
     fireEvent.change(screen.getByLabelText("Occurrence cancellation reason"), {
       target: { value: "Instructor unavailable" },
     });
@@ -1431,21 +1438,27 @@ describe("phase 5 command coverage", () => {
       ),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Mark attended" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Mark attended" }),
+    );
     await waitFor(() =>
       expect(attendClassBooking).toHaveBeenCalledWith(
         BOOKING,
         expect.stringMatching(KEY),
       ),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Mark no-show" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Mark no-show" }),
+    );
     await waitFor(() =>
       expect(noShowClassBooking).toHaveBeenCalledWith(
         BOOKING,
         expect.stringMatching(KEY),
       ),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Cancel booking" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Cancel booking" }),
+    );
     fireEvent.change(
       screen.getByLabelText("Class booking cancellation reason"),
       {
@@ -1465,18 +1478,28 @@ describe("phase 5 command coverage", () => {
       ),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Search members" }));
     fireEvent.click(
-      await screen.findByRole("button", { name: "Grace Hopper (M-1)" }),
+      await screen.findByRole("button", { name: "Book a class" }),
     );
-    await screen.findByRole("option", { name: /CLS/ });
-    fireEvent.change(screen.getByLabelText("Occurrence"), {
+    const bookDialog = screen.getByRole("dialog", { name: "Book a class" });
+    fireEvent.click(
+      within(bookDialog).getByRole("button", { name: "Search members" }),
+    );
+    fireEvent.click(
+      await within(bookDialog).findByRole("button", {
+        name: "Grace Hopper (M-1)",
+      }),
+    );
+    await within(bookDialog).findByRole("option", { name: /CLS/ });
+    fireEvent.change(within(bookDialog).getByLabelText("Occurrence"), {
       target: { value: OCCURRENCE },
     });
-    fireEvent.change(screen.getByLabelText("Class package"), {
+    fireEvent.change(within(bookDialog).getByLabelText("Class package"), {
       target: { value: GRANT },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save class booking" }));
+    fireEvent.click(
+      within(bookDialog).getByRole("button", { name: "Save class booking" }),
+    );
     await waitFor(() =>
       expect(createClassBooking).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1502,6 +1525,7 @@ describe("phase 5 command coverage", () => {
         today="2026-10-19"
       />,
     );
+    fireEvent.click(await screen.findByRole("tab", { name: "Class types" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "Edit class type" }),
     );

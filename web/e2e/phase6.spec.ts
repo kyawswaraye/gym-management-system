@@ -124,7 +124,9 @@ test("owner daily and monthly reports load through the BFF", async ({
   const directReportCalls = trackDirectReportCalls(page);
 
   await signIn(page, ownerAccount);
-  await page.getByRole("link", { name: "Reports", exact: true }).click();
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  await nav.getByRole("button", { name: "Finance", exact: true }).click();
+  await nav.getByRole("link", { name: "Reports", exact: true }).click();
   await expect(page).toHaveURL(/\/reports$/);
   await expect(
     page.getByRole("heading", { name: "Reports", exact: true }),

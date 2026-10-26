@@ -54,7 +54,7 @@ Global tables are not made tenant-readable merely because they lack RLS. Runtime
 
 ### Tenant-owned tables (all require `gym_id`, forced RLS)
 
-`GymSettings`, `GymMembership`, `StaffInvitation`, `StaffInvitationRole`, `Role`, `RolePermission`, `GymMembershipRole`, `GymFeatureEntitlement`, `StaffProfile`, `Member`, `MembershipPlan`, `Membership`, `CheckIn`, `CheckInChallenge`, `Payment`, `Receipt`, `ExpenseCategory`, `Expense`, `SalaryPeriod`, `StaffSalaryLine`, `TrainerAssignment`, `ServicePackage`, `MemberServicePackage`, `ServiceSessionLedger`, `ClassType`, `ClassSchedule`, `ClassOccurrence`, `ClassBooking`, `PTBooking`, `PTSale`, `PTCommission`, `PTCommissionPayment`, `ProductCategory`, `Product`, `StockMovement`, `RetailSale`, `RetailSaleLine`, `RetailReturn`, `RetailReturnLine`, `CashSession`, `CashTransaction`, `TenantSequence`, `Announcement`, `MemberDevice`, `FileAsset`, `Notification`, `AuditLog`, and `IdempotencyRecord`.
+`GymSettings`, `GymLogo`, `GymMembership`, `StaffInvitation`, `StaffInvitationRole`, `Role`, `RolePermission`, `GymMembershipRole`, `GymFeatureEntitlement`, `StaffProfile`, `Member`, `MembershipPlan`, `Membership`, `CheckIn`, `CheckInChallenge`, `Payment`, `Receipt`, `ExpenseCategory`, `Expense`, `SalaryPeriod`, `StaffSalaryLine`, `TrainerAssignment`, `ServicePackage`, `MemberServicePackage`, `ServiceSessionLedger`, `ClassType`, `ClassSchedule`, `ClassOccurrence`, `ClassBooking`, `PTBooking`, `PTSale`, `PTCommission`, `PTCommissionPayment`, `ProductCategory`, `Product`, `StockMovement`, `RetailSale`, `RetailSaleLine`, `RetailReturn`, `RetailReturnLine`, `CashSession`, `CashTransaction`, `TenantSequence`, `Announcement`, `MemberDevice`, `FileAsset`, `Notification`, `AuditLog`, and `IdempotencyRecord`.
 
 No table has mixed global/tenant scope. In particular, `Role.gym_id` is never nullable.
 
@@ -189,6 +189,12 @@ Constraints: `UNIQUE (normalized_email)`; normalized email is nonblank; MFA secr
 Fields: `id`, unique immutable `code`, `name`, `legal_name`, `status` (`PENDING`, `ACTIVE`, `SUSPENDED`, `CLOSED`), `email`, `phone`, structured address fields, `timezone`, `currency`, `subscription_plan_id`, `subscription_status` (`TRIAL`, `ACTIVE`, `PAST_DUE`, `CANCELLED`), `subscription_starts_at`, `subscription_ends_at`, `created_at`, `updated_at`.
 
 Constraints: normalized `code` and `name` are nonblank; timezone is a supported IANA zone; currency is supported and defaults to `THB`; subscription end follows start. `subscription_plan_id` is a global FK with `RESTRICT`. Gyms are never physically deleted after provisioning; closing or suspension preserves all data.
+
+### GymLogo
+
+`GymLogo` stores one private brand image for a gym. The bytes are not a column on `Gym`, so authentication and profile reads do not load the file. The row is tenant-owned, forced-RLS, and granted to `gym_runtime`.
+
+Fields: `gym_id` primary key and one-to-one FK to `Gym` with `CASCADE`; `content_type` (`image/jpeg`, `image/png`, or `image/webp`); `data` bytea, at most 1 MB.
 
 ### GymSettings
 
@@ -424,8 +430,8 @@ Fields: common tenant columns; `sequence_key` (for example `RECEIPT:2026`); `pre
 Constraints: `UNIQUE (gym_id, sequence_key)`; next value positive; padding in `1..18`; prefix format validated. Receipt allocation locks this row with `SELECT ... FOR UPDATE` inside the caller's transaction, consumes `next_value`, increments it by exactly one, and inserts the receipt in that same transaction. A trigger rejects every other column change. `gym_runtime` may update only `next_value` and `updated_at`, and cannot delete the row. Rollback restores `next_value`:
 
 ```text
-{gym.code}-{year}-{sequence:06d}
-W1-2026-000001
+{prefix}-{year}-{sequence:06d}
+RCPT-2026-000001
 ```
 
 Transaction rollback does not consume a number; once committed, a number is never reused, including after void. Do not use `MAX(receipt_number) + 1`.
@@ -549,6 +555,7 @@ Gym --< GymMembership >-- User
  |--1 GymSettings
  |          |--0..1 StaffProfile
  |          +--< GymMembershipRole >-- Role --< RolePermission >-- Permission
+ |--0..1 GymLogo
  |--< StaffInvitation --< StaffInvitationRole >-- Role
  +--< GymFeatureEntitlement >-- Feature
 
@@ -632,7 +639,7 @@ For staff, `app.gym_id` is established only after global user/session validation
 
 RLS policy inventory:
 
-- Standard read/write policy: mutable tenant master/operational tables (`GymSettings`, `GymMembership`, `StaffInvitation`, `StaffInvitationRole`, `Role`, joins, entitlement, staff, member, plan, membership, check-in, category, assignment, salary line while draft, file, notification, idempotency). Announcement, member-device, and push-attempt tables use those forced-RLS policies.
+- Standard read/write policy: mutable tenant master/operational tables (`GymSettings`, `GymLogo`, `GymMembership`, `StaffInvitation`, `StaffInvitationRole`, `Role`, joins, entitlement, staff, member, plan, membership, check-in, category, assignment, salary line while draft, file, notification, idempotency). Announcement, member-device, and push-attempt tables use those forced-RLS policies.
 - Insert/select plus constrained transition procedures: `Payment`, `Receipt`, `Expense`, `SalaryPeriod`, `PTSale`, `PTCommission`, `CashSession`. Increment 4 grants commission runtime `SELECT` and `INSERT` only. The payout child, member-package, ledger, class, and booking tables join this list when their migrations land.
 - Insert/select only for runtime: `CashTransaction`, `AuditLog`; maintenance deletion runs as a separately controlled owner role where retention permits.
 - `TenantSequence` allocation is `SELECT … FOR UPDATE` in the caller's transaction. A trigger allows only `next_value + 1` and `updated_at`. Runtime column grants match that rule. There is no `SECURITY DEFINER` sequence allocator.

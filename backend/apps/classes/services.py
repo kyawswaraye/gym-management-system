@@ -28,6 +28,7 @@ from apps.classes.selectors import (
     get_visible_occurrence,
     get_visible_schedule,
 )
+from apps.common.codes import resolve_code
 from apps.common.db.tenant_context import set_gym_context
 from apps.tenants.models import Gym, GymMembership, Role, StaffProfile
 
@@ -251,6 +252,12 @@ def create_class_type(
     user_agent: str,
 ) -> ClassType:
     set_gym_context(gym_id=gym.id)
+    code = resolve_code(
+        code,
+        ClassType.objects.filter(gym=gym).values_list("code", flat=True),
+        name,
+        prefix="CLASS",
+    )
     stored_name, normalized_name = canonical_label(name, field="name")
     description = _SPACE.sub(" ", description.strip())
     try:

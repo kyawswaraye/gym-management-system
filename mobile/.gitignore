@@ -33,6 +33,7 @@ local.properties
 .cxx/
 *.keystore
 *.jks
+android/keystore.properties
 *.p8
 *.mobileprovision
 google-services.json

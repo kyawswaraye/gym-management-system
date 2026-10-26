@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/brand-logo";
 import { OwnerInvitationForm } from "@/features/auth/owner-invitation-form";
 
 export default async function AcceptOwnerInvitationPage({
@@ -8,7 +9,8 @@ export default async function AcceptOwnerInvitationPage({
   const { token = "" } = await searchParams;
   return (
     <section className="card w-full max-w-md">
-      <h1 className="text-2xl font-bold">Accept Owner invitation</h1>
+      <BrandLogo />
+      <h1 className="mt-6 text-2xl font-bold">Accept Owner invitation</h1>
       <p className="muted mt-2">
         Create or confirm your login to join this gym as an equal-authority
         Owner.

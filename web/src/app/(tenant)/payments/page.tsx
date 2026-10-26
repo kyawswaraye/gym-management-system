@@ -25,7 +25,7 @@ export default async function PaymentsPage() {
   return (
     <section aria-labelledby="payments-title">
       <PageHeader
-        description="Record membership and other payment drafts, then submit them for approval. Receipts stay with the posted payment."
+        description="Save a draft and submit it for approval. Issued receipts stay on their own tab."
         eyebrow="Finance"
         title="Payments"
         titleId="payments-title"

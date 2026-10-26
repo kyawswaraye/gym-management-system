@@ -25,6 +25,7 @@ test("owner opens finance pages and submits an other payment draft", async ({
   ]);
   await signIn(page, ownerAccount);
   const nav = page.getByRole("navigation", { name: "Primary" });
+  await nav.getByRole("button", { name: "Finance", exact: true }).click();
   for (const [label, href] of PAGES) {
     await expect(
       nav.getByRole("link", { name: label, exact: true }),
@@ -42,9 +43,10 @@ test("owner opens finance pages and submits an other payment draft", async ({
   }
 
   await page.goto("/payments");
-  const form = page.locator("form").filter({
-    has: page.getByRole("heading", { name: "Record payment", exact: true }),
-  });
+  await page
+    .getByRole("button", { name: "Record payment", exact: true })
+    .click();
+  const form = page.getByRole("dialog", { name: "Record payment" });
   const description = `E2E locker ${crypto.randomUUID()}`;
   await form
     .getByRole("combobox", { name: "Purpose", exact: true })

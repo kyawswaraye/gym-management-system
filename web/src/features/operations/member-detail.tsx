@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 
+import { FormDialog } from "@/components/form-dialog";
 import {
   listMemberPayments,
   operationGet,
@@ -216,6 +217,7 @@ export function MemberDetail({
   const [restoring, setRestoring] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [activeMemberId, setActiveMemberId] = useState(memberId);
   const [draftState, setDraftState] = useState<{
     snapshot: string;
@@ -311,6 +313,7 @@ export function MemberDetail({
     setError("");
     try {
       await operationMutation<Member>(`members/${memberId}/`, payload, "PATCH");
+      setEditing(false);
       await load();
     } catch (caught) {
       setError(
@@ -433,35 +436,67 @@ export function MemberDetail({
             await load();
           }}
         />
-        <form className="grid gap-4" onSubmit={save}>
-          {error ? (
-            <p className="error" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <p className="muted">{member.member_number}</p>
-          <dl>
-            <dt className="muted">Status</dt>
-            <dd>{member.status}</dd>
-          </dl>
+        {error && !editing ? (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <p className="muted">{member.member_number}</p>
+        <dl>
+          <dt className="muted">Status</dt>
+          <dd>{member.status}</dd>
+        </dl>
+        {canUpdate ? (
+          <button
+            className="button button-edit"
+            disabled={commandPending}
+            onClick={() => setEditing(true)}
+            type="button"
+          >
+            Edit profile
+          </button>
+        ) : (
           <MemberProfileFields
-            disabled={!canUpdate || commandPending}
+            disabled
             includeMemberNumber={false}
-            onChange={(next) =>
-              setDraftState({ snapshot: profileSnapshot, draft: next })
-            }
+            onChange={() => undefined}
             value={draft}
           />
-          {canUpdate && (
-            <button
-              className="button button-edit"
+        )}
+        {canUpdate && editing ? (
+          <FormDialog
+            onClose={() => {
+              if (!saving) setEditing(false);
+            }}
+            onSubmit={save}
+            pending={saving}
+            title="Edit profile"
+            wide
+          >
+            {error ? (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <MemberProfileFields
               disabled={commandPending}
-              type="submit"
-            >
-              {saving ? "Saving…" : "Save changes"}
-            </button>
-          )}
-        </form>
+              includeMemberNumber={false}
+              onChange={(next) =>
+                setDraftState({ snapshot: profileSnapshot, draft: next })
+              }
+              value={draft}
+            />
+            <div>
+              <button
+                className="button button-edit"
+                disabled={commandPending}
+                type="submit"
+              >
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </FormDialog>
+        ) : null}
         {showArchive ? (
           <button
             className="button button-archive"

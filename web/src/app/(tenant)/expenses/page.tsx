@@ -15,7 +15,7 @@ export default async function ExpensesPage() {
   return (
     <section aria-labelledby="expenses-title">
       <PageHeader
-        description="Keep custom categories and expense drafts inside this gym. Protected salary and commission categories stay unchanged."
+        description="Save a draft and submit it for approval. Custom categories stay on their own tab, separate from salary and commission."
         eyebrow="Finance"
         title="Expenses"
         titleId="expenses-title"

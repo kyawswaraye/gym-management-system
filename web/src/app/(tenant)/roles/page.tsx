@@ -18,7 +18,7 @@ export default async function RolesPage() {
   return (
     <section aria-labelledby="roles-title">
       <PageHeader
-        description="Review protected and custom roles for this gym. Permission changes stay inside the delegation policy, and the server confirms every save."
+        description="See what each role can do. Custom roles can be renamed or archived, and every permission change is checked again when you save."
         eyebrow="Operations"
         title="Roles"
         titleId="roles-title"

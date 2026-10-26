@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import DashboardPage from "@/app/(tenant)/dashboard/page";
@@ -153,7 +153,7 @@ describe("trainer dashboard page and navigation", () => {
       screen.getByRole("link", { name: "Trainer dashboard" }),
     ).toHaveAttribute("href", "/pt/dashboard");
     expect(
-      screen.getByRole("link", { name: "Gym Management" }),
+      screen.getByRole("link", { name: "Yangon Fitness" }),
     ).toHaveAttribute("href", "/pt/dashboard");
     expect(
       screen.queryByRole("link", { name: "Dashboard" }),
@@ -173,6 +173,7 @@ describe("trainer dashboard page and navigation", () => {
         <p>Workspace</p>
       </AppShell>,
     );
+    fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));
     expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
       "href",
       "/dashboard",
@@ -182,7 +183,7 @@ describe("trainer dashboard page and navigation", () => {
     ).toHaveAttribute("href", "/pt/dashboard");
     expect(screen.getByRole("link", { name: "Reports" })).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Gym Management" }),
+      screen.getByRole("link", { name: "Yangon Fitness" }),
     ).toHaveAttribute("href", "/dashboard");
 
     rerender(

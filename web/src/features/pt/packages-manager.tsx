@@ -20,7 +20,6 @@ import { phase5Error } from "@/features/pt/errors";
 import type { ClassType, ServicePackage, ValidityUnit } from "@/types/api";
 
 const PAGE = "25";
-const PACKAGE_CODE = /^[A-Z][A-Z0-9_]{0,31}$/;
 const PACKAGE_PRICE = /^\d+(\.\d{1,2})?$/;
 
 const cardClass =
@@ -52,7 +51,6 @@ function validityLabel(value: number, unit: string): string {
 
 function packageFormError(input: {
   type: "PT" | "CLASS";
-  code: string;
   name: string;
   sessionCount: number;
   validityValue: number;
@@ -60,9 +58,6 @@ function packageFormError(input: {
   classTypeId: string;
   classTypesPending: boolean;
 }): string {
-  if (!PACKAGE_CODE.test(input.code)) {
-    return "Enter an uppercase package code.";
-  }
   if (input.name.trim() === "") return "Enter a package name.";
   if (!Number.isInteger(input.sessionCount) || input.sessionCount < 1) {
     return "Enter at least 1 session.";
@@ -153,14 +148,12 @@ export function PackagesManager({
     if (pendingRef.current) return;
     const form = new FormData(event.currentTarget);
     const classTypeId = String(form.get("class_type_id") ?? "");
-    const code = String(form.get("code") ?? "");
     const name = String(form.get("name") ?? "");
     const sessionCount = Number(form.get("session_count"));
     const validityValue = Number(form.get("validity_value"));
     const price = String(form.get("price") ?? "");
     const problem = packageFormError({
       type: packageType,
-      code,
       name,
       sessionCount,
       validityValue,
@@ -178,7 +171,6 @@ export function PackagesManager({
     setNotice("");
     void createServicePackage({
       type: packageType,
-      code,
       name,
       session_count: sessionCount,
       validity_value: validityValue,
@@ -502,7 +494,7 @@ export function PackagesManager({
                 <div>
                   <h3 className="text-sm font-bold text-slate-800">Identity</h3>
                   <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Use an uppercase code such as PT10. The name is what staff
+                    A code is assigned from the name. The name is what staff
                     see.
                   </p>
                 </div>
@@ -521,14 +513,6 @@ export function PackagesManager({
                       <option value="PT">PT</option>
                       <option value="CLASS">CLASS</option>
                     </SelectInput>
-                  </Field>
-                  <Field label="Code">
-                    <TextInput
-                      maxLength={32}
-                      name="code"
-                      placeholder="PT10"
-                      required
-                    />
                   </Field>
                   <div className="sm:col-span-2">
                     <Field label="Name">

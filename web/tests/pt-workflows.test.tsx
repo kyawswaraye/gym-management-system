@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BookingsManager } from "@/features/pt/bookings-manager";
@@ -263,9 +269,6 @@ describe("phase 5 workflows", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Create package" }),
     );
-    fireEvent.change(screen.getByLabelText("Code"), {
-      target: { value: "PT10" },
-    });
     fireEvent.change(screen.getByLabelText("Name"), {
       target: { value: "Ten sessions" },
     });
@@ -284,7 +287,6 @@ describe("phase 5 workflows", () => {
       expect(createServicePackage).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "PT",
-          code: "PT10",
           name: "Ten sessions",
           session_count: 10,
           validity_value: 3,
@@ -561,13 +563,23 @@ describe("phase 5 workflows", () => {
     expect(
       await screen.findByRole("heading", { name: "Trainer QR scan" }),
     ).toBeInTheDocument();
+    const opener = await screen.findByRole("button", {
+      name: "Scan check-in code",
+    });
+    await waitFor(() => expect(opener).toBeEnabled());
+    fireEvent.click(opener);
     fireEvent.change(await screen.findByLabelText("Assigned member"), {
       target: { value: MEMBER },
     });
     fireEvent.change(screen.getByLabelText("Check-in code"), {
       target: { value: "opaque-code" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Scan check-in code" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Trainer QR scan" })).getByRole(
+        "button",
+        { name: "Scan check-in code" },
+      ),
+    );
     await waitFor(() =>
       expect(scanTrainerCheckIn).toHaveBeenCalledWith({
         memberId: MEMBER,

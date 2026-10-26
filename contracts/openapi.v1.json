@@ -8032,6 +8032,176 @@
                 }
             }
         },
+        "/api/v1/gym/logo/": {
+            "get": {
+                "operationId": "gym_logo_retrieve",
+                "tags": [
+                    "gym"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "operationId": "gym_logo_update",
+                "tags": [
+                    "gym"
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "logo": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "required": [
+                                    "logo"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GymProfileEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "gym_logo_destroy",
+                "tags": [
+                    "gym"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GymProfileEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/health/": {
             "get": {
                 "operationId": "health",
@@ -12378,6 +12548,72 @@
                         "description": ""
                     },
                     "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/owners/{gym_membership_id}/cancel-invitation/": {
+            "post": {
+                "operationId": "owners_invitation_cancel",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "gym_membership_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "owners"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OwnerItemEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -24004,9 +24240,17 @@
                 "type": "object",
                 "properties": {
                     "code": {
-                        "type": "string",
-                        "minLength": 1,
-                        "pattern": "^[A-Z0-9][A-Z0-9-]{1,31}$"
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "default": "",
+                                "pattern": "^[A-Z0-9][A-Z0-9-]{1,31}$"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
                     },
                     "name": {
                         "type": "string",
@@ -24102,7 +24346,6 @@
                     }
                 },
                 "required": [
-                    "code",
                     "name",
                     "subscription_plan_id"
                 ]
@@ -26994,10 +27237,18 @@
                 "type": "object",
                 "properties": {
                     "code": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 32,
-                        "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "default": "",
+                                "maxLength": 32,
+                                "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
                     },
                     "name": {
                         "type": "string",
@@ -27018,7 +27269,6 @@
                     }
                 },
                 "required": [
-                    "code",
                     "default_capacity",
                     "default_duration_minutes",
                     "name"
@@ -28170,9 +28420,17 @@
                 "type": "object",
                 "properties": {
                     "code": {
-                        "type": "string",
-                        "minLength": 1,
-                        "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "default": "",
+                                "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
                     },
                     "name": {
                         "type": "string",
@@ -28186,7 +28444,6 @@
                     }
                 },
                 "required": [
-                    "code",
                     "name"
                 ]
             },
@@ -28557,6 +28814,9 @@
                     "updated_at": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "has_logo": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
@@ -28568,6 +28828,7 @@
                     "created_at",
                     "currency",
                     "email",
+                    "has_logo",
                     "id",
                     "legal_name",
                     "name",
@@ -31452,7 +31713,7 @@
                 "properties": {
                     "code": {
                         "type": "string",
-                        "minLength": 1,
+                        "default": "",
                         "maxLength": 32
                     },
                     "name": {
@@ -31480,7 +31741,6 @@
                     }
                 },
                 "required": [
-                    "code",
                     "duration_unit",
                     "duration_value",
                     "name",
@@ -31663,10 +31923,18 @@
                 "type": "object",
                 "properties": {
                     "register_code": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 32,
-                        "pattern": "^[A-Z0-9_-]{1,32}$"
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "default": "",
+                                "maxLength": 32,
+                                "pattern": "^[A-Z0-9_-]{1,32}$"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
                     },
                     "business_date": {
                         "type": "string",
@@ -31680,8 +31948,7 @@
                 },
                 "required": [
                     "business_date",
-                    "opening_cash",
-                    "register_code"
+                    "opening_cash"
                 ]
             },
             "OwnerAcceptInputRequest": {
@@ -35166,10 +35433,18 @@
                 "type": "object",
                 "properties": {
                     "code": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 32,
-                        "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "default": "",
+                                "maxLength": 32,
+                                "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
                     },
                     "name": {
                         "type": "string",
@@ -35182,7 +35457,6 @@
                     }
                 },
                 "required": [
-                    "code",
                     "name"
                 ]
             },
@@ -35372,10 +35646,18 @@
                 "type": "object",
                 "properties": {
                     "sku": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 32,
-                        "pattern": "^[A-Z0-9][A-Z0-9_-]{0,31}$"
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "default": "",
+                                "maxLength": 32,
+                                "pattern": "^[A-Z0-9][A-Z0-9_-]{0,31}$"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
                     },
                     "barcode": {
                         "type": "string",
@@ -35430,7 +35712,6 @@
                     "low_stock_threshold",
                     "name",
                     "sale_price",
-                    "sku",
                     "unit"
                 ]
             },
@@ -37003,9 +37284,18 @@
                 "type": "object",
                 "properties": {
                     "key": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 32
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "default": "",
+                                "maxLength": 32,
+                                "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
                     },
                     "name": {
                         "type": "string",
@@ -37021,7 +37311,6 @@
                     }
                 },
                 "required": [
-                    "key",
                     "name"
                 ]
             },
@@ -37762,10 +38051,18 @@
                         "$ref": "#/components/schemas/ServicePackageWriteTypeEnum"
                     },
                     "code": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 32,
-                        "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "default": "",
+                                "maxLength": 32,
+                                "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
                     },
                     "name": {
                         "type": "string",
@@ -37795,7 +38092,6 @@
                     }
                 },
                 "required": [
-                    "code",
                     "name",
                     "price",
                     "session_count",
@@ -38093,7 +38389,7 @@
                     },
                     "staff_code": {
                         "type": "string",
-                        "minLength": 1,
+                        "default": "",
                         "maxLength": 32
                     },
                     "display_name": {
@@ -38130,8 +38426,7 @@
                     "first_name",
                     "joined_date",
                     "last_name",
-                    "role_ids",
-                    "staff_code"
+                    "role_ids"
                 ]
             },
             "StaffLifecycleRequest": {

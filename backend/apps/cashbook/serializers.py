@@ -6,6 +6,7 @@ from typing import Any, cast
 from rest_framework import serializers
 
 from apps.cashbook.models import CashSession, CashTransaction
+from apps.common.codes import DEFAULT_REGISTER, OptionalPatternField
 from apps.common.finance.money import InvalidMoney, parse_money
 from apps.users.serializers import StrictSerializer
 
@@ -44,9 +45,12 @@ class ExactMoneyField(serializers.DecimalField):
 
 
 class OpenCashSessionSerializer(StrictSerializer):
-    register_code = serializers.RegexField(_REGISTER, max_length=32)
+    register_code = OptionalPatternField(_REGISTER, max_length=32)
     business_date = serializers.DateField()
     opening_cash = ExactMoneyField(minimum=Decimal("0"))
+
+    def validate_register_code(self, value: str) -> str:
+        return value or DEFAULT_REGISTER
 
 
 class AdjustCashSessionSerializer(StrictSerializer):

@@ -75,6 +75,7 @@ describe("subscription plan manager", () => {
       screen.queryByText(/feature|usage|entitlement/i),
     ).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "Edit GROWTH" }));
     fireEvent.change(screen.getByLabelText("Name for GROWTH"), {
       target: { value: "Growth Plus" },
     });
@@ -90,9 +91,13 @@ describe("subscription plan manager", () => {
     expect(updatePlan.mock.calls[0]?.[2]).not.toHaveProperty("code");
     expect(updatePlan.mock.calls[0]?.[2]).not.toHaveProperty("currency");
     expect(updatePlan.mock.calls[0]?.[2]).not.toHaveProperty("id");
-    expect(await screen.findByLabelText("Name for GROWTH")).toHaveValue(
-      "Growth Plus",
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Edit GROWTH" }),
+      ).not.toBeInTheDocument(),
     );
+    fireEvent.click(screen.getByRole("button", { name: "Edit GROWTH" }));
+    expect(screen.getByLabelText("Name for GROWTH")).toHaveValue("Growth Plus");
   });
 
   it("keeps the catalog status when retirement is rejected", async () => {
@@ -101,6 +106,7 @@ describe("subscription plan manager", () => {
     );
     render(<SubscriptionsManager canManage />);
     await screen.findByLabelText("Current status for GROWTH");
+    fireEvent.click(screen.getByRole("button", { name: "Edit GROWTH" }));
 
     fireEvent.change(screen.getByLabelText("Status for GROWTH"), {
       target: { value: "RETIRED" },
@@ -120,7 +126,7 @@ describe("subscription plan manager", () => {
 
   it("rejects an invalid price or lowercase interval before saving", async () => {
     render(<SubscriptionsManager canManage />);
-    await screen.findByRole("button", { name: "Save GROWTH" });
+    fireEvent.click(await screen.findByRole("button", { name: "Edit GROWTH" }));
 
     fireEvent.change(screen.getByLabelText("Price for GROWTH"), {
       target: { value: "-1.00" },

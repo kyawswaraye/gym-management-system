@@ -12,6 +12,7 @@ from apps.cashbook.serializers import (
     CashTransactionSerializer,
     ExactMoneyField,
 )
+from apps.common.codes import OptionalPatternField
 from apps.expenses.models import Expense
 from apps.members.models import Payment
 from apps.members.payment_serializers import money_text
@@ -22,7 +23,7 @@ _CODE = r"^[A-Z][A-Z0-9_]{0,31}$"
 
 
 class ExpenseCategoryWriteSerializer(StrictSerializer):
-    code = serializers.RegexField(_CODE)
+    code = OptionalPatternField(_CODE)
     name = serializers.CharField(max_length=120, trim_whitespace=True)
     display_order = serializers.IntegerField(required=False, min_value=0, max_value=32767)
 

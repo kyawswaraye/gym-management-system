@@ -164,8 +164,9 @@ describe("Role manager", () => {
     expect(
       await screen.findByText("No roles are defined for this gym."),
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Permission catalog" }));
     expect(
-      screen.getByText("No permissions are in the catalog."),
+      await screen.findByText("No permissions are in the catalog."),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Create role" }),
@@ -201,9 +202,10 @@ describe("Role manager", () => {
     const ownerCard = within(screen.getByRole("article", { name: "Owner" }));
     expect(ownerCard.getByText("Protected")).toBeInTheDocument();
     expect(ownerCard.getByText("1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Permission catalog" }));
     expect(
       within(
-        screen.getByRole("region", { name: "Permission catalog" }),
+        screen.getByRole("tabpanel", { name: "Permission catalog" }),
       ).getByText(HARD_RESERVED_LABEL),
     ).toBeInTheDocument();
     expect(screen.getByText(SETTINGS_MANAGE_LABEL)).toBeInTheDocument();
@@ -218,6 +220,9 @@ describe("Role manager", () => {
 
     const floorCard = within(
       await screen.findByRole("article", { name: "Floor" }),
+    );
+    fireEvent.click(
+      floorCard.getByRole("button", { name: "Edit permissions for Floor" }),
     );
     const permissions = within(
       floorCard.getByRole("group", { name: "Permissions for Floor" }),
@@ -286,6 +291,11 @@ describe("Role manager", () => {
     expect(
       managerCard.queryByRole("button", { name: "Save Manager" }),
     ).not.toBeInTheDocument();
+    fireEvent.click(
+      managerCard.getByRole("button", {
+        name: "Edit permissions for Manager",
+      }),
+    );
     const managerPermissions = within(
       managerCard.getByRole("group", { name: "Permissions for Manager" }),
     );
@@ -343,6 +353,11 @@ describe("Role manager", () => {
     expect(
       receptionistCard.queryByRole("button", { name: "Archive Receptionist" }),
     ).not.toBeInTheDocument();
+    fireEvent.click(
+      receptionistCard.getByRole("button", {
+        name: "Edit permissions for Receptionist",
+      }),
+    );
     expect(
       receptionistCard.getByRole("button", {
         name: "Save permissions for Receptionist",
@@ -375,29 +390,14 @@ describe("Role manager", () => {
 
   it("creates a custom role without permission ids", async () => {
     render(<RoleManager {...manager} />);
-    const create = within(
-      await screen.findByRole("region", { name: "Create role" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Create role" }));
+    const create = within(screen.getByRole("dialog", { name: "Create role" }));
     fireEvent.click(create.getByRole("button", { name: "Create role" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Enter an uppercase role key",
+      "Enter a role name",
     );
     expect(createRole).not.toHaveBeenCalled();
 
-    fireEvent.change(create.getByLabelText("Key"), {
-      target: { value: "OWNER" },
-    });
-    fireEvent.change(create.getByLabelText("Name"), {
-      target: { value: "Not an owner" },
-    });
-    fireEvent.click(create.getByRole("button", { name: "Create role" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "This role key is reserved.",
-    );
-
-    fireEvent.change(create.getByLabelText("Key"), {
-      target: { value: "GUIDE" },
-    });
     fireEvent.change(create.getByLabelText("Name"), {
       target: { value: "Guide" },
     });
@@ -408,7 +408,6 @@ describe("Role manager", () => {
 
     await waitFor(() =>
       expect(createRole).toHaveBeenCalledWith({
-        key: "GUIDE",
         name: "Guide",
         description: "Helps members",
         is_active: true,

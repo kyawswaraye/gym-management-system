@@ -2,8 +2,12 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 
+import { FormDialog } from "@/components/form-dialog";
 import { platformGet, platformMutation } from "@/features/platform/client";
-import { buildSubscriptionUpdate } from "@/features/platform/subscription-policy";
+import {
+  buildSubscriptionUpdate,
+  compareSubscriptionPlans,
+} from "@/features/platform/subscription-policy";
 import type {
   PlatformSubscription,
   PlatformSubscriptionDetail,
@@ -11,6 +15,18 @@ import type {
 
 const PLAN_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+const INTERVAL_LABELS: Record<string, string> = {
+  TRIAL: "Trial",
+  MONTHLY: "Monthly",
+  QUARTERLY: "Quarterly",
+  YEARLY: "Yearly",
+  LIFETIME: "Lifetime",
+};
+
+function intervalLabel(value: string): string {
+  return INTERVAL_LABELS[value] ?? value;
+}
 
 function toListItem(detail: PlatformSubscriptionDetail): PlatformSubscription {
   return {
@@ -30,13 +46,14 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (!canManage) return;
     let active = true;
     void platformGet<PlatformSubscription[]>("admin/subscriptions?status=ALL")
       .then((data) => {
-        if (active) setPlans(data);
+        if (active) setPlans([...data].sort(compareSubscriptionPlans));
       })
       .catch((reason: unknown) => {
         if (active) {
@@ -87,8 +104,11 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
       );
       const next = toListItem(detail);
       setPlans((current) =>
-        current.map((item) => (item.id === plan.id ? next : item)),
+        current
+          .map((item) => (item.id === plan.id ? next : item))
+          .sort(compareSubscriptionPlans),
       );
+      setEditingCode(null);
       setSavedId(plan.id);
     } catch (reason) {
       setError(
@@ -102,9 +122,27 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
   }
 
   if (!canManage) {
-    return <p>You do not have access to subscription plans.</p>;
+    return (
+      <p className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm font-semibold text-slate-700 shadow-sm">
+        You do not have access to subscription plans.
+      </p>
+    );
   }
-  if (loading) return <p className="muted">Loading subscription plans.</p>;
+  if (loading) {
+    return (
+      <div className="grid gap-3" role="status">
+        <p className="text-sm font-medium text-slate-500">
+          Loading subscription plans.
+        </p>
+        {[0, 1].map((item) => (
+          <div
+            className="h-24 animate-pulse rounded-2xl bg-slate-200"
+            key={item}
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4">
@@ -114,91 +152,164 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
         </p>
       )}
       {!error && plans.length === 0 && (
-        <p className="muted">No subscription plans found.</p>
+        <p className="rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center text-sm font-semibold text-slate-700 shadow-sm">
+          No subscription plans found.
+        </p>
       )}
-      {plans.map((plan) => (
-        <article
-          key={`${plan.id}:${plan.name}:${plan.status}:${plan.price}:${plan.billing_interval}`}
-          className="rounded-lg border border-slate-200 bg-white p-4"
-          aria-label={`${plan.code} plan`}
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-lg font-bold">{plan.code}</h2>
-            <p>
-              Current status:{" "}
-              <span aria-label={`Current status for ${plan.code}`}>
-                {plan.status}
-              </span>
-            </p>
-          </div>
-          <p className="muted mt-1 text-sm">Currency {plan.currency}</p>
-          <form
-            className="mt-4 grid gap-3 md:grid-cols-2"
-            onSubmit={(event) => void save(event, plan)}
-          >
-            <label className="field">
-              <span>Name for {plan.code}</span>
-              <input
-                className="input"
-                name="name"
-                defaultValue={plan.name}
-                maxLength={100}
-                required
-                disabled={pendingId !== null}
-              />
-            </label>
-            <label className="field">
-              <span>Price for {plan.code}</span>
-              <input
-                className="input"
-                name="price"
-                inputMode="decimal"
-                defaultValue={plan.price}
-                required
-                disabled={pendingId !== null}
-              />
-            </label>
-            <label className="field">
-              <span>Billing interval for {plan.code}</span>
-              <input
-                className="input"
-                name="billing_interval"
-                defaultValue={plan.billing_interval}
-                maxLength={20}
-                required
-                disabled={pendingId !== null}
-              />
-            </label>
-            <label className="field">
-              <span>Status for {plan.code}</span>
-              <select
-                className="input"
-                name="status"
-                defaultValue={plan.status}
-                disabled={pendingId !== null}
-              >
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="RETIRED">RETIRED</option>
-              </select>
-            </label>
-            <button
-              className="button button-edit md:col-span-2"
-              type="submit"
-              disabled={pendingId !== null}
-            >
-              {pendingId === plan.id ? "Saving…" : `Save ${plan.code}`}
-            </button>
-          </form>
-          {savedId === plan.id && (
+      {plans.length > 0 ? (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {savedId ? (
             <p
-              className="mt-3 text-sm font-medium text-emerald-700"
+              className="border-b border-slate-100 px-5 py-3 text-sm font-medium text-emerald-700"
               role="status"
             >
-              {plan.code} was updated.
+              {plans.find((plan) => plan.id === savedId)?.code} was updated.
             </p>
-          )}
-        </article>
-      ))}
+          ) : null}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[44rem] text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                  <th className="px-5 py-3" scope="col">
+                    Plan
+                  </th>
+                  <th className="px-5 py-3" scope="col">
+                    Interval
+                  </th>
+                  <th className="px-5 py-3" scope="col">
+                    Price
+                  </th>
+                  <th className="px-5 py-3" scope="col">
+                    Currency
+                  </th>
+                  <th className="px-5 py-3" scope="col">
+                    Status
+                  </th>
+                  <th className="px-5 py-3" scope="col">
+                    <span className="sr-only">Edit</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {plans.map((plan) => (
+                  <tr
+                    aria-label={`${plan.code} plan`}
+                    className="bg-white hover:bg-slate-50"
+                    key={`${plan.id}:${plan.name}:${plan.status}:${plan.price}:${plan.billing_interval}`}
+                    role="article"
+                  >
+                    <td className="px-5 py-4">
+                      <p className="font-bold text-slate-900">{plan.name}</p>
+                      <p className="mt-0.5 text-xs font-medium text-slate-500">
+                        {plan.code}
+                      </p>
+                    </td>
+                    <td className="px-5 py-4 text-slate-700">
+                      {intervalLabel(plan.billing_interval)}
+                    </td>
+                    <td className="px-5 py-4 font-semibold text-slate-800 tabular-nums">
+                      {plan.price}
+                    </td>
+                    <td className="px-5 py-4 font-medium text-slate-700">
+                      {plan.currency}
+                    </td>
+                    <td className="px-5 py-4">
+                      <span
+                        aria-label={`Current status for ${plan.code}`}
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
+                          plan.status === "ACTIVE"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {plan.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <button
+                        aria-label={`Edit ${plan.code}`}
+                        className="button button-edit button-sm"
+                        onClick={() => setEditingCode(plan.code)}
+                        type="button"
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+      {plans.map((plan) =>
+        editingCode === plan.code ? (
+          <FormDialog
+            key={plan.id}
+            onClose={() => {
+              if (pendingId === null) setEditingCode(null);
+            }}
+            onSubmit={(event) => void save(event, plan)}
+            pending={pendingId === plan.id}
+            title={`Edit ${plan.code}`}
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="field">
+                <span>Name for {plan.code}</span>
+                <input
+                  className="input"
+                  name="name"
+                  defaultValue={plan.name}
+                  maxLength={100}
+                  required
+                  disabled={pendingId !== null}
+                />
+              </label>
+              <label className="field">
+                <span>Price for {plan.code}</span>
+                <input
+                  className="input"
+                  name="price"
+                  inputMode="decimal"
+                  defaultValue={plan.price}
+                  required
+                  disabled={pendingId !== null}
+                />
+              </label>
+              <label className="field">
+                <span>Billing interval for {plan.code}</span>
+                <input
+                  className="input"
+                  name="billing_interval"
+                  defaultValue={plan.billing_interval}
+                  maxLength={20}
+                  required
+                  disabled={pendingId !== null}
+                />
+              </label>
+              <label className="field">
+                <span>Status for {plan.code}</span>
+                <select
+                  className="input"
+                  name="status"
+                  defaultValue={plan.status}
+                  disabled={pendingId !== null}
+                >
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="RETIRED">RETIRED</option>
+                </select>
+              </label>
+              <button
+                className="button button-edit md:col-span-2"
+                type="submit"
+                disabled={pendingId !== null}
+              >
+                {pendingId === plan.id ? "Saving…" : `Save ${plan.code}`}
+              </button>
+            </div>
+          </FormDialog>
+        ) : null,
+      )}
     </div>
   );
 }

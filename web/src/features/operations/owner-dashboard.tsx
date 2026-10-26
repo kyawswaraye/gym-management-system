@@ -144,7 +144,7 @@ export function OwnerDashboard() {
     : 0;
   return (
     <div className="grid gap-8">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <section className="rounded-2xl bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-bold tracking-[0.16em] text-slate-500 uppercase">
@@ -163,8 +163,8 @@ export function OwnerDashboard() {
                     aria-pressed={selected}
                     className={
                       selected
-                        ? "shrink-0 rounded-lg bg-slate-800 px-3.5 py-2 text-sm font-semibold text-white shadow-sm"
-                        : "shrink-0 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                        ? "shrink-0 rounded-lg border border-[#0866ff] bg-[#e7f3ff] px-3.5 py-2 text-sm font-semibold text-[#0866ff]"
+                        : "shrink-0 rounded-lg border border-transparent bg-slate-100 px-3.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
                     }
                     key={item.value}
                     onClick={() => selectPreset(item.value)}
@@ -235,7 +235,7 @@ export function OwnerDashboard() {
             />
           ))}
         </div>
-        <div className="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid overflow-hidden rounded-2xl bg-white shadow-sm sm:grid-cols-2 xl:grid-cols-3">
           {MEMBERSHIP_METRICS.map((metric) => (
             <div
               className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4 last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0 xl:border-r xl:[&:nth-child(3n)]:border-r-0 xl:[&:nth-last-child(-n+3)]:border-b-0"
@@ -252,7 +252,7 @@ export function OwnerDashboard() {
         </div>
       </section>
       {financial === null ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
+        <div className="rounded-2xl bg-white p-6 text-sm text-slate-600 shadow-sm">
           Financial totals are not included in this response.
         </div>
       ) : (
@@ -262,7 +262,7 @@ export function OwnerDashboard() {
             id="dashboard-financial"
             title="Financial totals"
           />
-          <div className="grid overflow-hidden rounded-2xl bg-slate-800 text-white shadow-lg shadow-slate-900/10 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <FinancialMetric
               label="Total revenue"
               value={money(financial.total_revenue)}
@@ -277,7 +277,6 @@ export function OwnerDashboard() {
               value={money(financial.total_expenses)}
             />
             <FinancialMetric
-              accent
               label="Net profit"
               value={money(financial.net_profit)}
             />
@@ -306,7 +305,7 @@ export function OwnerDashboard() {
                       </div>
                       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
                         <div
-                          className="h-full rounded-full bg-amber-400"
+                          className="h-full rounded-full bg-[#0866ff]"
                           style={{ width: `${width}%` }}
                         />
                       </div>
@@ -343,7 +342,7 @@ export function OwnerDashboard() {
             <ul className="grid gap-3 md:grid-cols-2">
               {financial.top_product_items.map((item) => (
                 <li
-                  className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4"
+                  className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 p-4"
                   key={item.product_id}
                 >
                   <span>
@@ -385,11 +384,7 @@ function Metric({
   detail: string;
 }) {
   return (
-    <article className="relative min-h-36 overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <span
-        className="absolute top-0 left-0 h-full w-1 bg-slate-700"
-        aria-hidden="true"
-      />
+    <article className="min-h-36 rounded-2xl bg-white p-5 shadow-sm">
       <p className="text-sm font-semibold text-slate-500">{label}</p>
       <p className="mt-3 text-3xl font-black tracking-tight text-slate-900">
         {value}
@@ -410,7 +405,7 @@ function SectionHeading({
 }) {
   return (
     <div>
-      <p className="text-xs font-bold tracking-[0.16em] text-amber-600 uppercase">
+      <p className="text-xs font-bold tracking-[0.16em] text-[#0866ff] uppercase">
         {eyebrow}
       </p>
       <h2
@@ -424,27 +419,23 @@ function SectionHeading({
 }
 
 function FinancialMetric({
-  accent = false,
   detail,
   label,
   value,
 }: {
-  accent?: boolean;
   detail?: string;
   label: string;
   value: string;
 }) {
   return (
-    <article
-      className={`border-b border-white/10 p-5 last:border-b-0 md:border-r md:[&:nth-child(2n)]:border-r-0 xl:border-b-0 xl:[&:nth-child(2n)]:border-r xl:last:border-r-0 ${
-        accent ? "bg-amber-400 text-slate-950" : ""
-      }`}
-    >
-      <p className="text-xs font-bold tracking-wide uppercase opacity-65">
+    <article className="rounded-2xl bg-white p-5 shadow-sm">
+      <p className="text-xs font-bold tracking-wide text-slate-500 uppercase">
         {label}
       </p>
-      <p className="mt-3 text-2xl font-black tracking-tight">{value}</p>
-      {detail && <p className="mt-2 text-xs opacity-60">{detail}</p>}
+      <p className="mt-3 text-2xl font-black tracking-tight text-slate-900">
+        {value}
+      </p>
+      {detail && <p className="mt-2 text-xs text-slate-500">{detail}</p>}
     </article>
   );
 }
@@ -457,7 +448,7 @@ function DashboardPanel({
   title: string;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+    <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
       <h3 className="mb-5 text-base font-bold text-slate-900">{title}</h3>
       {children}
     </section>

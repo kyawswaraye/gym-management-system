@@ -298,7 +298,7 @@ describe("Member detail summary", () => {
       screen.getByRole("heading", { name: "Payment summary" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Save changes" }),
+      screen.getByRole("button", { name: "Edit profile" }),
     ).toBeInTheDocument();
   });
 
@@ -338,9 +338,9 @@ describe("Member detail summary", () => {
         memberId={MEMBER_ID}
       />,
     );
-    expect(
-      await screen.findByRole("button", { name: "Save changes" }),
-    ).toBeInTheDocument();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit profile" }),
+    );
     screen.getByRole("button", { name: "Save changes" }).click();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -901,6 +901,9 @@ describe("Member profile editor", () => {
 
   it("keeps profile editing available without file permissions", async () => {
     renderDetail({ canUpdate: true });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit profile" }),
+    );
 
     expect(await screen.findByLabelText("Notes")).toHaveValue("Morning visits");
     expect(screen.getByLabelText("First name")).toHaveValue("Ada");
@@ -929,6 +932,9 @@ describe("Member profile editor", () => {
 
   it("saves the writable profile and blank nullable fields", async () => {
     renderDetail({ canUpdate: true });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit profile" }),
+    );
     expect(await screen.findByLabelText("Phone")).toHaveValue("555");
 
     fireEvent.change(screen.getByLabelText("First name"), {
@@ -1014,6 +1020,9 @@ describe("Member profile editor", () => {
       new Error("Unable to update member."),
     );
     renderDetail({ canUpdate: true });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit profile" }),
+    );
     const firstName = await screen.findByLabelText("First name");
     fireEvent.change(firstName, { target: { value: "Grace" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
@@ -1041,12 +1050,24 @@ describe("Member profile editor", () => {
       member({ first_name: "Pat" }),
     );
     renderDetail({ canUpdate: true });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit profile" }),
+    );
     const firstName = await screen.findByLabelText("First name");
     fireEvent.change(firstName, { target: { value: "Grace" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-    expect(await screen.findByDisplayValue("Pat")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Edit profile" }),
+      ).not.toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit profile" }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("First name")).toHaveValue("Pat"),
+    );
     expect(screen.queryByDisplayValue("Ada")).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Grace")).not.toBeInTheDocument();
     expect(screen.getByText("Total charged")).toBeInTheDocument();
   });
 });
@@ -1461,6 +1482,7 @@ describe("Member profile photo", () => {
     expect(screen.queryByText("Profile photo saved.")).not.toBeInTheDocument();
     expect(screen.queryByText(/could not be removed/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit profile" }));
     expect(screen.getByLabelText("First name")).toHaveValue("Grace");
     expect(operationMutation).not.toHaveBeenCalled();
     expect(deleteFileAsset).not.toHaveBeenCalled();
@@ -1517,6 +1539,7 @@ describe("Member profile photo", () => {
     expect(await screen.findByText("No profile photo.")).toBeInTheDocument();
     expect(screen.queryByText("Profile photo saved.")).not.toBeInTheDocument();
     expect(screen.queryByText(/could not be removed/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit profile" }));
     expect(screen.getByLabelText("First name")).toHaveValue("Grace");
     expect(operationMutation).toHaveBeenCalledTimes(1);
     expect(operationMutation).toHaveBeenCalledWith(

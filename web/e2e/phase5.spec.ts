@@ -34,6 +34,7 @@ test("owner assigns trainers and prepares the catalogs", async ({ page }) => {
   await expect(
     links.getByRole("link", { name: "Check-in QR", exact: true }),
   ).toHaveCount(0);
+  await links.getByRole("button", { name: "Training", exact: true }).click();
   await expect(
     links.getByRole("link", { name: "Commissions", exact: true }),
   ).toBeVisible();
@@ -57,17 +58,18 @@ test("owner assigns trainers and prepares the catalogs", async ({ page }) => {
   await page.goto("/pt/packages");
   await savePackage(page, {
     type: "PT",
-    code: "E2EPT",
     name: "E2E PT pack",
     sessions: "4",
     price: "80.00",
   });
 
   await page.goto("/classes");
-  const classType = page.locator("form").filter({
-    has: page.getByRole("button", { name: "Create class type", exact: true }),
-  });
-  await classType.getByLabel("Code", { exact: true }).fill("E2ECYCLE");
+  await page.getByRole("tab", { name: "Class types", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Create class type", exact: true })
+    .click();
+  const classType = titledForm(page, "create-class-type-title");
+  await expect(classType).toBeVisible();
   await classType.getByLabel("Name", { exact: true }).fill("E2E Cycle");
   await classType
     .getByLabel("Default duration minutes", { exact: true })
@@ -78,15 +80,15 @@ test("owner assigns trainers and prepares the catalogs", async ({ page }) => {
       .getByRole("button", { name: "Create class type", exact: true })
       .click(),
   );
+  await expect(classType).toBeHidden();
 
   await page.goto("/pt/packages");
   await savePackage(page, {
     type: "CLASS",
-    code: "E2ECLASS",
     name: "E2E Class pack",
     sessions: "4",
     price: "0.00",
-    classType: /E2ECYCLE/,
+    classType: /E2E_CYCLE/,
   });
 
   await page.goto("/pt/member-packages");
@@ -96,7 +98,7 @@ test("owner assigns trainers and prepares the catalogs", async ({ page }) => {
   const grant = titledForm(page, "grant-title");
   await expect(grant).toBeVisible();
   await pickMember(grant, "E2Escan", /E2Escan Visitor/);
-  await selectByText(combo(grant, "Package"), "CLASS · E2ECLASS");
+  await selectByText(combo(grant, "Package"), "CLASS · E2E_CLASS_PACK");
   await grant.getByLabel("Reason", { exact: true }).fill("E2E class grant");
   await runCommand(page, /\/member-service-packages\/?$/, () =>
     grant.getByRole("button", { name: "Save grant", exact: true }).click(),
@@ -114,15 +116,17 @@ test("reception submits packaged cash sales and cannot approve", async ({
   const assertResponses = watchJsonResponses(page, secretValues(accounts));
   await signIn(page, receptionAccount);
   const links = page.getByRole("navigation", { name: "Primary" });
+  await links.getByRole("button", { name: "Training", exact: true }).click();
   await expect(
     links.getByRole("link", { name: "PT sales", exact: true }),
   ).toBeVisible();
   await expect(
-    links.getByRole("link", { name: "Cash book", exact: true }),
-  ).toBeVisible();
-  await expect(
     links.getByRole("link", { name: "Commissions", exact: true }),
   ).toHaveCount(0);
+  await links.getByRole("button", { name: "Finance", exact: true }).click();
+  await expect(
+    links.getByRole("link", { name: "Cash book", exact: true }),
+  ).toBeVisible();
   await expect(
     links.getByRole("link", { name: "Check-ins", exact: true }),
   ).toBeVisible();
@@ -137,7 +141,7 @@ test("reception submits packaged cash sales and cannot approve", async ({
     trainer: "E2E Trainer (E2ETRN)",
     description: "E2E consumed pack",
     gross: "100.00",
-    packageLabel: "E2EPT",
+    packageLabel: "E2E_PT_PACK",
     payment: "100.00",
   });
   await submitOpenSale(page);
@@ -185,7 +189,7 @@ test("owner approves reception sales with the open cash session", async ({
   await expect(saleDetail(page)).toContainText("POSTED");
 
   await page.goto("/pt/member-packages");
-  const grant = page.locator("li").filter({ hasText: "E2EPT" });
+  const grant = page.locator("li").filter({ hasText: "E2E_PT_PACK" });
   await expect(grant).toHaveCount(1);
   await grant.getByRole("button").click();
   await expect(
@@ -238,7 +242,7 @@ test("manager pays the trainer commission and a consumed sale does not void", as
   await booking
     .getByLabel("Ends", { exact: true })
     .fill(`${past.date}T${past.end}`);
-  await selectByText(combo(booking, "Member package"), "E2EPT");
+  await selectByText(combo(booking, "Member package"), "E2E_PT_PACK");
   await runCommand(page, /\/pt-bookings\/?$/, () =>
     booking.getByRole("button", { name: "Save booking", exact: true }).click(),
   );
@@ -284,13 +288,13 @@ test("manager pays the trainer commission and a consumed sale does not void", as
   const consumed = page
     .locator("li")
     .filter({ hasText: "ACTIVE · remaining 3 of 4" });
-  await consumed.getByRole("button", { name: /E2EPT/ }).click();
+  await consumed.getByRole("button", { name: /E2E_PT_PACK/ }).click();
   const ledger = page.getByRole("region", { name: "Session ledger" });
   await expect(ledger).toContainText("GRANT · 4");
   await expect(ledger).toContainText("ATTENDED · -1");
   await expect(ledger).not.toContainText("REFUND");
   await page.goto("/cash-book");
-  await page.getByRole("button", { name: "E2EPT", exact: true }).click();
+  await page.getByRole("button", { name: "E2E_PT_PACK", exact: true }).click();
   await expect(
     movements(page).getByRole("cell", { name: "100.00 THB" }),
   ).toHaveCount(1);
@@ -308,7 +312,7 @@ test("reception submits the untouched packaged sale", async ({ page }) => {
     trainer: "E2E Trainer (E2ETRN)",
     description: "E2E untouched pack",
     gross: "80.00",
-    packageLabel: "E2EPT",
+    packageLabel: "E2E_PT_PACK",
     payment: "80.00",
   });
   await submitOpenSale(page);
@@ -326,7 +330,9 @@ test("owner approves the untouched sale", async ({ page }) => {
   await approveCashSale(page);
   await expect(saleDetail(page)).toContainText("POSTED");
   await page.goto("/pt/member-packages");
-  await expect(page.locator("li").filter({ hasText: "E2EPT" })).toHaveCount(2);
+  await expect(
+    page.locator("li").filter({ hasText: "E2E_PT_PACK" }),
+  ).toHaveCount(2);
   await expectNoBrowserSecrets(page, secretValues(accounts));
   await assertResponses();
 });
@@ -361,19 +367,19 @@ test("manager voids the untouched sale and runs the class cutoff", async ({
   const refunded = page
     .locator("li")
     .filter({ hasText: "VOID · remaining 0 of 4" });
-  await refunded.getByRole("button", { name: /E2EPT/ }).click();
+  await refunded.getByRole("button", { name: /E2E_PT_PACK/ }).click();
   const ledger = page.getByRole("region", { name: "Session ledger" });
   await expect(ledger).toContainText("GRANT · 4");
   await expect(ledger).toContainText("REFUND · -4");
   const consumed = page
     .locator("li")
     .filter({ hasText: "ACTIVE · remaining 3 of 4" });
-  await consumed.getByRole("button", { name: /E2EPT/ }).click();
+  await consumed.getByRole("button", { name: /E2E_PT_PACK/ }).click();
   await expect(ledger).toContainText("ATTENDED · -1");
   await expect(ledger).not.toContainText("REFUND");
 
   await page.goto("/cash-book");
-  await page.getByRole("button", { name: "E2EPT", exact: true }).click();
+  await page.getByRole("button", { name: "E2E_PT_PACK", exact: true }).click();
   const table = movements(page);
   await expect(table.getByRole("cell", { name: "100.00 THB" })).toHaveCount(1);
   await expect(table.getByRole("cell", { name: "80.00 THB" })).toHaveCount(2);
@@ -414,11 +420,6 @@ test("manager voids the untouched sale and runs the class cutoff", async ({
     from: late.date,
     location: "E2E Late",
   });
-  await selectByText(
-    page.locator("select[name='class_occurrence_id']"),
-    "E2E Early",
-  );
-
   await bookClass(page, /E2E Early/);
   await cancelClassBooking(page, "Before cutoff", 200);
   await bookClass(page, /E2E Attend/);
@@ -437,7 +438,7 @@ test("manager voids the untouched sale and runs the class cutoff", async ({
   await page.goto("/pt/member-packages");
   await page
     .locator("li")
-    .filter({ hasText: "E2ECLASS" })
+    .filter({ hasText: "E2E_CLASS_PACK" })
     .getByRole("button")
     .click();
   await expect(
@@ -500,6 +501,7 @@ test("trainer sees only one commission and scans an assigned member", async ({
 
   await signIn(page, trainerAccount);
   const links = page.getByRole("navigation", { name: "Primary" });
+  await links.getByRole("button", { name: "Training", exact: true }).click();
   await expect(
     links.getByRole("link", { name: "Commissions", exact: true }),
   ).toBeVisible();
@@ -532,19 +534,24 @@ test("trainer sees only one commission and scans an assigned member", async ({
     page.getByRole("heading", { name: "Trainer QR scan", exact: true }),
   ).toBeVisible();
   await page
+    .getByRole("button", { name: "Scan check-in code", exact: true })
+    .click();
+  const scan = page.getByRole("dialog", { name: "Trainer QR scan" });
+  await scan
     .getByLabel("Search assigned members", { exact: true })
     .fill("E2Eother");
-  await expect(combo(page, "Assigned member")).not.toContainText("E2Eother");
-  await page.getByLabel("Search assigned members", { exact: true }).fill("");
-  await selectByText(combo(page, "Assigned member"), "E2Eassigned Member");
-  await page.getByLabel("Check-in code", { exact: true }).fill(firstCode);
-  await page
+  await expect(combo(scan, "Assigned member")).not.toContainText("E2Eother");
+  await scan.getByLabel("Search assigned members", { exact: true }).fill("");
+  await selectByText(combo(scan, "Assigned member"), "E2Eassigned Member");
+  await scan.getByLabel("Check-in code", { exact: true }).fill(firstCode);
+  await scan
     .getByRole("button", { name: "Scan check-in code", exact: true })
     .click();
   await expectNotice(page, "Checked in from the trainer code.");
-  await expect(page.getByLabel("Check-in code", { exact: true })).toHaveValue(
-    "",
-  );
+  await expect(
+    page.getByRole("dialog", { name: "Trainer QR scan" }),
+  ).toHaveCount(0);
+  await expect(page.getByText(firstCode, { exact: true })).toHaveCount(0);
   const storedCode = await page.evaluate(() => {
     const blob = JSON.stringify({
       localStorage: Object.entries(localStorage),
@@ -861,17 +868,15 @@ async function pickMember(
 
 async function openTill(page: Page): Promise<void> {
   await page.goto("/cash-book");
-  const open = page.locator("form").filter({
-    has: page.getByRole("button", { name: "Open session", exact: true }),
-  });
-  await open.getByLabel("Register code", { exact: true }).fill("E2EPT");
+  await page.getByRole("button", { name: "Open session", exact: true }).click();
+  const open = page.getByRole("dialog", { name: "Open session" });
   await open.getByLabel(/Opening cash/).fill("500.00");
   await runCommand(page, /\/cash-sessions\/open\/?$/, () =>
     open.getByRole("button", { name: "Open session", exact: true }).click(),
   );
   await expect(
     page.getByRole("region", { name: "Session detail" }),
-  ).toContainText("E2EPT");
+  ).toContainText("MAIN");
 }
 
 async function assign(
@@ -897,7 +902,6 @@ async function savePackage(
   page: Page,
   input: {
     type: "PT" | "CLASS";
-    code: string;
     name: string;
     sessions: string;
     price: string;
@@ -910,7 +914,6 @@ async function savePackage(
   const form = titledForm(page, "create-package-title");
   await expect(form).toBeVisible();
   await combo(form, "Type").selectOption(input.type);
-  await form.getByLabel("Code", { exact: true }).fill(input.code);
   await form.getByLabel("Name", { exact: true }).fill(input.name);
   await form.getByLabel("Sessions", { exact: true }).fill(input.sessions);
   await form.getByLabel("Validity", { exact: true }).fill("3");
@@ -918,7 +921,7 @@ async function savePackage(
   if (input.classType) {
     await selectByText(
       combo(form, "Class type for a CLASS package"),
-      "E2ECYCLE",
+      "E2E_CYCLE",
     );
   }
   await runCommand(page, /\/service-packages\/?$/, () =>
@@ -976,7 +979,7 @@ async function openSale(page: Page, gross: string): Promise<void> {
 }
 
 async function chooseSession(scope: Locator, label: string): Promise<void> {
-  await selectByText(combo(scope, label), "E2EPT");
+  await selectByText(combo(scope, label), "MAIN");
 }
 
 async function approveCashSale(page: Page): Promise<void> {
@@ -1015,10 +1018,13 @@ async function createSchedule(
     location: string;
   },
 ): Promise<void> {
-  const form = page.locator("form").filter({
-    has: page.getByRole("button", { name: "Create schedule", exact: true }),
-  });
-  await selectByText(combo(form, "Class type"), "E2ECYCLE");
+  await page.getByRole("tab", { name: "Schedules", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Create schedule", exact: true })
+    .click();
+  const form = titledForm(page, "create-schedule-title");
+  await expect(form).toBeVisible();
+  await selectByText(combo(form, "Class type"), "E2E_CYCLE");
   await selectByText(combo(form, "Trainer"), "E2E Trainer (E2ETRN)");
   for (const [index, label] of WEEKDAYS.entries()) {
     const box = form.getByRole("checkbox", { name: label, exact: true });
@@ -1034,23 +1040,23 @@ async function createSchedule(
   await runCommand(page, /\/class-schedules\/?$/, () =>
     form.getByRole("button", { name: "Create schedule", exact: true }).click(),
   );
-  await expect(
-    form.getByRole("button", { name: "Create schedule", exact: true }),
-  ).toBeEnabled();
+  await expect(form).toBeHidden();
 }
 
 async function bookClass(page: Page, occurrence: RegExp): Promise<void> {
-  const form = page.locator("form").filter({
-    has: page.getByRole("heading", { name: "Book a class", exact: true }),
-  });
+  await page.getByRole("tab", { name: "This week", exact: true }).click();
+  await page.getByRole("button", { name: "Book a class", exact: true }).click();
+  const form = titledForm(page, "book-class-title");
+  await expect(form).toBeVisible();
   await selectByText(combo(form, "Occurrence"), occurrence.source);
   await pickMember(form, "E2Escan", /E2Escan Visitor/);
-  await selectByText(combo(form, "Class package"), "E2ECLASS");
+  await selectByText(combo(form, "Class package"), "E2E_CLASS_PACK");
   await runCommand(page, /\/class-bookings\/?$/, () =>
     form
       .getByRole("button", { name: "Save class booking", exact: true })
       .click(),
   );
+  await expect(form).toBeHidden();
 }
 
 async function cancelClassBooking(

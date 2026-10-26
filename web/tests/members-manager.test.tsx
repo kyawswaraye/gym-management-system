@@ -8,11 +8,21 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { listMembers, operationMutation } from "@/features/operations/client";
+import {
+  getGymSettings,
+  listMembers,
+  operationMutation,
+} from "@/features/operations/client";
 import { MembersManager } from "@/features/operations/members-manager";
-import type { Member, MemberListPage, MemberListQuery } from "@/types/api";
+import type {
+  GymSettings,
+  Member,
+  MemberListPage,
+  MemberListQuery,
+} from "@/types/api";
 
 vi.mock("@/features/operations/client", () => ({
+  getGymSettings: vi.fn(),
   listMembers: vi.fn(),
   operationMutation: vi.fn(),
 }));
@@ -412,6 +422,7 @@ describe("Members manager", () => {
         status: "ACTIVE",
       }),
     );
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
     fireEvent.change(screen.getByLabelText("First name"), {
       target: { value: "Grace" },
     });
@@ -751,10 +762,16 @@ describe("Members manager", () => {
   it("normalizes a full create form and blank nullable fields", async () => {
     render(<MembersManager canCreate defaultDate="2026-10-17" />);
     expect(await screen.findByText("MEM-000001")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
 
-    fireEvent.change(screen.getByLabelText("Member number"), {
-      target: { value: "  " },
-    });
+    const memberNumber = screen.getByLabelText("Member number");
+    expect(memberNumber).toBeDisabled();
+    expect(memberNumber).toHaveValue("");
+    expect(
+      screen.getByText("The gym assigns the next number when you save."),
+    ).toBeInTheDocument();
+    expect(getGymSettings).not.toHaveBeenCalled();
+
     fireEvent.change(screen.getByLabelText("First name"), {
       target: { value: "  Grace   Hopper " },
     });
@@ -774,9 +791,6 @@ describe("Members manager", () => {
       "Enter a first name, last name, and join date.",
     );
 
-    fireEvent.change(screen.getByLabelText("Member number"), {
-      target: { value: "  M-42  " },
-    });
     fireEvent.change(screen.getByLabelText("First name"), {
       target: { value: "  Grace  " },
     });
@@ -829,7 +843,7 @@ describe("Members manager", () => {
 
     await waitFor(() =>
       expect(operationMutation).toHaveBeenCalledWith("members/", {
-        member_number: "M-42",
+        member_number: "",
         first_name: "Grace",
         last_name: "Hopper",
         phone: "+1 555",
@@ -849,6 +863,47 @@ describe("Members manager", () => {
         emergency_contact_phone: "999",
         notes: "Evening visits",
       }),
+    );
+  });
+
+  it("shows the next gym number and keeps it out of the create request", async () => {
+    vi.mocked(getGymSettings).mockResolvedValue({
+      member_number_prefix: "NORTH",
+      next_member_number: 7,
+    } as GymSettings);
+    render(
+      <MembersManager
+        canCreate
+        canPreviewMemberNumber
+        defaultDate="2026-10-17"
+      />,
+    );
+    expect(await screen.findByText("MEM-000001")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
+
+    const memberNumber = screen.getByLabelText("Member number");
+    expect(memberNumber).toBeDisabled();
+    expect(await screen.findByText("Assigned by the gym.")).toBeInTheDocument();
+    expect(memberNumber).toHaveValue("NORTH-000007");
+    expect(getGymSettings).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByLabelText("First name"), {
+      target: { value: "Grace" },
+    });
+    fireEvent.change(screen.getByLabelText("Last name"), {
+      target: { value: "Hopper" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save member" }));
+
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith(
+        "members/",
+        expect.objectContaining({
+          member_number: "",
+          first_name: "Grace",
+          last_name: "Hopper",
+        }),
+      ),
     );
   });
 });

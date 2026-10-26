@@ -339,7 +339,7 @@ class MembershipPlanSerializer(serializers.Serializer):
 
 
 class MembershipPlanCreateSerializer(StrictSerializer):
-    code = serializers.CharField(max_length=32)
+    code = serializers.CharField(required=False, allow_blank=True, default="", max_length=32)
     name = serializers.CharField(max_length=100)
     description = serializers.CharField(
         required=False, allow_blank=True, default="", max_length=4000
@@ -349,6 +349,8 @@ class MembershipPlanCreateSerializer(StrictSerializer):
     price = PlanPriceField()
 
     def validate_code(self, value: str) -> str:
+        if value == "":
+            return ""
         return _plan_code(value)
 
     def validate_name(self, value: str) -> str:

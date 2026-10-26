@@ -68,7 +68,6 @@ PROFILE_MAX_LENGTHS = {
     "currency": 3,
 }
 _TIMEZONE_ALIASES = {"Asia/Rangoon": "Asia/Yangon"}
-_CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 _PREFIX_RE = re.compile(r"^[A-Z0-9-]{1,20}$")
 _WARNING_DAY_LIMIT = 366
 
@@ -82,10 +81,13 @@ def normalize_timezone(value: str) -> str:
     return canonical
 
 
+ALLOWED_GYM_CURRENCIES = frozenset({"THB", "MMK"})
+
+
 def normalize_currency(value: str) -> str:
     currency = value.strip().upper()
-    if _CURRENCY_RE.fullmatch(currency) is None:
-        raise serializers.ValidationError("Enter a three-letter ISO currency code.")
+    if currency not in ALLOWED_GYM_CURRENCIES:
+        raise serializers.ValidationError("Choose THB or MMK.")
     return currency
 
 
