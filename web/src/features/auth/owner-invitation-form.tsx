@@ -63,7 +63,12 @@ export function OwnerInvitationForm({ token }: { token: string }) {
       )}
       <div className="field">
         <label htmlFor={passwordId}>Password</label>
-        <PasswordInput id={passwordId} name="password" minLength={12} required />
+        <PasswordInput
+          id={passwordId}
+          name="password"
+          minLength={12}
+          required
+        />
       </div>
       <div className="field">
         <label htmlFor={confirmId}>Confirm password</label>

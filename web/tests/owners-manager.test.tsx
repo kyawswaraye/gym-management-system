@@ -166,9 +166,9 @@ describe("Owner management", () => {
       within(dialog).getByRole("button", { name: "Remove invitation" }),
     );
 
-    expect(
-      await within(dialog).findByRole("alert"),
-    ).toHaveTextContent("Django route is not allowed.");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Django route is not allowed.",
+    );
     expect(
       screen.getByRole("dialog", { name: "Remove wrong@example.test?" }),
     ).toBeInTheDocument();
