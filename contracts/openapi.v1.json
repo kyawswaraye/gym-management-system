@@ -10064,6 +10064,12 @@
                 "responses": {
                     "200": {
                         "content": {
+                            "image/*": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            },
                             "application/json": {
                                 "schema": {
                                     "type": "string",
@@ -10075,6 +10081,11 @@
                     },
                     "401": {
                         "content": {
+                            "image/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            },
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ErrorEnvelope"
@@ -10085,6 +10096,11 @@
                     },
                     "403": {
                         "content": {
+                            "image/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            },
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ErrorEnvelope"
@@ -10095,6 +10111,11 @@
                     },
                     "404": {
                         "content": {
+                            "image/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            },
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ErrorEnvelope"

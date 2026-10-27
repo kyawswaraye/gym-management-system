@@ -14703,6 +14703,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          "image/*": string;
           "application/json": string;
         };
       };
@@ -14711,6 +14712,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          "image/*": components["schemas"]["ErrorEnvelope"];
           "application/json": components["schemas"]["ErrorEnvelope"];
         };
       };
@@ -14719,6 +14721,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          "image/*": components["schemas"]["ErrorEnvelope"];
           "application/json": components["schemas"]["ErrorEnvelope"];
         };
       };
@@ -14727,6 +14730,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          "image/*": components["schemas"]["ErrorEnvelope"];
           "application/json": components["schemas"]["ErrorEnvelope"];
         };
       };
