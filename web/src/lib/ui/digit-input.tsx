@@ -22,9 +22,7 @@ function atLeastOne(min: number | string | undefined): boolean {
   return Number.isFinite(value) && value >= 1;
 }
 
-function changeEvent(
-  input: HTMLInputElement,
-): ChangeEvent<HTMLInputElement> {
+function changeEvent(input: HTMLInputElement): ChangeEvent<HTMLInputElement> {
   return {
     currentTarget: input,
     target: input,

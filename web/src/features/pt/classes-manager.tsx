@@ -2008,7 +2008,8 @@ export function ClassesManager({
                 <option value="">{tx("Select an occurrence")}</option>
                 {scheduled.map((row) => (
                   <option key={row.id} title={row.class_type_id} value={row.id}>
-                    {formatAppDate(row.local_date)} · {occurrenceClock(row)} · {row.location} ·{" "}
+                    {formatAppDate(row.local_date)} · {occurrenceClock(row)} ·{" "}
+                    {row.location} ·{" "}
                     {typeName(row.class_type_id) ??
                       compactIdentifier(row.class_type_id)}{" "}
                     {tx("· capacity")} {row.capacity}

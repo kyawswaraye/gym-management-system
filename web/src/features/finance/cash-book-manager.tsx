@@ -871,7 +871,8 @@ export function CashBookManager({
               </h2>
               {session ? (
                 <p className="mt-1 text-sm text-slate-500">
-                  {session.register_code} · {formatAppDate(session.business_date)}
+                  {session.register_code} ·{" "}
+                  {formatAppDate(session.business_date)}
                 </p>
               ) : (
                 <p className="mt-1 text-sm text-slate-500">

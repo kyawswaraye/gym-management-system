@@ -1041,8 +1041,9 @@ export function RetailSalesManager({
                         {tx("Sale")}{" "}
                       </p>
                       <p className="mt-1 text-sm text-slate-500">
-                        {formatAppDate(sale.business_date)} · {tx(pretty(sale.payment_method))}{" "}
-                        · {memberLabel(members, sale.member_id, tx)}
+                        {formatAppDate(sale.business_date)} ·{" "}
+                        {tx(pretty(sale.payment_method))} ·{" "}
+                        {memberLabel(members, sale.member_id, tx)}
                       </p>
                     </div>
                     <StatusPill status={sale.status} />

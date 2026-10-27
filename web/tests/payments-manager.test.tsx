@@ -948,9 +948,7 @@ describe("payments manager", () => {
     vi.mocked(getPayment).mockResolvedValue(posted);
     const hidden = renderPayments();
     fireEvent.click(await screen.findByRole("button", { name: "Locker key" }));
-    expect(
-      await screen.findByRole("button", { name: "Refund" }),
-    ).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Refund" })).toBeVisible();
     expect(
       screen.queryByRole("link", { name: "Print receipt" }),
     ).not.toBeInTheDocument();
@@ -983,10 +981,7 @@ describe("payments manager", () => {
     const postedLink = await screen.findByRole("link", {
       name: "Print receipt",
     });
-    expect(postedLink).toHaveAttribute(
-      "href",
-      `/receipts/${RECEIPT_ID}/print`,
-    );
+    expect(postedLink).toHaveAttribute("href", `/receipts/${RECEIPT_ID}/print`);
     expect(postedLink).toHaveAttribute("rel", "noopener noreferrer");
     expect(postedLink).toHaveAttribute("target", "_blank");
     expect(listReceipts).toHaveBeenCalledWith({
@@ -1007,9 +1002,9 @@ describe("payments manager", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Confirm refund" }));
     await waitFor(() => {
-      expect(screen.getAllByRole("link", { name: "Print receipt" })).toHaveLength(
-        2,
-      );
+      expect(
+        screen.getAllByRole("link", { name: "Print receipt" }),
+      ).toHaveLength(2);
     });
     expect(
       screen

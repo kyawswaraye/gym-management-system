@@ -70,9 +70,9 @@ function PaymentHistory({
 }) {
   const tx = useTx();
   const [payments, setPayments] = useState<MemberPaymentHistoryItem[]>([]);
-  const [receiptByPayment, setReceiptByPayment] = useState<
-    Map<string, string>
-  >(new Map());
+  const [receiptByPayment, setReceiptByPayment] = useState<Map<string, string>>(
+    new Map(),
+  );
   const [nextAfter, setNextAfter] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -122,23 +122,27 @@ function PaymentHistory({
   useEffect(() => {
     if (!canViewReceipts) return undefined;
     let active = true;
-    setReceiptByPayment(new Map());
-    void listReceipts({ member: memberId, status: "ISSUED", limit: "100" })
-      .then((page) => {
-        if (!active) return;
-        const next = new Map<string, string>();
-        for (const row of page.data) {
-          if (row.status === "ISSUED" && row.payment_id) {
-            next.set(row.payment_id.toLowerCase(), row.id);
+    const timer = window.setTimeout(() => {
+      if (!active) return;
+      setReceiptByPayment(new Map());
+      void listReceipts({ member: memberId, status: "ISSUED", limit: "100" })
+        .then((page) => {
+          if (!active) return;
+          const next = new Map<string, string>();
+          for (const row of page.data) {
+            if (row.status === "ISSUED" && row.payment_id) {
+              next.set(row.payment_id.toLowerCase(), row.id);
+            }
           }
-        }
-        setReceiptByPayment(next);
-      })
-      .catch(() => {
-        if (active) setReceiptByPayment(new Map());
-      });
+          setReceiptByPayment(next);
+        })
+        .catch(() => {
+          if (active) setReceiptByPayment(new Map());
+        });
+    }, 0);
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
   }, [canViewReceipts, memberId]);
 
@@ -208,8 +212,8 @@ function PaymentHistory({
               className="py-3 text-sm leading-6 text-slate-700 first:pt-1 last:pb-0"
               key={payment.id}
             >
-              {formatAppDate(payment.business_date)} · {tx(payment.entry_type)} ·{" "}
-              {tx(payment.purpose)} · {tx(payment.description)} ·{" "}
+              {formatAppDate(payment.business_date)} · {tx(payment.entry_type)}{" "}
+              · {tx(payment.purpose)} · {tx(payment.description)} ·{" "}
               {payment.amount} {tx(payment.currency)} · {tx(payment.method)} ·{" "}
               {tx(payment.status)}
               {payment.receipt_number
@@ -662,8 +666,10 @@ export function MemberDetail({
                     className="py-3 text-sm leading-6 text-slate-700 first:pt-1 last:pb-0"
                     key={membership.id}
                   >
-                    {membership.plan_name}: {formatAppDate(membership.start_date)} –{" "}
-                    {formatAppDate(membership.expiry_date)} ({tx(membership.status)})
+                    {membership.plan_name}:{" "}
+                    {formatAppDate(membership.start_date)} –{" "}
+                    {formatAppDate(membership.expiry_date)} (
+                    {tx(membership.status)})
                   </li>
                 ))}
               </ul>

@@ -120,10 +120,7 @@ describe("member detail page capability", () => {
     expect(screen.getByText("restore:false")).toBeInTheDocument();
 
     requireSession.mockResolvedValue(
-      session(
-        ["members.view", "payments.view", "receipts.view"],
-        ["members"],
-      ),
+      session(["members.view", "payments.view", "receipts.view"], ["members"]),
     );
     rerender(
       await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),

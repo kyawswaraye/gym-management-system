@@ -593,8 +593,10 @@ export function PaymentsManager({
   useEffect(() => {
     if (!canViewReceipts) return undefined;
     if (!payment || payment.id !== selectedId || payment.status !== "POSTED") {
-      setIssuedReceiptId((current) => (current === null ? current : null));
-      return undefined;
+      const timer = window.setTimeout(() => {
+        setIssuedReceiptId((current) => (current === null ? current : null));
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
     const paymentId = payment.id;
     let active = true;
@@ -792,9 +794,7 @@ export function PaymentsManager({
   const paymentReceiptIds =
     canViewReceipts && payment
       ? issuedPrintIds([
-          issuedReceiptId
-            ? { id: issuedReceiptId, status: "ISSUED" }
-            : null,
+          issuedReceiptId ? { id: issuedReceiptId, status: "ISSUED" } : null,
           correction?.correction_receipt,
           correction?.original_receipt,
         ]).filter((id) => {

@@ -173,6 +173,13 @@ a {
   gap: 0.4rem;
 }
 
+.required-mark::before {
+  content: "*";
+  margin-left: 0.125rem;
+  color: #b91c1c;
+  text-decoration: none;
+}
+
 .input {
   width: 100%;
   min-height: 2.75rem;

@@ -129,11 +129,9 @@ export function Field({
         {required ? (
           <abbr
             aria-hidden="true"
-            className="ml-0.5 text-red-700 no-underline"
+            className="required-mark"
             title={tx("Required")}
-          >
-            *
-          </abbr>
+          />
         ) : null}
       </span>
       {children}

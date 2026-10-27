@@ -262,34 +262,33 @@ export function SalesManager({
     if (!canViewReceipts) return undefined;
     const paymentId =
       selected?.status === "POSTED" ? selected.payment_id : null;
-    if (!paymentId) {
-      setSaleReceiptId((current) => (current === null ? current : null));
-      return undefined;
-    }
     let active = true;
-    setSaleReceiptId(null);
-    void listReceipts({ payment: paymentId, status: "ISSUED", limit: "5" })
-      .then((page) => {
-        if (!active) return;
-        const match = page.data.find(
-          (row) =>
-            row.payment_id.toLowerCase() === paymentId.toLowerCase() &&
-            row.status === "ISSUED",
-        );
-        setSaleReceiptId(match?.id ?? null);
-      })
-      .catch(() => {
-        if (active) setSaleReceiptId(null);
-      });
+    const timer = window.setTimeout(() => {
+      if (!active) return;
+      if (!paymentId) {
+        setSaleReceiptId((current) => (current === null ? current : null));
+        return;
+      }
+      setSaleReceiptId(null);
+      void listReceipts({ payment: paymentId, status: "ISSUED", limit: "5" })
+        .then((page) => {
+          if (!active) return;
+          const match = page.data.find(
+            (row) =>
+              row.payment_id.toLowerCase() === paymentId.toLowerCase() &&
+              row.status === "ISSUED",
+          );
+          setSaleReceiptId(match?.id ?? null);
+        })
+        .catch(() => {
+          if (active) setSaleReceiptId(null);
+        });
+    }, 0);
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
-  }, [
-    canViewReceipts,
-    selected?.id,
-    selected?.payment_id,
-    selected?.status,
-  ]);
+  }, [canViewReceipts, selected?.id, selected?.payment_id, selected?.status]);
 
   useEffect(() => {
     if (mode) {

@@ -27,10 +27,7 @@ function clampIndex(index: number, length: number): number {
   return Math.max(0, Math.min(index, length));
 }
 
-function collapsed(
-  value: string,
-  caret: number,
-): EnglishDigitsCaret {
+function collapsed(value: string, caret: number): EnglishDigitsCaret {
   const bounded = clampIndex(caret, value.length);
   return { value, caret: bounded, selectionEnd: bounded };
 }
@@ -144,7 +141,9 @@ function scanDecimal(
   if (!finalWhole && !dot) {
     return collapsed(sign, spot.kind === "before" ? 0 : sign.length);
   }
-  const text = dot ? `${sign}${finalWhole}.${fraction}` : `${sign}${finalWhole}`;
+  const text = dot
+    ? `${sign}${finalWhole}.${fraction}`
+    : `${sign}${finalWhole}`;
   if (
     insertedZero &&
     ((spot.kind === "before" && !negative) || spot.kind === "sign")

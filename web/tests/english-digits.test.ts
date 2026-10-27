@@ -64,6 +64,11 @@ describe("english digit input", () => {
 
   it("places the caret on the cleaned text", () => {
     const money = { kind: "decimal" as const, scale: 2 };
+    const signedQuantity = {
+      kind: "decimal" as const,
+      scale: 3,
+      allowNegative: true,
+    };
     expect(englishDigitsCaret("1a.00", 2, money)).toEqual({
       value: "1.00",
       caret: 1,
@@ -135,7 +140,10 @@ describe("english digit input", () => {
     input.maxLength = 6;
     input.value = "12";
     input.setSelectionRange(2, 2);
-    expect(pasteEnglishDigits(input, "3 4-56၇8", { kind: "code" })).toBe(6);
+    expect(pasteEnglishDigits(input, "3 4-56၇8", { kind: "code" })).toEqual({
+      start: 6,
+      end: 6,
+    });
     expect(input.value).toBe("123456");
   });
 });

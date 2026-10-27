@@ -1194,7 +1194,11 @@ describe("approve, reject, cancel, and void dialogs", () => {
     const receiptId = "66666666-6666-4666-8666-666666666666";
     const posted = sale("POSTED", {
       payment_id: paymentId,
-      payment: { method: "CARD", status: "POSTED", business_date: "2026-10-19" },
+      payment: {
+        method: "CARD",
+        status: "POSTED",
+        business_date: "2026-10-19",
+      },
     });
     vi.mocked(listPtSales).mockResolvedValue(page([posted]));
     vi.mocked(getPtSale).mockResolvedValue(posted);
