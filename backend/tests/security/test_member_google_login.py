@@ -54,7 +54,7 @@ def _post(monkeypatch: pytest.MonkeyPatch, email: str) -> Response:
     monkeypatch.setattr("apps.users.member_views.verify_google_id_token", lambda token: email)
     return APIClient().post(
         "/api/v1/member-auth/google/",
-        {"id_token": "signed-google-token", "device_name": "pixel"},
+        {"id_token": "signed-google-token-ok", "device_name": "pixel"},
         format="json",
     )
 
@@ -70,7 +70,7 @@ def test_google_sign_in_links_an_active_member_without_a_password(
     data = logged_in.json()["data"]
     assert data["member_id"] == member_id
     assert data["gym_id"] == str(gym.id)
-    assert "signed-google-token" not in logged_in.content.decode()
+    assert "signed-google-token-ok" not in logged_in.content.decode()
     user = User.objects.get(normalized_email=email)
     assert user.has_usable_password() is False
     with transaction.atomic():

@@ -225,7 +225,11 @@ describe("salaries", () => {
       await screen.findByRole("button", { name: "2026-10-01 – 2026-10-31" }),
     );
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
-    expect(screen.getByText(/Ko Ko is BANK_TRANSFER/i)).toBeVisible();
+    expect(
+      screen.getByText(
+        "Ko Ko pays by BANK_TRANSFER and is not mapped to a session.",
+      ),
+    ).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Confirm approval" }));
     expect(approveSalaryPeriod).not.toHaveBeenCalled();
     await screen.findByRole("option", { name: /FRONT/ });

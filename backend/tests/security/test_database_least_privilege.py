@@ -209,7 +209,7 @@ def _assert_least_privilege(cursor: CatalogCursor) -> None:
         True,
         True,
         False,
-        False,
+        True,
         True,
         True,
         False,

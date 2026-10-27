@@ -283,6 +283,7 @@ def test_tenant_gym_and_settings_are_scoped_and_owner_gated() -> None:
         "id",
         "code",
         "status",
+        "has_logo",
         "subscription_plan_id",
         "subscription_plan_name",
         "subscription_status",
