@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from django.db import transaction
@@ -170,11 +171,14 @@ class MemberLogoRenderer(BaseRenderer):
         self,
         data: Any,
         accepted_media_type: str | None = None,
-        renderer_context: dict[str, Any] | None = None,
+        renderer_context: Mapping[str, Any] | None = None,
     ) -> bytes:
         if isinstance(data, (bytes, bytearray)):
             return bytes(data)
-        return JSONRenderer().render(data, "application/json", renderer_context)
+        rendered = JSONRenderer().render(data, "application/json", renderer_context)
+        if isinstance(rendered, (bytes, bytearray)):
+            return bytes(rendered)
+        raise TypeError("The logo error response was not bytes.")
 
 
 class MemberGymLogoView(MemberSelfView):
