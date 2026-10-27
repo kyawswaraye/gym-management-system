@@ -56,6 +56,10 @@ EXPECTED_VALUES = {
     "ACME_EMAIL": "ops@example.com",
     "APP_ORIGINS": "https://app.example.com",
     "APP_PUBLIC_URL": "https://app.example.com",
+    "GOOGLE_OAUTH_CLIENT_IDS": (
+        "603619909582-t5ociaflk5ck54ttm1atbk42oguvj4c1.apps.googleusercontent.com,"
+        "603619909582-sqq7junqbia6qckn33t4cvbui2j1aeqo.apps.googleusercontent.com"
+    ),
     "DEFAULT_FROM_EMAIL": "Gym <no-reply@example.com>",
     "POSTGRES_DB": "gym_platform",
     "POSTGRES_ADMIN_USER": "gym_admin",
@@ -270,7 +274,9 @@ def lint_compose_document(document: dict[str, Any]) -> list[str]:
         "probe",
         "observe",
     }:
-        errors.append("networks must be edge, app, data, scan, backup, probe, and observe")
+        errors.append(
+            "networks must be edge, app, data, scan, backup, probe, and observe"
+        )
     else:
         for name, internal in (
             ("data", "true"),
@@ -408,7 +414,9 @@ def lint_caddy(text: str) -> list[str]:
     if capture not in text:
         errors.append("Caddy request ID matcher must capture 1-128 characters into $1")
     if "{http.request.header.X-Request-Id}" not in text:
-        errors.append("Caddy request ID source must use the canonical header placeholder")
+        errors.append(
+            "Caddy request ID source must use the canonical header placeholder"
+        )
     return errors
 
 
@@ -521,7 +529,9 @@ def lint_repository(repo: Path) -> list[str]:
     errors.extend(_lint_supporting_files(repo))
     errors.extend(_lint_release(repo))
     errors.extend(_lint_backup(repo, document if isinstance(document, dict) else {}))
-    errors.extend(_lint_observability(repo, document if isinstance(document, dict) else {}))
+    errors.extend(
+        _lint_observability(repo, document if isinstance(document, dict) else {})
+    )
     errors.extend(_lint_deployment(repo))
     errors.extend(_lint_staging(repo))
     return errors
@@ -603,6 +613,10 @@ def offline_environment() -> dict[str, str]:
         "PASSWORD_RESET_TOKEN_PEPPER": marker("reset-pepper"),
         "PASSWORD_RESET_TTL_SECONDS": "1800",
         "BFF_SHARED_SECRET": marker("bff-secret"),
+        "GOOGLE_OAUTH_CLIENT_IDS": (
+            "603619909582-t5ociaflk5ck54ttm1atbk42oguvj4c1.apps.googleusercontent.com,"
+            "603619909582-sqq7junqbia6qckn33t4cvbui2j1aeqo.apps.googleusercontent.com"
+        ),
         "APP_PUBLIC_URL": "https://app.example.com",
         "EMAIL_BACKEND": "apps.common.mail.resend.EmailBackend",
         "DEFAULT_FROM_EMAIL": "Gym <no-reply@example.com>",
@@ -741,7 +755,11 @@ def _lint_service(name: str, service: dict[str, Any]) -> list[str]:
         errors.append("caddy needs NET_BIND_SERVICE after dropping capabilities")
     if name in {"api", "web", "migrate"} and service.get("user") != "10001:10001":
         errors.append(f"{name} must run as uid 10001")
-    if name != "migrate" and not name.startswith("backup-") and "healthcheck" not in service:
+    if (
+        name != "migrate"
+        and not name.startswith("backup-")
+        and "healthcheck" not in service
+    ):
         errors.append(f"{name} is missing a healthcheck")
     logging = service.get("logging")
     options = logging.get("options") if isinstance(logging, dict) else None
