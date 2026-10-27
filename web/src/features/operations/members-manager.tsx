@@ -752,6 +752,10 @@ export function MembersManager({
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
                   {" "}
+                  {tx("Email")}{" "}
+                </th>
+                <th className="px-5 py-3 text-xs font-semibold" scope="col">
+                  {" "}
                   {tx("Joined")}{" "}
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
@@ -809,6 +813,9 @@ export function MembersManager({
                     </td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-600">
                       {member.phone || "—"}
+                    </td>
+                    <td className="px-5 py-4 break-all text-slate-600">
+                      {member.email || "—"}
                     </td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-600">
                       {member.join_date}

@@ -927,7 +927,11 @@ describe("Members directory archive", () => {
       <MembersManager canCreate={false} defaultDate="2026-10-17" />,
     );
     expect(await screen.findByText("MEM-000001")).toBeInTheDocument();
-    expect(screen.getAllByRole("columnheader")).toHaveLength(4);
+    expect(screen.getAllByRole("columnheader")).toHaveLength(5);
+    expect(
+      screen.getByRole("columnheader", { name: "Email" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("ada@example.test")).toBeInTheDocument();
     expect(
       screen.queryByRole("columnheader", { name: "Action" }),
     ).not.toBeInTheDocument();
@@ -938,7 +942,7 @@ describe("Members directory archive", () => {
     view.rerender(
       <MembersManager canArchive canCreate={false} defaultDate="2026-10-17" />,
     );
-    expect(screen.getAllByRole("columnheader")).toHaveLength(5);
+    expect(screen.getAllByRole("columnheader")).toHaveLength(6);
     expect(
       screen.getByRole("columnheader", { name: "Action" }),
     ).toBeInTheDocument();

@@ -533,6 +533,8 @@ describe("Member archive", () => {
     const view = renderMember(false);
 
     expect(await screen.findByText("ACTIVE")).toBeInTheDocument();
+    expect(screen.getAllByText("Email").length).toBeGreaterThan(0);
+    expect(screen.getByText("ada@example.test")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Archive member" }),
     ).not.toBeInTheDocument();

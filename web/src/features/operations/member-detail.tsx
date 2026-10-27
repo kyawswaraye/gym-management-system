@@ -476,7 +476,13 @@ export function MemberDetail({
                   {tx(error)}
                 </p>
               ) : null}
-              <dl>
+              <dl className="grid gap-2">
+                <div className="flex items-baseline gap-3">
+                  <dt className="text-sm text-slate-500">{tx("Email")}</dt>
+                  <dd className="min-w-0 text-sm font-medium break-all text-slate-800">
+                    {member.email || "—"}
+                  </dd>
+                </div>
                 <div className="flex items-center gap-3">
                   <dt className="text-sm text-slate-500">{tx("Status")}</dt>
                   <dd
