@@ -33,7 +33,8 @@ from apps.members.services import (
     membership_history_for_summary,
     page_member_payments,
 )
-from apps.tenants.models import Gym, GymFeatureEntitlement
+from apps.tenants.logo import LOGO_CONTENT_TYPES
+from apps.tenants.models import Gym, GymFeatureEntitlement, GymLogo
 from apps.trainers.models import MemberServicePackage, PTBooking
 from apps.trainers.selectors import _annotate_packages, annotate_member_pt_client
 
@@ -124,6 +125,16 @@ def update_self_profile(
         ).get()
 
 
+def member_gym_brand(*, gym: Gym) -> dict[str, object]:
+    """Name and logo presence for the gym on the member principal."""
+
+    content_type = GymLogo.objects.filter(pk=gym.id).values_list("content_type", flat=True).first()
+    return {
+        "name": gym.name,
+        "has_logo": content_type in LOGO_CONTENT_TYPES,
+    }
+
+
 def member_self_dashboard(*, gym: Gym, member: Member) -> dict[str, object]:
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
@@ -152,6 +163,7 @@ def member_self_dashboard(*, gym: Gym, member: Member) -> dict[str, object]:
             as_of=today,
         ).get()
         return {
+            "gym": member_gym_brand(gym=gym),
             "member": annotated,
             "current_membership": current,
             "days_remaining": days_remaining,

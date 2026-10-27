@@ -3,8 +3,8 @@ export type CursorMeta = {
   next_after: string | null;
 };
 
-export function cursorAfter(meta: CursorMeta): string | null {
-  if (!meta.has_more || !meta.next_after) {
+export function cursorAfter(meta: CursorMeta | undefined): string | null {
+  if (!meta?.has_more || !meta.next_after) {
     return null;
   }
   return meta.next_after;

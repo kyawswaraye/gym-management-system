@@ -12,6 +12,7 @@ import {
   getTrainerSessionReport,
 } from "@/features/pt/client";
 import { TrainerDashboardManager } from "@/features/pt/trainer-dashboard";
+import { formatAppDateTime } from "@/lib/date";
 import type { TrainerDashboard, TrainerSessionReport } from "@/types/api";
 
 vi.mock("@/features/pt/client", () => ({
@@ -144,9 +145,11 @@ describe("trainer dashboard manager", () => {
     expect(screen.getByText("Active assigned members")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText(/Asia\/Bangkok/)).toBeInTheDocument();
-    expect(screen.getByText(/2026-10-20 to 2026-10-20/)).toBeInTheDocument();
+    expect(screen.getByText(/20-10-2026 to 20-10-2026/)).toBeInTheDocument();
     expect(
-      screen.getByText(/Generated 2026-10-20T01:00:00Z/),
+      screen.getByText(
+        new RegExp(`Generated ${formatAppDateTime("2026-10-20T01:00:00Z")}`),
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByTitle("11111111-1111-4111-8111-111111111111"),
@@ -158,7 +161,7 @@ describe("trainer dashboard manager", () => {
     ).toBeInTheDocument();
     expect(within(upcoming).getByText("M-0008")).toBeInTheDocument();
     expect(
-      within(upcoming).getByText("2026-10-20T03:00:00Z"),
+      within(upcoming).getByText(formatAppDateTime("2026-10-20T03:00:00Z")),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("22222222-2222-4222-8222-222222222222"),
@@ -209,7 +212,7 @@ describe("trainer dashboard manager", () => {
     expect(screen.getByText("YGN")).toBeInTheDocument();
     expect(screen.getByText("current booking status")).toBeInTheDocument();
     expect(
-      screen.getByRole("rowheader", { name: "2026-10-01" }).closest("tr"),
+      screen.getByRole("rowheader", { name: "01-10-2026" }).closest("tr"),
     ).toHaveTextContent("0");
     expect(loadReport).toHaveBeenCalledWith({
       date_from: "2026-10-01",

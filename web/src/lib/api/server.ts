@@ -13,6 +13,7 @@ import {
   type Locale,
 } from "@/i18n/locale";
 import { translate } from "@/i18n/translate";
+import { requestLocale, safeErrorResponse } from "@/lib/api/errors";
 import {
   allowsFinanceRoute,
   FINANCE_PATH_PATTERNS,
@@ -1574,6 +1575,59 @@ const STAFF_LIST_CURSOR = /^[A-Za-z0-9._:~+=-]{1,2048}$/;
 export function normalizeResourceId(value: string): string | null {
   const resourceId = value.toLowerCase();
   return STAFF_ID_PATTERN.test(resourceId) ? resourceId : null;
+}
+
+function rejectedReceiptPrint(
+  request: NextRequest,
+  status: number,
+  code: string,
+  message: string,
+): NextResponse {
+  return safeErrorResponse(
+    status,
+    code,
+    message,
+    undefined,
+    requestLocale(request),
+  );
+}
+
+export function getReceiptPrintContext(
+  request: NextRequest,
+): Promise<NextResponse> | NextResponse {
+  if (request.nextUrl.search.length > 0) {
+    return rejectedReceiptPrint(
+      request,
+      400,
+      "INVALID_REQUEST",
+      "Invalid request.",
+    );
+  }
+  return authenticatedGet(request, "/api/v1/receipts/print-context/");
+}
+
+export function getReceiptPrintPayload(
+  request: NextRequest,
+  receiptId: string,
+): Promise<NextResponse> | NextResponse {
+  if (request.nextUrl.search.length > 0) {
+    return rejectedReceiptPrint(
+      request,
+      400,
+      "INVALID_REQUEST",
+      "Invalid request.",
+    );
+  }
+  const id = normalizeResourceId(receiptId);
+  if (!id) {
+    return rejectedReceiptPrint(
+      request,
+      404,
+      "NOT_FOUND",
+      "Receipt was not found.",
+    );
+  }
+  return authenticatedGet(request, `/api/v1/receipts/${id}/print/`);
 }
 
 export function normalizeStaffId(value: string): string | null {

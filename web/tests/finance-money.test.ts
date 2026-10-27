@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canonicalMoney,
   canonicalQuantity,
+  englishMoneyInput,
   previewLineAmount,
   subtractMoney,
 } from "@/features/finance/money";
@@ -18,6 +19,14 @@ describe("exact finance decimals", () => {
     expect(canonicalQuantity("1.2500")).toBeNull();
     expect(canonicalQuantity("-2", { allowNegative: true })).toBe("-2.000");
     expect(canonicalQuantity("0.000")).toBeNull();
+  });
+
+  it("keeps typed money in English digits with at most two decimal places", () => {
+    expect(englishMoneyInput("20၀0a.5x99")).toBe("200.59");
+    expect(englishMoneyInput("၂၀၀၀၀၀")).toBe("");
+    expect(englishMoneyInput("020")).toBe("20");
+    expect(englishMoneyInput(".5")).toBe("0.5");
+    expect(englishMoneyInput("10.5.5")).toBe("10.55");
   });
 
   it("previews a half-up line without treating it as a posted total", () => {

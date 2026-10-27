@@ -202,8 +202,12 @@ def approve_payment(
     _assert_approver(gym_id=gym.id, actor=actor)
     if payment.status != Payment.Status.PENDING_APPROVAL:
         raise PaymentPostingConflict()
-    if actor.id in {payment.created_by_membership_id, payment.submitted_by_membership_id}:
-        raise PermissionDenied()
+    _deny_self_close(
+        gym_id=gym.id,
+        actor=actor,
+        created_by=payment.created_by_membership_id,
+        submitted_by=payment.submitted_by_membership_id,
+    )
     membership = _lock_membership(payment)
     movement: CashTransaction | None = None
     if payment.method == Payment.Method.CASH:
@@ -305,8 +309,12 @@ def reject_payment(
     _assert_approver(gym_id=gym.id, actor=actor)
     if payment.status != Payment.Status.PENDING_APPROVAL:
         raise PaymentPostingConflict()
-    if actor.id in {payment.created_by_membership_id, payment.submitted_by_membership_id}:
-        raise PermissionDenied()
+    _deny_self_close(
+        gym_id=gym.id,
+        actor=actor,
+        created_by=payment.created_by_membership_id,
+        submitted_by=payment.submitted_by_membership_id,
+    )
     now = timezone.now()
     payment.status = Payment.Status.REJECTED
     payment.rejected_at = now
@@ -370,11 +378,41 @@ def _reload(
     )
 
 
+def _may_close_own_payment(*, gym_id: UUID, membership_id: UUID) -> bool:
+    """The owner, or one person who is both manager and receptionist, can.
+
+    A manager who does not also work the desk still needs another approver.
+    """
+
+    if holds_protected_role(gym_id=gym_id, membership_id=membership_id, role_key="OWNER"):
+        return True
+    return holds_protected_role(
+        gym_id=gym_id, membership_id=membership_id, role_key="MANAGER"
+    ) and holds_protected_role(gym_id=gym_id, membership_id=membership_id, role_key="RECEPTIONIST")
+
+
+def _deny_self_close(
+    *,
+    gym_id: UUID,
+    actor: GymMembership,
+    created_by: UUID | None,
+    submitted_by: UUID | None,
+) -> None:
+    if actor.id not in {created_by, submitted_by}:
+        return
+    if _may_close_own_payment(gym_id=gym_id, membership_id=actor.id):
+        return
+    raise PermissionDenied()
+
+
 def _assert_approver(*, gym_id: UUID, actor: GymMembership) -> None:
-    if holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key="RECEPTIONIST"):
-        raise PermissionDenied()
     manager = holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key="MANAGER")
     owner = holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key="OWNER")
+    receptionist = holds_protected_role(
+        gym_id=gym_id, membership_id=actor.id, role_key="RECEPTIONIST"
+    )
+    if receptionist and not manager and not owner:
+        raise PermissionDenied()
     if not manager and not owner:
         raise PermissionDenied()
     if not membership_has_permission(membership=actor, code="payments.approve"):
@@ -583,18 +621,16 @@ def _received_at(*, gym: Gym, fields: dict[str, Any]) -> datetime:
 
 
 def _issuer_name(actor: GymMembership) -> str:
-    personal = f"{actor.user.first_name} {actor.user.last_name}".strip()
-    if personal:
-        return personal
+    """Receipts store the staff code. A person with no staff record has no name on the slip."""
     profile = (
         StaffProfile.objects.filter(gym_id=actor.gym_id, gym_membership_id=actor.id)
-        .only("display_name")
+        .only("staff_code")
         .first()
     )
     if profile is not None:
-        display = str(profile.display_name or "").strip()
-        if display:
-            return display
+        code = str(profile.staff_code or "").strip()
+        if code:
+            return code
     return str(actor.user.email or "").strip()
 
 
@@ -608,8 +644,6 @@ def _gym_address(gym: Gym) -> str:
     parts = [
         gym.address_line1,
         gym.address_line2,
-        gym.city,
-        gym.region,
         gym.postal_code,
         gym.country_code,
     ]

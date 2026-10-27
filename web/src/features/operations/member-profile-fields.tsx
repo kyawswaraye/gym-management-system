@@ -1,17 +1,17 @@
 "use client";
 
 import { useTx, useLocale } from "@/i18n/use-tx";
+import type { Locale } from "@/i18n/locale";
 import {
   isMemberGender,
   MEMBER_GENDERS,
   type MemberProfileInput,
 } from "@/features/operations/member-profile";
+import { formatAppDate } from "@/lib/date";
 import {
-  citiesForRegion,
-  MYANMAR_REGIONS,
-  type MyanmarPlace,
-} from "@/features/operations/myanmar-locations";
-import type { Locale } from "@/i18n/locale";
+  myanmarPlaceText,
+  MyanmarRegionCityFields,
+} from "@/features/operations/myanmar-place-fields";
 
 const GENDER_LABELS: Record<(typeof MEMBER_GENDERS)[number], string> = {
   FEMALE: "Female",
@@ -19,20 +19,6 @@ const GENDER_LABELS: Record<(typeof MEMBER_GENDERS)[number], string> = {
   OTHER: "Other",
   UNSPECIFIED: "Unspecified",
 };
-
-function placeLabel(place: MyanmarPlace, locale: Locale): string {
-  return locale === "mm" ? place.my : place.value;
-}
-
-function placesWithCurrent(
-  places: readonly MyanmarPlace[],
-  current: string,
-): MyanmarPlace[] {
-  if (!current || places.some((place) => place.value === current)) {
-    return [...places];
-  }
-  return [{ value: current, my: current }, ...places];
-}
 
 export type MemberNumberPreview = {
   status: "loading" | "ready" | "unavailable";
@@ -53,41 +39,12 @@ export function MemberProfileFields({
   memberNumberPreview?: MemberNumberPreview;
 }) {
   const tx = useTx();
-  const locale = useLocale();
   function update<K extends keyof MemberProfileInput>(
     key: K,
     fieldValue: MemberProfileInput[K],
   ) {
     onChange({ ...value, [key]: fieldValue });
   }
-
-  function updateRegion(region: string) {
-    const stillValid = citiesForRegion(region).some(
-      (place) => place.value === value.city,
-    );
-    onChange({
-      ...value,
-      region,
-      city: stillValid ? value.city : "",
-    });
-  }
-
-  const regions = placesWithCurrent(MYANMAR_REGIONS, value.region).sort(
-    (a, b) =>
-      placeLabel(a, locale).localeCompare(
-        placeLabel(b, locale),
-        locale === "mm" ? "my" : "en",
-      ),
-  );
-  const cities = placesWithCurrent(
-    citiesForRegion(value.region),
-    value.city,
-  ).sort((a, b) =>
-    placeLabel(a, locale).localeCompare(
-      placeLabel(b, locale),
-      locale === "mm" ? "my" : "en",
-    ),
-  );
 
   return (
     <>
@@ -221,46 +178,15 @@ export function MemberProfileFields({
               value={value.address_line2}
             />
           </label>
-          <label className="field min-w-0 items-start">
-            {tx("Region")}
-            <select
-              className="input w-0 max-w-full min-w-full"
-              disabled={disabled}
-              onChange={(event) => updateRegion(event.target.value)}
-              value={value.region}
-            >
-              <option value="">{tx("Not specified")}</option>
-              {regions.map((region) => (
-                <option key={region.value} value={region.value}>
-                  {placeLabel(region, locale)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="grid min-w-0 content-start gap-1">
-            <label className="field min-w-0 items-start">
-              {tx("City")}
-              <select
-                aria-describedby={value.region ? undefined : "member-city-hint"}
-                className="input w-0 max-w-full min-w-full"
-                disabled={disabled || !value.region}
-                onChange={(event) => update("city", event.target.value)}
-                value={value.city}
-              >
-                <option value="">{tx("Not specified")}</option>
-                {cities.map((cityOption) => (
-                  <option key={cityOption.value} value={cityOption.value}>
-                    {placeLabel(cityOption, locale)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {value.region ? null : (
-              <span className="muted" id="member-city-hint">
-                {tx("Choose a region first.")}
-              </span>
-            )}
-          </div>
+          <MyanmarRegionCityFields
+            city={value.city}
+            disabled={disabled}
+            named={false}
+            onChange={(next) =>
+              onChange({ ...value, region: next.region, city: next.city })
+            }
+            region={value.region}
+          />
           <label className="field min-w-0">
             {tx("Postal code")}
             <input
@@ -328,5 +254,47 @@ export function MemberProfileFields({
         />
       </label>
     </>
+  );
+}
+
+function shown(value: string): string {
+  const text = value.trim();
+  return text || "—";
+}
+
+function namedPlace(value: string, locale: Locale): string {
+  return myanmarPlaceText(value, locale) || "—";
+}
+
+export function MemberProfileDetails({ value }: { value: MemberProfileInput }) {
+  const tx = useTx();
+  const locale = useLocale();
+  const gender = value.gender ? tx(GENDER_LABELS[value.gender]) : "";
+  const rows: Array<[string, string, boolean]> = [
+    ["Phone", shown(value.phone), false],
+    ["Gender", shown(gender), false],
+    ["Date of birth", shown(formatAppDate(value.date_of_birth)), false],
+    ["Address line 1", shown(value.address_line1), false],
+    ["Address line 2", shown(value.address_line2), false],
+    ["Region", namedPlace(value.region, locale), false],
+    ["City", namedPlace(value.city, locale), false],
+    ["Postal code", shown(value.postal_code), false],
+    ["Country code", shown(value.country_code), false],
+    ["Join date", shown(formatAppDate(value.join_date)), false],
+    ["Emergency contact name", shown(value.emergency_contact_name), false],
+    ["Emergency contact phone", shown(value.emergency_contact_phone), false],
+    ["Notes", shown(value.notes), true],
+  ];
+  return (
+    <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+      {rows.map(([label, text, wide]) => (
+        <div className={wide ? "sm:col-span-2" : undefined} key={label}>
+          <dt className="text-xs font-semibold text-slate-500">{tx(label)}</dt>
+          <dd className="mt-1 text-sm font-medium break-words whitespace-pre-wrap text-slate-900">
+            {text}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }

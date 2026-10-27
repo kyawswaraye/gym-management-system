@@ -1,9 +1,17 @@
 "use client";
 import { useTx } from "@/i18n/use-tx";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import Link from "next/link";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 
 import { getCsrfToken } from "@/features/auth/client";
+import { formatAppDate } from "@/lib/date";
 import {
   CashSessionSelect,
   useOpenCashSessions,
@@ -14,6 +22,7 @@ import {
   createPayment,
   downloadReceiptDocument,
   getPayment,
+  getReceiptPrintContext,
   listPayments,
   listReceipts,
   refundPayment,
@@ -25,8 +34,16 @@ import {
 } from "@/features/finance/client";
 import { FormDialog } from "@/components/form-dialog";
 import { fieldMap, financeError } from "@/features/finance/errors";
-import { canonicalMoney } from "@/features/finance/money";
+import { canonicalMoney, englishMoneyInput } from "@/features/finance/money";
 import { useCursorPages } from "@/features/finance/paging";
+import {
+  ReceiptPreview,
+  ReceiptPrintLink,
+} from "@/features/finance/receipt-preview";
+import {
+  draftReceiptPreview,
+  receiptPrintHref,
+} from "@/features/finance/receipt-print";
 import {
   Alert,
   CursorControls,
@@ -35,11 +52,17 @@ import {
   SelectInput,
   TextInput,
 } from "@/features/finance/ui";
-import { listMembers, listMemberships } from "@/features/operations/client";
+import {
+  getGymProfile,
+  listMembers,
+  listMemberships,
+  operationGet,
+} from "@/features/operations/client";
 import { actionButtonClass } from "@/lib/ui/action-button";
 import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
   ApprovePaymentRequest,
+  GymProfile,
   Member,
   Membership,
   Payment,
@@ -49,6 +72,7 @@ import type {
   PaymentUpdateRequest,
   PaymentWriteRequest,
   Receipt,
+  ReceiptPrintContext,
   RefundPaymentRequest,
   VoidPaymentRequest,
 } from "@/types/api";
@@ -69,6 +93,8 @@ const STATUSES = [
   "VOID",
 ] as const;
 const PAGE = "25";
+const MEMBER_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const cardClass =
   "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm";
 
@@ -232,6 +258,169 @@ function openDocument(html: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+type PrinterState = {
+  status: "loading" | "ready" | "error";
+  context: ReceiptPrintContext | null;
+  address: string;
+  gymName: string;
+};
+
+type PrintFollowUp = {
+  href: string;
+  message: string;
+};
+
+function memberResourcePath(memberId: string): string | null {
+  const id = memberId.trim().toLowerCase();
+  if (!MEMBER_ID.test(id)) return null;
+  return `members/${id}/`;
+}
+
+function formatGymAddress(profile: GymProfile | null): string {
+  if (!profile) return "";
+  const parts = [
+    profile.address_line1,
+    profile.address_line2,
+    profile.postal_code,
+    profile.country_code,
+  ];
+  return parts
+    .filter((part): part is string => typeof part === "string")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .join(", ")
+    .slice(0, 800);
+}
+
+function slipMember(
+  memberId: string | null,
+  member: Member | null,
+): { memberName: string; memberNumber: string } {
+  if (!memberId) return { memberName: "Walk-in", memberNumber: "Walk-in" };
+  if (!member || member.id !== memberId) {
+    return { memberName: "", memberNumber: "" };
+  }
+  return {
+    memberName: `${member.first_name} ${member.last_name}`.trim(),
+    memberNumber: member.member_number,
+  };
+}
+
+function openBlankPrintWindow(): Window | null {
+  // Open during the click. about:blank keeps a handle; noopener would drop it.
+  const opened = window.open("about:blank", "_blank");
+  if (!opened || opened.closed) return null;
+  return opened;
+}
+
+function navigatePrintWindow(opened: Window, href: string): boolean {
+  try {
+    opened.location.replace(href);
+  } catch {
+    closePrintWindow(opened);
+    return false;
+  }
+  try {
+    opened.opener = null;
+  } catch {
+    // The print page is already loading.
+  }
+  return true;
+}
+
+function closePrintWindow(opened: Window | null): void {
+  if (!opened) return;
+  try {
+    opened.close();
+  } catch {
+    // Approval does not depend on closing the spare window.
+  }
+}
+
+function approvalPrintPlan(input: {
+  href: string | null;
+  navigated: boolean;
+  openedForPrint: boolean;
+  latest: PrinterState;
+}): PrintFollowUp | null {
+  if (input.navigated) return null;
+  if (!input.href) {
+    if (input.openedForPrint || input.latest.status !== "ready") {
+      return { href: "", message: "The receipt could not be printed." };
+    }
+    return null;
+  }
+  if (input.openedForPrint) {
+    return { href: input.href, message: "The print window was blocked." };
+  }
+  if (input.latest.status !== "ready") {
+    return {
+      href: input.href,
+      message: "The printer setup could not be loaded.",
+    };
+  }
+  if (input.latest.context?.printer_enabled) {
+    return { href: input.href, message: "Print the receipt manually." };
+  }
+  return null;
+}
+
+function issuedPrintIds(
+  receipts: ({ id: string; status: string } | null | undefined)[],
+): string[] {
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const receipt of receipts) {
+    if (!receipt || receipt.status !== "ISSUED") continue;
+    const href = receiptPrintHref(receipt.id);
+    if (!href || seen.has(href)) continue;
+    seen.add(href);
+    ids.push(receipt.id);
+  }
+  return ids;
+}
+
+function DraftReceiptSlip({
+  address,
+  context,
+  gymName,
+  member,
+  memberId,
+  payment,
+}: {
+  address: string;
+  context: ReceiptPrintContext | null;
+  gymName: string;
+  member: Member | null;
+  memberId: string | null;
+  payment: Payment;
+}) {
+  const names = slipMember(memberId, member);
+  const model = draftReceiptPreview({
+    gymName,
+    address,
+    phone: context?.phone ?? "",
+    showAddress: context?.printer_print_address ?? false,
+    showPhone: context?.printer_print_phone ?? false,
+    showLogo: context?.printer_print_logo ?? false,
+    logo: context?.logo ?? null,
+    footer: context?.printer_footer ?? "",
+    businessDate: payment.business_date,
+    memberName: names.memberName,
+    memberNumber: names.memberNumber,
+    description: payment.description,
+    amount: payment.amount,
+    currency: payment.currency,
+    method: payment.method,
+    issuerName: "",
+  });
+  return (
+    <div className="mx-auto w-full max-w-[80mm]">
+      <ReceiptPreview model={model} />
+    </div>
+  );
+}
+
 export function PaymentsManager({
   canCreate,
   canSubmit,
@@ -243,6 +432,7 @@ export function PaymentsManager({
   canVoidReceipt,
   currency,
   defaultDate,
+  gymName = "",
 }: {
   canCreate: boolean;
   canSubmit: boolean;
@@ -254,6 +444,7 @@ export function PaymentsManager({
   canVoidReceipt: boolean;
   currency: string;
   defaultDate: string;
+  gymName?: string;
 }) {
   const tx = useTx();
   const [status, setStatus] = useState("");
@@ -266,6 +457,9 @@ export function PaymentsManager({
   const [members, setMembers] = useState<Member[]>([]);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
+  const [memberSearchLoading, setMemberSearchLoading] = useState(false);
+  const [memberSearchError, setMemberSearchError] = useState("");
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [draftMember, setDraftMember] = useState("");
   const [action, setAction] = useState<Action>(null);
   const [recording, setRecording] = useState(false);
@@ -275,9 +469,28 @@ export function PaymentsManager({
   const [formError, setFormError] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
+  const [approveBody, setApproveBody] = useState<ApprovePaymentRequest | null>(
+    null,
+  );
   const [correction, setCorrection] = useState<PaymentCorrection | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [receiptAction, setReceiptAction] = useState(false);
+  const [printer, setPrinter] = useState<PrinterState>({
+    status: "loading",
+    context: null,
+    address: "",
+    gymName,
+  });
+  const [slipMemberRecord, setSlipMemberRecord] = useState<Member | null>(null);
+  const [slipMemberError, setSlipMemberError] = useState<{
+    memberId: string;
+    message: string;
+  } | null>(null);
+  const [issuedReceiptId, setIssuedReceiptId] = useState<string | null>(null);
+  const [printFollowUp, setPrintFollowUp] = useState<PrintFollowUp | null>(
+    null,
+  );
+  const printerRef = useRef(printer);
 
   const payments = useCursorPages(applied, (after) => {
     const [filterStatus, filterMethod, filterPurpose] = applied.split("|");
@@ -310,19 +523,25 @@ export function PaymentsManager({
   );
 
   useEffect(() => {
+    const trimmed = memberSearch.trim();
+    if (!trimmed) return undefined;
     let active = true;
     const timer = window.setTimeout(() => {
-      void listMembers({
-        limit: 25,
-        ...(memberSearch ? { search: memberSearch } : {}),
-      })
+      void listMembers({ search: trimmed, limit: 25 })
         .then((page) => {
-          if (active) setMembers(page.data);
+          if (!active) return;
+          setMembers(page.data);
+          setMemberSearchError("");
         })
         .catch(() => {
-          if (active) setMembers([]);
+          if (!active) return;
+          setMembers([]);
+          setMemberSearchError("Unable to search members.");
+        })
+        .finally(() => {
+          if (active) setMemberSearchLoading(false);
         });
-    }, 0);
+    }, 250);
     return () => {
       active = false;
       window.clearTimeout(timer);
@@ -371,6 +590,103 @@ export function PaymentsManager({
     };
   }, [selectedId, payments.rows, tx]);
 
+  useEffect(() => {
+    if (!canViewReceipts) return undefined;
+    if (!payment || payment.id !== selectedId || payment.status !== "POSTED") {
+      setIssuedReceiptId((current) => (current === null ? current : null));
+      return undefined;
+    }
+    const paymentId = payment.id;
+    let active = true;
+    void listReceipts({ payment: paymentId, status: "ISSUED", limit: "5" })
+      .then((page) => {
+        if (!active) return;
+        const match = page.data.find(
+          (row) =>
+            row.payment_id.toLowerCase() === paymentId.toLowerCase() &&
+            row.status === "ISSUED",
+        );
+        setIssuedReceiptId(match?.id ?? null);
+      })
+      .catch(() => {
+        if (active) setIssuedReceiptId(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [canViewReceipts, payment, selectedId]);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const context = await getReceiptPrintContext();
+        if (!context || typeof context.printer_enabled !== "boolean") {
+          throw new Error("The printer setup could not be loaded.");
+        }
+        let profile: GymProfile | null = null;
+        try {
+          profile = await getGymProfile();
+        } catch {
+          profile = null;
+        }
+        if (!active) return;
+        const profileName =
+          profile && typeof profile.name === "string"
+            ? profile.name.trim()
+            : "";
+        setPrinter({
+          status: "ready",
+          context,
+          address: formatGymAddress(profile),
+          gymName: gymName.trim() || profileName,
+        });
+      } catch {
+        if (!active) return;
+        setPrinter({
+          status: "error",
+          context: null,
+          address: "",
+          gymName: gymName.trim(),
+        });
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [gymName]);
+
+  useEffect(() => {
+    printerRef.current = printer;
+  }, [printer]);
+
+  useEffect(() => {
+    if (action !== "submit" || !payment?.member_id) return undefined;
+    if (selectedMember?.id === payment.member_id) return undefined;
+    const memberId = payment.member_id;
+    const path = memberResourcePath(memberId);
+    if (!path) return undefined;
+    let active = true;
+    void (async () => {
+      try {
+        const member = await operationGet<Member>(path);
+        if (!active) return;
+        setSlipMemberRecord(member);
+        setSlipMemberError(null);
+      } catch {
+        if (!active) return;
+        setSlipMemberRecord(null);
+        setSlipMemberError({
+          memberId,
+          message: "The member on this draft could not be loaded.",
+        });
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [action, payment?.member_id, selectedMember]);
+
   function fail(caught: unknown, fallback: string) {
     setFields(fieldMap(caught));
     setFormError(financeError(caught, fallback));
@@ -381,8 +697,39 @@ export function PaymentsManager({
     setFormError("");
   }
 
+  function resetMemberLookup() {
+    setMemberSearch("");
+    setMembers([]);
+    setMemberSearchLoading(false);
+    setMemberSearchError("");
+    setSelectedMember(null);
+    setDraftMember("");
+    setMemberships([]);
+  }
+
+  function searchMembers(value: string) {
+    setMemberSearch(value);
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setMembers([]);
+      setMemberSearchLoading(false);
+      setMemberSearchError("");
+      return;
+    }
+    setMembers([]);
+    setMemberSearchLoading(true);
+    setMemberSearchError("");
+  }
+
+  function chooseMember(member: Member | null) {
+    setDraftMember(member?.id ?? "");
+    setSelectedMember(member);
+    if (!member) setMemberships([]);
+  }
+
   async function afterChange(id: string) {
     setAction(null);
+    setApproveBody(null);
     setFields({});
     setFormError("");
     payments.reload();
@@ -428,6 +775,34 @@ export function PaymentsManager({
     return editing ? { ...shared, membership_id: null } : shared;
   }
 
+  const previewMember =
+    payment?.member_id && selectedMember?.id === payment.member_id
+      ? selectedMember
+      : slipMemberRecord;
+  const memberPreviewError =
+    action !== "submit" ||
+    !payment?.member_id ||
+    selectedMember?.id === payment.member_id
+      ? ""
+      : !memberResourcePath(payment.member_id)
+        ? "The member on this draft could not be loaded."
+        : slipMemberError?.memberId === payment.member_id
+          ? slipMemberError.message
+          : "";
+  const paymentReceiptIds =
+    canViewReceipts && payment
+      ? issuedPrintIds([
+          issuedReceiptId
+            ? { id: issuedReceiptId, status: "ISSUED" }
+            : null,
+          correction?.correction_receipt,
+          correction?.original_receipt,
+        ]).filter((id) => {
+          const href = receiptPrintHref(id);
+          const followUp = printFollowUp?.href.split("?")[0];
+          return !href || !followUp || href !== followUp;
+        })
+      : [];
   const filtered = applied !== "||";
   const showPaymentPaging =
     payments.index > 0 || payments.hasMore || payments.bounded;
@@ -495,6 +870,7 @@ export function PaymentsManager({
                     <button
                       className="button button-create"
                       onClick={() => {
+                        resetMemberLookup();
                         setRecording(true);
                         setAction(null);
                         clearFeedback();
@@ -669,6 +1045,7 @@ export function PaymentsManager({
                                   setSelectedId(row.id);
                                   setAction(null);
                                   setCorrection(null);
+                                  setPrintFollowUp(null);
                                 }}
                                 type="button"
                               >
@@ -685,7 +1062,7 @@ export function PaymentsManager({
                               {tx(pretty(row.method))}
                             </td>
                             <td className="px-5 py-3 whitespace-nowrap text-slate-600">
-                              {row.business_date}
+                              {formatAppDate(row.business_date)}
                             </td>
                             <td className="px-5 py-3">
                               <StatusPill status={row.status} />
@@ -750,7 +1127,7 @@ export function PaymentsManager({
                       { label: tx("Method"), value: payment.method },
                       {
                         label: tx("Business date"),
-                        value: payment.business_date,
+                        value: formatAppDate(payment.business_date),
                       },
                       { label: tx("Entry"), value: payment.entry_type },
                       {
@@ -782,11 +1159,38 @@ export function PaymentsManager({
                       {correction.refundable_amount} {tx(payment.currency)}.
                     </p>
                   )}
+                  {printFollowUp ? (
+                    <div
+                      className="grid gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+                      role="status"
+                    >
+                      <p className="text-sm text-amber-950">
+                        {tx(printFollowUp.message)}
+                      </p>
+                      {printFollowUp.href ? (
+                        <Link
+                          className="button w-fit"
+                          href={printFollowUp.href}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          {tx("Print receipt")}
+                        </Link>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
+                    {paymentReceiptIds.map((id) => (
+                      <ReceiptPrintLink key={id} receiptId={id} />
+                    ))}
                     {payment.status === "DRAFT" && canUpdate && (
                       <button
                         className="button button-edit"
-                        onClick={() => setAction("edit")}
+                        onClick={() => {
+                          resetMemberLookup();
+                          setDraftMember(payment.member_id ?? "");
+                          setAction("edit");
+                        }}
                         type="button"
                       >
                         {" "}
@@ -796,7 +1200,10 @@ export function PaymentsManager({
                     {payment.status === "DRAFT" && canSubmit && (
                       <button
                         className="button"
-                        onClick={() => setAction("submit")}
+                        onClick={() => {
+                          setPrintFollowUp(null);
+                          setAction("submit");
+                        }}
                         type="button"
                       >
                         {" "}
@@ -896,15 +1303,19 @@ export function PaymentsManager({
                           currency={currency}
                           defaultDate={payment.business_date}
                           fields={fields}
+                          memberId={draftMember}
                           memberSearch={memberSearch}
+                          memberSearchError={memberSearchError}
+                          memberSearchLoading={memberSearchLoading}
                           members={members}
                           memberships={memberships}
-                          onMember={setDraftMember}
-                          onSearch={setMemberSearch}
+                          onMember={chooseMember}
+                          onSearch={searchMembers}
                           payment={payment}
+                          selectedMember={selectedMember}
                         />
                       </div>
-                      <div>
+                      <div className="border-t border-slate-100 pt-4">
                         <button
                           className="button button-cancel"
                           disabled={pending}
@@ -941,13 +1352,42 @@ export function PaymentsManager({
                       }}
                       pending={pending}
                       title={tx("Submit this draft for approval?")}
-                    />
+                    >
+                      <p className="text-sm text-slate-600">
+                        {tx(
+                          "Review only. Submitting this draft does not print a receipt.",
+                        )}
+                      </p>
+                      {printer.status === "loading" ? (
+                        <p role="status">
+                          {tx("Loading the receipt preview.")}
+                        </p>
+                      ) : (
+                        <DraftReceiptSlip
+                          address={printer.address}
+                          context={printer.context}
+                          gymName={printer.gymName || gymName}
+                          member={previewMember}
+                          memberId={payment.member_id}
+                          payment={payment}
+                        />
+                      )}
+                      {printer.status === "error" ? (
+                        <Alert message="The printer setup could not be loaded." />
+                      ) : null}
+                      {memberPreviewError ? (
+                        <Alert message={memberPreviewError} />
+                      ) : null}
+                    </ActionPanel>
                   )}
                   {action === "approve" && (
                     <ActionPanel
                       confirmLabel="Confirm approval"
                       error={formError}
-                      onCancel={() => setAction(null)}
+                      onCancel={() => {
+                        setApproveBody(null);
+                        setAction(null);
+                      }}
                       onSubmit={(form) => {
                         const body: ApprovePaymentRequest = {};
                         if (payment.method === "CASH") {
@@ -960,17 +1400,16 @@ export function PaymentsManager({
                           }
                           body.cash_session_id = sessionId;
                         }
-                        setPending(true);
-                        void approvePayment(payment.id, body)
-                          .then(() => afterChange(payment.id))
-                          .catch((caught: unknown) =>
-                            fail(caught, "The payment could not be approved."),
-                          )
-                          .finally(() => setPending(false));
+                        setApproveBody(body);
                       }}
                       pending={pending}
                       title={tx("Approve payment")}
                     >
+                      {printer.status === "error" ? (
+                        <p className="text-sm text-slate-600" role="status">
+                          {tx("The printer setup could not be loaded.")}
+                        </p>
+                      ) : null}
                       {payment.method === "CASH" ? (
                         <CashSessionSelect
                           collectionError={sessions.error}
@@ -990,6 +1429,81 @@ export function PaymentsManager({
                       )}
                     </ActionPanel>
                   )}
+                  {approveBody && payment ? (
+                    <FormDialog
+                      compact
+                      description="This records the payment now. You can print the receipt again if the paper does not come out."
+                      onClose={() => {
+                        if (pending) return;
+                        setApproveBody(null);
+                      }}
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const body = approveBody;
+                        const snapshot = printerRef.current;
+                        const openedForPrint = Boolean(
+                          snapshot.status === "ready" &&
+                          snapshot.context?.printer_enabled,
+                        );
+                        const printWindow = openedForPrint
+                          ? openBlankPrintWindow()
+                          : null;
+                        setPending(true);
+                        void approvePayment(payment.id, body)
+                          .then(async (result) => {
+                            const href = receiptPrintHref(result.receipt.id, {
+                              autoPrint: true,
+                            });
+                            const navigated = Boolean(
+                              printWindow &&
+                              href &&
+                              navigatePrintWindow(printWindow, href),
+                            );
+                            if (!navigated) closePrintWindow(printWindow);
+                            setPrintFollowUp(
+                              approvalPrintPlan({
+                                href,
+                                navigated,
+                                openedForPrint: openedForPrint && !navigated,
+                                latest: printerRef.current,
+                              }),
+                            );
+                            try {
+                              await afterChange(payment.id);
+                            } catch (caught: unknown) {
+                              fail(caught, "The payment could not be loaded.");
+                            }
+                          })
+                          .catch((caught: unknown) => {
+                            closePrintWindow(printWindow);
+                            setPrintFollowUp(null);
+                            setApproveBody(null);
+                            fail(caught, "The payment could not be approved.");
+                          })
+                          .finally(() => setPending(false));
+                      }}
+                      pending={pending}
+                      title="Record this payment?"
+                    >
+                      <div>
+                        <button
+                          className="button button-cancel"
+                          disabled={pending}
+                          onClick={() => setApproveBody(null)}
+                          type="button"
+                        >
+                          {tx("Back")}
+                        </button>
+                        <button
+                          className={actionButtonClass("Record this payment")}
+                          disabled={pending}
+                          type="submit"
+                        >
+                          {tx("Record this payment")}
+                        </button>
+                      </div>
+                    </FormDialog>
+                  ) : null}
                   {action === "reject" && (
                     <ActionPanel
                       confirmLabel="Confirm rejection"
@@ -1175,14 +1689,36 @@ export function PaymentsManager({
                           {correction.refundable_amount}.
                         </p>
                       )}
-                      <Field error={fields.amount} label="Refund amount">
-                        <TextInput inputMode="decimal" name="amount" required />
+                      <Field
+                        error={fields.amount}
+                        label="Refund amount"
+                        required
+                      >
+                        <TextInput
+                          autoComplete="off"
+                          inputMode="decimal"
+                          lang="en"
+                          name="amount"
+                          onChange={(event) => {
+                            const cleaned = englishMoneyInput(
+                              event.currentTarget.value,
+                            );
+                            if (cleaned !== event.currentTarget.value) {
+                              event.currentTarget.value = cleaned;
+                            }
+                          }}
+                          required
+                        />
                       </Field>
                       <ReasonField
                         error={fields.reason}
                         label="Refund reason"
                       />
-                      <Field error={fields.method} label="Refund method">
+                      <Field
+                        error={fields.method}
+                        label="Refund method"
+                        required
+                      >
                         <SelectInput
                           name="method"
                           onChange={(event) =>
@@ -1198,7 +1734,11 @@ export function PaymentsManager({
                           ))}
                         </SelectInput>
                       </Field>
-                      <Field error={fields.business_date} label="Business date">
+                      <Field
+                        error={fields.business_date}
+                        label="Business date"
+                        required
+                      >
                         <TextInput
                           defaultValue={defaultDate}
                           name="business_date"
@@ -1244,7 +1784,7 @@ export function PaymentsManager({
                 void createPayment(body as PaymentWriteRequest)
                   .then(async (created) => {
                     formElement.reset();
-                    setDraftMember("");
+                    resetMemberLookup();
                     setRecording(false);
                     await afterChange(created.id);
                   })
@@ -1263,15 +1803,19 @@ export function PaymentsManager({
                   currency={currency}
                   defaultDate={defaultDate}
                   fields={fields}
+                  memberId={draftMember}
                   memberSearch={memberSearch}
+                  memberSearchError={memberSearchError}
+                  memberSearchLoading={memberSearchLoading}
                   members={members}
                   memberships={memberships}
-                  onMember={setDraftMember}
-                  onSearch={setMemberSearch}
+                  onMember={chooseMember}
+                  onSearch={searchMembers}
+                  selectedMember={selectedMember}
                   wide
                 />
               </div>
-              <div>
+              <div className="border-t border-slate-100 pt-4">
                 <button
                   className="button button-edit"
                   disabled={pending}
@@ -1432,7 +1976,10 @@ export function PaymentsManager({
                     value: `${receipt.amount} ${tx(receipt.currency)}`,
                   },
                   { label: tx("Status"), value: receipt.status },
-                  { label: tx("Business date"), value: receipt.business_date },
+                  {
+                    label: tx("Business date"),
+                    value: formatAppDate(receipt.business_date),
+                  },
                 ]}
               />
               <div className="flex flex-wrap gap-2">
@@ -1453,6 +2000,7 @@ export function PaymentsManager({
                   {" "}
                   {tx("Download receipt")}{" "}
                 </button>
+                <ReceiptPrintLink receiptId={receipt.id} />
                 {receipt.status === "ISSUED" && canVoidReceipt && (
                   <button
                     className="button button-delete"
@@ -1507,128 +2055,244 @@ export function PaymentsManager({
   );
 }
 
+function memberChoiceLabel(member: Member): string {
+  return `${member.member_number} — ${member.first_name} ${member.last_name}`;
+}
+
+function memberChoices(
+  members: readonly Member[],
+  selected: Member | null,
+): Member[] {
+  if (!selected || members.some((member) => member.id === selected.id)) {
+    return [...members];
+  }
+  return [selected, ...members];
+}
+
 function PaymentFields({
   currency,
   defaultDate,
   fields,
+  memberId,
   members,
   memberships,
   memberSearch,
+  memberSearchError,
+  memberSearchLoading,
   onMember,
   onSearch,
   payment,
+  selectedMember,
   wide = false,
 }: {
   currency: string;
   defaultDate: string;
   fields: Record<string, string>;
+  memberId: string;
   members: readonly Member[];
   memberships: readonly Membership[];
   memberSearch: string;
-  onMember: (id: string) => void;
+  memberSearchError: string;
+  memberSearchLoading: boolean;
+  onMember: (member: Member | null) => void;
   onSearch: (value: string) => void;
   payment?: Payment;
+  selectedMember: Member | null;
   wide?: boolean;
 }) {
   const tx = useTx();
+  const trimmedSearch = memberSearch.trim();
+  const [purpose, setPurpose] = useState(
+    payment?.purpose === "OTHER" ? "OTHER" : "MEMBERSHIP",
+  );
+  const needsMembership = purpose === "MEMBERSHIP";
+  const choices = memberChoices(members, selectedMember);
+  const preservedMemberId =
+    memberId && !choices.some((member) => member.id === memberId)
+      ? memberId
+      : "";
+  const columns = "grid items-start gap-4 sm:grid-cols-2";
   return (
-    <div
-      className={
-        wide
-          ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-          : "grid gap-4 sm:grid-cols-2"
-      }
-    >
-      <Field error={fields.purpose} label="Purpose">
-        <SelectInput
-          defaultValue={payment?.purpose === "OTHER" ? "OTHER" : "MEMBERSHIP"}
-          name="purpose"
+    <div className={wide ? "grid gap-5" : "grid gap-4"}>
+      <div className="grid gap-3">
+        <Field label="Find member">
+          <TextInput
+            autoComplete="off"
+            maxLength={100}
+            onChange={(event) => onSearch(event.target.value)}
+            placeholder={tx("Name, number, phone, or email")}
+            value={memberSearch}
+          />
+        </Field>
+        {memberSearchLoading ? (
+          <p className="text-sm text-slate-500" role="status">
+            {tx("Searching members.")}
+          </p>
+        ) : null}
+        {memberSearchError ? (
+          <p className="error" role="alert">
+            {tx(memberSearchError)}
+          </p>
+        ) : null}
+        {trimmedSearch &&
+        !memberSearchLoading &&
+        members.length === 0 &&
+        !memberSearchError ? (
+          <p className="muted">{tx("No matching members.")}</p>
+        ) : null}
+        {trimmedSearch && members.length > 0 ? (
+          <ul
+            aria-label={tx("Matching members")}
+            className="grid max-h-48 gap-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1"
+          >
+            {members.map((member) => (
+              <li key={member.id}>
+                <button
+                  aria-pressed={memberId === member.id}
+                  className="w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 aria-pressed:bg-amber-100 aria-pressed:text-amber-900"
+                  onClick={() => onMember(member)}
+                  type="button"
+                >
+                  {memberChoiceLabel(member)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {selectedMember ? (
+          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+            {tx("Selected member: {name}", {
+              name: memberChoiceLabel(selectedMember),
+            })}
+          </p>
+        ) : memberId ? null : (
+          <p className="text-sm text-slate-500">{tx("No member selected.")}</p>
+        )}
+        <div className={columns}>
+          <Field
+            error={fields.member_id}
+            label="Member"
+            required={needsMembership}
+          >
+            <SelectInput
+              name="member_id"
+              onChange={(event) => {
+                const id = event.target.value;
+                if (!id) {
+                  onMember(null);
+                  return;
+                }
+                const match = choices.find((member) => member.id === id);
+                if (match) onMember(match);
+              }}
+              required={needsMembership}
+              value={memberId}
+            >
+              <option value="">{tx("No member")}</option>
+              {preservedMemberId ? (
+                <option value={preservedMemberId}>
+                  {tx("Current member")}
+                </option>
+              ) : null}
+              {choices.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {memberChoiceLabel(member)}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
+          <Field
+            error={fields.membership_id}
+            label="Membership"
+            required={needsMembership}
+          >
+            <SelectInput
+              defaultValue={payment?.membership_id ?? ""}
+              name="membership_id"
+              required={needsMembership}
+            >
+              <option value="">{tx("No membership")}</option>
+              {memberships.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.plan_name} · {tx(row.status)} · {row.final_amount}{" "}
+                  {tx(row.currency)}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
+        </div>
+      </div>
+      <div className={`${columns} border-t border-slate-100 pt-5`}>
+        <Field error={fields.purpose} label="Purpose" required>
+          <SelectInput
+            name="purpose"
+            onChange={(event) => setPurpose(event.target.value)}
+            required
+            value={purpose}
+          >
+            <option value="MEMBERSHIP">{tx("Membership")}</option>
+            <option value="OTHER">{tx("Other")}</option>
+          </SelectInput>
+        </Field>
+        <Field error={fields.method} label="Method" required>
+          <SelectInput
+            defaultValue={payment?.method ?? "CASH"}
+            name="method"
+            required
+          >
+            {METHODS.map((item) => (
+              <option key={item} value={item}>
+                {tx(pretty(item))}
+              </option>
+            ))}
+          </SelectInput>
+        </Field>
+        <div className="sm:col-span-2">
+          <Field error={fields.description} label="Description" required>
+            <TextInput
+              defaultValue={payment?.description ?? ""}
+              name="description"
+              required
+            />
+          </Field>
+        </div>
+        <Field
+          error={fields.amount}
+          label={tx("Amount ({currency})", { currency: tx(currency) })}
           required
         >
-          <option value="MEMBERSHIP">{tx("Membership")}</option>
-          <option value="OTHER">{tx("Other")}</option>
-        </SelectInput>
-      </Field>
-      <Field label="Find member">
-        <TextInput
-          onChange={(event) => onSearch(event.target.value)}
-          placeholder={tx("Name or member number")}
-          value={memberSearch}
-        />
-      </Field>
-      <Field error={fields.member_id} label="Member">
-        <SelectInput
-          defaultValue={payment?.member_id ?? ""}
-          name="member_id"
-          onChange={(event) => onMember(event.target.value)}
-        >
-          <option value="">{tx("No member")}</option>
-          {members.map((member) => (
-            <option key={member.id} value={member.id}>
-              {member.member_number} — {member.first_name} {member.last_name}
-            </option>
-          ))}
-        </SelectInput>
-      </Field>
-      <Field error={fields.membership_id} label="Membership">
-        <SelectInput
-          defaultValue={payment?.membership_id ?? ""}
-          name="membership_id"
-        >
-          <option value="">{tx("No membership")}</option>
-          {memberships.map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.plan_name} · {tx(row.status)} · {row.final_amount}{" "}
-              {tx(row.currency)}
-            </option>
-          ))}
-        </SelectInput>
-      </Field>
-      <Field error={fields.description} label="Description">
-        <TextInput
-          defaultValue={payment?.description ?? ""}
-          name="description"
-          required
-        />
-      </Field>
-      <Field
-        error={fields.amount}
-        label={tx("Amount ({currency})", { currency: tx(currency) })}
-      >
-        <TextInput
-          defaultValue={payment?.amount ?? ""}
-          inputMode="decimal"
-          name="amount"
-          required
-        />
-      </Field>
-      <Field error={fields.method} label="Method">
-        <SelectInput
-          defaultValue={payment?.method ?? "CASH"}
-          name="method"
-          required
-        >
-          {METHODS.map((item) => (
-            <option key={item} value={item}>
-              {tx(pretty(item))}
-            </option>
-          ))}
-        </SelectInput>
-      </Field>
-      <Field error={fields.business_date} label="Business date">
-        <TextInput
-          defaultValue={payment?.business_date ?? defaultDate}
-          name="business_date"
-          required
-          type="date"
-        />
-      </Field>
-      <Field error={fields.reference_number} label="Reference">
-        <TextInput
-          defaultValue={payment?.reference_number ?? ""}
-          name="reference_number"
-        />
-      </Field>
+          <TextInput
+            autoComplete="off"
+            defaultValue={payment?.amount ?? ""}
+            inputMode="decimal"
+            lang="en"
+            name="amount"
+            onChange={(event) => {
+              const cleaned = englishMoneyInput(event.currentTarget.value);
+              if (cleaned !== event.currentTarget.value) {
+                event.currentTarget.value = cleaned;
+              }
+            }}
+            required
+          />
+        </Field>
+        <Field error={fields.business_date} label="Business date" required>
+          <TextInput
+            defaultValue={payment?.business_date ?? defaultDate}
+            name="business_date"
+            required
+            type="date"
+          />
+        </Field>
+        <div className="sm:col-span-2">
+          <Field error={fields.reference_number} label="Reference">
+            <TextInput
+              defaultValue={payment?.reference_number ?? ""}
+              name="reference_number"
+            />
+          </Field>
+        </div>
+      </div>
     </div>
   );
 }

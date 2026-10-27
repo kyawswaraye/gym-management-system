@@ -61,7 +61,18 @@ export function scheduleWindow(today: CalendarDate): {
   };
 }
 
+export function formatGymMonthLabel(year: number, month: number): string {
+  const name = MONTHS[month - 1];
+  if (!name) {
+    return "";
+  }
+  return `${tx(name)} ${year}`;
+}
+
 export function formatGymDate(value: string): string {
+  if (typeof value !== "string") {
+    return "";
+  }
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) {
     return value;
@@ -71,10 +82,21 @@ export function formatGymDate(value: string): string {
   if (!month) {
     return value;
   }
-  return `${Number(match[3])} ${tx(month)} ${match[1]}`;
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+
+export function formatGymTime(value: string): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const match = /T(\d{2}:\d{2})/.exec(value);
+  return match?.[1] ?? "";
 }
 
 export function formatGymDateTime(value: string): string {
+  if (typeof value !== "string") {
+    return "";
+  }
   const match =
     /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.exec(
       value,
@@ -82,7 +104,7 @@ export function formatGymDateTime(value: string): string {
   if (!match || !match[1] || !match[2] || !match[3]) {
     return value;
   }
-  return `${formatGymDate(match[1])} ${match[2]} ${match[3]}`;
+  return `${formatGymDate(match[1])} ${match[2]}`;
 }
 
 export function formatServerMoney(
@@ -95,6 +117,12 @@ export function formatServerMoney(
   return `${tx(currency)} ${amount}`;
 }
 
-export function formatRemainingSessions(remainingSessions: number): string {
+export function formatRemainingSessions(remainingSessions: unknown): string {
+  if (
+    typeof remainingSessions !== "number" ||
+    !Number.isFinite(remainingSessions)
+  ) {
+    return "";
+  }
   return String(remainingSessions);
 }

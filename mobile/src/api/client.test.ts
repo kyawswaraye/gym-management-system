@@ -10,7 +10,8 @@ function json(
   return {
     status,
     headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
-    text: async () => (status === 204 ? "" : JSON.stringify(body)),
+    text: async (): Promise<string> =>
+      status === 204 ? "" : JSON.stringify(body),
   };
 }
 
@@ -201,6 +202,52 @@ describe("member API client", () => {
       JSON.stringify({ payload: "gms-checkin:v1:secret-token" }),
     );
     expect(JSON.stringify(calls)).not.toContain(BFF_SECRET_HEADER);
+  });
+
+  it("loads the signed-in gym logo and treats a missing logo as absent", async () => {
+    let logos = 0;
+    const fetchImpl: FetchLike = jest.fn(async (url) => {
+      if (url.endsWith("/api/v1/member/gym/logo/")) {
+        logos += 1;
+        if (logos > 1) {
+          return json(404, {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Not found.", fields: {} },
+            request_id: "req-missing",
+          });
+        }
+        return {
+          status: 200,
+          headers: {
+            get: (name: string) =>
+              name.toLowerCase() === "content-type" ? "image/png" : null,
+          },
+          text: async (): Promise<string> => "",
+          bytes: async () => Uint8Array.from([1, 2, 3]),
+        };
+      }
+      return json(404, {
+        success: false,
+        error: { code: "NOT_FOUND", message: "Not found.", fields: {} },
+        request_id: "req-missing",
+      });
+    });
+    const api = createMemberApi(
+      createApiClient({
+        baseUrl: "https://api.example.com",
+        fetchImpl,
+        getAccessToken: () => "access",
+        setAccessToken: () => undefined,
+        getRefreshToken: async () => "refresh",
+        setRefreshToken: async () => undefined,
+        onSessionRevoked: async () => undefined,
+      }),
+    );
+    expect(await api.gymLogo()).toBe("data:image/png;base64,AQID");
+    expect(await api.gymLogo()).toBeNull();
+    const authorization = (fetchImpl as jest.Mock).mock.calls[0][1].headers
+      .Authorization;
+    expect(authorization).toBe("Bearer access");
   });
 
   it("sends the member language on each request", async () => {

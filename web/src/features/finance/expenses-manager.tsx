@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { formatAppDate } from "@/lib/date";
 import {
   CashSessionSelect,
   useOpenCashSessions,
@@ -823,7 +824,7 @@ export function ExpensesManager({
                               {tx(pretty(row.payment_method))}
                             </td>
                             <td className="hidden px-5 py-3 whitespace-nowrap text-slate-600 lg:table-cell">
-                              {row.business_date}
+                              {formatAppDate(row.business_date)}
                             </td>
                             <td className="px-5 py-3">
                               <StatusPill status={row.status} />
@@ -924,7 +925,7 @@ export function ExpensesManager({
                           },
                           {
                             label: tx("Business date"),
-                            value: detail.business_date,
+                            value: formatAppDate(detail.business_date),
                           },
                           {
                             label: tx("Receipt"),

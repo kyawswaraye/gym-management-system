@@ -1,5 +1,5 @@
 "use client";
-import { useTx } from "@/i18n/use-tx";
+import { useLocale, useTx } from "@/i18n/use-tx";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
@@ -11,6 +11,11 @@ import {
   platformMutation,
 } from "@/features/platform/client";
 import { compareSubscriptionPlans } from "@/features/platform/subscription-policy";
+import {
+  myanmarPlaceText,
+  MyanmarRegionCityFields,
+} from "@/features/operations/myanmar-place-fields";
+import { formatAppDateTime } from "@/lib/date";
 import type {
   PlatformAuditItem,
   PlatformGymDetail,
@@ -61,6 +66,7 @@ export function GymDetailManager({
   capabilities: Capabilities;
 }) {
   const tx = useTx();
+  const locale = useLocale();
   const [gym, setGym] = useState<PlatformGymDetail | null>(null);
   const [plans, setPlans] = useState<PlatformSubscription[]>([]);
   const [audits, setAudits] = useState<PlatformAuditItem[]>([]);
@@ -68,6 +74,7 @@ export function GymDetailManager({
   const [confirmed, setConfirmed] = useState(false);
   const [pending, setPending] = useState(false);
   const [editingSettings, setEditingSettings] = useState(false);
+  const [address, setAddress] = useState({ region: "", city: "" });
   const [lifecycleOpen, setLifecycleOpen] = useState(false);
   const [invitingOwner, setInvitingOwner] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -289,7 +296,11 @@ export function GymDetailManager({
               <Fact label="Plan" value={gym.subscription_plan_name ?? ""} />
               <Fact label="Timezone" value={gym.timezone} />
               <Fact label="Currency" value={gym.currency} />
-              <Fact label="City" value={gym.city} />
+              <Fact
+                label="Region"
+                value={myanmarPlaceText(gym.region, locale)}
+              />
+              <Fact label="City" value={myanmarPlaceText(gym.city, locale)} />
             </dl>
           </section>
 
@@ -306,7 +317,10 @@ export function GymDetailManager({
                   </h2>
                   <button
                     className="button button-edit"
-                    onClick={() => setEditingSettings(true)}
+                    onClick={() => {
+                      setAddress({ region: gym.region, city: gym.city });
+                      setEditingSettings(true);
+                    }}
                     type="button"
                   >
                     {" "}
@@ -334,8 +348,28 @@ export function GymDetailManager({
                             ["phone", "Phone"],
                             ["address_line1", "Address line 1"],
                             ["address_line2", "Address line 2"],
-                            ["city", "City"],
-                            ["region", "Region"],
+                          ] as const
+                        ).map(([field, label]) => (
+                          <label className="field" key={field}>
+                            <span>{tx(label)}</span>
+                            <input
+                              className="input"
+                              name={field}
+                              defaultValue={String(
+                                gym[field as keyof PlatformGymDetail] ?? "",
+                              )}
+                              disabled={pending}
+                            />
+                          </label>
+                        ))}
+                        <MyanmarRegionCityFields
+                          city={address.city}
+                          disabled={pending}
+                          onChange={setAddress}
+                          region={address.region}
+                        />
+                        {(
+                          [
                             ["postal_code", "Postal code"],
                             ["country_code", "Country code"],
                             ["timezone", "Timezone"],
@@ -642,7 +676,7 @@ export function GymDetailManager({
                     <div className="flex flex-wrap justify-between gap-2">
                       <strong>{audit.action}</strong>
                       <time dateTime={audit.occurred_at}>
-                        {new Date(audit.occurred_at).toLocaleString()}
+                        {formatAppDateTime(audit.occurred_at)}
                       </time>
                     </div>
                     <p className="muted mt-1">

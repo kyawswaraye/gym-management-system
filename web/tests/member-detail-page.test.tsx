@@ -23,18 +23,16 @@ vi.mock("@/features/operations/member-detail", () => ({
     canRestore,
     canUpdate,
     canViewPayments,
-    canUploadPhoto,
+    canViewReceipts = false,
     canViewPhoto,
-    canDeletePhoto,
     memberId,
   }: {
     canArchive: boolean;
     canRestore: boolean;
     canUpdate: boolean;
     canViewPayments: boolean;
-    canUploadPhoto: boolean;
+    canViewReceipts?: boolean;
     canViewPhoto: boolean;
-    canDeletePhoto: boolean;
     memberId: string;
   }) => (
     <section>
@@ -43,9 +41,8 @@ vi.mock("@/features/operations/member-detail", () => ({
       <p>restore:{String(canRestore)}</p>
       <p>update:{String(canUpdate)}</p>
       <p>payments:{String(canViewPayments)}</p>
-      <p>upload:{String(canUploadPhoto)}</p>
+      <p>receipts:{String(canViewReceipts)}</p>
       <p>view-photo:{String(canViewPhoto)}</p>
-      <p>delete-photo:{String(canDeletePhoto)}</p>
     </section>
   ),
 }));
@@ -117,9 +114,33 @@ describe("member detail page capability", () => {
       await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
     );
     expect(screen.getByText("payments:true")).toBeInTheDocument();
+    expect(screen.getByText("receipts:false")).toBeInTheDocument();
     expect(screen.getByText("update:false")).toBeInTheDocument();
     expect(screen.getByText("archive:false")).toBeInTheDocument();
     expect(screen.getByText("restore:false")).toBeInTheDocument();
+
+    requireSession.mockResolvedValue(
+      session(
+        ["members.view", "payments.view", "receipts.view"],
+        ["members"],
+      ),
+    );
+    rerender(
+      await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
+    );
+    expect(screen.getByText("receipts:false")).toBeInTheDocument();
+
+    requireSession.mockResolvedValue(
+      session(
+        ["members.view", "payments.view", "receipts.view"],
+        ["members", "finance"],
+      ),
+    );
+    rerender(
+      await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
+    );
+    expect(screen.getByText("payments:true")).toBeInTheDocument();
+    expect(screen.getByText("receipts:true")).toBeInTheDocument();
   });
 
   it("passes archive access only from members.archive", async () => {
@@ -196,8 +217,6 @@ describe("member detail page capability", () => {
       await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
     );
     expect(screen.getByText("view-photo:true")).toBeInTheDocument();
-    expect(screen.getByText("upload:false")).toBeInTheDocument();
-    expect(screen.getByText("delete-photo:false")).toBeInTheDocument();
     expect(screen.getByText("update:false")).toBeInTheDocument();
 
     requireSession.mockResolvedValue(
@@ -210,8 +229,6 @@ describe("member detail page capability", () => {
       await MemberDetailPage({ params: Promise.resolve({ id: MEMBER_ID }) }),
     );
     expect(screen.getByText("update:true")).toBeInTheDocument();
-    expect(screen.getByText("upload:true")).toBeInTheDocument();
-    expect(screen.getByText("delete-photo:true")).toBeInTheDocument();
     expect(screen.getByText("view-photo:false")).toBeInTheDocument();
 
     requireSession.mockResolvedValue(

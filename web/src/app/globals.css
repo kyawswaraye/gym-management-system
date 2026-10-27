@@ -252,6 +252,20 @@ div:has(> [role="dialog"][aria-modal="true"]) {
   backdrop-filter: blur(6px);
 }
 
+body:has([role="dialog"][aria-modal="true"]) #app-sidebar {
+  pointer-events: none;
+}
+
+body:has([role="dialog"][aria-modal="true"]) #app-sidebar::before {
+  content: "";
+  position: absolute;
+  z-index: 80;
+  inset: 0;
+  background: rgb(0 0 0 / 40%);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
 [role="dialog"][aria-modal="true"] {
   border: 1px solid var(--border);
   border-radius: 1rem;

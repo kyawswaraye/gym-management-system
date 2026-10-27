@@ -18,6 +18,8 @@ export type FetchResponse = {
   status: number;
   headers: { get(name: string): string | null };
   text(): Promise<string>;
+  bytes?(): Promise<Uint8Array>;
+  arrayBuffer?(): Promise<ArrayBuffer>;
 };
 
 export type FetchLike = (
@@ -39,6 +41,9 @@ export type ApiClient = {
   login(body: { idToken: string }): Promise<TokenData>;
   refresh(): Promise<TokenData>;
   logout(refreshToken: string): Promise<void>;
+  requestMedia(
+    path: string,
+  ): Promise<{ contentType: string; bytes: Uint8Array } | null>;
 };
 
 export type ApiClientOptions = {
@@ -78,7 +83,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     return url.toString();
   }
 
-  async function send(
+  async function sendRaw(
     path: string,
     init: {
       method: string;
@@ -87,7 +92,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       auth?: boolean;
       idempotencyKey?: string;
     },
-  ): Promise<RawResponse> {
+  ): Promise<FetchResponse> {
     const headers: Record<string, string> = {
       Accept: "application/json",
       "Accept-Language": options.getAcceptLanguage?.() ?? "en",
@@ -111,9 +116,8 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     ) {
       throw new Error("The member app cannot send the browser secret.");
     }
-    let response: FetchResponse;
     try {
-      response = await fetchImpl(urlFor(path, init.query), {
+      return await fetchImpl(urlFor(path, init.query), {
         method: init.method,
         headers,
         body: init.body === undefined ? undefined : JSON.stringify(init.body),
@@ -121,11 +125,79 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     } catch {
       throw new NetworkError();
     }
+  }
+
+  async function send(
+    path: string,
+    init: {
+      method: string;
+      body?: unknown;
+      query?: Record<string, string | number | undefined>;
+      auth?: boolean;
+      idempotencyKey?: string;
+    },
+  ): Promise<RawResponse> {
+    const response = await sendRaw(path, init);
     return {
       status: response.status,
       retryAfter: response.headers.get("Retry-After"),
       text: await response.text(),
     };
+  }
+
+  const logoTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+  async function readBytes(response: FetchResponse): Promise<Uint8Array> {
+    if (response.bytes) {
+      return response.bytes();
+    }
+    if (typeof response.arrayBuffer === "function") {
+      return new Uint8Array(await response.arrayBuffer());
+    }
+    throw new ApiError(
+      500,
+      "INVALID_RESPONSE",
+      tx("The server response could not be read."),
+    );
+  }
+
+  async function requestMedia(
+    path: string,
+    allowRetry = true,
+  ): Promise<{ contentType: string; bytes: Uint8Array } | null> {
+    const response = await sendRaw(path, { method: "GET" });
+    const contentType = (response.headers.get("content-type") ?? "")
+      .split(";")[0]
+      .trim()
+      .toLowerCase();
+    if (response.status === 401 && allowRetry) {
+      const error = parseErrorBody(
+        await response.text(),
+        response.status,
+        response.headers.get("Retry-After"),
+      );
+      if (isAccessTokenExpired(error)) {
+        await refresh();
+        return requestMedia(path, false);
+      }
+      if (isRevokedSession(error)) {
+        await options.onSessionRevoked();
+      }
+      throw error;
+    }
+    if (response.status === 200 && logoTypes.has(contentType)) {
+      const bytes = await readBytes(response);
+      return bytes.byteLength > 0 ? { contentType, bytes } : null;
+    }
+    if (response.status === 404 || response.status === 200) {
+      await response.text();
+      return null;
+    }
+    throw parseErrorBody(
+      await response.text(),
+      response.status,
+      response.headers.get("Retry-After"),
+    );
   }
 
   async function performRefresh(): Promise<TokenData> {
@@ -225,6 +297,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       return envelope.data;
     },
     refresh,
+    requestMedia,
     async logout(refreshToken) {
       await request<never>("/api/v1/member-auth/logout/", {
         method: "POST",

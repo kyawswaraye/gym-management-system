@@ -8,6 +8,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
 from rest_framework import serializers
 
+from apps.tenants.models import PRINTER_FOOTER_LINE_PATTERN
+
 GYM_PROFILE_FIELDS = (
     "name",
     "legal_name",
@@ -36,6 +38,11 @@ SETTINGS_MUTABLE_FIELDS = (
     "class_cancellation_cutoff_minutes",
     "class_no_show_consumes_session",
     "require_separate_finance_approval",
+    "printer_enabled",
+    "printer_print_logo",
+    "printer_print_address",
+    "printer_print_phone",
+    "printer_footer",
 )
 SETTINGS_BOOLEAN_FIELDS = frozenset(
     {
@@ -44,8 +51,14 @@ SETTINGS_BOOLEAN_FIELDS = frozenset(
         "membership_expiry_push_enabled",
         "class_no_show_consumes_session",
         "require_separate_finance_approval",
+        "printer_enabled",
+        "printer_print_logo",
+        "printer_print_address",
+        "printer_print_phone",
     }
 )
+PRINTER_FOOTER_MAX_CHARS = 120
+PRINTER_FOOTER_MAX_LINES = 3
 SETTINGS_INTEGER_RANGES: dict[str, tuple[int, int]] = {
     "week_starts_on": (0, 6),
     "check_in_duplicate_window_seconds": (0, 86_400),
@@ -111,6 +124,20 @@ def normalize_warning_days(value: Any) -> list[int]:
     return sorted(days)
 
 
+def normalize_printer_footer(value: Any) -> str:
+    if not isinstance(value, str):
+        raise serializers.ValidationError("Enter a footer.")
+    footer = value.replace("\r\n", "\n").replace("\r", "\n")
+    if len(footer) > PRINTER_FOOTER_MAX_CHARS:
+        raise serializers.ValidationError("Enter at most 120 characters.")
+    if (
+        len(footer.splitlines()) > PRINTER_FOOTER_MAX_LINES
+        or re.fullmatch(PRINTER_FOOTER_LINE_PATTERN, footer) is None
+    ):
+        raise serializers.ValidationError("Enter at most 3 lines.")
+    return footer
+
+
 def normalize_settings_value(field: str, value: Any) -> Any:
     if field in SETTINGS_INTEGER_RANGES:
         minimum, maximum = SETTINGS_INTEGER_RANGES[field]
@@ -129,6 +156,8 @@ def normalize_settings_value(field: str, value: Any) -> Any:
         return normalize_prefix(str(value))
     if field == "membership_expiry_warning_days":
         return normalize_warning_days(value)
+    if field == "printer_footer":
+        return normalize_printer_footer(value)
     raise serializers.ValidationError("This field is not allowed.")
 
 

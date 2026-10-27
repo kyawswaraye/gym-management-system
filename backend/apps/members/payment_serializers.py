@@ -253,6 +253,43 @@ class PaymentListEnvelopeSerializer(serializers.Serializer):
     message = serializers.CharField()
 
 
+class ReceiptPrintLogoSerializer(serializers.Serializer):
+    content_type = serializers.CharField()
+    data_base64 = serializers.CharField()
+
+
+class ReceiptPrintContextSerializer(serializers.Serializer):
+    printer_enabled = serializers.BooleanField()
+    printer_print_logo = serializers.BooleanField()
+    printer_print_address = serializers.BooleanField()
+    printer_print_phone = serializers.BooleanField()
+    printer_footer = serializers.CharField()
+    phone = serializers.CharField()
+    logo = ReceiptPrintLogoSerializer(allow_null=True)
+
+
+class ReceiptPrintContextEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    data = ReceiptPrintContextSerializer()
+    message = serializers.CharField()
+
+
+class ReceiptPrintSerializer(ReceiptSerializer):
+    phone = serializers.CharField()
+    logo = ReceiptPrintLogoSerializer(allow_null=True)
+    printer_enabled = serializers.BooleanField()
+    printer_print_logo = serializers.BooleanField()
+    printer_print_address = serializers.BooleanField()
+    printer_print_phone = serializers.BooleanField()
+    printer_footer = serializers.CharField()
+
+
+class ReceiptPrintEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    data = ReceiptPrintSerializer()
+    message = serializers.CharField()
+
+
 class ReceiptEnvelopeSerializer(serializers.Serializer):
     success = serializers.BooleanField()
     data = ReceiptSerializer()

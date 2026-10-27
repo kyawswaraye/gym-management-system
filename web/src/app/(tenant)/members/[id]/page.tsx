@@ -31,13 +31,16 @@ export default async function MemberDetailPage({
       <MemberDetail
         canArchive={session.permissions.includes("members.archive")}
         canRestore={session.permissions.includes("members.restore")}
-        canDeletePhoto={photo.canDelete}
         canUpdate={session.permissions.includes("members.update")}
-        canUploadPhoto={photo.canUpload}
         canViewCheckIns={canOpenCheckIns(session)}
         canViewPayments={hasTenantCapability(
           session,
           "payments.view",
+          "finance",
+        )}
+        canViewReceipts={hasTenantCapability(
+          session,
+          "receipts.view",
           "finance",
         )}
         canViewPhoto={photo.canView}

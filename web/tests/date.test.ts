@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { formatInstant, zonedLocalToIso } from "@/lib/date";
+import {
+  formatAppDate,
+  formatAppDateTime,
+  formatInstant,
+  zonedLocalToIso,
+} from "@/lib/date";
 
 describe("gym timezone instants", () => {
   it("converts a Yangon wall time to UTC", () => {
@@ -17,5 +22,16 @@ describe("gym timezone instants", () => {
 
   it("formats a missing instant as not recorded", () => {
     expect(formatInstant(null, "Asia/Yangon")).toBe("Not recorded");
+  });
+
+  it("shows calendar dates and instants as day-month-year", () => {
+    expect(formatAppDate("2026-10-28")).toBe("28-10-2026");
+    expect(formatAppDate("not-a-date")).toBe("not-a-date");
+    expect(formatAppDateTime("2026-10-28T02:30:00.000Z", "Asia/Yangon")).toBe(
+      "28-10-2026 09:00",
+    );
+    expect(formatInstant("2026-10-28T02:30:00.000Z", "Asia/Yangon")).toBe(
+      "28-10-2026 09:00",
+    );
   });
 });

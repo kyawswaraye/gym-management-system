@@ -17,6 +17,7 @@ import {
 import { FormDialog } from "@/components/form-dialog";
 import { fieldMap, financeError } from "@/features/finance/errors";
 import { canonicalMoney, canonicalQuantity } from "@/features/finance/money";
+import { formatAppDate } from "@/lib/date";
 import { useCursorPages } from "@/features/finance/paging";
 import {
   Alert,
@@ -234,6 +235,7 @@ function ProductFields({
       </Field>
       <Field error={fields.low_stock_threshold} label="Low-stock threshold">
         <TextInput
+          decimalPlaces={3}
           defaultValue={product?.low_stock_threshold ?? "0.000"}
           inputMode="decimal"
           name="low_stock_threshold"
@@ -1265,6 +1267,8 @@ export function InventoryManager({
                           <div className="grid gap-4 sm:grid-cols-2">
                             <Field error={fields.quantity} label="Quantity">
                               <TextInput
+                                allowNegative
+                                decimalPlaces={3}
                                 inputMode="decimal"
                                 name="quantity"
                                 placeholder="0.000"
@@ -1514,7 +1518,7 @@ export function InventoryManager({
                           {row.unit_cost_snapshot}
                         </td>
                         <td className="hidden px-5 py-3 whitespace-nowrap text-slate-600 md:table-cell">
-                          {row.business_date}
+                          {formatAppDate(row.business_date)}
                         </td>
                       </tr>
                     );

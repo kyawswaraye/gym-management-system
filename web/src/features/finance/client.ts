@@ -35,6 +35,8 @@ import type {
   ProductUpdateRequest,
   ProductWriteRequest,
   Receipt,
+  ReceiptPrint,
+  ReceiptPrintContext,
   ReconcileCashSessionRequest,
   RefundPaymentRequest,
   RejectPaymentRequest,
@@ -253,6 +255,16 @@ export function listReceipts(values: {
 
 export function getReceipt(receiptId: string): Promise<Receipt> {
   return operationGet<Receipt>(`receipts/${resourceId(receiptId, "Receipt")}/`);
+}
+
+export function getReceiptPrintContext(): Promise<ReceiptPrintContext> {
+  return operationGet<ReceiptPrintContext>("receipts/print-context/");
+}
+
+export function getReceiptPrint(receiptId: string): Promise<ReceiptPrint> {
+  return operationGet<ReceiptPrint>(
+    `receipts/${resourceId(receiptId, "Receipt")}/print/`,
+  );
 }
 
 export function voidReceipt(

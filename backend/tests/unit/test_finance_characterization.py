@@ -161,7 +161,8 @@ def test_paths_statuses_and_clipping() -> None:
     ):
         with pytest.raises(FinanceSpecError, match="path"):
             assert_finance_path(path)
-    assert classify_status("payment_self_approve", 403) == "expected_rejection"
+    assert classify_status("payment_self_approve", 200) == "success"
+    assert classify_status("payment_approve", 409) == "expected_rejection"
     assert classify_status("cash_close_immutable", 409) == "expected_rejection"
     assert classify_status("cross_receipt_download", 404) == "expected_rejection"
     assert classify_status("payment_approve", 500) == "unexpected"

@@ -6,6 +6,7 @@ import {
   type Response,
 } from "@playwright/test";
 
+import { formatAppDate, formatAppDateTime } from "../src/lib/date";
 import {
   expectNoBrowserSecrets,
   ownerAccount,
@@ -931,7 +932,7 @@ async function expectRenderedReport(
   ).toBeVisible();
   await expect(
     reportSection.getByText(
-      `${report.range.date_from} to ${report.range.date_to}`,
+      `${formatAppDate(report.range.date_from)} to ${formatAppDate(report.range.date_to)}`,
       { exact: true },
     ),
   ).toBeVisible();
@@ -941,10 +942,7 @@ async function expectRenderedReport(
   await expect(
     reportSection.getByText(report.currency, { exact: true }),
   ).toBeVisible();
-  const generatedLabel = new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(report.generated_at));
+  const generatedLabel = formatAppDateTime(report.generated_at);
   await expect(
     reportSection.getByText(`Generated ${generatedLabel}`, { exact: true }),
   ).toBeVisible();

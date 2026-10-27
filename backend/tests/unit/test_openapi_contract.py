@@ -63,6 +63,7 @@ PUBLISHED_PATHS = {
     "/api/v1/member/check-ins/scan/",
     "/api/v1/member/me/",
     "/api/v1/member/dashboard/",
+    "/api/v1/member/gym/logo/",
     "/api/v1/member/membership/",
     "/api/v1/member/payments/",
     "/api/v1/member/check-ins/",
@@ -142,7 +143,9 @@ PUBLISHED_PATHS = {
     "/api/v1/payments/{payment_id}/void/",
     "/api/v1/payments/{payment_id}/refund/",
     "/api/v1/receipts/",
+    "/api/v1/receipts/print-context/",
     "/api/v1/receipts/{receipt_id}/",
+    "/api/v1/receipts/{receipt_id}/print/",
     "/api/v1/receipts/{receipt_id}/void/",
     "/api/v1/receipts/{receipt_id}/download/",
     "/api/v1/sales/daily/",
@@ -1695,6 +1698,15 @@ def test_openapi_documents_tenant_gym_profile_and_settings() -> None:
     settings_read = schemas["GymSettings"]["properties"]
     assert "next_member_number" in settings_read
     assert "require_separate_finance_approval" in settings_read
+    printer_fields = {
+        "printer_enabled",
+        "printer_print_logo",
+        "printer_print_address",
+        "printer_print_phone",
+        "printer_footer",
+    }
+    assert printer_fields <= set(settings_write)
+    assert printer_fields <= set(settings_read)
 
 
 def test_openapi_documents_platform_dashboard_and_subscription_update() -> None:
@@ -1814,6 +1826,10 @@ def test_openapi_documents_payment_commands_and_generated_types() -> None:
         parameter["name"] for parameter in paths["/api/v1/payments/"]["get"].get("parameters", [])
     }
     assert "200" in paths["/api/v1/receipts/{receipt_id}/download/"]["get"]["responses"]
+    assert "200" in paths["/api/v1/receipts/print-context/"]["get"]["responses"]
+    assert "200" in paths["/api/v1/receipts/{receipt_id}/print/"]["get"]["responses"]
+    assert "post" not in paths["/api/v1/receipts/print-context/"]
+    assert "post" not in paths["/api/v1/receipts/{receipt_id}/print/"]
     sales = paths["/api/v1/sales/daily/"]["get"]
     assert any(parameter["name"] == "date" for parameter in sales["parameters"])
     assert "200" in sales["responses"]
@@ -1821,6 +1837,8 @@ def test_openapi_documents_payment_commands_and_generated_types() -> None:
     assert '"/api/v1/payments/{payment_id}/approve/"' in generated
     assert '"/api/v1/payments/{payment_id}/void/"' in generated
     assert '"/api/v1/receipts/{receipt_id}/void/"' in generated
+    assert '"/api/v1/receipts/print-context/"' in generated
+    assert '"/api/v1/receipts/{receipt_id}/print/"' in generated
     assert '"/api/v1/sales/daily/"' in generated
 
 

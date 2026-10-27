@@ -10,6 +10,8 @@ import type {
 
 import { FormDialog } from "@/components/form-dialog";
 import { actionButtonClass } from "@/lib/ui/action-button";
+import { DigitInput } from "@/lib/ui/digit-input";
+import { englishDigitsModeFromInput } from "@/lib/ui/english-digits";
 import { IdentifierValue } from "@/lib/ui/identifier";
 
 export function Alert({ message }: { message: string }) {
@@ -111,16 +113,29 @@ export function CursorControls({
 export function Field({
   label,
   error,
+  required = false,
   children,
 }: {
   label: string;
   error?: string | undefined;
+  required?: boolean;
   children: ReactNode;
 }) {
   const tx = useTx();
   return (
     <label className="field">
-      {tx(label)}
+      <span>
+        {tx(label)}
+        {required ? (
+          <abbr
+            aria-hidden="true"
+            className="ml-0.5 text-red-700 no-underline"
+            title={tx("Required")}
+          >
+            *
+          </abbr>
+        ) : null}
+      </span>
       {children}
       {error && <span className="text-sm text-red-700">{tx(error)}</span>}
     </label>
@@ -129,13 +144,46 @@ export function Field({
 
 export function TextInput({
   error,
+  decimalPlaces,
+  allowNegative,
+  keepLeadingZeros,
+  type,
+  inputMode,
+  step,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { error?: string }) {
+}: InputHTMLAttributes<HTMLInputElement> & {
+  error?: string;
+  decimalPlaces?: number;
+  allowNegative?: boolean;
+  keepLeadingZeros?: boolean;
+}) {
+  const mode = englishDigitsModeFromInput({
+    type,
+    inputMode,
+    step,
+    decimalPlaces,
+    allowNegative,
+    keepLeadingZeros,
+  });
+  const ariaInvalid = error ? true : props["aria-invalid"];
+  if (!mode) {
+    return (
+      <input
+        {...props}
+        aria-invalid={ariaInvalid}
+        className="input"
+        inputMode={inputMode}
+        step={step}
+        type={type}
+      />
+    );
+  }
   return (
-    <input
+    <DigitInput
       {...props}
-      aria-invalid={error ? true : undefined}
+      aria-invalid={ariaInvalid}
       className="input"
+      mode={mode}
     />
   );
 }
@@ -219,7 +267,7 @@ export function ReasonField({
   required?: boolean;
 }) {
   return (
-    <Field error={error} label={label}>
+    <Field error={error} label={label} required={required}>
       <textarea className="input min-h-24" name={name} required={required} />
     </Field>
   );

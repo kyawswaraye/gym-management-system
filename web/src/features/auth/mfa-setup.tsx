@@ -8,6 +8,7 @@ import QRCode from "qrcode";
 
 import { PasswordInput } from "@/features/auth/password-input";
 import { platformMutation } from "@/features/platform/client";
+import { DigitInput } from "@/lib/ui/digit-input";
 
 type Enrollment = {
   enrollment_token: string;
@@ -121,12 +122,12 @@ export function MFASetup() {
           <form className="grid gap-4" onSubmit={confirm}>
             <label className="field">
               <span>{tx("Six-digit code")}</span>
-              <input
+              <DigitInput
                 className="input"
-                name="code"
-                inputMode="numeric"
-                pattern="[0-9]{6}"
                 maxLength={6}
+                mode={{ kind: "code" }}
+                name="code"
+                pattern="[0-9]{6}"
                 required
               />
             </label>

@@ -12,8 +12,63 @@ export type SelectedPhoto = {
   uri: string;
   fileName: string;
   contentType: string;
-  base64: string;
+  bytes: Uint8Array;
 };
+
+export function photoContentType(
+  type: string | null | undefined,
+  fileName: string | null | undefined,
+): string {
+  const raw = (type ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+  if (raw === "image/jpg" || raw === "image/pjpeg" || raw === "image/jpeg") {
+    return "image/jpeg";
+  }
+  if (raw === "image/png") {
+    return "image/png";
+  }
+  if (raw === "image/webp") {
+    return "image/webp";
+  }
+  const name = (fileName ?? "").toLowerCase();
+  if (name.endsWith(".png")) {
+    return "image/png";
+  }
+  if (name.endsWith(".webp")) {
+    return "image/webp";
+  }
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+  return raw;
+}
+
+export async function readUriBytes(uri: string): Promise<Uint8Array> {
+  try {
+    const response = await fetch(uri);
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > 0) {
+      return new Uint8Array(buffer);
+    }
+  } catch {
+    // The file URI may only be readable through XHR on this phone.
+  }
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = () => resolve(xhr.response as Blob);
+    xhr.onerror = () => reject(new Error("The photo could not be opened."));
+    xhr.responseType = "blob";
+    xhr.open("GET", uri);
+    xhr.send();
+  });
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error("The photo could not be opened."));
+    reader.readAsDataURL(blob);
+  });
+  const encoded = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  return decodeBase64(encoded);
+}
 
 export type PhotoUploadResult = {
   fileId: string;
@@ -33,7 +88,7 @@ export async function uploadProfilePhoto(
     contentType: string;
   }) => Promise<void>,
 ): Promise<PhotoUploadResult> {
-  const bytes = decodeBase64(photo.base64);
+  const bytes = photo.bytes;
   const contentType = validatePhoto({
     contentType: photo.contentType,
     byteSize: bytes.byteLength,

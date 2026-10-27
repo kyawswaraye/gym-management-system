@@ -21,6 +21,8 @@ import {
   assignableRoles,
 } from "@/features/operations/role-policy";
 import type { StaffAccess } from "@/lib/auth/authorization";
+import { formatAppDate } from "@/lib/date";
+import { DigitInput } from "@/lib/ui/digit-input";
 import type {
   MembershipRole,
   Role,
@@ -333,18 +335,32 @@ function InputField({
       <label className="text-sm font-semibold text-slate-700" htmlFor={id}>
         {tx(label)}
       </label>
-      <input
-        id={id}
-        className="input"
-        name={name}
-        type={type}
-        required={required}
-        defaultValue={defaultValue}
-        maxLength={maxLength}
-        inputMode={inputMode}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
-      />
+      {inputMode === "decimal" ? (
+        <DigitInput
+          aria-describedby={error ? errorId : undefined}
+          aria-invalid={error ? true : undefined}
+          className="input"
+          defaultValue={defaultValue}
+          id={id}
+          maxLength={maxLength}
+          mode={{ kind: "decimal", scale: 2 }}
+          name={name}
+          required={required}
+        />
+      ) : (
+        <input
+          id={id}
+          className="input"
+          name={name}
+          type={type}
+          required={required}
+          defaultValue={defaultValue}
+          maxLength={maxLength}
+          inputMode={inputMode}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+        />
+      )}
       {error ? (
         <span id={errorId} className="error">
           {tx(error)}
@@ -436,7 +452,7 @@ function ProfileFacts({ staff }: { staff: StaffRecord }) {
     { label: tx("Email"), value: staff.membership.email },
     { label: tx("Phone"), value: staff.phone || "—" },
     { label: tx("Employment title"), value: staff.employment_title || "—" },
-    { label: tx("Joined date"), value: staff.joined_date },
+    { label: tx("Joined date"), value: formatAppDate(staff.joined_date) },
     {
       label: tx("Commission"),
       value: staff.default_commission_percent,
@@ -451,7 +467,10 @@ function ProfileFacts({ staff }: { staff: StaffRecord }) {
     });
   }
   if (staff.terminated_date) {
-    facts.push({ label: tx("Terminated date"), value: staff.terminated_date });
+    facts.push({
+      label: tx("Terminated date"),
+      value: formatAppDate(staff.terminated_date),
+    });
   }
   if (staff.archived_at) {
     facts.push({ label: tx("Archived at"), value: staff.archived_at });

@@ -538,7 +538,7 @@ describe("phase 5 command coverage", () => {
     );
     await screen.findByRole("option", { name: /FRONT/ });
     expect(
-      screen.getByText(/payment business date 2026-09-30/),
+      screen.getByText(/payment business date 30-09-2026/),
     ).toBeInTheDocument();
     expect(listCashSessions).toHaveBeenCalledWith(
       expect.objectContaining({

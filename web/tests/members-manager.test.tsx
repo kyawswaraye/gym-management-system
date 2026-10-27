@@ -104,7 +104,7 @@ describe("Members manager", () => {
     ).toHaveAttribute("href", `/members/${MEMBER_ID}`);
     expect(screen.getByText("MEM-000001")).toBeInTheDocument();
     expect(screen.getByText("555")).toBeInTheDocument();
-    expect(screen.getByText("2026-01-01")).toBeInTheDocument();
+    expect(screen.getByText("01-01-2026")).toBeInTheDocument();
     expect(screen.getByText("ACTIVE")).toBeInTheDocument();
     expect(screen.queryByText("ada lovelace")).not.toBeInTheDocument();
     expect(listMembers).toHaveBeenCalledWith({ limit: 25 });

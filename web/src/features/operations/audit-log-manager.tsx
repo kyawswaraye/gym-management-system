@@ -16,6 +16,8 @@ import {
   type TenantAuditFilters,
 } from "@/features/operations/audit-policy";
 import { listAuditLogs } from "@/features/operations/client";
+import { formatAppDateTime } from "@/lib/date";
+import { DigitInput } from "@/lib/ui/digit-input";
 import { IdentifierValue } from "@/lib/ui/identifier";
 import type { TenantAuditItem, TenantAuditMeta } from "@/types/api";
 
@@ -32,15 +34,7 @@ const cardClass =
   "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm";
 
 function formatWhen(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
+  return formatAppDateTime(value);
 }
 
 function outcomeLabel(outcome: string): string {
@@ -417,10 +411,10 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
             />
           </FilterField>
           <FilterField label="Page size">
-            <input
+            <DigitInput
               className="input placeholder:text-slate-400"
               disabled={loading}
-              inputMode="numeric"
+              mode={{ kind: "integer" }}
               onChange={(event) =>
                 setDraft((current) => ({
                   ...current,
@@ -524,7 +518,7 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
                       <OutcomePill outcome={audit.outcome} />
                       <time
                         dateTime={audit.occurred_at}
-                        title={audit.occurred_at}
+                        title={formatWhen(audit.occurred_at)}
                       >
                         {formatWhen(audit.occurred_at)}
                       </time>

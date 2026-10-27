@@ -1,3 +1,5 @@
+import { englishDigitsInput } from "@/lib/ui/english-digits";
+
 const MONEY_INPUT = /^(-?)(0|[1-9]\d{0,15})(?:\.(\d{1,2}))?$/;
 const QUANTITY_INPUT = /^(-?)(0|[1-9]\d{0,14})(?:\.(\d{1,3}))?$/;
 
@@ -35,6 +37,11 @@ export function canonicalMoney(
   options: DecimalOptions = {},
 ): string | null {
   return canonical(value, MONEY_INPUT, 2, options);
+}
+
+/** Keep ASCII digits and one decimal point while a money amount is typed. */
+export function englishMoneyInput(value: string): string {
+  return englishDigitsInput(value, { kind: "decimal", scale: 2 });
 }
 
 export function canonicalQuantity(

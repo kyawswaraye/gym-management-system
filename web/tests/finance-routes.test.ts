@@ -42,6 +42,25 @@ describe("finance route allowlist", () => {
     expect(allowsFinanceRoute("/api/v1/cash-sessions/", "", "DELETE")).toBe(
       false,
     );
+    expect(
+      allowsFinanceRoute("/api/v1/receipts/print-context/", "", "GET"),
+    ).toBe(true);
+    expect(allowsFinanceRoute(`/api/v1/receipts/${ID}/print/`, "", "GET")).toBe(
+      true,
+    );
+    expect(
+      allowsFinanceRoute("/api/v1/receipts/print-context/", "?logo=1", "GET"),
+    ).toBe(false);
+    expect(
+      allowsFinanceRoute(`/api/v1/receipts/${ID}/print/`, "", "POST"),
+    ).toBe(false);
+    expect(
+      allowsFinanceRoute(
+        `/api/v1/receipts/${ID.toUpperCase()}/print/`,
+        "",
+        "GET",
+      ),
+    ).toBeNull();
   });
 });
 

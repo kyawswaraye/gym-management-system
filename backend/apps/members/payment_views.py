@@ -48,6 +48,8 @@ from apps.members.payment_serializers import (
     ReceiptEnvelopeSerializer,
     ReceiptListEnvelopeSerializer,
     ReceiptListQuerySerializer,
+    ReceiptPrintContextEnvelopeSerializer,
+    ReceiptPrintEnvelopeSerializer,
     RefundPaymentSerializer,
     RejectPaymentSerializer,
     VoidPaymentSerializer,
@@ -68,6 +70,12 @@ from apps.members.payment_services import (
     update_payment_draft,
     void_payment,
     void_receipt,
+)
+from apps.members.receipt_print import (
+    get_printer_settings,
+    print_context_payload,
+    printer_logo,
+    receipt_print_payload,
 )
 from apps.members.receipt_rendering import receipt_download_response
 from apps.users.permissions import (
@@ -593,6 +601,26 @@ class ReceiptListView(PaymentAPIView):
         return success_response([receipt_payload(row) for row in rows], meta=meta)
 
 
+class ReceiptPrintContextView(PaymentAPIView):
+    required_permission = "receipts.view"
+
+    @extend_schema(
+        operation_id="receipts_print_context",
+        responses={
+            200: ReceiptPrintContextEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request) -> Response:
+        settings = get_printer_settings(gym_id=request.gym.id)
+        logo = printer_logo(gym_id=request.gym.id, enabled=settings.printer_print_logo)
+        return success_response(
+            print_context_payload(gym=request.gym, settings=settings, logo=logo)
+        )
+
+
 class ReceiptDetailView(PaymentAPIView):
     required_permission = "receipts.view"
 
@@ -667,6 +695,32 @@ class ReceiptVoidView(PaymentCommandView):
             request=request,
         )
         return _stored_response(result)
+
+
+class ReceiptPrintView(PaymentAPIView):
+    required_permission = "receipts.view"
+
+    @extend_schema(
+        operation_id="receipts_print",
+        responses={
+            200: ReceiptPrintEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request, receipt_id: UUID) -> Response:
+        receipt = get_receipt(gym_id=request.gym.id, receipt_id=receipt_id)
+        settings = get_printer_settings(gym_id=request.gym.id)
+        logo = printer_logo(gym_id=request.gym.id, enabled=settings.printer_print_logo)
+        return success_response(
+            receipt_print_payload(
+                receipt=receipt,
+                gym=request.gym,
+                settings=settings,
+                logo=logo,
+            )
+        )
 
 
 class ReceiptDownloadView(PaymentAPIView):

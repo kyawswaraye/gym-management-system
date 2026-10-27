@@ -13,6 +13,7 @@ import {
   MemberProfileFields,
   type MemberNumberPreview,
 } from "@/features/operations/member-profile-fields";
+import { formatAppDate } from "@/lib/date";
 import {
   assignedMemberNumber,
   emptyMemberProfile,
@@ -818,7 +819,7 @@ export function MembersManager({
                       {member.email || "—"}
                     </td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-600">
-                      {member.join_date}
+                      {formatAppDate(member.join_date)}
                     </td>
                     <td className="px-5 py-4">
                       <MemberStatusBadge status={member.status} />

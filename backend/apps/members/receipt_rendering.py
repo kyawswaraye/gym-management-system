@@ -7,6 +7,7 @@ from html import escape
 from django.http import HttpResponse
 
 from apps.members.models import Receipt
+from apps.members.receipt_print import printed_issuer
 
 _CSP = "default-src 'none'; sandbox; base-uri 'none'; form-action 'none'"
 
@@ -24,7 +25,7 @@ def render_receipt_html(receipt: Receipt) -> str:
         ("Amount", f"{receipt.amount} {receipt.currency}"),
         ("Method", receipt.method),
         ("Business date", receipt.business_date.isoformat()),
-        ("Issuer", receipt.issuer_name),
+        ("Issuer", printed_issuer(receipt)),
         ("Status", receipt.status),
     )
     body = "".join(

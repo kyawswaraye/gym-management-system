@@ -11,13 +11,18 @@ import {
 } from "react";
 
 import { FormDialog } from "@/components/form-dialog";
+import { listReceipts } from "@/features/finance/client";
+import { ReceiptPrintLink } from "@/features/finance/receipt-preview";
 import {
   listMemberPayments,
   operationGet,
   operationMutation,
 } from "@/features/operations/client";
 import { MemberPhoto } from "@/features/operations/member-photo";
-import { MemberProfileFields } from "@/features/operations/member-profile-fields";
+import {
+  MemberProfileDetails,
+  MemberProfileFields,
+} from "@/features/operations/member-profile-fields";
 import {
   memberProfileFromMember,
   memberProfileSnapshot,
@@ -29,7 +34,7 @@ import {
   memberArchiveIdentity,
   RestoreMemberDialog,
 } from "@/features/operations/member-restore-dialog";
-import { formatInstant } from "@/lib/date";
+import { formatAppDate, formatInstant } from "@/lib/date";
 import type {
   Member,
   MemberPaymentHistoryItem,
@@ -56,9 +61,18 @@ function appendPayments(
   return next.length === 0 ? current : [...current, ...next];
 }
 
-function PaymentHistory({ memberId }: { memberId: string }) {
+function PaymentHistory({
+  canViewReceipts,
+  memberId,
+}: {
+  canViewReceipts: boolean;
+  memberId: string;
+}) {
   const tx = useTx();
   const [payments, setPayments] = useState<MemberPaymentHistoryItem[]>([]);
+  const [receiptByPayment, setReceiptByPayment] = useState<
+    Map<string, string>
+  >(new Map());
   const [nextAfter, setNextAfter] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -104,6 +118,29 @@ function PaymentHistory({ memberId }: { memberId: string }) {
       generation.current += 1;
     };
   }, [memberId]);
+
+  useEffect(() => {
+    if (!canViewReceipts) return undefined;
+    let active = true;
+    setReceiptByPayment(new Map());
+    void listReceipts({ member: memberId, status: "ISSUED", limit: "100" })
+      .then((page) => {
+        if (!active) return;
+        const next = new Map<string, string>();
+        for (const row of page.data) {
+          if (row.status === "ISSUED" && row.payment_id) {
+            next.set(row.payment_id.toLowerCase(), row.id);
+          }
+        }
+        setReceiptByPayment(next);
+      })
+      .catch(() => {
+        if (active) setReceiptByPayment(new Map());
+      });
+    return () => {
+      active = false;
+    };
+  }, [canViewReceipts, memberId]);
 
   async function loadOlder() {
     if (
@@ -171,13 +208,21 @@ function PaymentHistory({ memberId }: { memberId: string }) {
               className="py-3 text-sm leading-6 text-slate-700 first:pt-1 last:pb-0"
               key={payment.id}
             >
-              {payment.business_date} · {tx(payment.entry_type)} ·{" "}
+              {formatAppDate(payment.business_date)} · {tx(payment.entry_type)} ·{" "}
               {tx(payment.purpose)} · {tx(payment.description)} ·{" "}
               {payment.amount} {tx(payment.currency)} · {tx(payment.method)} ·{" "}
               {tx(payment.status)}
               {payment.receipt_number
                 ? ` · ${tx("Receipt {number}", { number: payment.receipt_number })}`
                 : ""}
+              {payment.receipt_number &&
+              receiptByPayment.get(payment.id.toLowerCase()) ? (
+                <div className="mt-2">
+                  <ReceiptPrintLink
+                    receiptId={receiptByPayment.get(payment.id.toLowerCase())}
+                  />
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -209,22 +254,20 @@ export function MemberDetail({
   canRestore = false,
   canUpdate,
   canViewPayments,
+  canViewReceipts = false,
   canViewCheckIns = false,
   timeZone = "Asia/Yangon",
-  canUploadPhoto = false,
   canViewPhoto = false,
-  canDeletePhoto = false,
 }: {
   memberId: string;
   canArchive: boolean;
   canRestore?: boolean;
   canUpdate: boolean;
   canViewPayments: boolean;
+  canViewReceipts?: boolean;
   canViewCheckIns?: boolean;
   timeZone?: string;
-  canUploadPhoto?: boolean;
   canViewPhoto?: boolean;
-  canDeletePhoto?: boolean;
 }) {
   const tx = useTx();
   const [summary, setSummary] = useState<MemberSummary | null>(null);
@@ -244,19 +287,6 @@ export function MemberDetail({
   const restoreLocked = useRef(false);
   const saveLocked = useRef(false);
   const loadGeneration = useRef(0);
-  const viewedMemberId = useRef(memberId);
-  const mounted = useRef(true);
-
-  useEffect(() => {
-    viewedMemberId.current = memberId;
-  }, [memberId]);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
 
   if (activeMemberId !== memberId) {
     setActiveMemberId(memberId);
@@ -304,17 +334,6 @@ export function MemberDetail({
         : null;
   if (memberForDraft && draft && draftState?.snapshot !== profileSnapshot) {
     setDraftState({ snapshot: profileSnapshot, draft });
-  }
-
-  function applyPhoto(assetId: string | null) {
-    setSummary((current) =>
-      current
-        ? {
-            ...current,
-            member: { ...current.member, profile_photo_asset_id: assetId },
-          }
-        : current,
-    );
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -436,30 +455,9 @@ export function MemberDetail({
             <div className="sm:w-64 sm:shrink-0">
               <MemberPhoto
                 assetId={member.profile_photo_asset_id}
-                canDelete={canDeletePhoto}
-                canUpload={canUploadPhoto}
                 canView={canViewPhoto}
                 memberId={memberId}
                 memberName={memberName}
-                onAttach={async (fileId) => {
-                  const targetMemberId = memberId;
-                  await operationMutation<Member>(
-                    `members/${targetMemberId}/`,
-                    { profile_photo_asset_id: fileId },
-                    "PATCH",
-                  );
-                  if (
-                    !mounted.current ||
-                    viewedMemberId.current !== targetMemberId
-                  )
-                    return;
-                  applyPhoto(fileId);
-                  await load();
-                }}
-                onRemove={async () => {
-                  applyPhoto(null);
-                  await load();
-                }}
               />
             </div>
             <div className="grid min-w-0 flex-1 content-start gap-4">
@@ -567,21 +565,12 @@ export function MemberDetail({
             </FormDialog>
           ) : null}
         </section>
-        {canUpdate ? null : (
-          <section aria-labelledby="member-profile-fields" className={PANEL}>
-            <h2 className={PANEL_TITLE} id="member-profile-fields">
-              {tx("Profile")}
-            </h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 [&_fieldset]:sm:col-span-2 [&>label:last-child]:sm:col-span-2">
-              <MemberProfileFields
-                disabled
-                includeMemberNumber={false}
-                onChange={() => undefined}
-                value={draft}
-              />
-            </div>
-          </section>
-        )}
+        <section aria-labelledby="member-profile-fields" className={PANEL}>
+          <h2 className={PANEL_TITLE} id="member-profile-fields">
+            {tx("Profile")}
+          </h2>
+          <MemberProfileDetails value={memberProfileFromMember(member)} />
+        </section>
         <div className="grid gap-5 xl:grid-cols-2">
           <section aria-labelledby="current-membership-title" className={PANEL}>
             <h2 className={PANEL_TITLE} id="current-membership-title">
@@ -591,8 +580,8 @@ export function MemberDetail({
               <div className="mt-4 grid gap-3">
                 <p className="text-lg font-semibold text-slate-900">
                   {summary.current_membership.plan_name}:{" "}
-                  {summary.current_membership.start_date} –{" "}
-                  {summary.current_membership.expiry_date} (
+                  {formatAppDate(summary.current_membership.start_date)} –{" "}
+                  {formatAppDate(summary.current_membership.expiry_date)} (
                   {tx(summary.current_membership.payment_status)})
                 </p>
                 <p className="text-sm text-slate-500">
@@ -651,7 +640,12 @@ export function MemberDetail({
             ) : null}
           </section>
         </div>
-        {canViewPayments ? <PaymentHistory memberId={memberId} /> : null}
+        {canViewPayments ? (
+          <PaymentHistory
+            canViewReceipts={canViewReceipts}
+            memberId={memberId}
+          />
+        ) : null}
         <div className="grid gap-5 xl:grid-cols-2">
           <section aria-labelledby="membership-history-title" className={PANEL}>
             <h2 className={PANEL_TITLE} id="membership-history-title">
@@ -668,8 +662,8 @@ export function MemberDetail({
                     className="py-3 text-sm leading-6 text-slate-700 first:pt-1 last:pb-0"
                     key={membership.id}
                   >
-                    {membership.plan_name}: {membership.start_date} –{" "}
-                    {membership.expiry_date} ({tx(membership.status)})
+                    {membership.plan_name}: {formatAppDate(membership.start_date)} –{" "}
+                    {formatAppDate(membership.expiry_date)} ({tx(membership.status)})
                   </li>
                 ))}
               </ul>

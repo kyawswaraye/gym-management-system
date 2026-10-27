@@ -13,6 +13,7 @@ import {
 
 import { FormDialog } from "@/components/form-dialog";
 import { operationGet, operationMutation } from "@/features/operations/client";
+import { formatAppDateTime } from "@/lib/date";
 import type { OwnerInvitation, OwnerItem } from "@/types/api";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -53,31 +54,12 @@ function displayName(owner: OwnerItem): string {
   return name || owner.email;
 }
 
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-] as const;
-
-function formatWhen(
-  value: string | null,
-  tx: (text: string, vars?: Record<string, string | number>) => string,
-): string | null {
+function formatWhen(value: string | null): string | null {
   if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  const month = MONTHS[date.getMonth()];
-  if (!month) return null;
-  return `${date.getDate()} ${tx(month)} ${date.getFullYear()}`;
+  const formatted = formatAppDateTime(value);
+  return formatted === value && Number.isNaN(new Date(value).getTime())
+    ? null
+    : formatted;
 }
 
 function accessNote(
@@ -85,14 +67,14 @@ function accessNote(
   tx: (text: string, vars?: Record<string, string | number>) => string,
 ): string | null {
   if (owner.status === "ACTIVE") {
-    const when = formatWhen(owner.activated_at, tx);
+    const when = formatWhen(owner.activated_at);
     return when ? tx("Since {when}", { when }) : null;
   }
   if (owner.status === "INVITED") {
-    const when = formatWhen(owner.invited_at, tx);
+    const when = formatWhen(owner.invited_at);
     return when ? tx("Sent {when}", { when }) : null;
   }
-  return formatWhen(owner.activated_at ?? owner.invited_at, tx);
+  return formatWhen(owner.activated_at ?? owner.invited_at);
 }
 
 function listSummary(

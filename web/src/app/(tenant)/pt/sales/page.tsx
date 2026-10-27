@@ -6,6 +6,7 @@ import {
   canApprovePtSale,
   canOpenPtSales,
   hasPermission,
+  hasTenantCapability,
   tenantHomePath,
 } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -28,6 +29,11 @@ export default async function PtSalesPage() {
         canCreate={hasPermission(session, "pt.sales.create")}
         canSubmit={hasPermission(session, "pt.sales.submit")}
         canUpdate={hasPermission(session, "pt.sales.update")}
+        canViewReceipts={hasTenantCapability(
+          session,
+          "receipts.view",
+          "finance",
+        )}
         canVoid={hasPermission(session, "pt.sales.void")}
         currency={session.gym?.currency ?? ""}
         membershipId={session.gym_membership?.id ?? ""}

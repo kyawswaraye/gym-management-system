@@ -721,8 +721,8 @@ export const commonEn = {
   "Select the member and membership.": "Select the member and membership.",
   "Selected gym": "Selected gym",
   "Selected staff": "Selected staff",
-  "Separate finance approval is mandatory and cannot be turned off. Payments, expenses, retail sales, PT sales, and salary records must be approved by a different authorized manager or owner.":
-    "Separate finance approval is mandatory and cannot be turned off. Payments, expenses, retail sales, PT sales, and salary records must be approved by a different authorized manager or owner.",
+  "Separate finance approval is mandatory and cannot be turned off. The owner, or the one person who is both manager and receptionist, can approve a payment they recorded. Expenses, retail sales, PT sales, and salary records still need a different authorized manager or owner.":
+    "Separate finance approval is mandatory and cannot be turned off. The owner, or the one person who is both manager and receptionist, can approve a payment they recorded. Expenses, retail sales, PT sales, and salary records still need a different authorized manager or owner.",
   "Session booked.": "Session booked.",
   "Show this rotating code at the desk. Members cannot scan it from a staff login.":
     "Show this rotating code at the desk. Members cannot scan it from a staff login.",
@@ -1614,8 +1614,8 @@ export const commonMm = {
   "Select the member and membership.": "အဖွဲ့ဝင်နှင့် အသင်းဝင်မှုကို ရွေးပါ။",
   "Selected gym": "ရွေးထားသော Gym",
   "Selected staff": "ရွေးထားသော ဝန်ထမ်း",
-  "Separate finance approval is mandatory and cannot be turned off. Payments, expenses, retail sales, PT sales, and salary records must be approved by a different authorized manager or owner.":
-    "ငွေကြေးသီးခြားအတည်ပြုချက်သည် မဖြစ်မနေဖြစ်ပြီး ပိတ်၍မရပါ။ ငွေပေးချေမှု၊ ကုန်ကျစရိတ်၊ လက်လီအရောင်း၊ PT အရောင်းနှင့် လစာမှတ်တမ်းများကို အခြားခွင့်ပြုထားသော မန်နေဂျာ သို့မဟုတ် ပိုင်ရှင်က အတည်ပြုရမည်။",
+  "Separate finance approval is mandatory and cannot be turned off. The owner, or the one person who is both manager and receptionist, can approve a payment they recorded. Expenses, retail sales, PT sales, and salary records still need a different authorized manager or owner.":
+    "ငွေကြေးသီးခြားအတည်ပြုချက်သည် မဖြစ်မနေဖြစ်ပြီး ပိတ်၍မရပါ။ ပိုင်ရှင်၊ သို့မဟုတ် မန်နေဂျာနှင့် ဧည့်ကြိုကို တစ်ယောက်တည်း ပေါင်းကိုင်ထားသူသည် ကိုယ်တိုင်မှတ်ထားသော ငွေပေးချေမှုကို အတည်ပြုနိုင်သည်။ ကုန်ကျစရိတ်၊ လက်လီအရောင်း၊ PT အရောင်းနှင့် လစာမှတ်တမ်းများကို အခြားခွင့်ပြုထားသော မန်နေဂျာ သို့မဟုတ် ပိုင်ရှင်က အတည်ပြုရမည်။",
   "Session booked.": "လေ့ကျင့်ချိန်ကို ကြိုတင်စာရင်းသွင်းပြီးပါပြီ။",
   "Show this rotating code at the desk. Members cannot scan it from a staff login.":
     "ဤလှည့်နေသော ကုဒ်ကို ကောင်တာတွင် ပြပါ။ အဖွဲ့ဝင်များသည် ဝန်ထမ်းအကောင့်မှ စကန်ဖတ်၍မရပါ။",

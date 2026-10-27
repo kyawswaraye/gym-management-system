@@ -10049,6 +10049,63 @@
                 }
             }
         },
+        "/api/v1/member/gym/logo/": {
+            "get": {
+                "operationId": "member_gym_logo_retrieve",
+                "description": "Logo bytes for the signed-in member's gym. Another gym's logo is unreachable.",
+                "tags": [
+                    "member"
+                ],
+                "security": [
+                    {
+                        "memberBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/member/me/": {
             "get": {
                 "operationId": "member_me_read",
@@ -17084,6 +17141,72 @@
                 }
             }
         },
+        "/api/v1/receipts/{receipt_id}/print/": {
+            "get": {
+                "operationId": "receipts_print",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "receipt_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "receipts"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReceiptPrintEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/receipts/{receipt_id}/void/": {
             "post": {
                 "operationId": "receipts_void",
@@ -17207,6 +17330,61 @@
                         "description": ""
                     },
                     "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/receipts/print-context/": {
+            "get": {
+                "operationId": "receipts_print_context",
+                "tags": [
+                    "receipts"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReceiptPrintContextEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -28993,6 +29171,21 @@
                     "require_separate_finance_approval": {
                         "type": "boolean"
                     },
+                    "printer_enabled": {
+                        "type": "boolean"
+                    },
+                    "printer_print_logo": {
+                        "type": "boolean"
+                    },
+                    "printer_print_address": {
+                        "type": "boolean"
+                    },
+                    "printer_print_phone": {
+                        "type": "boolean"
+                    },
+                    "printer_footer": {
+                        "type": "string"
+                    },
                     "next_member_number": {
                         "type": "integer"
                     },
@@ -29030,6 +29223,11 @@
                     "membership_expiry_push_enabled",
                     "membership_expiry_warning_days",
                     "next_member_number",
+                    "printer_enabled",
+                    "printer_footer",
+                    "printer_print_address",
+                    "printer_print_logo",
+                    "printer_print_phone",
                     "receipt_number_prefix",
                     "require_separate_finance_approval",
                     "updated_at",
@@ -30682,6 +30880,9 @@
             "MemberSelfDashboard": {
                 "type": "object",
                 "properties": {
+                    "gym": {
+                        "$ref": "#/components/schemas/MemberSelfGym"
+                    },
                     "member": {
                         "$ref": "#/components/schemas/MemberSelfProfile"
                     },
@@ -30722,6 +30923,7 @@
                     "check_in_summary",
                     "current_membership",
                     "days_remaining",
+                    "gym",
                     "is_pt_client",
                     "member",
                     "membership_history",
@@ -30765,6 +30967,22 @@
                 "required": [
                     "data",
                     "message"
+                ]
+            },
+            "MemberSelfGym": {
+                "type": "object",
+                "description": "Brand shown on the signed-in member's home screen. No other gym is included.",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "has_logo": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "has_logo",
+                    "name"
                 ]
             },
             "MemberSelfMembership": {
@@ -34115,6 +34333,22 @@
                     },
                     "require_separate_finance_approval": {
                         "type": "boolean"
+                    },
+                    "printer_enabled": {
+                        "type": "boolean"
+                    },
+                    "printer_print_logo": {
+                        "type": "boolean"
+                    },
+                    "printer_print_address": {
+                        "type": "boolean"
+                    },
+                    "printer_print_phone": {
+                        "type": "boolean"
+                    },
+                    "printer_footer": {
+                        "type": "string",
+                        "maxLength": 120
                     }
                 }
             },
@@ -36172,6 +36406,215 @@
                     "message",
                     "meta",
                     "success"
+                ]
+            },
+            "ReceiptPrint": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "payment_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "receipt_number": {
+                        "type": "string"
+                    },
+                    "issued_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "gym_code": {
+                        "type": "string"
+                    },
+                    "gym_name": {
+                        "type": "string"
+                    },
+                    "gym_address": {
+                        "type": "string"
+                    },
+                    "member_number": {
+                        "type": "string"
+                    },
+                    "member_name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$",
+                        "readOnly": true
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "method": {
+                        "type": "string"
+                    },
+                    "business_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "issuer_name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "phone": {
+                        "type": "string"
+                    },
+                    "logo": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ReceiptPrintLogo"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "printer_enabled": {
+                        "type": "boolean"
+                    },
+                    "printer_print_logo": {
+                        "type": "boolean"
+                    },
+                    "printer_print_address": {
+                        "type": "boolean"
+                    },
+                    "printer_print_phone": {
+                        "type": "boolean"
+                    },
+                    "printer_footer": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "amount",
+                    "business_date",
+                    "created_at",
+                    "currency",
+                    "description",
+                    "gym_address",
+                    "gym_code",
+                    "gym_name",
+                    "id",
+                    "issued_at",
+                    "issuer_name",
+                    "logo",
+                    "member_name",
+                    "member_number",
+                    "method",
+                    "payment_id",
+                    "phone",
+                    "printer_enabled",
+                    "printer_footer",
+                    "printer_print_address",
+                    "printer_print_logo",
+                    "printer_print_phone",
+                    "receipt_number",
+                    "status"
+                ]
+            },
+            "ReceiptPrintContext": {
+                "type": "object",
+                "properties": {
+                    "printer_enabled": {
+                        "type": "boolean"
+                    },
+                    "printer_print_logo": {
+                        "type": "boolean"
+                    },
+                    "printer_print_address": {
+                        "type": "boolean"
+                    },
+                    "printer_print_phone": {
+                        "type": "boolean"
+                    },
+                    "printer_footer": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string"
+                    },
+                    "logo": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ReceiptPrintLogo"
+                            }
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "logo",
+                    "phone",
+                    "printer_enabled",
+                    "printer_footer",
+                    "printer_print_address",
+                    "printer_print_logo",
+                    "printer_print_phone"
+                ]
+            },
+            "ReceiptPrintContextEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/ReceiptPrintContext"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
+                ]
+            },
+            "ReceiptPrintEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/ReceiptPrint"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
+                ]
+            },
+            "ReceiptPrintLogo": {
+                "type": "object",
+                "properties": {
+                    "content_type": {
+                        "type": "string"
+                    },
+                    "data_base64": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "content_type",
+                    "data_base64"
                 ]
             },
             "ReconcileCashSessionRequest": {

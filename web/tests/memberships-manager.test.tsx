@@ -216,7 +216,7 @@ describe("Memberships manager", () => {
         MEMBER_ID,
       ),
     ).toHaveTextContent("111111");
-    expect(screen.getByText("2026-01-31 – 2026-02-27")).toBeInTheDocument();
+    expect(screen.getByText("31-01-2026 – 27-02-2026")).toBeInTheDocument();
     expect(screen.getByText("1399.50 THB")).toBeInTheDocument();
     expect(screen.getByText("ACTIVE / UNPAID")).toBeInTheDocument();
     expect(screen.queryByText("ada lovelace")).not.toBeInTheDocument();
@@ -320,7 +320,7 @@ describe("Memberships manager", () => {
 
     const reopened = openStartMembershipDialog();
     expect(within(reopened).getByLabelText("Note")).toHaveValue("Keep me");
-    expect(within(reopened).getByLabelText("Discount")).toHaveValue(5);
+    expect(within(reopened).getByLabelText("Discount")).toHaveValue("5.00");
     fireEvent.keyDown(reopened, { key: "Escape" });
     expect(
       screen.queryByRole("dialog", { name: "Start membership" }),

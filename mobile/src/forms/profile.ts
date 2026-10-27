@@ -46,6 +46,11 @@ export const profileFormSchema = z
 
 export type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
+export function phoneDigits(value: string): string {
+  const lead = value.trimStart().startsWith("+") ? "+" : "";
+  return `${lead}${value.replace(/\D/g, "").slice(0, 15)}`;
+}
+
 export function profileToForm(
   profile: Schemas["MemberSelfProfile"],
 ): ProfileFormValues {

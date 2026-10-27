@@ -255,7 +255,7 @@ describe("retail sales", () => {
       target: { value: "1.25" },
     });
     expect(await screen.findByText(/Preview only: 0.13/)).toBeVisible();
-    fireEvent.click(await screen.findByRole("button", { name: "2026-10-18" }));
+    fireEvent.click(await screen.findByRole("button", { name: "18-10-2026" }));
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm approval" }));
     expect(approveRetailSale).not.toHaveBeenCalled();
@@ -410,7 +410,7 @@ describe("retail sales", () => {
         defaultDate="2026-10-18"
       />,
     );
-    fireEvent.click(await screen.findByRole("button", { name: "2026-10-18" }));
+    fireEvent.click(await screen.findByRole("button", { name: "18-10-2026" }));
     fireEvent.click(await screen.findByRole("button", { name: "Void sale" }));
     expect(
       screen.queryByRole("combobox", { name: "Destination open session" }),
@@ -426,6 +426,9 @@ describe("retail sales", () => {
       });
     });
     expect(await screen.findByText("1")).toBeVisible();
+    expect(
+      screen.queryByRole("link", { name: "Print receipt" }),
+    ).not.toBeInTheDocument();
   });
 
   it("returns a posted card sale without a cash session or client money", async () => {
@@ -505,7 +508,7 @@ describe("retail sales", () => {
         defaultDate="2026-10-18"
       />,
     );
-    fireEvent.click(await screen.findByRole("button", { name: "2026-10-18" }));
+    fireEvent.click(await screen.findByRole("button", { name: "18-10-2026" }));
     expect(
       await screen.findByRole("button", { name: "Void sale" }),
     ).toBeInTheDocument();
@@ -652,6 +655,9 @@ describe("retail sales", () => {
     );
     expect(screen.getByText("R-RET")).toBeVisible();
     expect(
+      screen.queryByRole("link", { name: "Print receipt" }),
+    ).not.toBeInTheDocument();
+    expect(
       screen.getByTitle("cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd"),
     ).toHaveTextContent("cdcdcd");
     expect(screen.getByText("Cash movement").parentElement).toHaveTextContent(
@@ -710,7 +716,7 @@ describe("retail sales", () => {
         defaultDate="2026-10-18"
       />,
     );
-    fireEvent.click(await screen.findByRole("button", { name: "2026-10-18" }));
+    fireEvent.click(await screen.findByRole("button", { name: "18-10-2026" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "Partial return" }),
     );
@@ -763,5 +769,82 @@ describe("retail sales", () => {
         ],
       });
     });
+  });
+
+  it("prints a posted sale receipt only with receipt access", async () => {
+    const receiptId = "88888888-8888-4888-8888-888888888888";
+    const pending = sale({
+      status: "PENDING_APPROVAL",
+      receipt_id: receiptId,
+    });
+    vi.mocked(getRetailSale).mockResolvedValue(pending);
+    vi.mocked(listRetailSales).mockResolvedValue({
+      data: [pending],
+      meta: { has_more: false, next_after: null },
+    });
+    const hidden = render(
+      <RetailSalesManager
+        canApprove={false}
+        canCreate={false}
+        canSubmit={false}
+        canUpdate={false}
+        canViewReceipts
+        canVoid={false}
+        currency="THB"
+        defaultDate="2026-10-18"
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "18-10-2026" }));
+    expect(await screen.findByTitle(receiptId)).toBeVisible();
+    expect(
+      screen.queryByRole("link", { name: "Print receipt" }),
+    ).not.toBeInTheDocument();
+    hidden.unmount();
+
+    const posted = sale({
+      status: "POSTED",
+      payment_method: "CARD",
+      receipt_id: receiptId,
+    });
+    vi.mocked(getRetailSale).mockResolvedValue(posted);
+    vi.mocked(listRetailSales).mockResolvedValue({
+      data: [posted],
+      meta: { has_more: false, next_after: null },
+    });
+    const denied = render(
+      <RetailSalesManager
+        canApprove={false}
+        canCreate={false}
+        canSubmit={false}
+        canUpdate={false}
+        canVoid={false}
+        currency="THB"
+        defaultDate="2026-10-18"
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "18-10-2026" }));
+    expect(await screen.findByTitle(receiptId)).toBeVisible();
+    expect(
+      screen.queryByRole("link", { name: "Print receipt" }),
+    ).not.toBeInTheDocument();
+    denied.unmount();
+
+    render(
+      <RetailSalesManager
+        canApprove={false}
+        canCreate={false}
+        canSubmit={false}
+        canUpdate={false}
+        canViewReceipts
+        canVoid={false}
+        currency="THB"
+        defaultDate="2026-10-18"
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "18-10-2026" }));
+    const link = await screen.findByRole("link", { name: "Print receipt" });
+    expect(link).toHaveAttribute("href", `/receipts/${receiptId}/print`);
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link).toHaveAttribute("target", "_blank");
   });
 });

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { View } from "react-native";
 
-import { colors, radius, space } from "./theme";
+import { colors, elevation, radius, space } from "./theme";
 
 export function Card({
   children,
@@ -17,9 +17,9 @@ export function Card({
         borderColor: colors.border,
         borderRadius: radius.md,
         borderWidth: 1,
-        gap: padded ? space.sm : 0,
-        overflow: "hidden",
-        padding: padded ? space.md : 0,
+        gap: padded ? space.md : 0,
+        padding: padded ? 18 : 0,
+        ...elevation,
       }}
     >
       {children}

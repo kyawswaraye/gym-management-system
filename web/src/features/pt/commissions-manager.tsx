@@ -13,6 +13,7 @@ import {
   CashSessionSelect,
   useOpenCashSessions,
 } from "@/features/finance/cash-session-field";
+import { formatAppDate } from "@/lib/date";
 import {
   Alert,
   CursorControls,
@@ -891,7 +892,9 @@ function PayoutEntry({
       </div>
       {payment.business_date ? (
         <p className="mt-1 text-sm text-slate-600">
-          <time dateTime={payment.business_date}>{payment.business_date}</time>
+          <time dateTime={payment.business_date}>
+            {formatAppDate(payment.business_date)}
+          </time>
         </p>
       ) : null}
       {payment.reference_number ? (

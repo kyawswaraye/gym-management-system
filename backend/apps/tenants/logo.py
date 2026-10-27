@@ -34,6 +34,14 @@ def read_logo_upload(upload: Any) -> tuple[bytes, str]:
     return payload, content_type
 
 
+def logo_bytes_are_safe(content_type: str, payload: bytes) -> bool:
+    return (
+        content_type in LOGO_CONTENT_TYPES
+        and 1 <= len(payload) <= MAX_LOGO_BYTES
+        and _matches_type(content_type, payload)
+    )
+
+
 def _matches_type(content_type: str, payload: bytes) -> bool:
     if content_type == "image/jpeg":
         return payload.startswith(b"\xff\xd8\xff")

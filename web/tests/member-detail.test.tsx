@@ -1,5 +1,4 @@
 import {
-  act,
   fireEvent,
   render,
   screen,
@@ -8,13 +7,12 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { listReceipts } from "@/features/finance/client";
 import {
-  deleteFileAsset,
   getFileDownloadUrl,
   listMemberPayments,
   operationGet,
   operationMutation,
-  uploadProfilePhoto,
 } from "@/features/operations/client";
 import { MemberDetail } from "@/features/operations/member-detail";
 import type {
@@ -28,17 +26,21 @@ vi.mock("@/features/operations/client", () => ({
   operationGet: vi.fn(),
   operationMutation: vi.fn(),
   listMemberPayments: vi.fn(),
-  uploadProfilePhoto: vi.fn(),
   getFileDownloadUrl: vi.fn(),
-  deleteFileAsset: vi.fn(),
+}));
+
+vi.mock("@/features/finance/client", () => ({
+  listReceipts: vi.fn(() =>
+    Promise.resolve({ data: [], meta: { has_more: false, next_after: null } }),
+  ),
 }));
 
 const MEMBER_ID = "11111111-1111-4111-8111-111111111111";
 const OTHER_MEMBER_ID = "66666666-6666-4666-8666-666666666666";
 const PHOTO_ID = "88888888-8888-4888-8888-888888888888";
-const NEXT_PHOTO_ID = "99999999-9999-4999-8999-999999999999";
 const MEMBERSHIP_ID = "22222222-2222-4222-8222-222222222222";
 const PAYMENT_ID = "55555555-5555-4555-8555-555555555555";
+const RECEIPT_ID = "99999999-9999-4999-8999-999999999999";
 const OLDER_PAYMENT_ID = "77777777-7777-4777-8777-777777777777";
 
 function member(overrides: Partial<Member> = {}): Member {
@@ -165,19 +167,17 @@ function renderDetail(
     canArchive: boolean;
     canUpdate: boolean;
     canViewPayments: boolean;
-    canUploadPhoto: boolean;
+    canViewReceipts: boolean;
     canViewPhoto: boolean;
-    canDeletePhoto: boolean;
     memberId: string;
   }> = {},
 ) {
   return render(
     <MemberDetail
       canArchive={props.canArchive ?? false}
-      canDeletePhoto={props.canDeletePhoto ?? false}
       canUpdate={props.canUpdate ?? false}
-      canUploadPhoto={props.canUploadPhoto ?? false}
       canViewPayments={props.canViewPayments ?? false}
+      canViewReceipts={props.canViewReceipts ?? false}
       canViewPhoto={props.canViewPhoto ?? false}
       memberId={props.memberId ?? MEMBER_ID}
     />,
@@ -227,7 +227,7 @@ describe("Member detail summary", () => {
       "ACTIVE",
     );
     expect(
-      screen.getByText("Monthly: 2026-10-01 – 2026-10-31 (PARTIAL)"),
+      screen.getByText("Monthly: 01-10-2026 – 31-10-2026 (PARTIAL)"),
     ).toBeInTheDocument();
     expect(screen.getByText(/15 days remaining/)).toBeInTheDocument();
     expect(screen.getByText(/PT client/)).toBeInTheDocument();
@@ -256,6 +256,7 @@ describe("Member detail summary", () => {
     expect(screen.getAllByText("Not recorded").length).toBeGreaterThan(0);
     expect(operationGet).toHaveBeenCalledWith(`members/${MEMBER_ID}/summary/`);
     expect(listMemberPayments).not.toHaveBeenCalled();
+    expect(listReceipts).not.toHaveBeenCalled();
     expect(
       screen.queryByRole("heading", { name: "Payment history" }),
     ).not.toBeInTheDocument();
@@ -388,6 +389,7 @@ describe("Member detail summary", () => {
 
     expect(listMemberPayments).toHaveBeenCalledTimes(2);
     expect(listMemberPayments).toHaveBeenLastCalledWith(MEMBER_ID, "cursor-1");
+    expect(listReceipts).not.toHaveBeenCalled();
     older.resolve({
       data: [
         payment(),
@@ -406,6 +408,63 @@ describe("Member detail summary", () => {
     expect(
       screen.queryByRole("button", { name: "Load older payments" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Print receipt" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("prints an issued history receipt only when receipt access can match it", async () => {
+    vi.mocked(operationGet).mockResolvedValue(summary());
+    vi.mocked(listMemberPayments).mockResolvedValue({
+      data: [
+        payment(),
+        payment({
+          id: OLDER_PAYMENT_ID,
+          description: "April dues",
+          receipt_number: "RCPT-OLD",
+        }),
+      ],
+      meta: { has_more: false, next_after: null },
+    });
+    vi.mocked(listReceipts).mockResolvedValue({
+      data: [
+        {
+          id: RECEIPT_ID,
+          payment_id: PAYMENT_ID,
+          status: "ISSUED",
+        },
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          payment_id: OLDER_PAYMENT_ID,
+          status: "VOID",
+        },
+      ],
+      meta: { has_more: false, next_after: null },
+    } as never);
+
+    render(
+      <MemberDetail
+        canArchive={false}
+        canUpdate={false}
+        canViewPayments
+        canViewReceipts
+        memberId={MEMBER_ID}
+      />,
+    );
+
+    expect(await screen.findByText(/Receipt RCPT-100/)).toBeInTheDocument();
+    const link = await screen.findByRole("link", { name: "Print receipt" });
+    expect(link).toHaveAttribute("href", `/receipts/${RECEIPT_ID}/print`);
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(screen.getAllByRole("link", { name: "Print receipt" })).toHaveLength(
+      1,
+    );
+    expect(listReceipts).toHaveBeenCalledWith({
+      member: MEMBER_ID,
+      status: "ISSUED",
+      limit: "100",
+    });
   });
 
   it("shows an empty payment history without hiding the summary", async () => {
@@ -903,9 +962,13 @@ describe("Member profile editor", () => {
 
   it("keeps profile editing available without file permissions", async () => {
     renderDetail({ canUpdate: true });
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Edit profile" }),
-    );
+
+    expect(await screen.findByText("Morning visits")).toBeInTheDocument();
+    expect(screen.getByText("555")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Profile" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit profile" }));
 
     expect(await screen.findByLabelText("Notes")).toHaveValue("Morning visits");
     expect(screen.getByLabelText("First name")).toHaveValue("Ada");
@@ -913,6 +976,9 @@ describe("Member profile editor", () => {
     expect(screen.getByText("Status").nextElementSibling).toHaveTextContent(
       "ACTIVE",
     );
+    expect(
+      screen.getByRole("img", { name: "No profile photo." }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByLabelText("Upload profile photo"),
     ).not.toBeInTheDocument();
@@ -922,14 +988,21 @@ describe("Member profile editor", () => {
     expect(getFileDownloadUrl).not.toHaveBeenCalled();
   });
 
-  it("disables profile fields without members.update", async () => {
+  it("shows profile details without members.update", async () => {
     renderDetail();
 
-    expect(await screen.findByLabelText("First name")).toBeDisabled();
-    expect(screen.getByLabelText("Notes")).toHaveValue("Morning visits");
+    expect(await screen.findByText("Morning visits")).toBeInTheDocument();
+    expect(screen.getByText("555")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Profile" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit profile" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Save changes" }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
   });
 
   it("saves the writable profile and blank nullable fields", async () => {
@@ -1089,17 +1162,19 @@ describe("Member profile photo", () => {
     });
   });
 
-  function photoFile() {
-    return new File(["abc"], "ada.png", { type: "image/png" });
-  }
-
-  function selectPhoto(label: string, files: File[]) {
-    const input = screen.getByLabelText(label);
-    Object.defineProperty(input, "files", {
-      configurable: true,
-      value: files,
-    });
-    fireEvent.change(input);
+  function expectPhotoControlsAbsent() {
+    expect(
+      screen.queryByLabelText("Upload profile photo"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Replace profile photo"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Remove profile photo" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Retry loading profile photo" }),
+    ).not.toBeInTheDocument();
   }
 
   it("loads a fresh photo without rendering the signed URL as text", async () => {
@@ -1118,9 +1193,26 @@ describe("Member profile photo", () => {
     expect(document.body.textContent).not.toContain("sig-do-not-leak");
     expect(document.body.textContent).not.toContain("sha256");
     expect(getFileDownloadUrl).toHaveBeenCalledWith(PHOTO_ID);
+    fireEvent.error(image);
     expect(
-      screen.queryByLabelText("Upload profile photo"),
+      await screen.findByRole("img", { name: "No profile photo." }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: "Profile photo of Ada Lovelace" }),
     ).not.toBeInTheDocument();
+    expectPhotoControlsAbsent();
+  });
+
+  it("shows an empty profile photo when the member has not uploaded one", async () => {
+    vi.mocked(operationGet).mockResolvedValue(summary());
+    renderDetail({ canViewPhoto: true });
+
+    expect(
+      await screen.findByRole("img", { name: "No profile photo." }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Total charged")).toBeInTheDocument();
+    expect(getFileDownloadUrl).not.toHaveBeenCalled();
+    expectPhotoControlsAbsent();
   });
 
   it("ignores a stale photo response after the member changes", async () => {
@@ -1149,9 +1241,7 @@ describe("Member profile photo", () => {
     view.rerender(
       <MemberDetail
         canArchive={false}
-        canDeletePhoto={false}
         canUpdate={false}
-        canUploadPhoto={false}
         canViewPayments={false}
         canViewPhoto
         memberId={OTHER_MEMBER_ID}
@@ -1162,419 +1252,46 @@ describe("Member profile photo", () => {
       contentType: "image/jpeg",
     });
 
-    expect(await screen.findByText("No profile photo.")).toBeInTheDocument();
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("img", { name: "No profile photo." }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: "Profile photo of Ada Lovelace" }),
+    ).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain("stale-secret");
-    expect(screen.getByLabelText("First name")).toHaveValue("Grace");
+    expect(screen.getByText("Grace Hopper")).toBeInTheDocument();
+    expectPhotoControlsAbsent();
   });
 
-  it("shows a photo load error and retries without hiding the summary", async () => {
+  it("shows an empty profile photo when the uploaded photo cannot be loaded", async () => {
     vi.mocked(operationGet).mockResolvedValue(
       summary({ member: member({ profile_photo_asset_id: PHOTO_ID }) }),
     );
-    vi.mocked(getFileDownloadUrl)
-      .mockRejectedValueOnce(new Error("Unable to load the profile photo."))
-      .mockResolvedValueOnce({
-        url: signedUrl,
-        contentType: "image/jpeg",
-      });
+    vi.mocked(getFileDownloadUrl).mockRejectedValue(
+      new Error("Unable to load the profile photo."),
+    );
     renderDetail({ canViewPhoto: true });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Unable to load the profile photo.",
-    );
-    expect(screen.getByText("Total charged")).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Retry loading profile photo" }),
-    );
     expect(
-      await screen.findByRole("img", {
-        name: "Profile photo of Ada Lovelace",
-      }),
-    ).toHaveAttribute("src", signedUrl);
-  });
-
-  it("uploads, attaches, and reloads without a second upload on a double change", async () => {
-    const pending = deferred<{ fileId: string }>();
-    vi.mocked(operationGet).mockResolvedValue(summary());
-    vi.mocked(uploadProfilePhoto).mockReturnValue(pending.promise);
-    renderDetail({
-      canUpdate: true,
-      canUploadPhoto: true,
-      canViewPhoto: true,
-      canDeletePhoto: true,
-    });
-    const file = photoFile();
-    await screen.findByLabelText("Upload profile photo");
-    selectPhoto("Upload profile photo", [file, file]);
-    selectPhoto("Upload profile photo", [file]);
-    selectPhoto("Upload profile photo", [file]);
-
-    expect(uploadProfilePhoto).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Uploading profile photo.")).toBeInTheDocument();
-    pending.resolve({ fileId: PHOTO_ID });
-
-    await waitFor(() =>
-      expect(operationMutation).toHaveBeenCalledWith(
-        `members/${MEMBER_ID}/`,
-        { profile_photo_asset_id: PHOTO_ID },
-        "PATCH",
-      ),
-    );
-    expect(await screen.findByText("Profile photo saved.")).toBeInTheDocument();
-    expect(operationGet).toHaveBeenCalledTimes(2);
-    expect(uploadProfilePhoto).toHaveBeenCalledTimes(1);
-    expect(document.body.textContent).not.toContain(PHOTO_ID);
-  });
-
-  it("keeps the completed photo for attach retry or delete", async () => {
-    vi.mocked(operationGet).mockResolvedValue(summary());
-    vi.mocked(uploadProfilePhoto).mockResolvedValue({ fileId: PHOTO_ID });
-    vi.mocked(operationMutation).mockRejectedValueOnce(
-      new Error("Unable to attach the profile photo."),
-    );
-    renderDetail({
-      canUpdate: true,
-      canUploadPhoto: true,
-      canDeletePhoto: true,
-    });
-    await screen.findByLabelText("Upload profile photo");
-    selectPhoto("Upload profile photo", [photoFile()]);
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Unable to attach the profile photo.",
-    );
-    expect(screen.getByText("Total charged")).toBeInTheDocument();
-    expect(
-      screen.queryByLabelText("Upload profile photo"),
-    ).not.toBeInTheDocument();
-    vi.mocked(operationMutation).mockResolvedValueOnce(
-      member({ profile_photo_asset_id: PHOTO_ID }),
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Retry attaching profile photo" }),
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Retry attaching profile photo" }),
-    );
-
-    await waitFor(() => expect(operationMutation).toHaveBeenCalledTimes(2));
-    expect(operationMutation).toHaveBeenLastCalledWith(
-      `members/${MEMBER_ID}/`,
-      { profile_photo_asset_id: PHOTO_ID },
-      "PATCH",
-    );
-    expect(await screen.findByText("Profile photo saved.")).toBeInTheDocument();
-    expect(deleteFileAsset).not.toHaveBeenCalled();
-  });
-
-  it("deletes the unattached photo when attach fails and retry is declined", async () => {
-    vi.mocked(operationGet).mockResolvedValue(summary());
-    vi.mocked(uploadProfilePhoto).mockResolvedValue({ fileId: PHOTO_ID });
-    vi.mocked(operationMutation).mockRejectedValue(
-      new Error("Unable to attach the profile photo."),
-    );
-    vi.mocked(deleteFileAsset).mockResolvedValue(undefined);
-    renderDetail({
-      canUploadPhoto: true,
-      canDeletePhoto: true,
-    });
-    await screen.findByLabelText("Upload profile photo");
-    selectPhoto("Upload profile photo", [photoFile()]);
-    fireEvent.click(
-      await screen.findByRole("button", {
-        name: "Delete unattached profile photo",
-      }),
-    );
-
-    await waitFor(() => expect(deleteFileAsset).toHaveBeenCalledWith(PHOTO_ID));
-    expect(
-      await screen.findByText("Unattached profile photo deleted."),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText("Upload profile photo")).toBeInTheDocument();
-    expect(screen.getByText("Total charged")).toBeInTheDocument();
-  });
-
-  it("pauses another upload when the unfinished photo cannot be deleted", async () => {
-    const error = new Error(
-      "The file service did not accept the profile photo.",
-    );
-    Object.assign(error, { recoverableFileId: PHOTO_ID, attachReady: false });
-    vi.mocked(operationGet).mockResolvedValue(summary());
-    vi.mocked(uploadProfilePhoto).mockRejectedValue(error);
-    renderDetail({ canUploadPhoto: true, canDeletePhoto: false });
-    await screen.findByLabelText("Upload profile photo");
-    selectPhoto("Upload profile photo", [photoFile()]);
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The file service did not accept the profile photo.",
-    );
-    expect(
-      screen.getByText(/do not have permission to delete/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Retry attaching profile photo" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", {
-        name: "Delete unattached profile photo",
-      }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByLabelText("Upload profile photo"),
-    ).not.toBeInTheDocument();
-    expect(document.body.textContent).not.toContain(PHOTO_ID);
-  });
-
-  it("replaces and removes the current photo through the file endpoints", async () => {
-    vi.mocked(operationGet)
-      .mockResolvedValueOnce(
-        summary({ member: member({ profile_photo_asset_id: PHOTO_ID }) }),
-      )
-      .mockResolvedValueOnce(
-        summary({
-          member: member({ profile_photo_asset_id: NEXT_PHOTO_ID }),
-        }),
-      )
-      .mockResolvedValue(
-        summary({ member: member({ profile_photo_asset_id: null }) }),
-      );
-    vi.mocked(uploadProfilePhoto).mockResolvedValue({ fileId: NEXT_PHOTO_ID });
-    vi.mocked(operationMutation).mockResolvedValue(
-      member({ profile_photo_asset_id: NEXT_PHOTO_ID }),
-    );
-    vi.mocked(deleteFileAsset).mockResolvedValue(undefined);
-    renderDetail({
-      canUpdate: true,
-      canUploadPhoto: true,
-      canViewPhoto: true,
-      canDeletePhoto: true,
-    });
-
-    expect(
-      await screen.findByRole("img", {
-        name: "Profile photo of Ada Lovelace",
-      }),
-    ).toBeInTheDocument();
-    selectPhoto("Replace profile photo", [photoFile()]);
-    await waitFor(() =>
-      expect(operationMutation).toHaveBeenCalledWith(
-        `members/${MEMBER_ID}/`,
-        { profile_photo_asset_id: NEXT_PHOTO_ID },
-        "PATCH",
-      ),
-    );
-    expect(uploadProfilePhoto).toHaveBeenCalledWith(
-      MEMBER_ID,
-      expect.any(File),
-    );
-    await waitFor(() => expect(deleteFileAsset).toHaveBeenCalledTimes(1));
-    expect(deleteFileAsset).toHaveBeenCalledWith(PHOTO_ID);
-    expect(await screen.findByText("Profile photo saved.")).toBeInTheDocument();
-    expect(screen.queryByText(/could not be removed/i)).not.toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Remove profile photo" }),
-    );
-    await waitFor(() =>
-      expect(deleteFileAsset).toHaveBeenCalledWith(NEXT_PHOTO_ID),
-    );
-    expect(deleteFileAsset).toHaveBeenCalledTimes(2);
-    expect(operationMutation).toHaveBeenCalledTimes(1);
-    const bodies = vi
-      .mocked(operationMutation)
-      .mock.calls.map((call) => call[1]);
-    expect(bodies).not.toContainEqual({ profile_photo_asset_id: null });
-    expect(
-      await screen.findByText("Profile photo removed."),
+      await screen.findByRole("img", { name: "No profile photo." }),
     ).toBeInTheDocument();
     expect(screen.getByText("Total charged")).toBeInTheDocument();
-  });
-
-  it("keeps the new photo when cleanup of the previous photo fails", async () => {
-    vi.mocked(operationGet)
-      .mockResolvedValueOnce(
-        summary({ member: member({ profile_photo_asset_id: PHOTO_ID }) }),
-      )
-      .mockResolvedValue(
-        summary({
-          member: member({ profile_photo_asset_id: NEXT_PHOTO_ID }),
-        }),
-      );
-    vi.mocked(uploadProfilePhoto).mockResolvedValue({ fileId: NEXT_PHOTO_ID });
-    vi.mocked(operationMutation).mockResolvedValue(
-      member({ profile_photo_asset_id: NEXT_PHOTO_ID }),
-    );
-    vi.mocked(deleteFileAsset).mockRejectedValue(
-      new Error("storage unavailable"),
-    );
-    renderDetail({
-      canUpdate: true,
-      canUploadPhoto: true,
-      canViewPhoto: true,
-      canDeletePhoto: true,
-    });
-
-    expect(
-      await screen.findByRole("img", {
-        name: "Profile photo of Ada Lovelace",
-      }),
-    ).toBeInTheDocument();
-    selectPhoto("Replace profile photo", [photoFile()]);
-
-    expect(await screen.findByText("Profile photo saved.")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "The previous photo could not be removed and will be deleted later.",
-      ),
-    ).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(operationMutation).toHaveBeenCalledTimes(1);
-    expect(operationMutation).toHaveBeenCalledWith(
-      `members/${MEMBER_ID}/`,
-      { profile_photo_asset_id: NEXT_PHOTO_ID },
-      "PATCH",
-    );
-    expect(deleteFileAsset).toHaveBeenCalledTimes(1);
-    expect(deleteFileAsset).toHaveBeenCalledWith(PHOTO_ID);
-    expect(document.body.textContent).not.toContain(PHOTO_ID);
-    expect(document.body.textContent).not.toContain(NEXT_PHOTO_ID);
-    expect(screen.getByText("Total charged")).toBeInTheDocument();
+    expectPhotoControlsAbsent();
   });
 
-  it("does not apply a completed upload after leaving the member", async () => {
-    const pending = deferred<{ fileId: string }>();
-    vi.mocked(uploadProfilePhoto).mockReturnValue(pending.promise);
-    vi.mocked(operationGet).mockImplementation(async (path: string) => {
-      if (path.includes(OTHER_MEMBER_ID)) {
-        return summary({
-          member: member({
-            id: OTHER_MEMBER_ID,
-            first_name: "Grace",
-            last_name: "Hopper",
-            profile_photo_asset_id: null,
-          }),
-        });
-      }
-      return summary({
-        member: member({ profile_photo_asset_id: PHOTO_ID }),
-      });
-    });
-    const view = renderDetail({
-      canUpdate: true,
-      canUploadPhoto: true,
-      canViewPhoto: true,
-      canDeletePhoto: true,
-    });
-    await screen.findByLabelText("Replace profile photo");
-    selectPhoto("Replace profile photo", [photoFile()]);
-    view.rerender(
-      <MemberDetail
-        canArchive={false}
-        canDeletePhoto
-        canUpdate
-        canUploadPhoto
-        canViewPayments={false}
-        canViewPhoto
-        memberId={OTHER_MEMBER_ID}
-      />,
-    );
-    await act(async () => {
-      pending.resolve({ fileId: NEXT_PHOTO_ID });
-    });
-
-    expect(await screen.findByText("No profile photo.")).toBeInTheDocument();
-    expect(screen.queryByText("Profile photo saved.")).not.toBeInTheDocument();
-    expect(screen.queryByText(/could not be removed/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Edit profile" }));
-    expect(screen.getByLabelText("First name")).toHaveValue("Grace");
-    expect(operationMutation).not.toHaveBeenCalled();
-    expect(deleteFileAsset).not.toHaveBeenCalled();
-    expect(document.body.textContent).not.toContain(NEXT_PHOTO_ID);
-  });
-
-  it("does not apply an in-flight photo attach to the next member", async () => {
-    const uploaded = deferred<{ fileId: string }>();
-    const saved = deferred<ReturnType<typeof member>>();
-    vi.mocked(uploadProfilePhoto).mockReturnValue(uploaded.promise);
-    vi.mocked(operationMutation).mockReturnValue(saved.promise);
-    vi.mocked(operationGet).mockImplementation(async (path: string) => {
-      if (path.includes(OTHER_MEMBER_ID)) {
-        return summary({
-          member: member({
-            id: OTHER_MEMBER_ID,
-            first_name: "Grace",
-            last_name: "Hopper",
-            profile_photo_asset_id: null,
-          }),
-        });
-      }
-      return summary({
-        member: member({ profile_photo_asset_id: PHOTO_ID }),
-      });
-    });
-    const view = renderDetail({
-      canUpdate: true,
-      canUploadPhoto: true,
-      canViewPhoto: true,
-      canDeletePhoto: true,
-    });
-    await screen.findByLabelText("Replace profile photo");
-    selectPhoto("Replace profile photo", [photoFile()]);
-    await act(async () => {
-      uploaded.resolve({ fileId: NEXT_PHOTO_ID });
-    });
-    await waitFor(() => expect(operationMutation).toHaveBeenCalledTimes(1));
-    view.rerender(
-      <MemberDetail
-        canArchive={false}
-        canDeletePhoto
-        canUpdate
-        canUploadPhoto
-        canViewPayments={false}
-        canViewPhoto
-        memberId={OTHER_MEMBER_ID}
-      />,
-    );
-    await act(async () => {
-      saved.resolve(member({ profile_photo_asset_id: NEXT_PHOTO_ID }));
-    });
-
-    expect(await screen.findByText("No profile photo.")).toBeInTheDocument();
-    expect(screen.queryByText("Profile photo saved.")).not.toBeInTheDocument();
-    expect(screen.queryByText(/could not be removed/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Edit profile" }));
-    expect(screen.getByLabelText("First name")).toHaveValue("Grace");
-    expect(operationMutation).toHaveBeenCalledTimes(1);
-    expect(operationMutation).toHaveBeenCalledWith(
-      `members/${MEMBER_ID}/`,
-      { profile_photo_asset_id: NEXT_PHOTO_ID },
-      "PATCH",
-    );
-    expect(document.body.textContent).not.toContain(NEXT_PHOTO_ID);
-    expect(document.body.textContent).not.toContain("sig-do-not-leak");
-  });
-
-  it("does not attach a photo after the detail view unmounts", async () => {
-    const pending = deferred<{ fileId: string }>();
+  it("does not fetch a photo without file view permission", async () => {
     vi.mocked(operationGet).mockResolvedValue(
       summary({ member: member({ profile_photo_asset_id: PHOTO_ID }) }),
     );
-    vi.mocked(uploadProfilePhoto).mockReturnValue(pending.promise);
-    const view = renderDetail({
-      canUpdate: true,
-      canUploadPhoto: true,
-      canDeletePhoto: true,
-    });
-    await screen.findByLabelText("Replace profile photo");
-    selectPhoto("Replace profile photo", [photoFile()]);
-    view.unmount();
-    await act(async () => {
-      pending.resolve({ fileId: NEXT_PHOTO_ID });
-    });
+    renderDetail({ canViewPhoto: false });
 
-    expect(operationMutation).not.toHaveBeenCalled();
-    expect(deleteFileAsset).not.toHaveBeenCalled();
+    expect(
+      await screen.findByRole("img", { name: "No profile photo." }),
+    ).toBeInTheDocument();
+    expect(getFileDownloadUrl).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toContain("sig-do-not-leak");
+    expect(document.body.textContent).not.toContain(PHOTO_ID);
+    expectPhotoControlsAbsent();
   });
 });

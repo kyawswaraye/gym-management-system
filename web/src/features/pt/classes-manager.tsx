@@ -19,6 +19,7 @@ import {
   TextInput,
 } from "@/features/finance/ui";
 import { useCursorPages } from "@/features/finance/paging";
+import { formatAppDate } from "@/lib/date";
 import { compactIdentifier, IdentifierValue } from "@/lib/ui/identifier";
 import {
   attendClassBooking,
@@ -91,18 +92,7 @@ function inclusiveDays(from: string, to: string): number | null {
 }
 
 function formatLocalDate(iso: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!match?.[1] || !match[2] || !match[3]) return iso;
-  const date = new Date(
-    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])),
-  );
-  return new Intl.DateTimeFormat("en", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(date);
+  return formatAppDate(iso);
 }
 
 function wallClock(value: string): string {
@@ -2018,7 +2008,7 @@ export function ClassesManager({
                 <option value="">{tx("Select an occurrence")}</option>
                 {scheduled.map((row) => (
                   <option key={row.id} title={row.class_type_id} value={row.id}>
-                    {row.local_date} · {occurrenceClock(row)} · {row.location} ·{" "}
+                    {formatAppDate(row.local_date)} · {occurrenceClock(row)} · {row.location} ·{" "}
                     {typeName(row.class_type_id) ??
                       compactIdentifier(row.class_type_id)}{" "}
                     {tx("· capacity")} {row.capacity}

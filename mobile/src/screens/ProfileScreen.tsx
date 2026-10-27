@@ -1,28 +1,45 @@
-import { useTx } from "../i18n/useTx";
+import { useLocale, useTx } from "../i18n/useTx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { useState } from "react";
-import { Image, RefreshControl, View } from "react-native";
+import {
+  Image,
+  PermissionsAndroid,
+  Platform,
+  RefreshControl,
+  View,
+} from "react-native";
 import { launchCamera, launchImageLibrary } from "react-native-image-picker";
 
 import { ApiError, fieldMessage } from "../api/errors";
 import { useMemberApi, useOnline } from "../app/providers";
 import {
+  phoneDigits,
   profileFormSchema,
   profilePatch,
   profileToForm,
   type ProfileFormValues,
 } from "../forms/profile";
-import { zodFormResolver } from "../forms/zodResolver";
 import {
+  citiesForRegion,
+  MYANMAR_REGIONS,
+  type MyanmarPlace,
+} from "../forms/myanmar-locations";
+import { zodFormResolver } from "../forms/zodResolver";
+import type { Locale } from "../i18n/locale";
+import {
+  photoContentType,
   postPresignedPhoto,
+  readUriBytes,
   uploadProfilePhoto,
   type SelectedPhoto,
 } from "../files/profilePhoto";
 import { queryKeys } from "../query/keys";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
+import { DateField } from "../ui/DateField";
 import { NestedScreen } from "../ui/NestedScreen";
+import { SelectField } from "../ui/SelectField";
 import { ErrorState, LoadingState, OfflineBanner } from "../ui/StateView";
 import { Text } from "../ui/Text";
 import { TextField } from "../ui/TextField";
@@ -42,7 +59,9 @@ export function ProfileScreen() {
     enabled: Boolean(photoId),
     queryFn: () => api.photoDownloadUrl(photoId ?? ""),
   });
+  const locale = useLocale();
   const [message, setMessage] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const form = useForm<ProfileFormValues>({
     resolver: zodFormResolver(profileFormSchema),
     values: profile.data ? profileToForm(profile.data) : undefined,
@@ -85,27 +104,53 @@ export function ProfileScreen() {
   }
 
   async function choosePhoto(source: "library" | "camera") {
-    const picker = source === "library" ? launchImageLibrary : launchCamera;
-    const selected = await picker({
-      mediaType: "photo",
-      includeBase64: true,
-      selectionLimit: 1,
-    });
-    const asset = selected.assets?.[0];
-    if (!asset?.uri || !asset.base64 || !asset.type) {
-      if (selected.errorCode) {
-        setMessage(tx("The photo could not be opened."));
-      }
+    if (uploading) {
       return;
     }
-    const photoFile: SelectedPhoto = {
-      uri: asset.uri,
-      fileName: asset.fileName ?? "profile",
-      contentType: asset.type,
-      base64: asset.base64,
-    };
+    if (source === "camera" && !(await ensureCameraPermission())) {
+      setMessage(tx("Allow camera access in system settings, then try again."));
+      return;
+    }
+    setUploading(true);
     setMessage(null);
     try {
+      const picker = source === "library" ? launchImageLibrary : launchCamera;
+      const selected = await picker({
+        assetRepresentationMode: "compatible",
+        cameraType: "front",
+        includeBase64: false,
+        maxHeight: 1600,
+        maxWidth: 1600,
+        mediaType: "photo",
+        presentationStyle: "fullScreen",
+        quality: 0.8,
+        restrictMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+        saveToPhotos: false,
+        selectionLimit: 1,
+      });
+      if (selected.didCancel) {
+        return;
+      }
+      if (selected.errorCode || !selected.assets?.[0]?.uri) {
+        setMessage(
+          tx(
+            selected.errorCode === "permission" ||
+              selected.errorCode === "camera_unavailable"
+              ? source === "camera"
+                ? "Allow camera access in system settings, then try again."
+                : "Allow photo access in system settings, then try again."
+              : "The photo could not be opened. Choose a JPEG, PNG, or WebP photo.",
+          ),
+        );
+        return;
+      }
+      const asset = selected.assets[0];
+      const photoFile: SelectedPhoto = {
+        uri: asset.uri ?? "",
+        fileName: asset.fileName ?? "profile.jpg",
+        contentType: photoContentType(asset.type, asset.fileName),
+        bytes: await readUriBytes(asset.uri ?? ""),
+      };
       const uploaded = await uploadProfilePhoto(
         api,
         photoFile,
@@ -123,6 +168,8 @@ export function ProfileScreen() {
           ? error.message
           : "The photo could not be uploaded.",
       );
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -178,16 +225,22 @@ export function ProfileScreen() {
               </Text>
             </View>
             <Button
+              disabled={uploading}
               hint="Opens the system photo picker"
               label="Choose photo"
               variant="secondary"
-              onPress={() => choosePhoto("library")}
+              onPress={() => {
+                void choosePhoto("library");
+              }}
             />
             <Button
+              disabled={uploading}
               hint="Uses the camera for a profile photo"
               label="Take photo"
               variant="secondary"
-              onPress={() => choosePhoto("camera")}
+              onPress={() => {
+                void choosePhoto("camera");
+              }}
             />
             {photoId ? (
               <Button
@@ -223,18 +276,30 @@ export function ProfileScreen() {
             </View>
           </Card>
           <Card>
-            <Field control={form.control} name="phone" label={tx("Phone")} />
+            <Field
+              control={form.control}
+              name="phone"
+              label={tx("Phone")}
+              keyboardType="phone-pad"
+              transform={phoneDigits}
+            />
             <Field
               control={form.control}
               name="email"
               label={tx("Contact email")}
               keyboardType="email-address"
             />
-            <Field
+            <Controller
               control={form.control}
               name="date_of_birth"
-              label={tx("Date of birth")}
-              hint={tx("YYYY-MM-DD")}
+              render={({ field, fieldState }) => (
+                <DateField
+                  error={fieldState.error?.message}
+                  label={tx("Date of birth")}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
             />
             <Field
               control={form.control}
@@ -246,8 +311,58 @@ export function ProfileScreen() {
               name="address_line2"
               label={tx("Address line 2")}
             />
-            <Field control={form.control} name="city" label={tx("City")} />
-            <Field control={form.control} name="region" label={tx("Region")} />
+            <Controller
+              control={form.control}
+              name="region"
+              render={({ field, fieldState }) => (
+                <SelectField
+                  error={fieldState.error?.message}
+                  label={tx("Region")}
+                  options={placeOptions(
+                    placesWithCurrent(MYANMAR_REGIONS, field.value),
+                    locale,
+                  )}
+                  placeholder="Choose a region"
+                  value={field.value}
+                  onChange={(next) => {
+                    const currentCity = form.getValues("city");
+                    field.onChange(next);
+                    if (
+                      !citiesForRegion(next).some(
+                        (place) => place.value === currentCity,
+                      )
+                    ) {
+                      form.setValue("city", "", { shouldDirty: true });
+                    }
+                  }}
+                />
+              )}
+            />
+            <Controller
+              control={form.control}
+              name="city"
+              render={({ field, fieldState }) => (
+                <SelectField
+                  disabled={!form.watch("region")}
+                  error={fieldState.error?.message}
+                  label={tx("City")}
+                  options={placeOptions(
+                    placesWithCurrent(
+                      citiesForRegion(form.watch("region")),
+                      field.value,
+                    ),
+                    locale,
+                  )}
+                  placeholder={
+                    form.watch("region")
+                      ? "Choose a city"
+                      : "Choose a region first."
+                  }
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
+            />
             <Field
               control={form.control}
               name="postal_code"
@@ -265,8 +380,10 @@ export function ProfileScreen() {
             />
             <Field
               control={form.control}
-              name="emergency_contact_phone"
+              keyboardType="phone-pad"
               label={tx("Emergency contact phone")}
+              name="emergency_contact_phone"
+              transform={phoneDigits}
             />
           </Card>
           {message ? <Text accessibilityRole="alert">{message}</Text> : null}
@@ -290,12 +407,14 @@ function Field({
   label,
   hint,
   keyboardType,
+  transform,
 }: {
   control: ReturnType<typeof useForm<ProfileFormValues>>["control"];
   name: keyof ProfileFormValues;
   label: string;
   hint?: string;
-  keyboardType?: "email-address" | "default";
+  keyboardType?: "email-address" | "phone-pad" | "default";
+  transform?: (value: string) => string;
 }) {
   return (
     <Controller
@@ -307,15 +426,60 @@ function Field({
           hint={hint}
           keyboardType={keyboardType}
           autoCapitalize={
-            keyboardType === "email-address" ? "none" : "sentences"
+            keyboardType === "email-address" || keyboardType === "phone-pad"
+              ? "none"
+              : "sentences"
           }
-          value={field.value}
-          onChangeText={field.onChange}
+          autoCorrect={keyboardType === "phone-pad" ? false : undefined}
+          value={transform ? transform(field.value) : field.value}
+          onChangeText={(text) =>
+            field.onChange(transform ? transform(text) : text)
+          }
           error={fieldState.error?.message}
         />
       )}
     />
   );
+}
+
+function placeLabel(place: MyanmarPlace, locale: Locale): string {
+  return locale === "mm" ? place.my : place.value;
+}
+
+function placesWithCurrent(
+  places: readonly MyanmarPlace[],
+  current: string,
+): MyanmarPlace[] {
+  if (!current || places.some((place) => place.value === current)) {
+    return [...places];
+  }
+  return [{ value: current, my: current }, ...places];
+}
+
+function placeOptions(
+  places: readonly MyanmarPlace[],
+  locale: Locale,
+): Array<{ value: string; label: string }> {
+  return [...places]
+    .sort((left, right) =>
+      placeLabel(left, locale).localeCompare(
+        placeLabel(right, locale),
+        locale === "mm" ? "my" : "en",
+      ),
+    )
+    .map((place) => ({ value: place.value, label: placeLabel(place, locale) }));
+}
+
+async function ensureCameraPermission(): Promise<boolean> {
+  if (Platform.OS !== "android") {
+    return true;
+  }
+  const permission = PermissionsAndroid.PERMISSIONS.CAMERA;
+  if (await PermissionsAndroid.check(permission)) {
+    return true;
+  }
+  const result = await PermissionsAndroid.request(permission);
+  return result === PermissionsAndroid.RESULTS.GRANTED;
 }
 
 function emptyProfile(): ProfileFormValues {

@@ -557,7 +557,7 @@ describe("Staff manager", () => {
       screen.getByRole("button", { name: "View details for Ada Trainer" }),
     );
 
-    expect(await screen.findByText("2026-10-01")).toBeInTheDocument();
+    expect(await screen.findByText("01-10-2026")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Suspend access" }),
     ).not.toBeInTheDocument();

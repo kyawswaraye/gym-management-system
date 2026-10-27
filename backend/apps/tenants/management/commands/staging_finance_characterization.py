@@ -569,7 +569,7 @@ class Runner:
             state=state,
             other=other,
         )
-        if scenario == "payment_approve" and status == 200:
+        if scenario in {"payment_approve", "payment_self_approve"} and status == 200:
             state.receipt_id = _nested_id(payload, ("data", "receipt", "id"))
         return status, payload, leak, credential
 

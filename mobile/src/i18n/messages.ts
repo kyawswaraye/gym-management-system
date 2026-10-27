@@ -50,6 +50,7 @@ export const messages: Record<string, string> = {
     "Google က ဝင်ရောက်ရန် တိုကင် မပေးပါ။",
   "Google sign-in is not configured.": "Google ဝင်ရောက်မှုကို မပြင်ဆင်ရသေးပါ။",
   "Google sign-in was cancelled.": "Google ဝင်ရောက်မှုကို ပယ်ဖျက်လိုက်သည်။",
+  "Gym logo": "Gym လိုဂို",
   "GymPilot MM": "GymPilot MM",
   "GymPilot MM signs you in to one linked membership, shows your profile, membership, payments, check-ins, packages, and schedule, and can scan an onsite check-in code. The camera is used only when you scan that code or choose a profile photo. Push is optional. The app does not include advertising or an analytics SDK. Refresh credentials stay in the device keystore. Access credentials stay in memory for the current session.":
     "GymPilot MM သည် ချိတ်ဆက်ထားသော အသင်းဝင်မှုတစ်ခုသို့ သင့်ကို ဝင်ရောက်စေသည်။ ကိုယ်ရေးအချက်အလက်၊ အသင်းဝင်မှု၊ ငွေပေးချေမှုများ၊ ဝင်ရောက်မှုများ၊ ပက်ကေ့ဂျ်များနှင့် အချိန်ဇယားကို ပြသပြီး Gym ရှိ ဝင်ရောက်မှုကုဒ်ကို စကန်ဖတ်နိုင်သည်။ ကင်မရာကို ထိုကုဒ် စကန်ဖတ်ချိန်နှင့် ကိုယ်ရေးဓာတ်ပုံ ရွေးချိန်တွင်သာ အသုံးပြုသည်။ Push အကြောင်းကြားချက်ကို မဖြစ်မနေ မလိုပါ။ ဤအက်ပ်တွင် ကြော်ငြာနှင့် အသုံးပြုမှုခွဲခြမ်းစနစ် မပါဝင်ပါ။ ပြန်လည်သက်တမ်းတိုးအထောက်အထားများကို စက်၏ လုံခြုံသော့သိုလှောင်ခန်းတွင် သိမ်းထားသည်။ အကောင့်ဝင်အထောက်အထားများကို လက်ရှိ ဝင်ရောက်ချိန်အတွက် မှတ်ဉာဏ်ထဲတွင်သာ ထားသည်။",
@@ -175,6 +176,8 @@ export const messages: Record<string, string> = {
     "ဓာတ်ပုံကို စစ်ဆေးနေပါသည်။ ခဏကြာမှ ထပ်မံကြိုးစားပါ။",
   "The profile could not be saved.": "ကိုယ်ရေးအချက်အလက်ကို သိမ်း၍ မရပါ။",
   "The request could not be processed.": "တောင်းဆိုမှုကို ဆောင်ရွက်၍ မရပါ။",
+  "The gym server could not be reached. Check the connection and try again.":
+    "Gym ဆာဗာကို ဆက်သွယ်၍ မရပါ။ ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်မံကြိုးစားပါ။",
   "The server response could not be read.": "ဆာဗာ၏ တုံ့ပြန်ချက်ကို ဖတ်၍ မရပါ။",
   "The session could not be refreshed.":
     "ဝင်ရောက်ချိန်ကို ပြန်လည်မွမ်းမံ၍ မရပါ။",
@@ -288,4 +291,45 @@ export const messages: Record<string, string> = {
     "သင်ဝင်ရောက်ပြီးသားဖြစ်ပါသည်။ ထပ်မံ စကန်မဖတ်မီ ကောင်တာတွင် ထွက်မှတ်ပါ။",
   "Your membership is not eligible for check-in.":
     "သင်၏ အသင်းဝင်မှုသည် ဝင်ရောက်ရန် အရည်အချင်း မပြည့်ပါ။",
+  Language: "ဘာသာစကား",
+  "Language, sign out, and preferences":
+    "ဘာသာစကား၊ အကောင့်ထွက်ခြင်းနှင့် ရွေးချယ်မှုများ",
+  "Allow photo access in system settings, then try again.":
+    "ဓာတ်ပုံခွင့်ပြုချက်ကို ဖုန်းဆက်တင်ထဲတွင် ဖွင့်ပြီး ထပ်မံကြိုးစားပါ။",
+  "Allow camera access in system settings, then try again.":
+    "ကင်မရာခွင့်ပြုချက်ကို ဖုန်းဆက်တင်ထဲတွင် ဖွင့်ပြီး ထပ်မံကြိုးစားပါ။",
+  "The camera could not be started. The front desk can still check you in.":
+    "ကင်မရာကို မဖွင့်နိုင်ပါ။ ဧည့်ကြိုကောင်တာက သင့်ကို ဝင်ရောက်မှတ်ပေးနိုင်ပါသည်။",
+  "The photo could not be opened. Choose a JPEG, PNG, or WebP photo.":
+    "ဓာတ်ပုံကို မဖွင့်နိုင်ပါ။ JPEG၊ PNG သို့မဟုတ် WebP ဓာတ်ပုံ ရွေးပါ။",
+  "Choose a JPEG, PNG, or WebP photo.":
+    "JPEG၊ PNG သို့မဟုတ် WebP ဓာတ်ပုံ ရွေးပါ။",
+  "The photo is empty.": "ဓာတ်ပုံတွင် ဘာမှမရှိပါ။",
+  "The photo must be 5 MB or smaller.":
+    "ဓာတ်ပုံသည် ၅ MB သို့မဟုတ် ထိုထက်ငယ်ရပါမည်။",
+  "The photo could not be read.": "ဓာတ်ပုံကို ဖတ်၍ မရပါ။",
+  "The photo upload was rejected.": "ဓာတ်ပုံတင်ခြင်းကို ငြင်းပယ်လိုက်သည်။",
+  "Choose a region": "တိုင်း/ပြည်နယ် ရွေးပါ",
+  "Choose a city": "မြို့ ရွေးပါ",
+  "Choose a region first.": "တိုင်း/ပြည်နယ်ကို အရင်ရွေးပါ။",
+  "Choose a date": "ရက်ရွေးပါ",
+  Clear: "ရှင်းရန်",
+  Close: "ပိတ်ရန်",
+  Search: "ရှာရန်",
+  "No matches.": "မတွေ့ပါ။",
+  "Previous year": "ယခင်နှစ်",
+  "Next year": "နောက်နှစ်",
+  "Previous month": "ယခင်လ",
+  "Next month": "နောက်လ",
+  Su: "နွေ",
+  Mo: "လာ",
+  Tu: "ဂါ",
+  We: "ဟူး",
+  Th: "တေး",
+  Fr: "ကြာ",
+  Sa: "နေ",
+  Full: "ပြည့်နေသည်",
+  "{count} remaining": "ကျန် {count}",
+  "{booked} of {capacity}": "{capacity} နေရာအနက် {booked}",
+  "This record could not be shown.": "ဤမှတ်တမ်းကို မပြနိုင်ပါ။",
 };

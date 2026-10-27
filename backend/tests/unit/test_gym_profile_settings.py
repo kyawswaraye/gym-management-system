@@ -10,7 +10,11 @@ from apps.tenants.serializers import (
     GymProfileUpdateSerializer,
     GymSettingsUpdateSerializer,
 )
-from apps.tenants.validation import GYM_PROFILE_FIELDS, SETTINGS_MUTABLE_FIELDS
+from apps.tenants.validation import (
+    GYM_PROFILE_FIELDS,
+    SETTINGS_MUTABLE_FIELDS,
+    prepare_settings_changes,
+)
 from apps.tenants.views import GymProfileView, GymSettingsView
 from apps.users.permissions import IsActiveOwner, RequiresPermission
 
@@ -279,3 +283,49 @@ def test_gym_and_settings_permissions_follow_owner_policy() -> None:
         IsActiveOwner,
     ]
     assert settings_write.required_permission == "settings.manage"
+
+
+def test_printer_footer_accepts_three_lines_and_rejects_limits() -> None:
+    footer = "ကျေးဇူးတင်ပါသည်\nThank you\nSee you soon"
+    accepted = GymSettingsUpdateSerializer(
+        data={
+            "printer_enabled": True,
+            "printer_print_logo": False,
+            "printer_print_address": True,
+            "printer_print_phone": True,
+            "printer_footer": footer + "\n",
+        }
+    )
+    assert accepted.is_valid(), accepted.errors
+    assert accepted.validated_data["printer_footer"] == footer + "\n"
+    assert accepted.validated_data["printer_enabled"] is True
+
+    windows = GymSettingsUpdateSerializer(data={"printer_footer": "Line 1\r\nLine 2"})
+    assert windows.is_valid(), windows.errors
+    assert windows.validated_data["printer_footer"] == "Line 1\nLine 2"
+
+    too_long = GymSettingsUpdateSerializer(data={"printer_footer": "က" * 121})
+    assert not too_long.is_valid()
+    assert "printer_footer" in too_long.errors
+
+    four_lines = GymSettingsUpdateSerializer(data={"printer_footer": "a\nb\nc\nd"})
+    assert not four_lines.is_valid()
+    assert "printer_footer" in four_lines.errors
+
+    extra_break = GymSettingsUpdateSerializer(data={"printer_footer": "a\nb\nc\n\n"})
+    assert not extra_break.is_valid()
+    assert "printer_footer" in extra_break.errors
+
+    fuzzy = GymSettingsUpdateSerializer(data={"printer_enabled": "maybe"})
+    assert not fuzzy.is_valid()
+    assert "printer_enabled" in fuzzy.errors
+    unknown = GymSettingsUpdateSerializer(data={"printer_paper": "80mm"})
+    assert not unknown.is_valid()
+    assert "printer_paper" in unknown.errors
+
+    try:
+        prepare_settings_changes({"printer_enabled": 1})
+    except Exception as exc:
+        assert "printer_enabled" in getattr(exc, "detail", {})
+    else:
+        raise AssertionError("integer printer toggle was accepted")

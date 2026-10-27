@@ -28,6 +28,7 @@ from apps.tenants.models import (
     GymMembership,
     GymMembershipRole,
     IdempotencyRecord,
+    Role,
     TenantSequence,
 )
 from tests.security.test_payments import (
@@ -153,8 +154,21 @@ def test_approval_sod_snapshots_lists_and_idempotency() -> None:
     )
     assert submitter_denied.status_code == 403
     owner_self = _pending_bank(api, headers, gym, member_id, membership_id, "5.00")
-    self_denied = _approve(api, headers, owner_self, key=f"pay-owner-self-{uuid4().hex}")
-    assert self_denied.status_code == 403
+    self_approved = _approve(api, headers, owner_self, key=f"pay-owner-self-{uuid4().hex}")
+    assert self_approved.status_code == 200, self_approved.content
+
+    desk = add_staff(gym, email="payctl-desk@example.test", role_key="MANAGER")
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        GymMembershipRole.objects.create(
+            gym=gym,
+            gym_membership=desk,
+            role=Role.objects.get(gym=gym, key="RECEPTIONIST"),
+        )
+    desk_headers = auth_headers(staff_token(desk))
+    desk_payment = _pending_bank(api, desk_headers, gym, member_id, membership_id, "6.00")
+    desk_approved = _approve(api, desk_headers, desk_payment, key=f"pay-desk-{uuid4().hex}")
+    assert desk_approved.status_code == 200, desk_approved.content
 
     stale_id = _pending_bank(api, headers, gym, member_id, membership_id, "5.00")
     stale_key = "pay-control-stale-001"

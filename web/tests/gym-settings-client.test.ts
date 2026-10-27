@@ -62,4 +62,36 @@ describe("gym settings browser client", () => {
     expect(new Headers(patch?.headers).get("X-CSRF-Token")).toBe("csrf-token");
     expect(JSON.parse(String(patch?.body))).toEqual({ name: "Updated Gym" });
   });
+
+  it("patches only the printer fields it is given", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () =>
+        Response.json({ success: true, data: { printer_enabled: true } }),
+      );
+    const footer = "ကျေးဇူးတင်ပါသည်";
+
+    await updateGymSettings({
+      printer_enabled: true,
+      printer_print_logo: false,
+      printer_print_address: true,
+      printer_print_phone: false,
+      printer_footer: footer,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe("/api/operations/settings");
+    expect(init?.method).toBe("PATCH");
+    expect(init?.credentials).toBe("same-origin");
+    expect(new Headers(init?.headers).has("authorization")).toBe(false);
+    expect(JSON.parse(String(init?.body))).toEqual({
+      printer_enabled: true,
+      printer_print_logo: false,
+      printer_print_address: true,
+      printer_print_phone: false,
+      printer_footer: footer,
+    });
+    expect(JSON.parse(String(init?.body))).not.toHaveProperty("week_starts_on");
+  });
 });

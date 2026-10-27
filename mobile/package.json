@@ -36,6 +36,7 @@
     "react-native-safe-area-context": "5.10.1",
     "react-native-screens": "4.30.0",
     "react-native-vision-camera": "5.2.3",
+    "react-native-vision-camera-barcode-scanner": "5.2.3",
     "zod": "4.6.7"
   },
   "devDependencies": {

@@ -1,8 +1,14 @@
 "use client";
-import { useTx } from "@/i18n/use-tx";
+import { useLocale, useTx } from "@/i18n/use-tx";
+import {
+  myanmarPlaceText,
+  MyanmarRegionCityFields,
+} from "@/features/operations/myanmar-place-fields";
 
+import Link from "next/link";
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type ChangeEvent,
@@ -12,6 +18,11 @@ import {
 
 import { FormDialog } from "@/components/form-dialog";
 import { GymLogo } from "@/components/gym-logo";
+import { listReceipts } from "@/features/finance/client";
+import {
+  receiptPrintHref,
+  receiptTestPrintHref,
+} from "@/features/finance/receipt-print";
 import {
   deleteGymLogo,
   getGymProfile,
@@ -22,12 +33,15 @@ import {
 } from "@/features/operations/client";
 import { assignedMemberNumber } from "@/features/operations/member-profile";
 import type { GymSettingsAccess } from "@/lib/auth/authorization";
+import { formatAppDateTime } from "@/lib/date";
+import { DigitInput } from "@/lib/ui/digit-input";
 import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
   GymProfile,
   GymProfileUpdate,
   GymSettings,
   GymSettingsUpdate,
+  Receipt,
 } from "@/types/api";
 
 const WEEKDAYS = [
@@ -275,6 +289,63 @@ function readWarningDays(form: FormData, tx: Tx): number[] {
   return [...days].sort((left, right) => left - right);
 }
 
+const PRINTER_FOOTER_MAX_CHARS = 120;
+const PRINTER_FOOTER_MAX_LINES = 3;
+
+function normalizePrinterFooter(value: unknown): string {
+  const text = typeof value === "string" ? value : "";
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function printerFooterLength(value: string): number {
+  return [...value].length;
+}
+
+function printerFooterLineCount(value: string): number {
+  if (value.length === 0) return 0;
+  const lines = value.split("\n");
+  if (lines[lines.length - 1] === "") lines.pop();
+  return lines.length;
+}
+
+function printerFooterIssues(value: string): string[] {
+  const issues: string[] = [];
+  if (printerFooterLength(value) > PRINTER_FOOTER_MAX_CHARS) {
+    issues.push("Enter at most 120 characters.");
+  }
+  if (printerFooterLineCount(value) > PRINTER_FOOTER_MAX_LINES) {
+    issues.push("Enter at most 3 lines.");
+  }
+  return issues;
+}
+
+function readPrinterSettings(form: FormData): GymSettingsUpdate {
+  const footer = normalizePrinterFooter(
+    String(form.get("printer_footer") ?? ""),
+  );
+  const issue = printerFooterIssues(footer)[0];
+  if (issue) throw new Error(issue);
+  return {
+    printer_enabled: form.get("printer_enabled") === "on",
+    printer_print_logo: form.get("printer_print_logo") === "on",
+    printer_print_address: form.get("printer_print_address") === "on",
+    printer_print_phone: form.get("printer_print_phone") === "on",
+    printer_footer: footer,
+  };
+}
+
+function latestIssuedReceipt(
+  rows: readonly Receipt[],
+): { href: string; receiptNumber: string } | null {
+  for (const row of rows) {
+    if (row.status !== "ISSUED") continue;
+    const href = receiptPrintHref(row.id);
+    if (!href) continue;
+    return { href, receiptNumber: row.receipt_number };
+  }
+  return null;
+}
+
 function readSettings(form: FormData, tx: Tx): GymSettingsUpdate {
   return {
     week_starts_on: readInteger(
@@ -402,15 +473,7 @@ function profileHasLogo(profile: GymProfile): boolean {
 
 function profileWhen(value: string | null | undefined): ReactNode {
   if (!value) return textValue("");
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return textValue(value);
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return formatAppDateTime(value);
 }
 
 function Pill({ children, tone }: { children: ReactNode; tone: string }) {
@@ -471,37 +534,6 @@ function Fact({
   );
 }
 
-function ProfileBlock({
-  title,
-  hint,
-  rows,
-}: {
-  title: string;
-  hint?: string;
-  rows: { label: string; value: ReactNode }[];
-}) {
-  const tx = useTx();
-  return (
-    <div>
-      <h3 className="text-base font-bold text-[#050505]">{tx(title)}</h3>
-      {hint ? <p className="mt-1 text-sm text-slate-500">{tx(hint)}</p> : null}
-      <dl className="mt-3 border-t border-[#e4e6eb]">
-        {rows.map((row) => (
-          <div
-            className="grid gap-1 border-b border-[#e4e6eb] py-3 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-baseline sm:gap-6"
-            key={row.label}
-          >
-            <dt className="text-sm text-slate-500">{tx(row.label)}</dt>
-            <dd className="min-w-0 text-sm font-semibold break-words text-[#050505]">
-              {row.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
-}
-
 function SettingGroup({
   title,
   hint,
@@ -513,13 +545,13 @@ function SettingGroup({
 }) {
   const tx = useTx();
   return (
-    <div>
-      <h3 className="text-sm font-bold text-slate-900">{tx(title)}</h3>
+    <section className="rounded-2xl border border-[#e4e6eb] bg-white p-4">
+      <h3 className="text-sm font-bold text-[#050505]">{tx(title)}</h3>
       {hint ? (
-        <p className="mt-0.5 text-sm text-slate-500">{tx(hint)}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{tx(hint)}</p>
       ) : null}
       <dl className="mt-3 grid gap-2 sm:grid-cols-2">{children}</dl>
-    </div>
+    </section>
   );
 }
 
@@ -630,20 +662,34 @@ function TextControl({
         <span className="text-sm font-semibold text-slate-700">
           {tx(label)}
         </span>
-        <input
-          aria-describedby={hintId}
-          autoComplete={autoComplete}
-          className={uppercase ? "input uppercase" : "input"}
-          defaultValue={defaultValue}
-          max={max}
-          maxLength={maxLength}
-          min={min}
-          name={name}
-          required={required}
-          spellCheck={spellCheck}
-          step={step}
-          type={type}
-        />
+        {type === "number" ? (
+          <DigitInput
+            aria-describedby={hintId}
+            autoComplete={autoComplete}
+            className="input"
+            defaultValue={defaultValue}
+            max={max}
+            min={min}
+            mode={{ kind: "integer" }}
+            name={name}
+            required={required}
+          />
+        ) : (
+          <input
+            aria-describedby={hintId}
+            autoComplete={autoComplete}
+            className={uppercase ? "input uppercase" : "input"}
+            defaultValue={defaultValue}
+            max={max}
+            maxLength={maxLength}
+            min={min}
+            name={name}
+            required={required}
+            spellCheck={spellCheck}
+            step={step}
+            type={type}
+          />
+        )}
       </label>
       {hint ? (
         <p className="mt-1 text-xs leading-5 text-slate-500" id={hintId}>
@@ -761,7 +807,7 @@ function IntegerControl({
 }
 
 function approvalCopy() {
-  return "Separate finance approval is mandatory and cannot be turned off. Payments, expenses, retail sales, PT sales, and salary records must be approved by a different authorized manager or owner.";
+  return "Separate finance approval is mandatory and cannot be turned off. The owner, or the one person who is both manager and receptionist, can approve a payment they recorded. Expenses, retail sales, PT sales, and salary records still need a different authorized manager or owner.";
 }
 
 function ImageFrameIcon() {
@@ -853,63 +899,55 @@ function GymLogoPicker({
   const preview = previewUrl ? (
     <img
       alt=""
-      className="max-h-40 max-w-full rounded-md object-contain"
+      className="max-h-full max-w-full object-contain"
       src={previewUrl}
     />
   ) : hasLogo ? (
     <GymLogo
-      className="max-h-40 max-w-full rounded-md object-contain"
+      className="max-h-full max-w-full object-contain"
       fallback={
         <span className="h-28 w-28 animate-pulse rounded-md bg-white" />
       }
     />
   ) : null;
   return (
-    <div>
-      <div className="flex items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#e7f3ff] text-[#0866ff]">
-          <ImageFrameIcon />
-        </span>
-        <div>
-          <p className="text-sm font-bold text-[#050505]">{tx("Gym logo")}</p>
-          <p className="text-sm text-slate-500">
-            {tx("Max 1 MB · PNG, JPEG, WebP.")}
-          </p>
-        </div>
-      </div>
-      <p className="mt-4 text-sm font-semibold text-slate-500">{tx("Image")}</p>
+    <div className="w-full sm:w-44">
       {preview ? (
-        <div className="mt-2">
-          <div className="grid min-h-40 place-items-center rounded-xl bg-[#f0f2f5] p-4">
-            {preview}
-          </div>
-          {canUpdate ? (
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <label
-                className={`button button-sm relative w-full ${pending ? "pointer-events-none opacity-55" : ""}`}
-              >
-                <UploadArrowIcon /> {tx("Change")}{" "}
-                <LogoFileInput pending={pending} onFile={onFile} />
-              </label>
-              <button
-                className="button button-delete button-sm w-full"
-                disabled={pending}
-                type="button"
-                onClick={onRemove}
-              >
-                <RemoveIcon /> {tx("Remove")}{" "}
-              </button>
-            </div>
-          ) : null}
+        <div className="grid h-44 place-items-center overflow-hidden rounded-2xl bg-[#f0f2f5] p-3">
+          {preview}
         </div>
-      ) : (
+      ) : canUpdate ? (
         <label
-          className={`relative mt-2 flex min-h-40 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#c5cad3] bg-[#f0f2f5] px-4 py-6 text-sm font-semibold text-slate-500 hover:border-[#0866ff] hover:text-[#0866ff] ${pending ? "pointer-events-none opacity-55" : ""}`}
+          className={`relative flex h-44 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[#c5cad3] bg-[#f0f2f5] px-3 text-center text-sm font-semibold text-slate-500 hover:border-[#0866ff] hover:text-[#0866ff] ${pending ? "pointer-events-none opacity-55" : ""}`}
         >
-          <ImageFrameIcon /> {tx("Click to select an image")}{" "}
+          <ImageFrameIcon />
+          {tx("Click to select an image")}
           <LogoFileInput pending={pending} onFile={onFile} />
         </label>
-      )}
+      ) : null}
+      <p className="mt-2 text-xs leading-5 text-slate-500">
+        {tx("Max 1 MB · PNG, JPEG, WebP.")}
+      </p>
+      {preview && canUpdate ? (
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <label
+            className={`button button-sm relative w-full ${pending ? "pointer-events-none opacity-55" : ""}`}
+          >
+            <UploadArrowIcon />
+            {tx("Change")}
+            <LogoFileInput pending={pending} onFile={onFile} />
+          </label>
+          <button
+            className="button button-delete button-sm w-full"
+            disabled={pending}
+            type="button"
+            onClick={onRemove}
+          >
+            <RemoveIcon />
+            {tx("Remove")}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -924,8 +962,10 @@ function ProfileSection({
   onPending: (value: boolean) => void;
 }) {
   const tx = useTx();
+  const locale = useLocale();
   const [profile, setProfile] = useState<GymProfile | null>(null);
   const [editing, setEditing] = useState(false);
+  const [address, setAddress] = useState({ region: "", city: "" });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1039,11 +1079,13 @@ function ProfileSection({
         {profile && canUpdate ? (
           <button
             className="button button-edit"
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              setAddress({ region: profile.region, city: profile.city });
+              setEditing(true);
+            }}
             type="button"
           >
-            {" "}
-            {tx("Edit gym profile")}{" "}
+            {tx("Edit gym profile")}
           </button>
         ) : null}
       </div>
@@ -1065,7 +1107,7 @@ function ProfileSection({
           <Notice error={editing ? null : error} success={success} />
           {profile ? (
             <>
-              <div className="grid items-start gap-8 lg:grid-cols-[20rem_minmax(0,1fr)]">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
                 <GymLogoPicker
                   canUpdate={canUpdate}
                   hasLogo={profileHasLogo(profile)}
@@ -1074,7 +1116,7 @@ function ProfileSection({
                   onFile={(event) => void changeLogo(event)}
                   onRemove={() => void removeLogo()}
                 />
-                <div className="min-w-0 lg:pt-1">
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-3">
                     <p className="truncate text-2xl font-bold text-[#050505]">
                       {profile.name}
@@ -1084,88 +1126,48 @@ function ProfileSection({
                     </Pill>
                   </div>
                   <p className="mt-1 text-sm text-slate-500">{profile.code}</p>
-                  <div className="mt-6">
-                    <ProfileBlock
-                      hint="How members and staff reach this gym."
-                      rows={[
-                        ...profileFields("contact").map((field) => ({
-                          label: field.label,
-                          value: textValue(profile[field.name]),
-                        })),
-                        { label: tx("Email"), value: textValue(profile.email) },
-                      ]}
-                      title={tx("Contact")}
-                    />
-                  </div>
+                  <dl className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <Fact label="Phone">{textValue(profile.phone)}</Fact>
+                    <Fact label="Email">{textValue(profile.email)}</Fact>
+                    <Fact label="Timezone">{textValue(profile.timezone)}</Fact>
+                    <Fact label="Currency">{textValue(profile.currency)}</Fact>
+                  </dl>
                 </div>
               </div>
-              <div className="grid gap-8 lg:grid-cols-2">
-                <ProfileBlock
-                  rows={[
-                    ...profileFields("address").map((field) => ({
-                      label: field.label,
-                      value: textValue(profile[field.name]),
-                    })),
-                    {
-                      label: tx("Country code"),
-                      value: textValue(profile.country_code),
-                    },
-                  ]}
-                  title={tx("Address")}
-                />
-                <ProfileBlock
-                  hint="Schedules, receipts, and reports use these."
-                  rows={[
-                    ...profileFields("locale").map((field) => ({
-                      label: field.label,
-                      value: textValue(profile[field.name]),
-                    })),
-                    {
-                      label: tx("Currency"),
-                      value: textValue(profile.currency),
-                    },
-                  ]}
-                  title={tx("Time and currency")}
-                />
-              </div>
-              <ProfileBlock
-                hint="Lifecycle and subscription stay with platform administration."
-                rows={[
-                  {
-                    label: tx("Subscription plan"),
-                    value: textValue(profile.subscription_plan_name ?? ""),
-                  },
-                  {
-                    label: tx("Subscription plan ID"),
-                    value: textValue(profile.subscription_plan_id ?? ""),
-                  },
-                  {
-                    label: tx("Subscription status"),
-                    value: (
-                      <Pill tone={recordTone(profile.subscription_status)}>
-                        {tx(profile.subscription_status)}
-                      </Pill>
-                    ),
-                  },
-                  {
-                    label: tx("Subscription starts"),
-                    value: profileWhen(profile.subscription_starts_at),
-                  },
-                  {
-                    label: tx("Subscription ends"),
-                    value: profileWhen(profile.subscription_ends_at),
-                  },
-                  {
-                    label: tx("Created"),
-                    value: profileWhen(profile.created_at),
-                  },
-                  {
-                    label: tx("Updated"),
-                    value: profileWhen(profile.updated_at),
-                  },
-                ]}
-                title={tx("Platform record")}
-              />
+              <dl className="grid gap-2 sm:grid-cols-2">
+                <Fact label="Address line 1" wide>
+                  {textValue(profile.address_line1)}
+                </Fact>
+                <Fact label="Address line 2" wide>
+                  {textValue(profile.address_line2)}
+                </Fact>
+                <Fact label="Region">
+                  {textValue(myanmarPlaceText(profile.region, locale))}
+                </Fact>
+                <Fact label="City">
+                  {textValue(myanmarPlaceText(profile.city, locale))}
+                </Fact>
+                <Fact label="Postal code">
+                  {textValue(profile.postal_code)}
+                </Fact>
+                <Fact label="Country code">
+                  {textValue(profile.country_code)}
+                </Fact>
+                <Fact label="Subscription plan">
+                  {textValue(profile.subscription_plan_name ?? "")}
+                </Fact>
+                <Fact label="Subscription status">
+                  <Pill tone={recordTone(profile.subscription_status)}>
+                    {tx(profile.subscription_status)}
+                  </Pill>
+                </Fact>
+                <Fact label="Subscription starts">
+                  {profileWhen(profile.subscription_starts_at)}
+                </Fact>
+                <Fact label="Subscription ends">
+                  {profileWhen(profile.subscription_ends_at)}
+                </Fact>
+              </dl>
             </>
           ) : null}
         </div>
@@ -1200,16 +1202,26 @@ function ProfileSection({
             />
           </FormSection>
           <FormSection title={tx("Address")}>
-            {profileFields("address").map((field) => (
-              <ProfileControl
-                key={field.name}
-                name={field.name}
-                profile={profile}
-                {...(field.name.startsWith("address_line")
-                  ? { className: "sm:col-span-2" }
-                  : {})}
-              />
-            ))}
+            {profileFields("address")
+              .filter(
+                (field) => field.name !== "city" && field.name !== "region",
+              )
+              .map((field) => (
+                <ProfileControl
+                  key={field.name}
+                  name={field.name}
+                  profile={profile}
+                  {...(field.name.startsWith("address_line")
+                    ? { className: "sm:col-span-2" }
+                    : {})}
+                />
+              ))}
+            <MyanmarRegionCityFields
+              city={address.city}
+              disabled={pending}
+              onChange={setAddress}
+              region={address.region}
+            />
             <TextControl
               autoComplete="country"
               defaultValue={profile.country_code}
@@ -1348,12 +1360,10 @@ function SettingsSection({
             className="text-lg font-bold text-slate-900"
             id="operational-settings-title"
           >
-            {" "}
-            {tx("Operational settings")}{" "}
+            {tx("Operational settings")}
           </h2>
           <p className="mt-0.5 text-sm text-slate-500">
-            {" "}
-            {tx("Check-in, numbers, classes, and reminders.")}{" "}
+            {tx("Check-in, numbers, classes, and reminders.")}
           </p>
         </div>
         {settings && canManage ? (
@@ -1362,8 +1372,7 @@ function SettingsSection({
             onClick={() => setEditing(true)}
             type="button"
           >
-            {" "}
-            {tx("Edit operational settings")}{" "}
+            {tx("Edit operational settings")}
           </button>
         ) : null}
       </div>
@@ -1384,16 +1393,24 @@ function SettingsSection({
         <div className="grid gap-5 p-4 sm:p-5">
           <Notice error={editing ? null : error} success={success} />
           {settings ? (
-            <>
+            <div className="grid gap-4 lg:grid-cols-2">
               <SettingGroup
                 hint="Weekly schedules and reports start on this day."
-                title={tx("Calendar")}
+                title="Calendar"
               >
                 <Fact label="Week starts on">{textValue(weekday)}</Fact>
               </SettingGroup>
               <SettingGroup
+                hint="Example of the printed number. The sequence increases with each receipt."
+                title="Receipts"
+              >
+                <Fact label="Receipt number">
+                  {receiptExample(settings.receipt_number_prefix)}
+                </Fact>
+              </SettingGroup>
+              <SettingGroup
                 hint="New members receive the next number unless manual numbers are allowed."
-                title={tx("Member numbers")}
+                title="Member numbers"
               >
                 <Fact label="Next member number">
                   {assignedMemberNumber(
@@ -1406,16 +1423,8 @@ function SettingsSection({
                 </Fact>
               </SettingGroup>
               <SettingGroup
-                hint="Example of the printed number. The sequence increases with each receipt."
-                title={tx("Receipts")}
-              >
-                <Fact label="Receipt number">
-                  {receiptExample(settings.receipt_number_prefix)}
-                </Fact>
-              </SettingGroup>
-              <SettingGroup
                 hint="How the front desk accepts a check-in code."
-                title={tx("Check-in")}
+                title="Check-in"
               >
                 <Fact label="Check-in duplicate window (seconds)">
                   {textValue(settings.check_in_duplicate_window_seconds)}
@@ -1423,13 +1432,13 @@ function SettingsSection({
                 <Fact label="Check-in challenge lifetime (seconds)">
                   {textValue(settings.check_in_challenge_ttl_seconds)}
                 </Fact>
-                <Fact label="Check-in challenge maximum uses">
+                <Fact label="Check-in challenge maximum uses" wide>
                   {textValue(settings.check_in_challenge_max_uses)}
                 </Fact>
               </SettingGroup>
               <SettingGroup
                 hint="Days before a membership ends. Example: 7 means one week before."
-                title={tx("Membership reminders")}
+                title="Membership reminders"
               >
                 <Fact label="Membership expiry warning days" wide>
                   {settings.membership_expiry_warning_days.length === 0 ? (
@@ -1454,7 +1463,7 @@ function SettingsSection({
                   <Choice on={settings.membership_expiry_push_enabled} />
                 </Fact>
               </SettingGroup>
-              <SettingGroup title={tx("Classes")}>
+              <SettingGroup title="Classes">
                 <Fact label="Class cancellation cutoff (minutes)">
                   {textValue(settings.class_cancellation_cutoff_minutes)}
                 </Fact>
@@ -1462,26 +1471,24 @@ function SettingsSection({
                   <Choice on={settings.class_no_show_consumes_session} />
                 </Fact>
               </SettingGroup>
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 lg:col-span-2">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h3 className="text-sm font-bold text-amber-950">
-                    {" "}
-                    {tx("Finance approval")}{" "}
+                    {tx("Finance approval")}
                   </h3>
-                  <Pill tone="bg-amber-50 text-amber-800 ring-amber-600/15">
-                    {" "}
-                    {tx("Required")}{" "}
+                  <Pill tone="bg-white text-amber-800 ring-amber-600/15">
+                    {tx("Required")}
                   </Pill>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-amber-950">
-                  {approvalCopy()}
+                  {tx(approvalCopy())}
                 </p>
               </div>
-              <SettingGroup title={tx("Record")}>
-                <Fact label="Created">{textValue(settings.created_at)}</Fact>
-                <Fact label="Updated">{textValue(settings.updated_at)}</Fact>
+              <SettingGroup title="Record">
+                <Fact label="Created">{profileWhen(settings.created_at)}</Fact>
+                <Fact label="Updated">{profileWhen(settings.updated_at)}</Fact>
               </SettingGroup>
-            </>
+            </div>
           ) : null}
         </div>
       )}
@@ -1644,11 +1651,11 @@ function SettingsSection({
           <ReadOnlyRows
             rows={[
               {
-                label: tx("Next member number"),
+                label: "Next member number",
                 value: settings.next_member_number,
               },
-              { label: tx("Created"), value: settings.created_at },
-              { label: tx("Updated"), value: settings.updated_at },
+              { label: "Created", value: profileWhen(settings.created_at) },
+              { label: "Updated", value: profileWhen(settings.updated_at) },
             ]}
           />
           {error ? (
@@ -1672,26 +1679,377 @@ function SettingsSection({
   );
 }
 
+function PrinterActions({ canViewReceipts }: { canViewReceipts: boolean }) {
+  const tx = useTx();
+  const [latest, setLatest] = useState<{
+    href: string;
+    receiptNumber: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(canViewReceipts);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!canViewReceipts) return undefined;
+    let active = true;
+    void listReceipts({ status: "ISSUED", limit: "1" })
+      .then((page) => {
+        if (!active) return;
+        setLatest(latestIssuedReceipt(page.data));
+      })
+      .catch((failure: unknown) => {
+        if (!active) return;
+        setError(
+          failureMessage(failure, "The last receipt could not be loaded."),
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [canViewReceipts]);
+
+  const reprintHelp = !canViewReceipts
+    ? "You need receipt access before the last receipt can be reprinted."
+    : error
+      ? error
+      : loading
+        ? "Loading the last receipt."
+        : latest
+          ? null
+          : "No issued receipt is available to reprint.";
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap gap-2">
+        {canViewReceipts ? (
+          <Link className="button button-cancel" href={receiptTestPrintHref()}>
+            {tx("Test print")}
+          </Link>
+        ) : (
+          <button className="button button-cancel" disabled type="button">
+            {tx("Test print")}
+          </button>
+        )}
+        {latest ? (
+          <Link className="button" href={latest.href}>
+            {tx("Reprint last receipt")}
+          </Link>
+        ) : (
+          <button className="button" disabled type="button">
+            {tx("Reprint last receipt")}
+          </button>
+        )}
+      </div>
+      {canViewReceipts ? null : (
+        <p className="text-sm leading-6 text-slate-500">
+          {tx("You need receipt access before a test slip can be printed.")}
+        </p>
+      )}
+      {reprintHelp ? (
+        <p
+          className="text-sm leading-6 text-slate-500"
+          role={error ? "alert" : "status"}
+        >
+          {tx(reprintHelp)}
+        </p>
+      ) : null}
+      {latest?.receiptNumber ? (
+        <p className="text-sm leading-6 text-slate-500">
+          {tx("Last receipt {number}.", { number: latest.receiptNumber })}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function PrinterSection({
+  canManage,
+  canViewReceipts,
+  pending,
+  onPending,
+}: {
+  canManage: boolean;
+  canViewReceipts: boolean;
+  pending: boolean;
+  onPending: (value: boolean) => void;
+}) {
+  const tx = useTx();
+  const footerHintId = useId();
+  const footerCountId = useId();
+  const footerLineId = useId();
+  const footerErrorId = useId();
+  const [settings, setSettings] = useState<GymSettings | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [footer, setFooter] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const footerIssues = printerFooterIssues(footer);
+
+  useEffect(() => {
+    let active = true;
+    void getGymSettings()
+      .then((value) => {
+        if (active) setSettings(value);
+      })
+      .catch((failure: unknown) => {
+        if (active)
+          setError(failureMessage(failure, "Unable to load printer settings."));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function beginEdit() {
+    if (!settings) return;
+    setFooter(normalizePrinterFooter(settings.printer_footer));
+    setEditing(true);
+  }
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSuccess(null);
+    let payload: GymSettingsUpdate;
+    try {
+      payload = readPrinterSettings(new FormData(event.currentTarget));
+    } catch (failure) {
+      setError(
+        failureMessage(failure, "Check the printer settings and try again."),
+      );
+      return;
+    }
+    onPending(true);
+    setError(null);
+    try {
+      setSettings(await updateGymSettings(payload));
+      setEditing(false);
+      setSuccess("Printer settings saved.");
+    } catch (failure) {
+      setError(failureMessage(failure, "Unable to save printer settings."));
+    } finally {
+      onPending(false);
+    }
+  }
+
+  return (
+    <section aria-labelledby="printer-settings-title" className={panelClass}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+        <div>
+          <h2
+            className="text-lg font-bold text-slate-900"
+            id="printer-settings-title"
+          >
+            {tx("Printer settings")}
+          </h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {tx("80mm receipts, branding, and footer.")}
+          </p>
+        </div>
+        {settings && canManage ? (
+          <button
+            className="button button-edit"
+            onClick={beginEdit}
+            type="button"
+          >
+            {tx("Edit printer settings")}
+          </button>
+        ) : null}
+      </div>
+      <div className="grid gap-5 p-4 sm:p-5">
+        {loading ? (
+          <div className="grid gap-3">
+            <p className="text-sm font-medium text-slate-500" role="status">
+              {tx("Loading printer settings.")}
+            </p>
+            {[0, 1].map((item) => (
+              <div
+                className="h-16 animate-pulse rounded-xl bg-slate-100"
+                key={item}
+              />
+            ))}
+          </div>
+        ) : (
+          <>
+            <Notice error={editing ? null : error} success={success} />
+            {settings ? (
+              <SettingGroup
+                hint="These choices apply the next time a receipt is printed."
+                title="Receipt printer"
+              >
+                <Fact label="Enable printer">
+                  <Choice on={settings.printer_enabled} />
+                </Fact>
+                <Fact label="Print logo">
+                  <Choice on={settings.printer_print_logo} />
+                </Fact>
+                <Fact label="Print address">
+                  <Choice on={settings.printer_print_address} />
+                </Fact>
+                <Fact label="Print phone">
+                  <Choice on={settings.printer_print_phone} />
+                </Fact>
+                <Fact label="Receipt footer" wide>
+                  {settings.printer_footer ? (
+                    <span className="whitespace-pre-line">
+                      {settings.printer_footer}
+                    </span>
+                  ) : (
+                    textValue("")
+                  )}
+                </Fact>
+              </SettingGroup>
+            ) : null}
+          </>
+        )}
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <h3 className="text-sm font-bold text-slate-900">
+            {tx("Receipt printer setup")}
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            {tx(
+              "Install the 80mm printer with its operating-system driver. In the browser print dialog, select that printer, choose 80mm paper, keep the printable width at 72mm, turn off headers, footers, and margins, and do not scale the page to A4.",
+            )}
+          </p>
+        </div>
+        <PrinterActions canViewReceipts={canViewReceipts} />
+      </div>
+      {settings && canManage && editing ? (
+        <FormDialog
+          description="Logo, address, phone, and the receipt footer."
+          key={settings.updated_at}
+          onClose={() => {
+            if (!pending) setEditing(false);
+          }}
+          onSubmit={save}
+          pending={pending}
+          title="Printer settings"
+          wide
+        >
+          <FormSection title="Receipt printer">
+            <ToggleRow
+              defaultChecked={settings.printer_enabled}
+              hint="Turn the receipt printer on for this gym."
+              label="Enable printer"
+              name="printer_enabled"
+            />
+            <ToggleRow
+              defaultChecked={settings.printer_print_logo}
+              hint="Show the gym logo on the receipt."
+              label="Print logo"
+              name="printer_print_logo"
+            />
+            <ToggleRow
+              defaultChecked={settings.printer_print_address}
+              hint="Show the gym address on the receipt."
+              label="Print address"
+              name="printer_print_address"
+            />
+            <ToggleRow
+              defaultChecked={settings.printer_print_phone}
+              hint="Show the gym phone on the receipt."
+              label="Print phone"
+              name="printer_print_phone"
+            />
+            <div className="sm:col-span-2">
+              <label className="field">
+                <span className="text-sm font-semibold text-slate-700">
+                  {tx("Receipt footer")}
+                </span>
+                <textarea
+                  aria-describedby={`${footerHintId} ${footerCountId} ${footerLineId}${footerIssues.length > 0 ? ` ${footerErrorId}` : ""}`}
+                  aria-invalid={footerIssues.length > 0 || undefined}
+                  className="input min-h-24"
+                  name="printer_footer"
+                  onChange={(event) =>
+                    setFooter(normalizePrinterFooter(event.target.value))
+                  }
+                  rows={3}
+                  value={footer}
+                />
+              </label>
+              <p
+                className="mt-1 text-xs leading-5 text-slate-500"
+                id={footerHintId}
+              >
+                {tx(
+                  "Up to 120 characters and 3 lines. It prints at the bottom of the receipt.",
+                )}
+              </p>
+              <p
+                className="mt-1 text-xs font-semibold text-slate-600"
+                id={footerCountId}
+              >
+                {tx("Characters: {count}/120", {
+                  count: printerFooterLength(footer),
+                })}
+              </p>
+              <p
+                className="text-xs font-semibold text-slate-600"
+                id={footerLineId}
+              >
+                {tx("Lines: {lines}/3", {
+                  lines: printerFooterLineCount(footer),
+                })}
+              </p>
+              {footerIssues.length > 0 ? (
+                <div id={footerErrorId}>
+                  {footerIssues.map((issue) => (
+                    <p className="error" key={issue} role="alert">
+                      {tx(issue)}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </FormSection>
+          {error ? (
+            <p className="error" role="alert">
+              {tx(error)}
+            </p>
+          ) : null}
+          <div>
+            <button
+              className="button button-edit"
+              disabled={pending || footerIssues.length > 0}
+              type="submit"
+            >
+              {tx("Save printer settings")}
+            </button>
+          </div>
+        </FormDialog>
+      ) : null}
+    </section>
+  );
+}
+
 export function GymSettingsManager({
   canViewProfile,
   canUpdateProfile,
   canViewSettings,
   canManageSettings,
-}: GymSettingsAccess) {
+  canViewReceipts,
+}: GymSettingsAccess & { canViewReceipts: boolean }) {
   const tx = useTx();
   const [pending, setPending] = useState(false);
-  const [tab, setTab] = useState<"profile" | "operations">(
+  const [tab, setTab] = useState<"profile" | "operations" | "printer">(
     canViewProfile ? "profile" : "operations",
   );
-  const both = canViewProfile && canViewSettings;
   const tabs = [
     canViewProfile ? (["profile", "Profile"] as const) : null,
     canViewSettings ? (["operations", "Operations"] as const) : null,
+    canViewSettings ? (["printer", "Printer"] as const) : null,
   ].filter((item) => item !== null);
+  const showTabs = tabs.length > 1;
 
   return (
     <div className="grid gap-5">
-      {both ? (
+      {showTabs ? (
         <div
           aria-label={tx("Gym settings sections")}
           className="inline-flex w-fit rounded-xl bg-slate-200/70 p-1"
@@ -1715,10 +2073,10 @@ export function GymSettingsManager({
       ) : null}
       {canViewProfile ? (
         <div
-          aria-labelledby={both ? "profile-tab" : undefined}
-          hidden={both && tab !== "profile"}
-          id={both ? "profile-panel" : undefined}
-          role={both ? "tabpanel" : undefined}
+          aria-labelledby={showTabs ? "profile-tab" : undefined}
+          hidden={showTabs && tab !== "profile"}
+          id={showTabs ? "profile-panel" : undefined}
+          role={showTabs ? "tabpanel" : undefined}
         >
           <ProfileSection
             canUpdate={canUpdateProfile}
@@ -1729,13 +2087,28 @@ export function GymSettingsManager({
       ) : null}
       {canViewSettings ? (
         <div
-          aria-labelledby={both ? "operations-tab" : undefined}
-          hidden={both && tab !== "operations"}
-          id={both ? "operations-panel" : undefined}
-          role={both ? "tabpanel" : undefined}
+          aria-labelledby={showTabs ? "operations-tab" : undefined}
+          hidden={showTabs && tab !== "operations"}
+          id={showTabs ? "operations-panel" : undefined}
+          role={showTabs ? "tabpanel" : undefined}
         >
           <SettingsSection
             canManage={canManageSettings}
+            onPending={setPending}
+            pending={pending}
+          />
+        </div>
+      ) : null}
+      {canViewSettings ? (
+        <div
+          aria-labelledby={showTabs ? "printer-tab" : undefined}
+          hidden={showTabs && tab !== "printer"}
+          id={showTabs ? "printer-panel" : undefined}
+          role={showTabs ? "tabpanel" : undefined}
+        >
+          <PrinterSection
+            canManage={canManageSettings}
+            canViewReceipts={canViewReceipts}
             onPending={setPending}
             pending={pending}
           />

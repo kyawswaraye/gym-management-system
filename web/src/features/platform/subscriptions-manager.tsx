@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { FormDialog } from "@/components/form-dialog";
 import { platformGet, platformMutation } from "@/features/platform/client";
+import { DigitInput } from "@/lib/ui/digit-input";
 import {
   buildSubscriptionUpdate,
   compareSubscriptionPlans,
@@ -285,13 +286,13 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
                 <span>
                   {tx("Price for")} {plan.code}
                 </span>
-                <input
+                <DigitInput
                   className="input"
-                  name="price"
-                  inputMode="decimal"
                   defaultValue={plan.price}
-                  required
                   disabled={pendingId !== null}
+                  mode={{ kind: "decimal", scale: 2 }}
+                  name="price"
+                  required
                 />
               </label>
               <label className="field">

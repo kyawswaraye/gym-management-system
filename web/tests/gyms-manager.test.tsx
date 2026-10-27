@@ -235,6 +235,7 @@ const provisionRequest = {
     phone: "",
     address_line1: "",
     city: "",
+    region: "",
     country_code: "",
     timezone: "Asia/Yangon",
     currency: "THB",

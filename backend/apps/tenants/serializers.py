@@ -14,6 +14,7 @@ from apps.tenants.validation import (
     SETTINGS_INTEGER_RANGES,
     normalize_currency,
     normalize_prefix,
+    normalize_printer_footer,
     normalize_timezone,
     normalize_warning_days,
 )
@@ -568,6 +569,11 @@ class GymSettingsSerializer(serializers.Serializer):
     class_cancellation_cutoff_minutes = serializers.IntegerField()
     class_no_show_consumes_session = serializers.BooleanField()
     require_separate_finance_approval = serializers.BooleanField()
+    printer_enabled = serializers.BooleanField()
+    printer_print_logo = serializers.BooleanField()
+    printer_print_address = serializers.BooleanField()
+    printer_print_phone = serializers.BooleanField()
+    printer_footer = serializers.CharField()
     next_member_number = serializers.IntegerField()
     created_by_membership_id = serializers.UUIDField(allow_null=True)
     updated_by_membership_id = serializers.UUIDField(allow_null=True)
@@ -613,6 +619,16 @@ class GymSettingsUpdateSerializer(StrictSerializer):
     )
     class_no_show_consumes_session = serializers.BooleanField(required=False)
     require_separate_finance_approval = serializers.BooleanField(required=False)
+    printer_enabled = serializers.BooleanField(required=False)
+    printer_print_logo = serializers.BooleanField(required=False)
+    printer_print_address = serializers.BooleanField(required=False)
+    printer_print_phone = serializers.BooleanField(required=False)
+    printer_footer = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        trim_whitespace=False,
+        max_length=120,
+    )
 
     def validate_member_number_prefix(self, value: str) -> str:
         return normalize_prefix(value)
@@ -622,6 +638,9 @@ class GymSettingsUpdateSerializer(StrictSerializer):
 
     def validate_membership_expiry_warning_days(self, value: list[int]) -> list[int]:
         return normalize_warning_days(value)
+
+    def validate_printer_footer(self, value: str) -> str:
+        return normalize_printer_footer(value)
 
     def validate_require_separate_finance_approval(self, value: bool) -> bool:
         if value is not True:

@@ -1,7 +1,7 @@
 import { useTx } from "../i18n/useTx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { RefreshControl } from "react-native";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 
 import { ApiError } from "../api/errors";
 import type { Schemas } from "../api/memberApi";
@@ -9,7 +9,8 @@ import { useMemberApi, useOnline } from "../app/providers";
 import { createIdempotencyKey } from "../booking/idempotency";
 import {
   calendarDateFromLocal,
-  formatGymDateTime,
+  formatGymDate,
+  formatGymTime,
   scheduleWindow,
 } from "../dates/gymLocal";
 import { queryKeys } from "../query/keys";
@@ -23,7 +24,7 @@ import {
   OfflineBanner,
 } from "../ui/StateView";
 import { Text } from "../ui/Text";
-import { colors } from "../ui/theme";
+import { colors, radius, space } from "../ui/theme";
 
 export function ScheduleScreen() {
   const tx = useTx();
@@ -36,7 +37,7 @@ export function ScheduleScreen() {
     queryFn: () => api.schedule(range.date_from, range.date_to),
   });
   const packages = useQuery({
-    queryKey: queryKeys.packages,
+    queryKey: queryKeys.bookingPackages,
     queryFn: () => api.servicePackages(),
   });
   const classPackages = (packages.data?.items ?? []).filter(
@@ -104,10 +105,15 @@ export function ScheduleScreen() {
       }
     >
       <OfflineBanner visible={!online} />
-      <Text style={{ color: colors.muted }}>
-        {tx("Showing")} {range.date_from} {tx("through")} {range.date_to}
-        {tx(", 42 gym-local days.")}
-      </Text>
+      <Card>
+        <Text style={{ color: colors.muted, fontSize: 13 }}>
+          {tx("Showing")}
+        </Text>
+        <Text style={{ fontSize: 18, fontWeight: "700" }}>
+          {formatGymDate(range.date_from)} {tx("to")}{" "}
+          {formatGymDate(range.date_to)}
+        </Text>
+      </Card>
       {schedule.isLoading ? (
         <LoadingState label={tx("Loading schedule")} />
       ) : null}
@@ -128,8 +134,15 @@ export function ScheduleScreen() {
       {schedule.data && schedule.data.bookings.length === 0 ? (
         <EmptyState message={tx("No bookings in this window.")} />
       ) : null}
-      {schedule.data?.bookings.map((booking) => (
-        <BookingRow key={booking.id} booking={booking} />
+      {groupByStart(schedule.data?.bookings ?? []).map((group) => (
+        <View key={`booking-${group.date}`} style={{ gap: space.sm }}>
+          <Text style={{ color: colors.primary, fontWeight: "700" }}>
+            {formatGymDate(group.date)}
+          </Text>
+          {group.items.map((booking) => (
+            <BookingRow key={booking.id} booking={booking} />
+          ))}
+        </View>
       ))}
       <Text
         accessibilityRole="header"
@@ -144,45 +157,146 @@ export function ScheduleScreen() {
           )}
         </Text>
       ) : (
-        classPackages.map((item) => (
-          <Button
-            key={item.id}
-            label={tx("{name}, {count} remaining", {
-              name: item.package_name,
-              count: item.remaining_sessions,
-            })}
-            variant={selectedPackage === item.id ? "primary" : "secondary"}
-            hint={tx("Selects this package for the next class booking")}
-            onPress={() => setSelectedPackage(item.id)}
-          />
-        ))
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: space.sm }}
+        >
+          {classPackages.map((item) => {
+            const selected = selectedPackage === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                accessibilityHint={tx(
+                  "Selects this package for the next class booking",
+                )}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                onPress={() => setSelectedPackage(item.id)}
+                style={{
+                  backgroundColor: selected ? colors.primary : colors.surface,
+                  borderColor: selected ? colors.primary : colors.border,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  justifyContent: "center",
+                  minHeight: 44,
+                  paddingHorizontal: 14,
+                }}
+              >
+                <Text
+                  style={{
+                    color: selected ? colors.onPrimary : colors.text,
+                    fontWeight: "700",
+                  }}
+                >
+                  {item.package_name}
+                </Text>
+                <Text
+                  style={{
+                    color: selected ? colors.onPrimary : colors.muted,
+                    fontSize: 13,
+                  }}
+                >
+                  {tx("{count} remaining", { count: item.remaining_sessions })}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       )}
+      {classPackages.length > 0 && !selectedPackage ? (
+        <Text style={{ color: colors.muted }}>
+          {tx("Choose a class package with remaining sessions.")}
+        </Text>
+      ) : null}
       {schedule.data && schedule.data.occurrences.length === 0 ? (
         <EmptyState message={tx("No classes are scheduled in this window.")} />
       ) : null}
-      {schedule.data?.occurrences.map((occurrence) => (
-        <Card key={occurrence.id}>
-          <Text style={{ fontWeight: "700" }}>
-            {occurrence.class_name} · {formatGymDateTime(occurrence.starts_at)}
+      {groupByStart(schedule.data?.occurrences ?? []).map((group) => (
+        <View key={`class-${group.date}`} style={{ gap: space.sm }}>
+          <Text style={{ color: colors.primary, fontWeight: "700" }}>
+            {formatGymDate(group.date)}
           </Text>
-          <Text style={{ color: colors.muted }}>
-            {occurrence.trainer_display_name}
-            {occurrence.location ? ` · ${occurrence.location}` : ""} ·{" "}
-            {occurrence.booked_count}/{occurrence.capacity}
-          </Text>
-          {occurrence.member_booking_id ? (
-            <Text>{tx("You are booked.")}</Text>
-          ) : (
-            <Button
-              label={tx("Book class")}
-              hint={tx("Books {name}", { name: occurrence.class_name })}
-              disabled={
-                !selectedPackage || bookingId === occurrence.id || !online
-              }
-              onPress={() => book(occurrence.id)}
-            />
-          )}
-        </Card>
+          {group.items.map((occurrence) => {
+            const full = occurrence.booked_count >= occurrence.capacity;
+            const width =
+              occurrence.capacity > 0
+                ? Math.min(
+                    100,
+                    (occurrence.booked_count / occurrence.capacity) * 100,
+                  )
+                : 0;
+            return (
+              <Card key={occurrence.id}>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <View style={{ width: 58 }}>
+                    <Text style={{ color: colors.primary, fontWeight: "700" }}>
+                      {formatGymTime(occurrence.starts_at)}
+                    </Text>
+                    <Text style={{ color: colors.muted, fontSize: 13 }}>
+                      {formatGymTime(occurrence.ends_at)}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <Text style={{ fontSize: 17, fontWeight: "700" }}>
+                      {occurrence.class_name}
+                    </Text>
+                    <Text style={{ color: colors.muted }}>
+                      {occurrence.trainer_display_name}
+                      {occurrence.location ? ` · ${occurrence.location}` : ""}
+                    </Text>
+                    <View
+                      style={{
+                        backgroundColor: colors.border,
+                        borderRadius: 4,
+                        height: 6,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <View
+                        style={{
+                          backgroundColor: full
+                            ? colors.danger
+                            : colors.primary,
+                          height: 6,
+                          width: `${width}%`,
+                        }}
+                      />
+                    </View>
+                    <Text style={{ color: colors.muted, fontSize: 13 }}>
+                      {tx("{booked} of {capacity}", {
+                        booked: occurrence.booked_count,
+                        capacity: occurrence.capacity,
+                      })}
+                      {full ? ` · ${tx("Full")}` : ""}
+                    </Text>
+                    {occurrence.member_booking_id ? (
+                      <Text
+                        style={{ color: colors.primary, fontWeight: "700" }}
+                      >
+                        {tx("You are booked.")}
+                      </Text>
+                    ) : (
+                      <Button
+                        label={tx("Book class")}
+                        hint={tx("Books {name}", {
+                          name: occurrence.class_name,
+                        })}
+                        disabled={
+                          !selectedPackage ||
+                          bookingId === occurrence.id ||
+                          !online ||
+                          full
+                        }
+                        onPress={() => book(occurrence.id)}
+                      />
+                    )}
+                  </View>
+                </View>
+              </Card>
+            );
+          })}
+        </View>
       ))}
     </Screen>
   );
@@ -194,21 +308,60 @@ function BookingRow({
   booking: Schemas["MemberScheduleBooking"];
 }) {
   const tx = useTx();
+  const title =
+    booking.kind === "CLASS"
+      ? (booking.class_name ?? tx("Class"))
+      : tx("Personal training");
   return (
     <Card>
-      <Text style={{ fontWeight: "700" }}>
-        {booking.kind === "CLASS"
-          ? (booking.class_name ?? tx("Class"))
-          : tx("Personal training")}{" "}
-        · {tx(booking.status)}
-      </Text>
-      <Text style={{ color: colors.muted }}>
-        {formatGymDateTime(booking.starts_at)} {tx("to")}{" "}
-        {formatGymDateTime(booking.ends_at)}
-      </Text>
-      <Text style={{ color: colors.muted }}>
-        {booking.trainer_display_name}
-      </Text>
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ width: 58 }}>
+          <Text style={{ color: colors.primary, fontWeight: "700" }}>
+            {formatGymTime(booking.starts_at)}
+          </Text>
+          <Text style={{ color: colors.muted, fontSize: 13 }}>
+            {formatGymTime(booking.ends_at)}
+          </Text>
+        </View>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={{ fontSize: 17, fontWeight: "700" }}>{title}</Text>
+          <Text style={{ color: colors.muted }}>
+            {booking.trainer_display_name}
+          </Text>
+          <Text
+            style={{
+              alignSelf: "flex-start",
+              backgroundColor: colors.primarySoft,
+              borderRadius: 999,
+              color: colors.primary,
+              fontSize: 13,
+              fontWeight: "700",
+              overflow: "hidden",
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+            }}
+          >
+            {tx(booking.status)}
+          </Text>
+        </View>
+      </View>
     </Card>
   );
+}
+
+function groupByStart<T extends { starts_at: string }>(items: readonly T[]) {
+  const order: string[] = [];
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const date =
+      typeof item.starts_at === "string" ? item.starts_at.slice(0, 10) : "";
+    const list = groups.get(date);
+    if (list) {
+      list.push(item);
+    } else {
+      groups.set(date, [item]);
+      order.push(date);
+    }
+  }
+  return order.map((date) => ({ date, items: groups.get(date) ?? [] }));
 }

@@ -8,6 +8,7 @@ import { useCursorList } from "../pagination/useCursorList";
 import { Button } from "./Button";
 import { Card } from "./Card";
 import { Screen } from "./Screen";
+import { Text } from "./Text";
 import {
   EmptyState,
   ErrorState,
@@ -58,9 +59,15 @@ export function PagedScreen<T extends { id: string }>({
       {query.isSuccess && query.items.length === 0 ? (
         <EmptyState message={empty} />
       ) : null}
-      {query.items.map((item) => (
-        <Card key={item.id}>{renderItem(item)}</Card>
-      ))}
+      {query.items.map((item, index) =>
+        item && typeof item.id === "string" ? (
+          <Card key={item.id}>{renderItem(item)}</Card>
+        ) : (
+          <Card key={`row-${index}`}>
+            <Text>{tx("This record could not be shown.")}</Text>
+          </Card>
+        ),
+      )}
       {query.hasNextPage ? (
         <Button
           label={

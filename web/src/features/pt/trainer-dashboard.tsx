@@ -7,6 +7,7 @@ import {
   getTrainerDashboard,
   getTrainerSessionReport,
 } from "@/features/pt/client";
+import { formatAppDate, formatAppDateTime } from "@/lib/date";
 import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
   DashboardRangePreset,
@@ -191,9 +192,10 @@ export function TrainerDashboardManager() {
       {dashboard ? (
         <>
           <p className="muted text-sm">
-            {dashboard.today}. {dashboard.range.date_from} {tx("to")}{" "}
-            {dashboard.range.date_to}. {dashboard.timezone}
-            {tx(". Generated")} {dashboard.generated_at}.
+            {formatAppDate(dashboard.today)}.{" "}
+            {formatAppDate(dashboard.range.date_from)} {tx("to")}{" "}
+            {formatAppDate(dashboard.range.date_to)}. {dashboard.timezone}
+            {tx(". Generated")} {formatAppDateTime(dashboard.generated_at)}.
           </p>
           <p className="text-sm">
             {" "}
@@ -272,12 +274,12 @@ export function TrainerDashboardManager() {
                         <td className="px-2 py-1">{booking.member_number}</td>
                         <td className="px-2 py-1">
                           <time dateTime={booking.starts_at}>
-                            {booking.starts_at}
+                            {formatAppDateTime(booking.starts_at)}
                           </time>
                         </td>
                         <td className="px-2 py-1">
                           <time dateTime={booking.ends_at}>
-                            {booking.ends_at}
+                            {formatAppDateTime(booking.ends_at)}
                           </time>
                         </td>
                       </tr>
@@ -368,10 +370,11 @@ function SessionReportView({ report }: { report: TrainerSessionReport }) {
       <p>{report.gym.name}</p>
       <p>{report.gym.code}</p>
       <p>
-        {report.range.date_from} {tx("to")} {report.range.date_to}
+        {formatAppDate(report.range.date_from)} {tx("to")}{" "}
+        {formatAppDate(report.range.date_to)}
       </p>
       <p>{report.timezone}</p>
-      <p>{report.generated_at}</p>
+      <p>{formatAppDateTime(report.generated_at)}</p>
       <p>
         <span className="sr-only">{tx("Source status")} </span>
         {report.source_status_policy}
@@ -402,7 +405,7 @@ function SessionReportView({ report }: { report: TrainerSessionReport }) {
               {report.rows.map((row) => (
                 <tr key={row.date}>
                   <th className="px-2 py-1" scope="row">
-                    {row.date}
+                    {formatAppDate(row.date)}
                   </th>
                   {SESSION_FIELDS.map((field) => (
                     <td className="px-2 py-1" key={field.key}>

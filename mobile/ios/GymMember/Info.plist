@@ -44,6 +44,10 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>GymPilot MM uses the camera to scan the onsite check-in code and, if you choose, to take a profile photo.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>GymPilot MM does not record audio. The camera needs this permission so a profile photo can be taken.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>GymPilot MM uses your photo library only when you choose a profile photo.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

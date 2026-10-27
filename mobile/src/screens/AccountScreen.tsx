@@ -38,7 +38,7 @@ const links: Array<{
   {
     route: "Settings",
     label: "Settings",
-    hint: "Signs out and shows app details",
+    hint: "Language, sign out, and preferences",
   },
 ];
 

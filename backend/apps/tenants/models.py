@@ -16,6 +16,8 @@ def default_expiry_warning_days() -> list[int]:
 
 # Printed on membership, shop, and PT receipts. The gym code stays a separate id.
 RECEIPT_NUMBER_PREFIX = "RCPT"
+# At most three lines. One trailing newline does not add a fourth line.
+PRINTER_FOOTER_LINE_PATTERN = r"^([^\r\n]*\n){0,2}[^\r\n]*\n?$"
 
 
 # Fernet token for a 65,536-byte plaintext. PKCS7 adds a full block when the
@@ -481,6 +483,11 @@ class GymSettings(TenantModel):
     class_cancellation_cutoff_minutes = models.PositiveIntegerField(default=60)
     class_no_show_consumes_session = models.BooleanField(default=True)
     require_separate_finance_approval = models.BooleanField(default=True)
+    printer_enabled = models.BooleanField(default=False)
+    printer_print_logo = models.BooleanField(default=False)
+    printer_print_address = models.BooleanField(default=False)
+    printer_print_phone = models.BooleanField(default=False)
+    printer_footer = models.CharField(max_length=120, blank=True, default="")
     next_member_number = models.PositiveBigIntegerField(default=1)
     created_by_membership_id = models.UUIDField(null=True, blank=True)
     updated_by_membership_id = models.UUIDField(null=True, blank=True)
@@ -519,6 +526,10 @@ class GymSettings(TenantModel):
             models.CheckConstraint(
                 condition=models.Q(receipt_number_prefix__regex=r"^[A-Z0-9-]+$"),
                 name="settings_receipt_prefix_format_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(printer_footer__regex=PRINTER_FOOTER_LINE_PATTERN),
+                name="settings_printer_footer_lines_ck",
             ),
         ]
 

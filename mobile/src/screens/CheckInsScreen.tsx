@@ -4,6 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useMemberApi } from "../app/providers";
 import { formatGymDateTime } from "../dates/gymLocal";
 import { queryKeys } from "../query/keys";
+import { displayText } from "../ui/display";
 import { PagedScreen } from "../ui/PagedScreen";
 import { Text } from "../ui/Text";
 import { colors } from "../ui/theme";
@@ -19,19 +20,26 @@ export function CheckInsScreen() {
       queryKey={queryKeys.checkIns}
       load={(after) => api.checkIns(after)}
       empty="No check-ins are on file."
-      renderItem={(item) => (
-        <>
-          <Text style={{ fontWeight: "700" }}>
-            {formatGymDateTime(item.check_in_at)} · {tx(item.status)}
-          </Text>
-          <Text style={{ color: colors.muted }}>
-            {tx(item.method)}
-            {item.check_out_at
-              ? ` · ${tx("out {time}", { time: formatGymDateTime(item.check_out_at) })}`
-              : tx("· still open")}
-          </Text>
-        </>
-      )}
+      renderItem={(item) => {
+        const status = displayText(item?.status);
+        const method = displayText(item?.method);
+        const arrived = formatGymDateTime(displayText(item?.check_in_at));
+        const left = formatGymDateTime(displayText(item?.check_out_at));
+        return (
+          <>
+            <Text style={{ fontWeight: "700" }}>
+              {arrived}
+              {status ? ` · ${tx(status)}` : ""}
+            </Text>
+            <Text style={{ color: colors.muted }}>
+              {method ? tx(method) : ""}
+              {left
+                ? ` · ${tx("out {time}", { time: left })}`
+                : tx("· still open")}
+            </Text>
+          </>
+        );
+      }}
     />
   );
 }

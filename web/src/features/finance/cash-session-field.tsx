@@ -10,6 +10,7 @@ import {
   LOOKUP_PAGE_LIMIT,
 } from "@/features/finance/paging";
 import { Field, SelectInput } from "@/features/finance/ui";
+import { formatAppDate } from "@/lib/date";
 import type { CashSession } from "@/types/api";
 
 export function useOpenCashSessions(businessDate: string) {
@@ -128,7 +129,7 @@ export function CashSessionSelect({
           <option value="">{tx("Select an open session")}</option>
           {matches.map((session) => (
             <option key={session.id} value={session.id}>
-              {session.register_code} · {session.business_date} ·{" "}
+              {session.register_code} · {formatAppDate(session.business_date)} ·{" "}
               {tx(session.currency)}
             </option>
           ))}

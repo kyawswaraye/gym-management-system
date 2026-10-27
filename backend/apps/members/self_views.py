@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
@@ -55,6 +56,8 @@ from apps.members.self_services import (
     update_self_profile,
 )
 from apps.members.serializers import CheckInSerializer, MemberPaymentHistoryItemSerializer
+from apps.tenants.logo import logo_bytes_are_safe
+from apps.tenants.models import GymLogo
 from apps.users.authentication import MemberJWTAuthentication
 from apps.users.permissions import RequiresEntitlements
 from apps.users.throttling import MemberSelfReadThrottle, MemberSelfWriteThrottle
@@ -153,6 +156,31 @@ class MemberDashboardView(MemberSelfView):
         member = load_self_member(gym=request.gym, member_id=request.member.id)
         payload = member_self_dashboard(gym=request.gym, member=member)
         return success_response(MemberSelfDashboardSerializer(payload).data)
+
+
+class MemberGymLogoView(MemberSelfView):
+    """Logo bytes for the signed-in member's gym. Another gym's logo is unreachable."""
+
+    @extend_schema(
+        operation_id="member_gym_logo_retrieve",
+        tags=["member"],
+        parameters=[],
+        responses={
+            200: OpenApiTypes.BINARY,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request) -> HttpResponse:
+        MemberSelfEmptyQuerySerializer(data=request.query_params).is_valid(raise_exception=True)
+        logo = GymLogo.objects.filter(pk=request.gym.id).first()
+        if logo is None or not logo_bytes_are_safe(logo.content_type, bytes(logo.data)):
+            raise Http404
+        response = HttpResponse(bytes(logo.data), content_type=logo.content_type)
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
 
 class MemberMembershipView(MemberSelfView):

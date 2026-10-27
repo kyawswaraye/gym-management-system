@@ -9,7 +9,7 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { listCashSessions } from "@/features/finance/client";
+import { listCashSessions, listReceipts } from "@/features/finance/client";
 import { listMembers } from "@/features/operations/client";
 import {
   approvePtSale,
@@ -62,6 +62,7 @@ vi.mock("@/features/operations/client", () => ({
 
 vi.mock("@/features/finance/client", () => ({
   listCashSessions: vi.fn(),
+  listReceipts: vi.fn(),
 }));
 
 const TRAINER = "11111111-1111-4111-8111-111111111111";
@@ -135,6 +136,7 @@ function renderSales(
     canUpdate: boolean;
     canSubmit: boolean;
     canApprove: boolean;
+    canViewReceipts: boolean;
     canVoid: boolean;
     membershipId: string;
   }> = {},
@@ -145,6 +147,7 @@ function renderSales(
       canCreate={props.canCreate ?? false}
       canSubmit={props.canSubmit ?? false}
       canUpdate={props.canUpdate ?? false}
+      canViewReceipts={props.canViewReceipts ?? false}
       canVoid={props.canVoid ?? false}
       currency="MMK"
       membershipId={props.membershipId ?? "approver"}
@@ -238,6 +241,7 @@ beforeEach(() => {
   vi.mocked(listPtCommissions).mockResolvedValue(empty);
   vi.mocked(listMembers).mockResolvedValue(empty);
   vi.mocked(listCashSessions).mockResolvedValue(empty);
+  vi.mocked(listReceipts).mockResolvedValue(empty);
 });
 
 describe("PT sales list and detail", () => {
@@ -831,7 +835,7 @@ describe("approve, reject, cancel, and void dialogs", () => {
       submit: "Confirm approval",
       submitClass: "button-success",
     });
-    expect(dialog).toHaveTextContent("payment business date 2026-09-30");
+    expect(dialog).toHaveTextContent("payment business date 30-09-2026");
     await within(dialog).findByRole("option", { name: /FRONT/ });
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Confirm approval" }),
@@ -951,6 +955,10 @@ describe("approve, reject, cancel, and void dialogs", () => {
       ),
     );
     expect(listCashSessions).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("link", { name: "Print receipt" }),
+    ).not.toBeInTheDocument();
+    expect(listReceipts).not.toHaveBeenCalled();
   });
 
   it("rejects and cancels from dialogs without losing the reason", async () => {
@@ -976,7 +984,9 @@ describe("approve, reject, cancel, and void dialogs", () => {
       "Enter a rejection reason.",
     );
     expect(rejectPtSale).not.toHaveBeenCalled();
-    fireEvent.mouseDown(within(dialog).getByLabelText("Rejection reason"));
+    fireEvent.mouseDown(
+      within(dialog).getByRole("textbox", { name: "Rejection reason" }),
+    );
     expect(screen.getByRole("dialog")).toBe(dialog);
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -985,9 +995,10 @@ describe("approve, reject, cancel, and void dialogs", () => {
     const rejecting = await screen.findByRole("dialog", {
       name: "Reject sale",
     });
-    fireEvent.change(within(rejecting).getByLabelText("Rejection reason"), {
-      target: { value: "Wrong fee" },
-    });
+    fireEvent.change(
+      within(rejecting).getByRole("textbox", { name: "Rejection reason" }),
+      { target: { value: "Wrong fee" } },
+    );
     const pendingReject = deferred<PTSale>();
     vi.mocked(rejectPtSale).mockReturnValue(pendingReject.promise);
     fireEvent.click(
@@ -1050,9 +1061,10 @@ describe("approve, reject, cancel, and void dialogs", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel draft" }));
     const again = await screen.findByRole("dialog", { name: "Cancel draft" });
-    fireEvent.change(within(again).getByLabelText("Cancellation reason"), {
-      target: { value: "Not needed" },
-    });
+    fireEvent.change(
+      within(again).getByRole("textbox", { name: "Cancellation reason" }),
+      { target: { value: "Not needed" } },
+    );
     vi.mocked(cancelPtSale).mockResolvedValue(sale("CANCELLED"));
     fireEvent.click(
       within(again).getByRole("button", { name: "Confirm cancellation" }),
@@ -1137,9 +1149,10 @@ describe("approve, reject, cancel, and void dialogs", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Void sale" }));
     const ready = await screen.findByRole("dialog", { name: "Void sale" });
-    fireEvent.change(within(ready).getByLabelText("Void reason"), {
-      target: { value: "Undo" },
-    });
+    fireEvent.change(
+      within(ready).getByRole("textbox", { name: "Void reason" }),
+      { target: { value: "Undo" } },
+    );
     await within(ready).findByRole("option", { name: /FRONT/ });
     fireEvent.change(
       within(ready).getByLabelText("Cash session for the payment reversal"),
@@ -1170,5 +1183,69 @@ describe("approve, reject, cancel, and void dialogs", () => {
       expect.stringMatching(KEY),
     );
     expect(await screen.findByText("Sale voided.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Print receipt" }),
+    ).not.toBeInTheDocument();
+    expect(listReceipts).not.toHaveBeenCalled();
+  });
+
+  it("prints an issued PT receipt from the sale and from approval", async () => {
+    const paymentId = "77777777-7777-4777-8777-777777777777";
+    const receiptId = "66666666-6666-4666-8666-666666666666";
+    const posted = sale("POSTED", {
+      payment_id: paymentId,
+      payment: { method: "CARD", status: "POSTED", business_date: "2026-10-19" },
+    });
+    vi.mocked(listPtSales).mockResolvedValue(page([posted]));
+    vi.mocked(getPtSale).mockResolvedValue(posted);
+    const hidden = renderSales();
+    await openSaleRow();
+    expect(
+      screen.queryByRole("link", { name: "Print receipt" }),
+    ).not.toBeInTheDocument();
+    expect(listReceipts).not.toHaveBeenCalled();
+    hidden.unmount();
+
+    vi.mocked(listReceipts).mockResolvedValue({
+      data: [{ id: receiptId, payment_id: paymentId, status: "ISSUED" }],
+      meta: { has_more: false, next_after: null },
+    } as never);
+    const viewed = renderSales({ canViewReceipts: true });
+    await openSaleRow();
+    const postedLink = await screen.findByRole("link", {
+      name: "Print receipt",
+    });
+    expect(postedLink).toHaveAttribute("href", `/receipts/${receiptId}/print`);
+    expect(postedLink).toHaveAttribute("rel", "noopener noreferrer");
+    expect(postedLink).toHaveAttribute("target", "_blank");
+    expect(listReceipts).toHaveBeenCalledWith({
+      payment: paymentId,
+      status: "ISSUED",
+      limit: "5",
+    });
+    viewed.unmount();
+
+    const pending = sale("PENDING_APPROVAL", {
+      payment: { method: "CARD", business_date: "2026-10-19" },
+    });
+    vi.mocked(listPtSales).mockResolvedValue(page([pending]));
+    vi.mocked(getPtSale).mockResolvedValue(pending);
+    vi.mocked(listReceipts).mockClear();
+    vi.mocked(listReceipts).mockResolvedValue(empty);
+    vi.mocked(approvePtSale).mockResolvedValue({
+      receipt: { id: receiptId, status: "ISSUED" },
+    } as never);
+    renderSales({ canApprove: true, canViewReceipts: true });
+    await openSaleRow();
+    fireEvent.click(screen.getByRole("button", { name: "Approve sale" }));
+    fireEvent.click(
+      within(
+        await screen.findByRole("dialog", { name: "Approve sale" }),
+      ).getByRole("button", { name: "Confirm approval" }),
+    );
+    expect(
+      await screen.findByRole("link", { name: "Print receipt" }),
+    ).toHaveAttribute("href", `/receipts/${receiptId}/print`);
+    expect(listReceipts).not.toHaveBeenCalled();
   });
 });

@@ -235,6 +235,14 @@ const FINANCE_ROUTES: readonly Rule[] = [
     methods: READ,
   },
   {
+    pattern: /^\/api\/v1\/receipts\/print-context\/$/,
+    methods: READ,
+  },
+  {
+    pattern: action("receipts", "print"),
+    methods: READ,
+  },
+  {
     pattern: action("receipts", "void"),
     methods: COMMAND,
   },

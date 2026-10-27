@@ -124,21 +124,16 @@ describe("subscription plan manager", () => {
     ).toHaveTextContent("RETIRED");
   });
 
-  it("rejects an invalid price or lowercase interval before saving", async () => {
+  it("keeps a plan price in English digits and rejects a lowercase interval", async () => {
     render(<SubscriptionsManager canManage />);
     fireEvent.click(await screen.findByRole("button", { name: "Edit GROWTH" }));
 
-    fireEvent.change(screen.getByLabelText("Price for GROWTH"), {
-      target: { value: "-1.00" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Save GROWTH" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Enter a nonnegative price with up to 2 decimal places.",
-    );
-
-    fireEvent.change(screen.getByLabelText("Price for GROWTH"), {
-      target: { value: "10.00" },
-    });
+    const price = screen.getByLabelText("Price for GROWTH");
+    fireEvent.change(price, { target: { value: "-1.00" } });
+    expect(price).toHaveValue("1.00");
+    fireEvent.change(price, { target: { value: "20၀0a.5" } });
+    expect(price).toHaveValue("200.5");
+    fireEvent.change(price, { target: { value: "10.00" } });
     fireEvent.change(screen.getByLabelText("Billing interval for GROWTH"), {
       target: { value: "monthly" },
     });

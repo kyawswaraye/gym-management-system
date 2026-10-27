@@ -48,15 +48,45 @@ export function zonedLocalToIso(localValue: string, timeZone: string): string {
   return new Date(instant).toISOString();
 }
 
+export function formatAppDate(value: string | null | undefined): string {
+  if (!value) return "";
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match?.[1] || !match[2] || !match[3]) return value;
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+
+export function formatAppDateTime(
+  value: string | null | undefined,
+  timeZone?: string,
+): string {
+  if (!value) return "";
+  const calendar = formatAppDate(value);
+  if (calendar !== value) return calendar;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    ...(timeZone ? { timeZone } : {}),
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  const hour = values.hour === "24" ? "00" : values.hour;
+  return `${values.day}-${values.month}-${values.year} ${hour}:${values.minute}`;
+}
+
 export function formatInstant(value: string | null, timeZone: string): string {
   if (!value) return "Not recorded";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Not recorded";
-  return new Intl.DateTimeFormat("en", {
-    timeZone,
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return formatAppDateTime(value, timeZone);
 }
 
 export function todayInTimezone(timeZone: string): string {

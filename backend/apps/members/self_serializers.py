@@ -138,7 +138,15 @@ class MemberSelfPaymentSummarySerializer(serializers.Serializer):
     )
 
 
+class MemberSelfGymSerializer(serializers.Serializer):
+    """Brand shown on the signed-in member's home screen. No other gym is included."""
+
+    name = serializers.CharField()
+    has_logo = serializers.BooleanField()
+
+
 class MemberSelfDashboardSerializer(serializers.Serializer):
+    gym = MemberSelfGymSerializer()
     member = MemberSelfProfileSerializer()
     current_membership = MemberSelfMembershipSerializer(allow_null=True)
     days_remaining = serializers.IntegerField(allow_null=True, min_value=0)

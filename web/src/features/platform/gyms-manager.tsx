@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { FormDialog } from "@/components/form-dialog";
+import { MyanmarRegionCityFields } from "@/features/operations/myanmar-place-fields";
 import {
   platformGet,
   platformGetCollection,
@@ -82,6 +83,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
   const [nextAfter, setNextAfter] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
+  const [address, setAddress] = useState({ region: "", city: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -181,6 +183,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
         phone: String(values.get("gym_phone") ?? "").trim(),
         address_line1: String(values.get("address_line1") ?? "").trim(),
         city: String(values.get("city") ?? "").trim(),
+        region: String(values.get("region") ?? "").trim(),
         country_code: String(values.get("country_code") ?? "")
           .trim()
           .toUpperCase(),
@@ -207,6 +210,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
         }),
       );
       idempotencyKey.current = null;
+      setAddress({ region: "", city: "" });
       setProvisioning(false);
       form.reset();
       await loadGyms(search, undefined, status);
@@ -318,10 +322,12 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                     disabled={pending}
                   />
                 </label>
-                <label className="field">
-                  <span>{tx("City")}</span>
-                  <input className="input" name="city" disabled={pending} />
-                </label>
+                <MyanmarRegionCityFields
+                  city={address.city}
+                  disabled={pending}
+                  onChange={setAddress}
+                  region={address.region}
+                />
                 <label className="field">
                   <span>{tx("Country code")}</span>
                   <input
@@ -419,7 +425,10 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
           {canProvision ? (
             <button
               className="button button-create"
-              onClick={() => setProvisioning(true)}
+              onClick={() => {
+                setAddress({ region: "", city: "" });
+                setProvisioning(true);
+              }}
               type="button"
             >
               {" "}

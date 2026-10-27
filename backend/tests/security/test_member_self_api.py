@@ -25,7 +25,7 @@ from apps.common.db.tenant_context import set_gym_context
 from apps.files.models import FileAsset
 from apps.files.storage import StoredObject
 from apps.members.models import Member, Payment
-from apps.tenants.models import Gym, GymFeatureEntitlement, GymMembership
+from apps.tenants.models import Gym, GymFeatureEntitlement, GymLogo, GymMembership
 from apps.users.models import User
 from tests.file_fakes import CURRENT, MemoryStore, use_fakes
 from tests.security.test_bookings import _grant, _key, _package
@@ -203,6 +203,48 @@ def test_member_self_profile_is_token_scoped_and_allowlisted() -> None:
     assert audit.actor_membership_id is None
     empty = client.patch("/api/v1/member/me/", {}, format="json", **_auth(token))
     assert empty.status_code == 400
+
+
+@override_settings(**jwt_settings())
+def test_member_home_brand_follows_the_signed_in_gym() -> None:
+    api, headers, gym, owner = _tenant("brand")
+    other_api, other_headers, other_gym, _other_owner = _tenant("brnd")
+    renamed = api.patch("/api/v1/gym/", {"name": "North Gym"}, format="json", **headers)
+    assert renamed.status_code == 200, renamed.json()
+    other_named = other_api.patch(
+        "/api/v1/gym/", {"name": "South Gym"}, format="json", **other_headers
+    )
+    assert other_named.status_code == 200, other_named.json()
+    member_id = _member(api, headers, first_name="Ada")
+    other_id = _member(other_api, other_headers, first_name="Grace")
+    _user, token = _link(gym, member_id, f"brand-{uuid4().hex[:8]}@example.test")
+    _other_user, other_token = _link(other_gym, other_id, f"brnd-{uuid4().hex[:8]}@example.test")
+    png = _png()
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        GymLogo.objects.create(gym=gym, content_type="image/png", data=png)
+
+    client = APIClient()
+    dashboard = client.get("/api/v1/member/dashboard/", **_auth(token))
+    assert dashboard.status_code == 200, dashboard.json()
+    assert dashboard.json()["data"]["gym"] == {"name": "North Gym", "has_logo": True}
+    other_dashboard = client.get("/api/v1/member/dashboard/", **_auth(other_token))
+    assert other_dashboard.status_code == 200, other_dashboard.json()
+    assert other_dashboard.json()["data"]["gym"] == {"name": "South Gym", "has_logo": False}
+    assert b"North Gym" not in other_dashboard.content
+    assert png not in other_dashboard.content
+
+    logo = client.get("/api/v1/member/gym/logo/", **_auth(token))
+    assert logo.status_code == 200
+    assert logo["Content-Type"] == "image/png"
+    assert logo["Cache-Control"] == "private, no-store"
+    assert logo["X-Content-Type-Options"] == "nosniff"
+    assert logo.content == png
+    missing = client.get("/api/v1/member/gym/logo/", **_auth(other_token))
+    assert missing.status_code == 404
+    assert png not in missing.content
+    staff_denied = client.get("/api/v1/member/gym/logo/", **auth_headers(staff_token(owner)))
+    assert staff_denied.status_code == 401
 
 
 @override_settings(**jwt_settings())

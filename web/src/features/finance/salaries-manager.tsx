@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { formatAppDate } from "@/lib/date";
 import {
   CashSessionSelect,
   useOpenCashSessions,
@@ -989,7 +990,7 @@ export function SalariesManager({
                           ) : null}
                         </td>
                         <td className="hidden px-5 py-3 whitespace-nowrap text-slate-600 tabular-nums md:table-cell">
-                          {row.business_date}
+                          {formatAppDate(row.business_date)}
                         </td>
                         <td className="hidden px-5 py-3 text-slate-600 tabular-nums sm:table-cell">
                           {row.lines.length}
@@ -1099,7 +1100,7 @@ export function SalariesManager({
                         {tx("Business date")}{" "}
                       </p>
                       <p className="mt-1 text-sm font-bold text-slate-900 tabular-nums">
-                        {detail.business_date}
+                        {formatAppDate(detail.business_date)}
                       </p>
                     </div>
                     <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/80">
@@ -1149,7 +1150,8 @@ export function SalariesManager({
                       {detail.void_business_date ? (
                         <span className="mt-2 block text-xs text-slate-500">
                           {" "}
-                          {tx("Correction date")} {detail.void_business_date}
+                          {tx("Correction date")}{" "}
+                          {formatAppDate(detail.void_business_date)}
                         </span>
                       ) : null}
                     </p>

@@ -9,8 +9,9 @@ export function Fact({ label, value }: { label: string; value: string }) {
       style={{
         alignItems: "flex-start",
         flexDirection: "row",
-        gap: 12,
+        gap: 16,
         justifyContent: "space-between",
+        paddingVertical: 2,
       }}
     >
       <Text style={{ color: colors.muted, flex: 1 }}>{label}</Text>

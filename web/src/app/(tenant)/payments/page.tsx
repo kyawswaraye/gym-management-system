@@ -43,6 +43,7 @@ export default async function PaymentsPage() {
         canVoidReceipt={session.permissions.includes("receipts.void")}
         currency={session.gym?.currency ?? "THB"}
         defaultDate={todayInTimezone(session.gym?.timezone ?? "UTC")}
+        gymName={session.gym?.name ?? ""}
       />
     </section>
   );

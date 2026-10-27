@@ -282,7 +282,7 @@ describe("commission list and detail", () => {
 
     const history = within(panel).getByRole("list", { name: "Payout history" });
     expect(within(history).getByText("4.00 CASH")).toBeInTheDocument();
-    expect(within(history).getByText("2026-10-02")).toBeInTheDocument();
+    expect(within(history).getByText("02-10-2026")).toBeInTheDocument();
     expect(within(history).getByText("POSTED")).toBeInTheDocument();
     expect(within(history).getByText("Reference R-19")).toBeInTheDocument();
     expect(within(history).getByTitle(CASH)).toHaveTextContent("444444");

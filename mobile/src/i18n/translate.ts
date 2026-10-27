@@ -4,6 +4,9 @@ import { messages } from "./messages";
 export type Vars = Record<string, string | number>;
 
 export function translate(locale: Locale, text: string, vars?: Vars): string {
+  if (typeof text !== "string") {
+    return "";
+  }
   const key = text.replace(/\s+/g, " ").trim();
   const template = locale === "mm" ? (messages[key] ?? key) : key;
   if (!vars) return template;

@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { FormDialog } from "@/components/form-dialog";
+import { formatAppDate } from "@/lib/date";
 
 import {
   CashSessionSelect,
@@ -30,6 +31,7 @@ import {
   voidRetailSale,
 } from "@/features/finance/client";
 import { fieldMap, financeError } from "@/features/finance/errors";
+import { ReceiptPrintLink } from "@/features/finance/receipt-preview";
 import {
   canonicalMoney,
   canonicalQuantity,
@@ -370,6 +372,7 @@ export function RetailSalesManager({
   canSubmit,
   canApprove,
   canVoid,
+  canViewReceipts = false,
   currency,
   defaultDate,
 }: {
@@ -378,6 +381,7 @@ export function RetailSalesManager({
   canSubmit: boolean;
   canApprove: boolean;
   canVoid: boolean;
+  canViewReceipts?: boolean;
   currency: string;
   defaultDate: string;
 }) {
@@ -747,6 +751,7 @@ export function RetailSalesManager({
                       </div>
                       <Field error={fields.quantity} label="Quantity">
                         <TextInput
+                          decimalPlaces={3}
                           inputMode="decimal"
                           onChange={(event) =>
                             setLines((current) =>
@@ -953,13 +958,13 @@ export function RetailSalesManager({
                         <td className="px-5 py-3">
                           <button
                             aria-current={selected ? "true" : undefined}
-                            aria-label={row.business_date}
+                            aria-label={formatAppDate(row.business_date)}
                             className="block text-left font-semibold"
                             onClick={() => selectSale(row.id)}
                             type="button"
                           >
                             <span className="font-semibold">
-                              {row.business_date}
+                              {formatAppDate(row.business_date)}
                             </span>
                             <span className="mt-0.5 block text-xs font-normal">
                               {lineSummary(row, tx)}
@@ -1036,7 +1041,7 @@ export function RetailSalesManager({
                         {tx("Sale")}{" "}
                       </p>
                       <p className="mt-1 text-sm text-slate-500">
-                        {sale.business_date} · {tx(pretty(sale.payment_method))}{" "}
+                        {formatAppDate(sale.business_date)} · {tx(pretty(sale.payment_method))}{" "}
                         · {memberLabel(members, sale.member_id, tx)}
                       </p>
                     </div>
@@ -1099,6 +1104,13 @@ export function RetailSalesManager({
                     ]}
                   />
                 </div>
+                {canViewReceipts &&
+                sale.status === "POSTED" &&
+                sale.receipt_id ? (
+                  <div className="px-5 pb-4">
+                    <ReceiptPrintLink receiptId={sale.receipt_id} />
+                  </div>
+                ) : null}
                 <div className="border-t border-slate-100 px-5 py-4">
                   <p className="mb-3 text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase">
                     {" "}
@@ -1577,6 +1589,7 @@ export function RetailSalesManager({
                                 : descriptionId
                             }
                             aria-invalid={error ? true : undefined}
+                            decimalPlaces={3}
                             disabled={remaining === 0n}
                             id={inputId}
                             inputMode="decimal"
@@ -1648,6 +1661,14 @@ export function RetailSalesManager({
                         },
                       ]}
                     />
+                    {canViewReceipts &&
+                    approval.receipt.status === "ISSUED" &&
+                    approval.receipt.id.toLowerCase() !==
+                      sale.receipt_id?.toLowerCase() ? (
+                      <div className="mt-3">
+                        <ReceiptPrintLink receiptId={approval.receipt.id} />
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
                 {voidResult ? (
@@ -1676,6 +1697,14 @@ export function RetailSalesManager({
                         },
                       ]}
                     />
+                    {canViewReceipts &&
+                    voidResult.reversal_receipt.status === "ISSUED" ? (
+                      <div className="mt-3">
+                        <ReceiptPrintLink
+                          receiptId={voidResult.reversal_receipt.id}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
                 {returnResult ? (
@@ -1710,6 +1739,16 @@ export function RetailSalesManager({
                         },
                       ]}
                     />
+                    {canViewReceipts &&
+                    returnResult.correction_receipt?.status === "ISSUED" &&
+                    returnResult.correction_receipt.id.toLowerCase() !==
+                      sale.receipt_id?.toLowerCase() ? (
+                      <div className="mt-3">
+                        <ReceiptPrintLink
+                          receiptId={returnResult.correction_receipt.id}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </>

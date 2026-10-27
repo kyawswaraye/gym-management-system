@@ -5,6 +5,8 @@ import { useState } from "react";
 
 import { CursorControls } from "@/features/finance/ui";
 import { operationGet } from "@/features/operations/client";
+import { formatAppDate, formatAppDateTime } from "@/lib/date";
+import { DigitInput } from "@/lib/ui/digit-input";
 import { downloadReportCsv } from "@/features/reports/download";
 import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
@@ -471,9 +473,9 @@ export function ReportsManager({
                 <label className="hidden">
                   {" "}
                   {tx("Year")}{" "}
-                  <input
+                  <DigitInput
                     className="w-28 rounded-md border px-3 py-2"
-                    inputMode="numeric"
+                    mode={{ kind: "integer" }}
                     onChange={(event) => setYear(event.target.value)}
                     required
                     value={year}
@@ -482,9 +484,9 @@ export function ReportsManager({
                 <label className="hidden">
                   {" "}
                   {tx("Month")}{" "}
-                  <input
+                  <DigitInput
                     className="w-24 rounded-md border px-3 py-2"
-                    inputMode="numeric"
+                    mode={{ kind: "integer" }}
                     onChange={(event) => setMonth(event.target.value)}
                     required
                     value={month}
@@ -1360,13 +1362,7 @@ function countValue(totals: object, key: string): number {
 
 function ReportIdentity({ report }: { report: Identity }) {
   const tx = useTx();
-  const generated = new Date(report.generated_at);
-  const generatedLabel = Number.isNaN(generated.getTime())
-    ? report.generated_at
-    : new Intl.DateTimeFormat("en", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(generated);
+  const generatedLabel = formatAppDateTime(report.generated_at);
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
       <span className="inline-flex items-center gap-2">
@@ -1381,7 +1377,8 @@ function ReportIdentity({ report }: { report: Identity }) {
       </span>
       {report.range ? (
         <span>
-          {report.range.date_from} {tx("to")} {report.range.date_to}
+          {formatAppDate(report.range.date_from)} {tx("to")}{" "}
+          {formatAppDate(report.range.date_to)}
         </span>
       ) : null}
       <span>{report.timezone}</span>
@@ -1515,7 +1512,7 @@ function RowsTable<Row extends { date: string }>({
                   className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900"
                   scope="row"
                 >
-                  <IdentifierValue value={row.date} />
+                  <IdentifierValue value={formatAppDate(row.date)} />
                 </th>
                 {columns.slice(1).map((column) => (
                   <td

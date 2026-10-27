@@ -232,7 +232,7 @@ export function SidebarFrame({
     <>
       <aside
         aria-hidden={open ? undefined : true}
-        className={`z-30 bg-white text-[#050505] shadow-sm motion-reduce:transition-none max-md:grid max-md:overflow-hidden max-md:border-b max-md:border-[#e4e6eb] max-md:transition-[grid-template-rows] max-md:duration-300 max-md:ease-in-out md:fixed md:inset-y-0 md:left-0 md:flex md:w-64 md:flex-col md:overflow-hidden md:border-r md:border-[#e4e6eb] md:transition-[transform,box-shadow] md:duration-300 md:ease-in-out ${open ? "max-md:grid-rows-[1fr] md:translate-x-0" : "max-md:grid-rows-[0fr] max-md:border-b-0 md:-translate-x-full md:shadow-none"}`}
+        className={`relative z-30 bg-white text-[#050505] shadow-sm motion-reduce:transition-none max-md:grid max-md:overflow-hidden max-md:border-b max-md:border-[#e4e6eb] max-md:transition-[grid-template-rows] max-md:duration-300 max-md:ease-in-out md:fixed md:inset-y-0 md:left-0 md:flex md:w-64 md:flex-col md:overflow-hidden md:border-r md:border-[#e4e6eb] md:transition-[transform,box-shadow] md:duration-300 md:ease-in-out ${open ? "max-md:grid-rows-[1fr] md:translate-x-0" : "max-md:grid-rows-[0fr] max-md:border-b-0 md:-translate-x-full md:shadow-none"}`}
         id="app-sidebar"
         inert={open ? undefined : true}
       >

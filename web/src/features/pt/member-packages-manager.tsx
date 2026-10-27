@@ -19,6 +19,7 @@ import {
   TextInput,
 } from "@/features/finance/ui";
 import { useCursorPages } from "@/features/finance/paging";
+import { formatAppDate, formatAppDateTime } from "@/lib/date";
 import {
   adjustPackageLedger,
   grantMemberPackage,
@@ -62,14 +63,7 @@ function sessionTone(delta: number): string {
 }
 
 function formatOccurred(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const hours = String(date.getUTCHours()).padStart(2, "0");
-  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes} UTC`;
+  return formatAppDateTime(value, "UTC");
 }
 
 function packageKind(value: string | undefined): "PT" | "CLASS" | "" {
@@ -322,7 +316,8 @@ function GrantRow({
           <div className="col-span-2 sm:col-span-1">
             <dt className="text-xs text-slate-500">{tx("Validity")}</dt>
             <dd className="mt-0.5 font-semibold text-slate-900">
-              {row.valid_from} {tx("to")} {row.valid_until}
+              {formatAppDate(row.valid_from)} {tx("to")}{" "}
+              {formatAppDate(row.valid_until)}
             </dd>
           </div>
           <div>

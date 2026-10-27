@@ -10,6 +10,7 @@ type GoogleSignInModule = {
       | { type: "success"; data: { idToken: string | null } }
       | { type: "cancelled"; data: null }
     >;
+    signOut(): Promise<null>;
   };
   statusCodes: { SIGN_IN_CANCELLED: string };
 };
@@ -36,6 +37,7 @@ export async function requestGoogleIdToken(
   await loaded.GoogleSignin.hasPlayServices({
     showPlayServicesUpdateDialog: true,
   });
+  await clearSavedGoogleAccount(loaded);
   try {
     const response = await loaded.GoogleSignin.signIn();
     if (response.type === "cancelled") {
@@ -54,6 +56,16 @@ export async function requestGoogleIdToken(
       throw new GoogleSignInCancelled();
     }
     throw error;
+  }
+}
+
+async function clearSavedGoogleAccount(
+  loaded: GoogleSignInModule,
+): Promise<void> {
+  try {
+    await loaded.GoogleSignin.signOut();
+  } catch {
+    // No saved Google session. The account picker can still open.
   }
 }
 

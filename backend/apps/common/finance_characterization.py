@@ -47,15 +47,15 @@ _SUCCESS_SCENARIOS = (
     "cash_open",
     "payment_create",
     "payment_submit",
-    "payment_approve",
-    "payment_approve_replay",
+    "payment_self_approve",
     "receipt_download",
     "cash_expected",
     "cash_close",
     "cash_close_replay",
 )
 _REJECTION_SCENARIOS = (
-    "payment_self_approve",
+    "payment_approve",
+    "payment_approve_replay",
     "cash_close_immutable",
     "cross_receipt_download",
     "cross_cash_close",
@@ -144,9 +144,9 @@ RULES: dict[str, ScenarioRule] = {
     "cash_open": ScenarioRule(frozenset({201}), frozenset()),
     "payment_create": ScenarioRule(frozenset({201}), frozenset()),
     "payment_submit": ScenarioRule(frozenset({200}), frozenset()),
-    "payment_self_approve": ScenarioRule(frozenset(), frozenset({403})),
-    "payment_approve": ScenarioRule(frozenset({200}), frozenset()),
-    "payment_approve_replay": ScenarioRule(frozenset({200}), frozenset()),
+    "payment_self_approve": ScenarioRule(frozenset({200}), frozenset()),
+    "payment_approve": ScenarioRule(frozenset(), frozenset({409})),
+    "payment_approve_replay": ScenarioRule(frozenset(), frozenset({409})),
     "receipt_download": ScenarioRule(frozenset({200}), frozenset()),
     "cash_expected": ScenarioRule(frozenset({200}), frozenset()),
     "cash_close": ScenarioRule(frozenset({200}), frozenset()),
@@ -192,7 +192,7 @@ COVERAGE: tuple[dict[str, object], ...] = (
         "route": "/api/operations/payments/{id}/approve",
         "transport": "http",
         "covered": True,
-        "note": "The preparer cannot approve. HTTP 403 is expected.",
+        "note": "The owner who recorded the payment approves it. HTTP 200 is expected.",
     },
     {
         "id": "receipt_allocation",
@@ -200,7 +200,7 @@ COVERAGE: tuple[dict[str, object], ...] = (
         "route": "/api/operations/payments/{id}/approve",
         "transport": "http",
         "covered": True,
-        "note": "A different manager approves. Receipt allocation is that command.",
+        "note": "The owner's approval allocates the receipt.",
     },
     {
         "id": "receipt_download",
@@ -451,12 +451,12 @@ def assess_finance(
     if observed is None:
         return "not-run", False, False
     expected = {
-        "receipts_issued": _planned(plan, "payment_approve"),
-        "payments_posted": _planned(plan, "payment_approve"),
+        "receipts_issued": _planned(plan, "payment_self_approve"),
+        "payments_posted": _planned(plan, "payment_self_approve"),
         "cash_sessions": _planned(plan, "cash_open"),
         "cash_closed": _planned(plan, "cash_close"),
         "difference_nonzero": 0,
-        "distinct_receipt_numbers": _planned(plan, "payment_approve"),
+        "distinct_receipt_numbers": _planned(plan, "payment_self_approve"),
         "gym_mismatch": 0,
     }
     http_complete = all(
@@ -466,8 +466,10 @@ def assess_finance(
         for name in _REJECTION_SCENARIOS
     )
     mismatch = any(observed.get(key) != value for key, value in expected.items())
-    http_activity = _count(outcomes, "payment_approve", "success") + _count(
-        outcomes, "cash_close", "success"
+    http_activity = (
+        _count(outcomes, "payment_self_approve", "success")
+        + _count(outcomes, "payment_approve", "success")
+        + _count(outcomes, "cash_close", "success")
     )
     vacuous = http_activity == 0 and all(
         observed.get(key, 0) == 0 for key in (*_COUNT_KEYS, "gym_mismatch")

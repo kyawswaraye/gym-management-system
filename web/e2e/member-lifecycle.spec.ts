@@ -6,12 +6,6 @@ import {
   signIn,
   watchJsonResponses,
 } from "./auth";
-import {
-  assertProfilePhotoFixtures,
-  type ProfilePhotoFixture,
-  profilePhotos,
-} from "./profile-photos";
-
 const ORIGINAL_FIRST = "E2Ephase";
 const UPDATED_FIRST = "Updatedphase";
 const LAST_NAME = "Lifecycle";
@@ -26,7 +20,6 @@ const PLAN_DESCRIPTION = "E2E revised plan";
 const EMAIL = "e2e-phase2-member@example.test";
 const PHONE = "+959123450001";
 const UPDATED_PHONE = "+959123450002";
-const PHOTO_TIMEOUT = 60_000;
 
 test.use({ actionTimeout: 15_000 });
 
@@ -37,16 +30,6 @@ function combobox(scope: Locator | Page, name: string): Locator {
 function settledResponse(response: { status: () => number }): boolean {
   const status = response.status();
   return status < 300 || status >= 400;
-}
-
-function objectOrigin(): string {
-  const value = process.env.NEXT_PUBLIC_OBJECT_ORIGINS?.trim() ?? "";
-  if (!value) {
-    throw new Error(
-      "NEXT_PUBLIC_OBJECT_ORIGINS is required for profile photo E2E.",
-    );
-  }
-  return value;
 }
 
 function storageSecrets(): string[] {
@@ -262,10 +245,8 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   page,
 }) => {
   test.setTimeout(300_000);
-  assertProfilePhotoFixtures();
   const secrets = storageSecrets();
   const assertResponses = watchJsonResponses(page, secrets);
-  const origin = objectOrigin();
 
   await signIn(page, ownerAccount);
   await expect(page).toHaveURL(/\/dashboard$/);
@@ -458,122 +439,18 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   ).toHaveValue("E2E intake note");
   await expect(page.getByText(memberNumber, { exact: true })).toBeVisible();
   await expect(
-    page.getByText("No profile photo.", { exact: true }),
+    page.getByRole("img", { name: "No profile photo.", exact: true }),
   ).toBeVisible();
-
-  const uploadedUrls: string[] = [];
-  async function uploadPhoto(
-    label: string,
-    fixture: ProfilePhotoFixture,
-  ): Promise<void> {
-    const browserOrigin = new URL(page.url()).origin;
-    const posted = page.waitForResponse(
-      (response) =>
-        settledResponse(response) &&
-        response.request().method() === "POST" &&
-        response.url().startsWith(`${origin}/`),
-      { timeout: PHOTO_TIMEOUT },
-    );
-    const completed = page.waitForResponse(
-      (response) =>
-        settledResponse(response) &&
-        response.request().method() === "POST" &&
-        /\/api\/operations\/files\/[0-9a-f-]+\/complete\/?$/.test(
-          new URL(response.url()).pathname,
-        ),
-      { timeout: PHOTO_TIMEOUT },
-    );
-    const displayed = page.waitForResponse(
-      (response) =>
-        settledResponse(response) &&
-        response.request().method() === "GET" &&
-        response.request().resourceType() === "image" &&
-        response.url().startsWith(`${origin}/`),
-      { timeout: PHOTO_TIMEOUT },
-    );
-    await page.getByLabel(label, { exact: true }).setInputFiles({
-      name: fixture.fileName,
-      mimeType: fixture.contentType,
-      buffer: fixture.bytes,
-    });
-    const upload = await posted;
-    expect(upload.status()).toBe(204);
-    expect((upload.headers()["access-control-allow-origin"] ?? "").trim()).toBe(
-      browserOrigin,
-    );
-    const completion = await completed;
-    const completionBody = await completion.text();
-    expect(completion.status(), completionBody).toBeLessThan(400);
-    expect(responseBodyData(completionBody).attachable).toBe(true);
-    await expect(
-      page.getByText("Profile photo saved.", { exact: true }),
-    ).toBeVisible({
-      timeout: PHOTO_TIMEOUT,
-    });
-    const image = page.getByRole("img", {
-      name: `Profile photo of ${ORIGINAL_NAME}`,
-      exact: true,
-    });
-    await expect(image).toBeVisible();
-    const fetched = await displayed;
-    expect(fetched.ok()).toBeTruthy();
-    expect(fetched.headers()["content-type"] ?? "").toContain("image/");
-    const src = await image.getAttribute("src");
-    expect(src?.startsWith(`${origin}/`)).toBeTruthy();
-    expect(src ?? "").not.toContain("@");
-    for (const secret of secrets) {
-      expect((src ?? "").toLowerCase()).not.toContain(secret.toLowerCase());
-    }
-    await expect
-      .poll(
-        () =>
-          image.evaluate((element: HTMLImageElement) => element.naturalWidth),
-        {
-          timeout: PHOTO_TIMEOUT,
-        },
-      )
-      .toBeGreaterThan(0);
-    uploadedUrls.push(src ?? "");
-    await expectNoAlert(page);
-    await expect(
-      page.getByText(
-        "The previous photo could not be removed and will be deleted later.",
-        {
-          exact: true,
-        },
-      ),
-    ).toHaveCount(0);
-  }
-
-  await test.step("upload, replace, and remove a live profile photo", async () => {
-    await uploadPhoto("Upload profile photo", profilePhotos.png);
-    await uploadPhoto("Replace profile photo", profilePhotos.jpeg);
-    await uploadPhoto("Replace profile photo", profilePhotos.webp);
-    expect(new Set(uploadedUrls).size).toBe(uploadedUrls.length);
-    const html = await page.content();
-    for (const secret of secrets) {
-      expect(html.toLowerCase()).not.toContain(secret.toLowerCase());
-    }
-    await profile.getByRole("button", { name: "Close", exact: true }).click();
-    await page
-      .getByRole("button", { name: "Remove profile photo", exact: true })
-      .click();
-    await expect(
-      page.getByText("Profile photo removed.", { exact: true }),
-    ).toBeVisible({
-      timeout: PHOTO_TIMEOUT,
-    });
-    await expect(
-      page.getByText("No profile photo.", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("img", {
-        name: `Profile photo of ${ORIGINAL_NAME}`,
-        exact: true,
-      }),
-    ).toHaveCount(0);
-    await expectNoAlert(page);
-  });
+  await expect(
+    page.getByLabel("Upload profile photo", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByLabel("Replace profile photo", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Remove profile photo", exact: true }),
+  ).toHaveCount(0);
+  await profile.getByRole("button", { name: "Close", exact: true }).click();
 
   await test.step("update the profile and confirm search follows it", async () => {
     await page

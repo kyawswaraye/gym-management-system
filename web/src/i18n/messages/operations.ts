@@ -1,4 +1,6 @@
 export const operationsEn = {
+  "80mm receipts, branding, and footer.":
+    "80mm receipts, branding, and footer.",
   "· Backdated": "· Backdated",
   "· Membership": "· Membership",
   "· Optional": "· Optional",
@@ -56,9 +58,12 @@ export const operationsEn = {
   "Cancel membership": "Cancel membership",
   "Cancel this membership?": "Cancel this membership?",
   Change: "Change",
+  "Characters: {count}/120": "Characters: {count}/120",
   "Check in": "Check in",
   "Check out": "Check out",
   "Check the invitation.": "Check the invitation.",
+  "Check the printer settings and try again.":
+    "Check the printer settings and try again.",
   "Check the staff profile.": "Check the staff profile.",
   "Check-in": "Check-in",
   "Check-in challenge lifetime (seconds)":
@@ -137,9 +142,11 @@ export const operationsEn = {
   "Edit membership note": "Edit membership note",
   "Edit note": "Edit note",
   "Edit operational settings": "Edit operational settings",
+  "Edit printer settings": "Edit printer settings",
   "Edit profile": "Edit profile",
   "Email membership expiry warnings": "Email membership expiry warnings",
   "Employment title": "Employment title",
+  "Enable printer": "Enable printer",
   "Enter a cancellation reason.": "Enter a cancellation reason.",
   "Enter a commission from 0 to 100 with up to 2 decimal places.":
     "Enter a commission from 0 to 100 with up to 2 decimal places.",
@@ -155,6 +162,8 @@ export const operationsEn = {
   "Enter a valid target ID.": "Enter a valid target ID.",
   "Enter a whole duration of at least 1.":
     "Enter a whole duration of at least 1.",
+  "Enter at most 120 characters.": "Enter at most 120 characters.",
+  "Enter at most 3 lines.": "Enter at most 3 lines.",
   "Enter the member's personal and contact information.":
     "Enter the member's personal and contact information.",
   "Every permission this gym can grant.":
@@ -184,6 +193,8 @@ export const operationsEn = {
   Image: "Image",
   "Impersonator membership": "Impersonator membership",
   "In the gym now": "In the gym now",
+  "Install the 80mm printer with its operating-system driver. In the browser print dialog, select that printer, choose 80mm paper, keep the printable width at 72mm, turn off headers, footers, and margins, and do not scale the page to A4.":
+    "Install the 80mm printer with its operating-system driver. In the browser print dialog, select that printer, choose 80mm paper, keep the printable width at 72mm, turn off headers, footers, and margins, and do not scale the page to A4.",
   "Inventory insights": "Inventory insights",
   "Invite and revoke stay locked until you verify with your authenticator.":
     "Invite and revoke stay locked until you verify with your authenticator.",
@@ -203,6 +214,7 @@ export const operationsEn = {
   "JPEG, PNG, or WebP up to 5 MB.": "JPEG, PNG, or WebP up to 5 MB.",
   "Last check-in": "Last check-in",
   "Last check-out": "Last check-out",
+  "Lines: {lines}/3": "Lines: {lines}/3",
   "Live floor": "Live floor",
   "Live overview": "Live overview",
   "Load more members": "Load more members",
@@ -226,11 +238,14 @@ export const operationsEn = {
   "Loading owners.": "Loading owners.",
   "Loading payment history.": "Loading payment history.",
   "Loading permissions.": "Loading permissions.",
+  "Loading printer settings.": "Loading printer settings.",
   "Loading profile photo.": "Loading profile photo.",
   "Loading roles.": "Loading roles.",
   "Loading staff details.": "Loading staff details.",
   "Loading staff.": "Loading staff.",
   "Locked on this role": "Locked on this role",
+  "Logo, address, phone, and the receipt footer.":
+    "Logo, address, phone, and the receipt footer.",
   "Login access stays as it is while this profile is":
     "Login access stays as it is while this profile is",
   "Look up a person, then update their profile or login access. Those two actions stay separate.":
@@ -340,6 +355,12 @@ export const operationsEn = {
   "Platform record": "Platform record",
   "Postal code": "Postal code",
   "Preparing the code": "Preparing the code",
+  "Print address": "Print address",
+  "Print logo": "Print logo",
+  "Print phone": "Print phone",
+  Printer: "Printer",
+  "Printer settings": "Printer settings",
+  "Printer settings saved.": "Printer settings saved.",
   Profile: "Profile",
   "Profile photo": "Profile photo",
   "Profile status": "Profile status",
@@ -351,8 +372,11 @@ export const operationsEn = {
   "Quick actions": "Quick actions",
   "Read grants, balances, and the session ledger. Grant and correction stay with a protected owner or manager who does not also hold trainer or reception.":
     "Read grants, balances, and the session ledger. Grant and correction stay with a protected owner or manager who does not also hold trainer or reception.",
+  "Receipt footer": "Receipt footer",
   "Receipt number": "Receipt number",
   "Receipt number prefix": "Receipt number prefix",
+  "Receipt printer": "Receipt printer",
+  "Receipt printer setup": "Receipt printer setup",
   "Recent visits": "Recent visits",
   Record: "Record",
   "Refreshes before": "Refreshes before",
@@ -402,6 +426,7 @@ export const operationsEn = {
   "Save member": "Save member",
   "Save operational settings": "Save operational settings",
   "Save permissions": "Save permissions",
+  "Save printer settings": "Save printer settings",
   "Save staff profile": "Save staff profile",
   "Saving permissions": "Saving permissions",
   "Saving replaces the full permission set. Permissions outside the delegation policy are removed.":
@@ -429,6 +454,10 @@ export const operationsEn = {
   "Selected member": "Selected member",
   "Send invitation": "Send invitation",
   "Show permissions": "Show permissions",
+  "Show the gym address on the receipt.":
+    "Show the gym address on the receipt.",
+  "Show the gym logo on the receipt.": "Show the gym logo on the receipt.",
+  "Show the gym phone on the receipt.": "Show the gym phone on the receipt.",
   "Showing only actions recorded for your membership.":
     "Showing only actions recorded for your membership.",
   "Start a membership or manage the plans available to members.":
@@ -449,6 +478,8 @@ export const operationsEn = {
     "The profile photo upload did not finish.",
   "The profile photo was uploaded and still needs to be attached.":
     "The profile photo was uploaded and still needs to be attached.",
+  "These choices apply the next time a receipt is printed.":
+    "These choices apply the next time a receipt is printed.",
   "These members are archived. Open a name for the full profile, or restore them to Active. Membership and payment history stay in place, and the record is not deleted.":
     "These members are archived. Open a name for the full profile, or restore them to Active. Membership and payment history stay in place, and the record is not deleted.",
   "These members are archived. Open a name for the full profile.":
@@ -472,6 +503,8 @@ export const operationsEn = {
   "Total charged": "Total charged",
   "Total refunded": "Total refunded",
   "Trainer QR scan": "Trainer QR scan",
+  "Turn the receipt printer on for this gym.":
+    "Turn the receipt printer on for this gym.",
   "Try another action, module, or outcome.":
     "Try another action, module, or outcome.",
   "Try another name, email, or status.": "Try another name, email, or status.",
@@ -490,15 +523,19 @@ export const operationsEn = {
   "Unable to load members.": "Unable to load members.",
   "Unable to load membership plans.": "Unable to load membership plans.",
   "Unable to load memberships.": "Unable to load memberships.",
+  "Unable to load printer settings.": "Unable to load printer settings.",
   "Unable to load the profile photo.": "Unable to load the profile photo.",
   "Unable to remove the profile photo.": "Unable to remove the profile photo.",
   "Unable to restore member.": "Unable to restore member.",
+  "Unable to save printer settings.": "Unable to save printer settings.",
   "Unable to search members.": "Unable to search members.",
   "Unable to update membership note.": "Unable to update membership note.",
   "Unable to update membership.": "Unable to update membership.",
   "Unable to update plan.": "Unable to update plan.",
   "Unable to upload the profile photo.": "Unable to upload the profile photo.",
   Unpaid: "Unpaid",
+  "Up to 120 characters and 3 lines. It prints at the bottom of the receipt.":
+    "Up to 120 characters and 3 lines. It prints at the bottom of the receipt.",
   "Update location": "Update location",
   "Update the plan details below, then save your changes.":
     "Update the plan details below, then save your changes.",
@@ -527,6 +564,8 @@ export const operationsEn = {
 } as const;
 
 export const operationsMm = {
+  "80mm receipts, branding, and footer.":
+    "80mm ပြေစာ၊ တံဆိပ်နှင့် အောက်ခြေစာသား။",
   "· Backdated": "· နောက်ကြောင်းပြန်",
   "· Membership": "· အသင်းဝင်မှု",
   "· Optional": "· ရွေးချယ်နိုင်သည်",
@@ -586,9 +625,12 @@ export const operationsMm = {
   "Cancel membership": "အသင်းဝင်မှုပယ်ဖျက်ရန်",
   "Cancel this membership?": "ဤအသင်းဝင်မှုကို ပယ်ဖျက်မည်လား။",
   Change: "ပြောင်းရန်",
+  "Characters: {count}/120": "စာလုံးရေ: {count}/120",
   "Check in": "ဝင်ရောက်မှတ်ရန်",
   "Check out": "ထွက်ခွာမှတ်ရန်",
   "Check the invitation.": "ဖိတ်ခေါ်ချက်ကို စစ်ဆေးပါ။",
+  "Check the printer settings and try again.":
+    "ပရင်တာ ဆက်တင်ကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။",
   "Check the staff profile.": "ဝန်ထမ်းပရိုဖိုင်ကို စစ်ဆေးပါ။",
   "Check-in": "ဝင်ရောက်မှု",
   "Check-in challenge lifetime (seconds)": "ဝင်ရောက်မှုကုဒ်သက်တမ်း (စက္ကန့်)",
@@ -667,10 +709,12 @@ export const operationsMm = {
   "Edit membership note": "အသင်းဝင်မှုမှတ်ချက် ပြင်ရန်",
   "Edit note": "မှတ်ချက်ပြင်ရန်",
   "Edit operational settings": "လုပ်ငန်းလည်ပတ်မှုဆက်တင် ပြင်ရန်",
+  "Edit printer settings": "ပရင်တာ ဆက်တင် ပြင်ရန်",
   "Edit profile": "ပရိုဖိုင်ပြင်ရန်",
   "Email membership expiry warnings":
     "အသင်းဝင်မှုသက်တမ်းကုန် သတိပေးချက်များကို အီးမေးလ်ပို့ရန်",
   "Employment title": "ရာထူးအမည်",
+  "Enable printer": "ပရင်တာ ဖွင့်ရန်",
   "Enter a cancellation reason.": "ပယ်ဖျက်ရသည့် အကြောင်းပြချက်ကို ထည့်ပါ။",
   "Enter a commission from 0 to 100 with up to 2 decimal places.":
     "ကော်မရှင်ကို 0 မှ 100 အတွင်း၊ ဒသမနေရာ 2 လုံးအထိ ထည့်ပါ။",
@@ -686,6 +730,8 @@ export const operationsMm = {
   "Enter a valid target ID.": "မှန်ကန်သည့် သက်ဆိုင်ရာ ID ကို ထည့်ပါ။",
   "Enter a whole duration of at least 1.":
     "အနည်းဆုံး 1 ဖြစ်သည့် ကိန်းပြည့်ကြာချိန်ကို ထည့်ပါ။",
+  "Enter at most 120 characters.": "စာလုံးရေ 120 ထက် မပိုရပါ။",
+  "Enter at most 3 lines.": "စာကြောင်း 3 ကြောင်းထက် မပိုရပါ။",
   "Enter the member's personal and contact information.":
     "အဖွဲ့ဝင်၏ ကိုယ်ရေးအချက်အလက်နှင့် ဆက်သွယ်ရန်အချက်အလက်ကို ထည့်ပါ။",
   "Every permission this gym can grant.":
@@ -715,6 +761,8 @@ export const operationsMm = {
   Image: "ပုံ",
   "Impersonator membership": "ကိုယ်စားပြုဝင်ရောက်သူ အသင်းဝင်မှု",
   "In the gym now": "ယခု Gym တွင်",
+  "Install the 80mm printer with its operating-system driver. In the browser print dialog, select that printer, choose 80mm paper, keep the printable width at 72mm, turn off headers, footers, and margins, and do not scale the page to A4.":
+    "80mm ပရင်တာကို လည်ပတ်မှုစနစ်၏ ဒရိုင်ဘာဖြင့် တပ်ဆင်ပါ။ ဘရောက်ဇာ၏ ပုံနှိပ်စာမျက်နှာတွင် ထိုပရင်တာကို ရွေးပါ၊ စာရွက်ကို 80mm သတ်မှတ်ပါ၊ ပုံနှိပ်နိုင်သော အကျယ် 72mm ကို ထိန်းပါ၊ ခေါင်းစီး၊ အောက်ခြေနှင့် အနားသတ်များကို ပိတ်ပါ၊ စာမျက်နှာကို A4 သို့ မချဲ့ပါနှင့်။",
   "Inventory insights": "ကုန်လက်ကျန်အမြင်",
   "Invite and revoke stay locked until you verify with your authenticator.":
     "သင်၏ အထောက်အထားစိစစ်ကိရိယာဖြင့် အတည်မပြုမချင်း ဖိတ်ခေါ်ခြင်းနှင့် ရုပ်သိမ်းခြင်းကို သော့ခတ်ထားပါသည်။",
@@ -734,6 +782,7 @@ export const operationsMm = {
   "JPEG, PNG, or WebP up to 5 MB.": "JPEG၊ PNG သို့မဟုတ် WebP၊ 5 MB အထိ။",
   "Last check-in": "နောက်ဆုံးဝင်ရောက်မှု",
   "Last check-out": "နောက်ဆုံးထွက်ခွာမှု",
+  "Lines: {lines}/3": "စာကြောင်း: {lines}/3",
   "Live floor": "လက်ရှိခန်းမ",
   "Live overview": "လက်ရှိခြုံငုံချက်",
   "Load more members": "နောက်ထပ်အဖွဲ့ဝင်များ ဖွင့်ရန်",
@@ -757,11 +806,14 @@ export const operationsMm = {
   "Loading owners.": "ပိုင်ရှင်များ ရယူနေပါသည်။",
   "Loading payment history.": "ငွေပေးချေမှုမှတ်တမ်း ရယူနေပါသည်။",
   "Loading permissions.": "ခွင့်ပြုချက်များ ရယူနေပါသည်။",
+  "Loading printer settings.": "ပရင်တာ ဆက်တင်ကို ရယူနေပါသည်။",
   "Loading profile photo.": "ပရိုဖိုင်ဓာတ်ပုံ ရယူနေပါသည်။",
   "Loading roles.": "အခန်းကဏ္ဍများ ရယူနေပါသည်။",
   "Loading staff details.": "ဝန်ထမ်းအသေးစိတ် ရယူနေပါသည်။",
   "Loading staff.": "ဝန်ထမ်းများ ရယူနေပါသည်။",
   "Locked on this role": "ဤအခန်းကဏ္ဍတွင် သော့ခတ်ထားသည်",
+  "Logo, address, phone, and the receipt footer.":
+    "လိုဂို၊ လိပ်စာ၊ ဖုန်းနှင့် ပြေစာ အောက်ခြေစာသား။",
   "Login access stays as it is while this profile is":
     "ဝင်ရောက်အသုံးပြုခွင့်ကို ယခင်အတိုင်း ထားရှိပါသည်။ ပရိုဖိုင်အခြေအနေ:",
   "Look up a person, then update their profile or login access. Those two actions stay separate.":
@@ -876,6 +928,12 @@ export const operationsMm = {
   "Platform record": "စနစ် မှတ်တမ်း",
   "Postal code": "စာပို့သင်္ကေတ",
   "Preparing the code": "ကုဒ် ပြင်ဆင်နေပါသည်",
+  "Print address": "လိပ်စာ ပုံနှိပ်ရန်",
+  "Print logo": "လိုဂို ပုံနှိပ်ရန်",
+  "Print phone": "ဖုန်း ပုံနှိပ်ရန်",
+  Printer: "ပရင်တာ",
+  "Printer settings": "ပရင်တာ ဆက်တင်",
+  "Printer settings saved.": "ပရင်တာ ဆက်တင်ကို သိမ်းပြီးပါပြီ။",
   Profile: "ကိုယ်ရေးအချက်အလက်",
   "Profile photo": "ကိုယ်ရေးဓာတ်ပုံ",
   "Profile status": "ကိုယ်ရေးအခြေအနေ",
@@ -888,8 +946,11 @@ export const operationsMm = {
   "Quick actions": "အမြန်လုပ်ဆောင်ချက်များ",
   "Read grants, balances, and the session ledger. Grant and correction stay with a protected owner or manager who does not also hold trainer or reception.":
     "ခွင့်ပြုအကြိမ်များ၊ လက်ကျန်များနှင့် လေ့ကျင့်ချိန် စာရင်းကို ဖတ်ရှုပါ။ အကြိမ်ပေးခြင်းနှင့် ပြင်ဆင်ခြင်းကို နည်းပြ အခန်း သို့မဟုတ် ဧည့်ကြို အခန်း မကိုင်ထားသော ကာကွယ်ထားသည့် ပိုင်ရှင် သို့မဟုတ် စီမံခန့်ခွဲသူသာ လုပ်ဆောင်နိုင်ပါသည်။",
+  "Receipt footer": "ပြေစာ အောက်ခြေစာသား",
   "Receipt number": "ပြေစာနံပါတ်",
   "Receipt number prefix": "ပြေစာနံပါတ် ရှေ့ဆက်",
+  "Receipt printer": "ပြေစာပရင်တာ",
+  "Receipt printer setup": "ပြေစာပရင်တာ ပြင်ဆင်ခြင်း",
   "Recent visits": "လတ်တလော လာရောက်မှုများ",
   Record: "မှတ်တမ်း",
   "Refreshes before": "နောက်ဆုံးထား ပြန်လည်သတ်မှတ်ချိန်",
@@ -939,6 +1000,7 @@ export const operationsMm = {
   "Save member": "အဖွဲ့ဝင်ကို သိမ်းရန်",
   "Save operational settings": "လုပ်ငန်းလည်ပတ်မှု ဆက်တင်ကို သိမ်းရန်",
   "Save permissions": "ခွင့်ပြုချက်များကို သိမ်းရန်",
+  "Save printer settings": "ပရင်တာ ဆက်တင်ကို သိမ်းရန်",
   "Save staff profile": "ဝန်ထမ်း ကိုယ်ရေးအချက်အလက်ကို သိမ်းရန်",
   "Saving permissions": "ခွင့်ပြုချက်များ သိမ်းနေသည်",
   "Saving replaces the full permission set. Permissions outside the delegation policy are removed.":
@@ -966,6 +1028,10 @@ export const operationsMm = {
   "Selected member": "ရွေးထားသော အဖွဲ့ဝင်",
   "Send invitation": "ဖိတ်ကြားချက် ပို့ရန်",
   "Show permissions": "ခွင့်ပြုချက်များကို ပြရန်",
+  "Show the gym address on the receipt.": "ပြေစာပေါ်တွင် Gym လိပ်စာကို ပြပါ။",
+  "Show the gym logo on the receipt.": "ပြေစာပေါ်တွင် Gym လိုဂိုကို ပြပါ။",
+  "Show the gym phone on the receipt.":
+    "ပြေစာပေါ်တွင် Gym ဖုန်းနံပါတ်ကို ပြပါ။",
   "Showing only actions recorded for your membership.":
     "သင့်အသင်းဝင်မှုအတွက် မှတ်တမ်းတင်ထားသော လုပ်ဆောင်ချက်များကိုသာ ပြထားပါသည်။",
   "Start a membership or manage the plans available to members.":
@@ -986,6 +1052,8 @@ export const operationsMm = {
     "ကိုယ်ရေးဓာတ်ပုံ တင်ခြင်း မပြီးဆုံးပါ။",
   "The profile photo was uploaded and still needs to be attached.":
     "ကိုယ်ရေးဓာတ်ပုံကို တင်ပြီးပါပြီ။ တွဲထည့်ရန် ကျန်ရှိပါသေးသည်။",
+  "These choices apply the next time a receipt is printed.":
+    "ဤရွေးချယ်မှုများကို နောက်တစ်ကြိမ် ပြေစာပုံနှိပ်သည့်အခါ သုံးပါသည်။",
   "These members are archived. Open a name for the full profile, or restore them to Active. Membership and payment history stay in place, and the record is not deleted.":
     "ဤအဖွဲ့ဝင်များကို မှတ်တမ်းသိမ်းထားပါသည်။ ကိုယ်ရေးအချက်အလက် အပြည့်အစုံအတွက် အမည်ကို ဖွင့်ပါ၊ သို့မဟုတ် အသုံးပြုနေဆဲသို့ ပြန်ထားပါ။ အသင်းဝင်မှုနှင့် ငွေပေးချေမှု မှတ်တမ်း မပျက်ပါ။ မှတ်တမ်းကို မဖျက်ပါ။",
   "These members are archived. Open a name for the full profile.":
@@ -1009,6 +1077,8 @@ export const operationsMm = {
   "Total charged": "ကောက်ခံငွေ စုစုပေါင်း",
   "Total refunded": "ပြန်အမ်းငွေ စုစုပေါင်း",
   "Trainer QR scan": "နည်းပြ QR စကင်ဖတ်ခြင်း",
+  "Turn the receipt printer on for this gym.":
+    "ဤ Gym အတွက် ပြေစာပရင်တာကို ဖွင့်ပါ။",
   "Try another action, module, or outcome.":
     "အခြား လုပ်ဆောင်ချက်၊ လုပ်ငန်းအပိုင်း သို့မဟုတ် ရလဒ်ကို စမ်းကြည့်ပါ။",
   "Try another name, email, or status.":
@@ -1028,15 +1098,19 @@ export const operationsMm = {
   "Unable to load members.": "အဖွဲ့ဝင်များကို မရယူနိုင်ပါ။",
   "Unable to load membership plans.": "အသင်းဝင်မှု အစီအစဉ်များကို မရယူနိုင်ပါ။",
   "Unable to load memberships.": "အသင်းဝင်မှုများကို မရယူနိုင်ပါ။",
+  "Unable to load printer settings.": "ပရင်တာ ဆက်တင်ကို မရယူနိုင်ပါ။",
   "Unable to load the profile photo.": "ကိုယ်ရေးဓာတ်ပုံကို မရယူနိုင်ပါ။",
   "Unable to remove the profile photo.": "ကိုယ်ရေးဓာတ်ပုံကို ဖယ်ရှား၍ မရပါ။",
   "Unable to restore member.": "အဖွဲ့ဝင်ကို ပြန်ထား၍ မရပါ။",
+  "Unable to save printer settings.": "ပရင်တာ ဆက်တင်ကို မသိမ်းနိုင်ပါ။",
   "Unable to search members.": "အဖွဲ့ဝင်များကို ရှာ၍ မရပါ။",
   "Unable to update membership note.": "အသင်းဝင်မှု မှတ်ချက်ကို ပြင်ဆင်၍ မရပါ။",
   "Unable to update membership.": "အသင်းဝင်မှုကို ပြင်ဆင်၍ မရပါ။",
   "Unable to update plan.": "အစီအစဉ်ကို ပြင်ဆင်၍ မရပါ။",
   "Unable to upload the profile photo.": "ကိုယ်ရေးဓာတ်ပုံကို တင်၍ မရပါ။",
   Unpaid: "မပေးရသေး",
+  "Up to 120 characters and 3 lines. It prints at the bottom of the receipt.":
+    "စာလုံးရေ 120 နှင့် စာကြောင်း 3 ကြောင်းအထိ။ ပြေစာ၏ အောက်ခြေတွင် ပုံနှိပ်ပါသည်။",
   "Update location": "တည်နေရာကို ပြင်ဆင်ရန်",
   "Update the plan details below, then save your changes.":
     "အောက်ပါ အစီအစဉ် အသေးစိတ်ကို ပြင်ဆင်ပြီး ပြောင်းလဲချက်များကို သိမ်းပါ။",

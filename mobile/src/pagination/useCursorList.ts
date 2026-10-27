@@ -11,8 +11,11 @@ export function useCursorList<T>(
     queryKey,
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) => load(pageParam),
-    getNextPageParam: (lastPage) => cursorAfter(lastPage.meta) ?? undefined,
+    getNextPageParam: (lastPage) => cursorAfter(lastPage?.meta) ?? undefined,
   });
-  const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const items =
+    query.data?.pages?.flatMap((page) =>
+      Array.isArray(page?.items) ? page.items : [],
+    ) ?? [];
   return { ...query, items };
 }

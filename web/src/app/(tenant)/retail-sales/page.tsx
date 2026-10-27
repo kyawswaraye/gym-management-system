@@ -25,6 +25,11 @@ export default async function RetailSalesPage() {
         canCreate={session.permissions.includes("retail.create")}
         canSubmit={session.permissions.includes("retail.submit")}
         canUpdate={session.permissions.includes("retail.update")}
+        canViewReceipts={hasTenantCapability(
+          session,
+          "receipts.view",
+          "finance",
+        )}
         canVoid={session.permissions.includes("retail.void")}
         currency={session.gym?.currency ?? "THB"}
         defaultDate={todayInTimezone(session.gym?.timezone ?? "UTC")}

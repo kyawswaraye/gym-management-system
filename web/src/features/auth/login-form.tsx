@@ -12,6 +12,7 @@ import {
   mutationHeaders,
 } from "@/features/auth/client";
 import { PasswordInput } from "@/features/auth/password-input";
+import { DigitInput } from "@/lib/ui/digit-input";
 
 export function LoginForm({
   sessionExpired = false,
@@ -119,15 +120,15 @@ export function LoginForm({
       {mfaRequired && (
         <label className="field">
           <span>{tx("Authenticator code")}</span>
-          <input
-            className="input"
-            name="code"
-            inputMode="numeric"
+          <DigitInput
             autoComplete="one-time-code"
-            pattern="[0-9]{6}"
-            maxLength={6}
-            required
+            className="input"
             disabled={pending}
+            maxLength={6}
+            mode={{ kind: "code" }}
+            name="code"
+            pattern="[0-9]{6}"
+            required
           />
         </label>
       )}

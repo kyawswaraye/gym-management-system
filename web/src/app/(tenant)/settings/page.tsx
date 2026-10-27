@@ -3,7 +3,11 @@ import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { GymSettingsManager } from "@/features/operations/gym-settings-manager";
-import { gymSettingsAccess, tenantHomePath } from "@/lib/auth/authorization";
+import {
+  gymSettingsAccess,
+  hasTenantCapability,
+  tenantHomePath,
+} from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +31,14 @@ export default async function GymSettingsPage() {
         title="Gym settings"
         titleId="gym-settings-title"
       />
-      <GymSettingsManager {...access} />
+      <GymSettingsManager
+        {...access}
+        canViewReceipts={hasTenantCapability(
+          session,
+          "receipts.view",
+          "finance",
+        )}
+      />
     </section>
   );
 }

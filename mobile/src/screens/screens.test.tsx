@@ -1,4 +1,8 @@
 import { fireEvent, render } from "@testing-library/react-native";
+
+jest.mock("@react-navigation/native", () => ({
+  useIsFocused: () => true,
+}));
 import type { ReactElement } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -86,6 +90,10 @@ const dashboardData = {
     last_check_in_at: null,
     last_check_out_at: null,
   },
+  gym: {
+    name: "North Gym",
+    has_logo: false,
+  },
 };
 
 describe("member screens", () => {
@@ -130,7 +138,25 @@ describe("member screens", () => {
     fail = false;
     fireEvent.press(view.getByRole("button", { name: "Try again" }));
     expect((await view.findAllByText(/THB 10\.00/)).length).toBeGreaterThan(0);
-    expect(view.getByText(/Days remaining:\s*12/)).toBeTruthy();
+    expect(view.getByText("12")).toBeTruthy();
+    expect(view.getByText("Days remaining:")).toBeTruthy();
+    expect(view.getByText("North Gym")).toBeTruthy();
+    expect(view.getByText("GymPilot MM")).toBeTruthy();
+  });
+
+  it("shows the signed-in gym logo instead of the default wordmark", async () => {
+    const gymLogo = jest.fn(async () => "data:image/png;base64,AQID");
+    const view = await renderSignedIn(<DashboardScreen />, {
+      dashboard: async () => ({
+        ...dashboardData,
+        gym: { name: "North Gym", has_logo: true },
+      }),
+      gymLogo,
+    });
+    expect(await view.findByLabelText("Gym logo")).toBeTruthy();
+    expect(view.getByText("North Gym")).toBeTruthy();
+    expect(view.queryByText("GymPilot MM")).toBeNull();
+    expect(gymLogo).toHaveBeenCalled();
   });
 
   it("explains desk check-in when the camera is denied", async () => {

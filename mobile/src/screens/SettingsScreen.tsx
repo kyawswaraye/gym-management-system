@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { View } from "react-native";
 
-import { version } from "../../package.json";
 import { useAuth, useSetLocale } from "../app/providers";
 import { createSecureStore } from "../auth/secureStore";
 import type { AccountStackParamList } from "../navigation/types";
@@ -28,17 +27,10 @@ export function SettingsScreen({ navigation }: Props) {
   const [busy, setBusy] = useState(false);
 
   return (
-    <NestedScreen title={tx("Settings")}>
-      <Card>
-        <Text style={{ fontSize: 18, fontWeight: "700" }}>
-          {tx("GymPilot MM")}
-        </Text>
-        <Text style={{ color: colors.muted }}>{version}</Text>
-        <Text style={{ color: colors.muted }}>
-          {tx("Android 8 and newer, iOS 16 and newer.")}
-        </Text>
-        <LanguageSwitch onChange={(value) => void setLocale(value)} />
-      </Card>
+    <NestedScreen
+      accessory={<LanguageSwitch onChange={(value) => void setLocale(value)} />}
+      title={tx("Settings")}
+    >
       <Card padded={false}>
         <View style={{ paddingHorizontal: space.md }}>
           <MenuRow

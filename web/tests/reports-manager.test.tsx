@@ -566,7 +566,7 @@ describe("reports manager", () => {
       within(visitTotals).getByText("Currently checked in").closest("div"),
     ).toHaveTextContent("2");
     expect(
-      within(visitReport).getByRole("rowheader", { name: "2026-10-01" }),
+      within(visitReport).getByRole("rowheader", { name: "01-10-2026" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Show PT sessions" }));
     await waitFor(() => {
@@ -674,7 +674,7 @@ describe("reports manager", () => {
     const stockReport = screen.getByRole("region", { name: "Stock movements" });
     expect(within(stockReport).queryByText("MMK")).not.toBeInTheDocument();
     expect(
-      within(stockReport).getByRole("rowheader", { name: "2026-10-01" }),
+      within(stockReport).getByRole("rowheader", { name: "01-10-2026" }),
     ).toBeInTheDocument();
     const stockTotals = within(stockReport).getByRole("region", {
       name: "Totals",

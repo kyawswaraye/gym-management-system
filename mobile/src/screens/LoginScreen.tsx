@@ -1,9 +1,9 @@
 import { useTx } from "../i18n/useTx";
 import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { ApiError } from "../api/errors";
+import { ApiError, NetworkError } from "../api/errors";
 import { GoogleSignInCancelled, requestGoogleIdToken } from "../auth/google";
 import { LanguageSwitch } from "../i18n/LanguageSwitch";
 import { useAuth, useOnline, useSetLocale } from "../app/providers";
@@ -13,7 +13,7 @@ import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { ErrorState, OfflineBanner } from "../ui/StateView";
 import { Text } from "../ui/Text";
-import { colors, space } from "../ui/theme";
+import { colors, elevation, space } from "../ui/theme";
 
 const GOOGLE_ERRORS: Record<string, string> = {
   MEMBER_NOT_FOUND: "No member account uses this Google email.",
@@ -34,7 +34,6 @@ export function LoginScreen() {
   const setLocale = useSetLocale();
   const auth = useAuth();
   const online = useOnline();
-  const insets = useSafeAreaInsets();
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -44,14 +43,14 @@ export function LoginScreen() {
   }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
           gap: space.md,
-          paddingBottom: insets.bottom + space.lg,
+          paddingBottom: space.lg,
           paddingHorizontal: space.lg,
-          paddingTop: insets.top + space.md,
+          paddingTop: space.md,
         }}
       >
         <LanguageSwitch onChange={(value) => void setLocale(value)} />
@@ -63,13 +62,35 @@ export function LoginScreen() {
             justifyContent: "center",
           }}
         >
-          <BrandMark size={120} />
-          <Text
-            accessibilityRole="header"
-            style={{ fontSize: 28, fontWeight: "700", textAlign: "center" }}
+          <View
+            style={{
+              alignItems: "center",
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderRadius: 32,
+              borderWidth: 1,
+              gap: 10,
+              paddingHorizontal: 28,
+              paddingVertical: 22,
+              ...elevation,
+            }}
           >
-            {tx("GymPilot MM")}
-          </Text>
+            <BrandMark size={88} />
+            <Text
+              accessibilityRole="header"
+              style={{ fontSize: 22, fontWeight: "700", letterSpacing: 0.3 }}
+            >
+              {tx("GymPilot MM")}
+            </Text>
+            <View
+              style={{
+                backgroundColor: colors.accent,
+                borderRadius: 2,
+                height: 3,
+                width: 32,
+              }}
+            />
+          </View>
         </View>
         <Card>
           <Text style={{ color: colors.muted, textAlign: "center" }}>
@@ -80,7 +101,7 @@ export function LoginScreen() {
           <Button
             label={tx("Continue with Google")}
             hint={tx("Signs in to your gym membership")}
-            disabled={submitting || !online}
+            disabled={submitting}
             onPress={() => {
               void (async () => {
                 setFormError(null);
@@ -91,6 +112,16 @@ export function LoginScreen() {
                 } catch (error) {
                   if (error instanceof GoogleSignInCancelled) {
                     setFormError(tx("Google sign-in was cancelled."));
+                    return;
+                  }
+                  if (error instanceof NetworkError) {
+                    setFormError(
+                      tx(
+                        online
+                          ? "The gym server could not be reached. Check the connection and try again."
+                          : "You appear to be offline. Check the connection and try again.",
+                      ),
+                    );
                     return;
                   }
                   if (error instanceof ApiError) {
@@ -117,6 +148,6 @@ export function LoginScreen() {
           />
         </Card>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

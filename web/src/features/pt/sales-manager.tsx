@@ -13,6 +13,8 @@ import {
   CashSessionSelect,
   useOpenCashSessions,
 } from "@/features/finance/cash-session-field";
+import { listReceipts } from "@/features/finance/client";
+import { ReceiptPrintLink } from "@/features/finance/receipt-preview";
 import {
   Alert,
   CursorControls,
@@ -22,6 +24,7 @@ import {
   TextInput,
 } from "@/features/finance/ui";
 import { useCursorPages } from "@/features/finance/paging";
+import { formatAppDate } from "@/lib/date";
 import { SaleCommandDialog } from "@/features/pt/sale-command-dialog";
 import {
   approvePtSale,
@@ -106,7 +109,7 @@ function saleLabel(
   const paymentPart = row.payment?.method
     ? ` ${tx("payment")} ${tx(row.payment.method)}`
     : "";
-  return `${row.service_date} ${row.description} ${row.gross_fee} ${tx(row.currency)} ${tx("member")} ${row.member_id} ${tx("trainer")} ${row.trainer_staff_profile_id}${packagePart}${paymentPart} ${tx(row.status)}`;
+  return `${formatAppDate(row.service_date)} ${row.description} ${row.gross_fee} ${tx(row.currency)} ${tx("member")} ${row.member_id} ${tx("trainer")} ${row.trainer_staff_profile_id}${packagePart}${paymentPart} ${tx(row.status)}`;
 }
 
 function SaleStatusBadge({ status }: { status: string }) {
@@ -163,6 +166,7 @@ export function SalesManager({
   canSubmit,
   canApprove,
   canVoid,
+  canViewReceipts = false,
   currency,
   today,
   membershipId,
@@ -172,6 +176,7 @@ export function SalesManager({
   canSubmit: boolean;
   canApprove: boolean;
   canVoid: boolean;
+  canViewReceipts?: boolean;
   currency: string;
   today: string;
   membershipId: string;
@@ -184,6 +189,8 @@ export function SalesManager({
   const [commissionUnresolved, setCommissionUnresolved] = useState(false);
   const [member, setMember] = useState<PickedMember | null>(null);
   const [notice, setNotice] = useState("");
+  const [saleReceiptId, setSaleReceiptId] = useState<string | null>(null);
+  const [actionReceiptIds, setActionReceiptIds] = useState<string[]>([]);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [dialogError, setDialogError] = useState("");
@@ -252,6 +259,39 @@ export function SalesManager({
     selected.submitted_by_membership_id !== membershipId;
 
   useEffect(() => {
+    if (!canViewReceipts) return undefined;
+    const paymentId =
+      selected?.status === "POSTED" ? selected.payment_id : null;
+    if (!paymentId) {
+      setSaleReceiptId((current) => (current === null ? current : null));
+      return undefined;
+    }
+    let active = true;
+    setSaleReceiptId(null);
+    void listReceipts({ payment: paymentId, status: "ISSUED", limit: "5" })
+      .then((page) => {
+        if (!active) return;
+        const match = page.data.find(
+          (row) =>
+            row.payment_id.toLowerCase() === paymentId.toLowerCase() &&
+            row.status === "ISSUED",
+        );
+        setSaleReceiptId(match?.id ?? null);
+      })
+      .catch(() => {
+        if (active) setSaleReceiptId(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    canViewReceipts,
+    selected?.id,
+    selected?.payment_id,
+    selected?.status,
+  ]);
+
+  useEffect(() => {
     if (mode) {
       restoreFocus.current = mode;
       dialogRef.current?.focus({ preventScroll: true });
@@ -306,6 +346,9 @@ export function SalesManager({
 
   async function openSale(saleId: string) {
     const token = ++detailToken.current;
+    if (canViewReceipts && saleId !== selected?.id) {
+      setActionReceiptIds((current) => (current.length === 0 ? current : []));
+    }
     setDetailPending(true);
     setLoadError("");
     setActionError("");
@@ -466,8 +509,11 @@ export function SalesManager({
       body,
       commandKey(`approve:${selected.id}:${cashSessionId}`),
     )
-      .then(async () => {
+      .then(async (result) => {
         key.current = null;
+        if (canViewReceipts && result.receipt?.status === "ISSUED") {
+          setActionReceiptIds([result.receipt.id]);
+        }
         setNotice(tx("Sale approved."));
         setDialogError("");
         setMode(null);
@@ -597,8 +643,17 @@ export function SalesManager({
     const token = beginCommand();
     setDialogError("");
     void voidPtSale(selected.id, body, commandKey(JSON.stringify(body)))
-      .then(async () => {
+      .then(async (result) => {
         key.current = null;
+        if (canViewReceipts) {
+          const issued = [
+            result.payment?.correction_receipt,
+            result.payment?.original_receipt,
+          ].flatMap((receipt) =>
+            receipt?.status === "ISSUED" ? [receipt.id] : [],
+          );
+          setActionReceiptIds(issued);
+        }
         setNotice(tx("Sale voided."));
         setDialogError("");
         setMode(null);
@@ -617,6 +672,15 @@ export function SalesManager({
     (mode === "create" && canCreate) ||
     (mode === "edit" && canUpdate && selected !== null);
   const detailNotice = notice && selected ? notice : "";
+  const printableReceiptIds = canViewReceipts
+    ? [
+        ...new Set(
+          [saleReceiptId, ...actionReceiptIds].filter((id): id is string =>
+            Boolean(id),
+          ),
+        ),
+      ]
+    : [];
 
   return (
     <div className="grid gap-6">
@@ -777,7 +841,7 @@ export function SalesManager({
                           <div className="min-w-0">
                             <p className="text-xs font-semibold tracking-wide text-slate-500">
                               <time dateTime={row.service_date}>
-                                {row.service_date}
+                                {formatAppDate(row.service_date)}
                               </time>
                             </p>
                             <h3 className="text-base font-bold break-words text-slate-900">
@@ -879,7 +943,7 @@ export function SalesManager({
                   <div className="min-w-0">
                     <p className="text-xs font-semibold tracking-wide text-slate-500">
                       <time dateTime={selected.service_date}>
-                        {selected.service_date}
+                        {formatAppDate(selected.service_date)}
                       </time>
                     </p>
                     <h2
@@ -988,7 +1052,7 @@ export function SalesManager({
                     {selected.payment?.business_date ? (
                       <Fact
                         label="Payment date"
-                        value={selected.payment.business_date}
+                        value={formatAppDate(selected.payment.business_date)}
                       />
                     ) : null}
                     {selected.payment?.reference_number ? (
@@ -1004,6 +1068,13 @@ export function SalesManager({
                       />
                     ) : null}
                   </dl>
+                  {printableReceiptIds.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {printableReceiptIds.map((id) => (
+                        <ReceiptPrintLink key={id} receiptId={id} />
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 {selected.rejection_reason ? (
                   <p className="text-sm text-slate-700">
@@ -1072,7 +1143,7 @@ export function SalesManager({
                                 <p className="mt-1 text-sm text-slate-600">
                                   {tx(row.payment_method)}
                                   {row.business_date
-                                    ? ` · ${row.business_date}`
+                                    ? ` · ${formatAppDate(row.business_date)}`
                                     : ""}
                                 </p>
                               </li>
@@ -1328,6 +1399,7 @@ export function SalesManager({
             <Field label="Gross fee">
               <TextInput
                 defaultValue={selected?.gross_fee ?? ""}
+                inputMode="decimal"
                 name="gross_fee"
                 required
               />
@@ -1362,7 +1434,7 @@ export function SalesManager({
                 <TextInput name="payment_description" />
               </Field>
               <Field label="Payment amount">
-                <TextInput name="payment_amount" />
+                <TextInput inputMode="decimal" name="payment_amount" />
               </Field>
               <Field label="Payment method">
                 <SelectInput defaultValue="CASH" name="payment_method">
@@ -1410,7 +1482,7 @@ export function SalesManager({
                 {selected.payment?.business_date
                   ? tx(
                       "Open sessions are listed for the payment business date {date}.",
-                      { date: selected.payment.business_date },
+                      { date: formatAppDate(selected.payment.business_date) },
                     )
                   : tx(
                       "This cash payment has no business date, so a session cannot be chosen.",

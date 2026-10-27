@@ -1,7 +1,7 @@
 import { useTx } from "../i18n/useTx";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "../app/providers";
 import { AccountScreen } from "../screens/AccountScreen";
@@ -19,6 +19,7 @@ import { ScanScreen } from "../screens/ScanScreen";
 import { ScheduleScreen } from "../screens/ScheduleScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { BrandMark } from "../ui/BrandMark";
+import { TabIcon, type TabIconName } from "../ui/TabIcon";
 import { Button } from "../ui/Button";
 import { ErrorState, LoadingState } from "../ui/StateView";
 import { colors, space } from "../ui/theme";
@@ -42,12 +43,69 @@ const Tabs = createBottomTabNavigator<MainTabParamList>();
 
 const stackOptions = { headerShown: false } as const;
 
+function HomeStackScreen() {
+  return (
+    <HomeStack.Navigator screenOptions={stackOptions}>
+      <HomeStack.Screen name="Dashboard" component={DashboardScreen} />
+    </HomeStack.Navigator>
+  );
+}
+
+function ScheduleStackScreen() {
+  return (
+    <ScheduleStack.Navigator screenOptions={stackOptions}>
+      <ScheduleStack.Screen name="Schedule" component={ScheduleScreen} />
+    </ScheduleStack.Navigator>
+  );
+}
+
+function CheckInStackScreen() {
+  return (
+    <CheckInStack.Navigator screenOptions={stackOptions}>
+      <CheckInStack.Screen name="Scan" component={ScanScreen} />
+    </CheckInStack.Navigator>
+  );
+}
+
+function InboxStackScreen() {
+  return (
+    <InboxStack.Navigator screenOptions={stackOptions}>
+      <InboxStack.Screen name="Inbox" component={NotificationsScreen} />
+    </InboxStack.Navigator>
+  );
+}
+
+function AccountStackScreen() {
+  return (
+    <AccountStack.Navigator screenOptions={stackOptions}>
+      <AccountStack.Screen name="Account" component={AccountScreen} />
+      <AccountStack.Screen name="Profile" component={ProfileScreen} />
+      <AccountStack.Screen name="Membership" component={MembershipScreen} />
+      <AccountStack.Screen name="Payments" component={PaymentsScreen} />
+      <AccountStack.Screen name="CheckIns" component={CheckInsScreen} />
+      <AccountStack.Screen name="Packages" component={PackagesScreen} />
+      <AccountStack.Screen
+        name="NotificationSettings"
+        component={NotificationSettingsScreen}
+      />
+      <AccountStack.Screen name="Settings" component={SettingsScreen} />
+      <AccountStack.Screen name="Legal" component={LegalScreen} />
+    </AccountStack.Navigator>
+  );
+}
+
+function tabIcon(name: TabIconName) {
+  return ({ color, size }: { color: string; size: number }) => (
+    <TabIcon color={color} name={name} size={size} />
+  );
+}
+
 export function RootNavigator() {
   const tx = useTx();
   const auth = useAuth();
   if (auth.status === "loading") {
     return (
-      <View
+      <SafeAreaView
         style={{
           alignItems: "center",
           backgroundColor: colors.background,
@@ -59,12 +117,12 @@ export function RootNavigator() {
       >
         <BrandMark size={96} />
         <LoadingState label={tx("Checking your session")} />
-      </View>
+      </SafeAreaView>
     );
   }
   if (auth.status === "offline") {
     return (
-      <View
+      <SafeAreaView
         style={{
           backgroundColor: colors.background,
           flex: 1,
@@ -83,7 +141,7 @@ export function RootNavigator() {
           hint={tx("Removes the saved session from this phone")}
           onPress={() => auth.logout()}
         />
-      </View>
+      </SafeAreaView>
     );
   }
   if (auth.status === "anonymous") {
@@ -99,93 +157,64 @@ export function RootNavigator() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "600",
+          letterSpacing: 0.2,
+        },
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: 1,
+          paddingTop: 4,
         },
       }}
     >
       <Tabs.Screen
         name="Home"
+        component={HomeStackScreen}
         options={{
-          tabBarLabel: tx("Home"),
           tabBarAccessibilityLabel: tx("Home"),
+          tabBarIcon: tabIcon("home"),
+          tabBarLabel: tx("Home"),
         }}
-      >
-        {() => (
-          <HomeStack.Navigator screenOptions={stackOptions}>
-            <HomeStack.Screen name="Dashboard" component={DashboardScreen} />
-          </HomeStack.Navigator>
-        )}
-      </Tabs.Screen>
+      />
       <Tabs.Screen
         name="Schedule"
+        component={ScheduleStackScreen}
         options={{
-          tabBarLabel: tx("Schedule"),
           tabBarAccessibilityLabel: tx("Schedule"),
+          tabBarIcon: tabIcon("schedule"),
+          tabBarLabel: tx("Schedule"),
         }}
-      >
-        {() => (
-          <ScheduleStack.Navigator screenOptions={stackOptions}>
-            <ScheduleStack.Screen name="Schedule" component={ScheduleScreen} />
-          </ScheduleStack.Navigator>
-        )}
-      </Tabs.Screen>
+      />
       <Tabs.Screen
         name="CheckIn"
+        component={CheckInStackScreen}
         options={{
-          tabBarLabel: tx("Check in"),
           tabBarAccessibilityLabel: tx("Check in"),
+          tabBarIcon: tabIcon("checkin"),
+          tabBarLabel: tx("Check in"),
         }}
-      >
-        {() => (
-          <CheckInStack.Navigator screenOptions={stackOptions}>
-            <CheckInStack.Screen name="Scan" component={ScanScreen} />
-          </CheckInStack.Navigator>
-        )}
-      </Tabs.Screen>
+      />
       <Tabs.Screen
         name="Inbox"
+        component={InboxStackScreen}
         options={{
-          tabBarLabel: tx("Inbox"),
           tabBarAccessibilityLabel: tx("Inbox"),
+          tabBarIcon: tabIcon("inbox"),
+          tabBarLabel: tx("Inbox"),
         }}
-      >
-        {() => (
-          <InboxStack.Navigator screenOptions={stackOptions}>
-            <InboxStack.Screen name="Inbox" component={NotificationsScreen} />
-          </InboxStack.Navigator>
-        )}
-      </Tabs.Screen>
+      />
       <Tabs.Screen
         name="Account"
+        component={AccountStackScreen}
         options={{
-          tabBarLabel: tx("Account"),
           tabBarAccessibilityLabel: tx("Account"),
+          tabBarIcon: tabIcon("account"),
+          tabBarLabel: tx("Account"),
         }}
-      >
-        {() => (
-          <AccountStack.Navigator screenOptions={stackOptions}>
-            <AccountStack.Screen name="Account" component={AccountScreen} />
-            <AccountStack.Screen name="Profile" component={ProfileScreen} />
-            <AccountStack.Screen
-              name="Membership"
-              component={MembershipScreen}
-            />
-            <AccountStack.Screen name="Payments" component={PaymentsScreen} />
-            <AccountStack.Screen name="CheckIns" component={CheckInsScreen} />
-            <AccountStack.Screen name="Packages" component={PackagesScreen} />
-            <AccountStack.Screen
-              name="NotificationSettings"
-              component={NotificationSettingsScreen}
-            />
-            <AccountStack.Screen name="Settings" component={SettingsScreen} />
-            <AccountStack.Screen name="Legal" component={LegalScreen} />
-          </AccountStack.Navigator>
-        )}
-      </Tabs.Screen>
+      />
     </Tabs.Navigator>
   );
 }

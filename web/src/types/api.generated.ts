@@ -1454,6 +1454,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/member/gym/logo/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** @description Logo bytes for the signed-in member's gym. Another gym's logo is unreachable. */
+    get: operations["member_gym_logo_retrieve"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/member/me/": {
     parameters: {
       query?: never;
@@ -2414,6 +2431,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/receipts/{receipt_id}/print/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["receipts_print"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/receipts/{receipt_id}/void/": {
     parameters: {
       query?: never;
@@ -2424,6 +2457,22 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["receipts_void"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/receipts/print-context/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["receipts_print_context"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -4844,6 +4893,11 @@ export interface components {
       class_cancellation_cutoff_minutes: number;
       class_no_show_consumes_session: boolean;
       require_separate_finance_approval: boolean;
+      printer_enabled: boolean;
+      printer_print_logo: boolean;
+      printer_print_address: boolean;
+      printer_print_phone: boolean;
+      printer_footer: string;
       next_member_number: number;
       /** Format: uuid */
       created_by_membership_id: string | null;
@@ -5345,6 +5399,7 @@ export interface components {
       message: string;
     };
     MemberSelfDashboard: {
+      gym: components["schemas"]["MemberSelfGym"];
       member: components["schemas"]["MemberSelfProfile"];
       current_membership: components["schemas"]["MemberSelfMembership"] | null;
       days_remaining: number | null;
@@ -5365,6 +5420,11 @@ export interface components {
       success: boolean;
       data: components["schemas"]["MemberSelfProfile"];
       message: string;
+    };
+    /** @description Brand shown on the signed-in member's home screen. No other gym is included. */
+    MemberSelfGym: {
+      name: string;
+      has_logo: boolean;
     };
     MemberSelfMembership: {
       /** Format: uuid */
@@ -6357,6 +6417,11 @@ export interface components {
       class_cancellation_cutoff_minutes?: number;
       class_no_show_consumes_session?: boolean;
       require_separate_finance_approval?: boolean;
+      printer_enabled?: boolean;
+      printer_print_logo?: boolean;
+      printer_print_address?: boolean;
+      printer_print_phone?: boolean;
+      printer_footer?: string;
     };
     PatchedMemberDevicePatchRequest: {
       push_consent?: boolean;
@@ -6965,6 +7030,61 @@ export interface components {
       data: components["schemas"]["Receipt"][];
       meta: components["schemas"]["PaymentListMeta"];
       message: string;
+    };
+    ReceiptPrint: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      payment_id: string;
+      receipt_number: string;
+      /** Format: date-time */
+      issued_at: string;
+      gym_code: string;
+      gym_name: string;
+      gym_address: string;
+      member_number: string;
+      member_name: string;
+      description: string;
+      /** Format: decimal */
+      readonly amount: string;
+      currency: string;
+      method: string;
+      /** Format: date */
+      business_date: string;
+      issuer_name: string;
+      status: string;
+      /** Format: date-time */
+      created_at: string;
+      phone: string;
+      logo: components["schemas"]["ReceiptPrintLogo"] | null;
+      printer_enabled: boolean;
+      printer_print_logo: boolean;
+      printer_print_address: boolean;
+      printer_print_phone: boolean;
+      printer_footer: string;
+    };
+    ReceiptPrintContext: {
+      printer_enabled: boolean;
+      printer_print_logo: boolean;
+      printer_print_address: boolean;
+      printer_print_phone: boolean;
+      printer_footer: string;
+      phone: string;
+      logo: components["schemas"]["ReceiptPrintLogo"] | null;
+    };
+    ReceiptPrintContextEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ReceiptPrintContext"];
+      message: string;
+    };
+    ReceiptPrintEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ReceiptPrint"];
+      message: string;
+    };
+    ReceiptPrintLogo: {
+      content_type: string;
+      data_base64: string;
     };
     ReconcileCashSessionRequest: {
       /** Format: decimal */
@@ -14569,6 +14689,49 @@ export interface operations {
       };
     };
   };
+  member_gym_logo_retrieve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": string;
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   member_me_read: {
     parameters: {
       query?: never;
@@ -19001,6 +19164,51 @@ export interface operations {
       };
     };
   };
+  receipts_print: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        receipt_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReceiptPrintEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   receipts_void: {
     parameters: {
       query?: never;
@@ -19078,6 +19286,49 @@ export interface operations {
         };
       };
       429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  receipts_print_context: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReceiptPrintContextEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
         headers: {
           [name: string]: unknown;
         };

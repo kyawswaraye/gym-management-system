@@ -115,8 +115,8 @@ export function AppProviders({
 
   useEffect(() => {
     return NetInfo.addEventListener((state) => {
-      const connected =
-        state.isConnected !== false && state.isInternetReachable !== false;
+      // Android often reports isInternetReachable as false while the network works.
+      const connected = state.isConnected !== false;
       setOnline(connected);
       onlineManager.setOnline(connected);
     });

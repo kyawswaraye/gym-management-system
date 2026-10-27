@@ -14,6 +14,7 @@ import {
 import { FormDialog } from "@/components/form-dialog";
 import { fieldMap, financeError } from "@/features/finance/errors";
 import { canonicalMoney, subtractMoney } from "@/features/finance/money";
+import { formatAppDate } from "@/lib/date";
 import { useCursorPages } from "@/features/finance/paging";
 import {
   Alert,
@@ -493,7 +494,7 @@ export function CashBookManager({
                           </button>
                         </td>
                         <td className="px-5 py-3 whitespace-nowrap text-slate-600">
-                          {row.business_date}
+                          {formatAppDate(row.business_date)}
                         </td>
                         <td className="px-5 py-3 text-right font-semibold whitespace-nowrap text-slate-900 tabular-nums">
                           {row.expected_closing}{" "}
@@ -570,7 +571,7 @@ export function CashBookManager({
                         {session.register_code}
                       </p>
                       <p className="mt-0.5 text-sm text-slate-500">
-                        {session.business_date}
+                        {formatAppDate(session.business_date)}
                       </p>
                     </div>
                     <StatusPill status={session.status} />
@@ -870,7 +871,7 @@ export function CashBookManager({
               </h2>
               {session ? (
                 <p className="mt-1 text-sm text-slate-500">
-                  {session.register_code} · {session.business_date}
+                  {session.register_code} · {formatAppDate(session.business_date)}
                 </p>
               ) : (
                 <p className="mt-1 text-sm text-slate-500">
@@ -982,7 +983,7 @@ export function CashBookManager({
                             </span>
                           </td>
                           <td className="px-5 py-3 whitespace-nowrap text-slate-600">
-                            {row.business_date}
+                            {formatAppDate(row.business_date)}
                           </td>
                         </tr>
                       );

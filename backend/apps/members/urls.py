@@ -30,6 +30,8 @@ from apps.members.payment_views import (
     ReceiptDetailView,
     ReceiptDownloadView,
     ReceiptListView,
+    ReceiptPrintContextView,
+    ReceiptPrintView,
     ReceiptVoidView,
 )
 from apps.members.scan_views import MemberCheckInScanView, TrainerCheckInScanView
@@ -37,6 +39,7 @@ from apps.members.self_views import (
     MemberCheckInsView,
     MemberClassBookingView,
     MemberDashboardView,
+    MemberGymLogoView,
     MemberMembershipView,
     MemberMeView,
     MemberPaymentsView,
@@ -102,6 +105,7 @@ urlpatterns = [
     ),
     path("member/me/", MemberMeView.as_view(), name="member-me"),
     path("member/dashboard/", MemberDashboardView.as_view(), name="member-dashboard"),
+    path("member/gym/logo/", MemberGymLogoView.as_view(), name="member-gym-logo"),
     path("member/membership/", MemberMembershipView.as_view(), name="member-membership"),
     path("member/payments/", MemberPaymentsView.as_view(), name="member-payments"),
     path("member/check-ins/", MemberCheckInsView.as_view(), name="member-check-ins"),
@@ -249,7 +253,17 @@ urlpatterns = [
         name="payment-refund",
     ),
     path("receipts/", ReceiptListView.as_view(), name="receipt-list"),
+    path(
+        "receipts/print-context/",
+        ReceiptPrintContextView.as_view(),
+        name="receipt-print-context",
+    ),
     path("receipts/<uuid:receipt_id>/", ReceiptDetailView.as_view(), name="receipt-detail"),
+    path(
+        "receipts/<uuid:receipt_id>/print/",
+        ReceiptPrintView.as_view(),
+        name="receipt-print",
+    ),
     path(
         "receipts/<uuid:receipt_id>/void/",
         ReceiptVoidView.as_view(),

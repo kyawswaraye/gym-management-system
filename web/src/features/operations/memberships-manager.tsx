@@ -14,7 +14,9 @@ import {
   updateMembership,
   updateMembershipPlan,
 } from "@/features/operations/membership-writes";
+import { formatAppDate } from "@/lib/date";
 import { actionButtonClass } from "@/lib/ui/action-button";
+import { DigitInput } from "@/lib/ui/digit-input";
 import { compactIdentifier, IdentifierValue } from "@/lib/ui/identifier";
 import type {
   Member,
@@ -1195,12 +1197,12 @@ export function MembershipsManager({
                   <label className="field">
                     {" "}
                     {tx("Duration")}{" "}
-                    <input
+                    <DigitInput
                       className="input"
-                      min="1"
+                      min={1}
+                      mode={{ kind: "integer" }}
                       name="duration_value"
                       required
-                      type="number"
                     />
                   </label>
                   <label className="field">
@@ -1216,14 +1218,12 @@ export function MembershipsManager({
                   <label className="field">
                     {" "}
                     {tx("Price")}{" "}
-                    <input
+                    <DigitInput
                       className="input"
-                      min="0"
+                      mode={{ kind: "decimal", scale: 2 }}
                       name="price"
                       placeholder="0.00"
                       required
-                      step="0.01"
-                      type="number"
                     />
                   </label>
                   <label className="field">
@@ -1402,7 +1402,8 @@ export function MembershipsManager({
                     {membership.plan_name}
                   </td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-600">
-                    {membership.start_date} – {membership.expiry_date}
+                    {formatAppDate(membership.start_date)} –{" "}
+                    {formatAppDate(membership.expiry_date)}
                   </td>
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-900">
                     {membership.final_amount} {tx(membership.currency)}
@@ -1745,13 +1746,11 @@ export function MembershipsManager({
                 <label className="field">
                   {" "}
                   {tx("Discount")}{" "}
-                  <input
+                  <DigitInput
                     className="input"
-                    min="0"
+                    mode={{ kind: "decimal", scale: 2 }}
                     name="discount_amount"
                     onChange={(event) => setDraftDiscount(event.target.value)}
-                    step="0.01"
-                    type="number"
                     value={draftDiscount}
                   />
                 </label>
@@ -2098,10 +2097,10 @@ function PlanEditorDialog({
             <label className="field">
               {" "}
               {tx("Duration")}{" "}
-              <input
+              <DigitInput
                 className="input"
-                inputMode="numeric"
-                min="1"
+                min={1}
+                mode={{ kind: "integer" }}
                 onChange={(event) =>
                   onDraft({ ...draft, duration_value: event.target.value })
                 }
@@ -2131,9 +2130,9 @@ function PlanEditorDialog({
             <label className="field">
               {" "}
               {tx("Price")}{" "}
-              <input
+              <DigitInput
                 className="input"
-                inputMode="decimal"
+                mode={{ kind: "decimal", scale: 2 }}
                 onChange={(event) =>
                   onDraft({ ...draft, price: event.target.value })
                 }

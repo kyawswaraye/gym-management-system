@@ -1,6 +1,7 @@
-import { useTx } from "../i18n/useTx";
-import { useQuery } from "@tanstack/react-query";
-import { RefreshControl } from "react-native";
+import { useLocale, useTx } from "../i18n/useTx";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { Image, RefreshControl, View } from "react-native";
 
 import { useMemberApi, useOnline } from "../app/providers";
 import {
@@ -9,6 +10,7 @@ import {
   formatServerMoney,
 } from "../dates/gymLocal";
 import { queryKeys } from "../query/keys";
+import { BrandMark } from "../ui/BrandMark";
 import { Card } from "../ui/Card";
 import { Fact } from "../ui/Fact";
 import { Screen } from "../ui/Screen";
@@ -19,24 +21,34 @@ import {
   OfflineBanner,
 } from "../ui/StateView";
 import { Text } from "../ui/Text";
-import { colors } from "../ui/theme";
+import { colors, elevation, radius } from "../ui/theme";
 
 export function DashboardScreen() {
   const tx = useTx();
   const api = useMemberApi();
   const online = useOnline();
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: queryKeys.dashboard,
     queryFn: () => api.dashboard(),
   });
+  const gym = query.data?.gym;
   return (
     <Screen
       title={tx("Home")}
+      heading={
+        <GymBrand
+          hasLogo={gym?.has_logo ?? false}
+          name={gym?.name ?? ""}
+          pending={!gym}
+        />
+      }
       refreshControl={
         <RefreshControl
           refreshing={query.isRefetching}
           onRefresh={() => {
             void query.refetch();
+            void queryClient.invalidateQueries({ queryKey: queryKeys.gymLogo });
           }}
         />
       }
@@ -57,26 +69,189 @@ export function DashboardScreen() {
   );
 }
 
+function GymBrand({
+  name,
+  hasLogo,
+  pending,
+}: {
+  name: string;
+  hasLogo: boolean;
+  pending: boolean;
+}) {
+  const tx = useTx();
+  const locale = useLocale();
+  const api = useMemberApi();
+  const logo = useQuery({
+    queryKey: queryKeys.gymLogo,
+    enabled: hasLogo,
+    queryFn: () => api.gymLogo(),
+  });
+  const waiting = pending || (hasLogo && logo.isLoading);
+  const source = hasLogo && !logo.isError ? logo.data : null;
+  return (
+    <View style={{ alignItems: "center", gap: 16, paddingTop: 8 }}>
+      <View
+        style={{
+          alignItems: "center",
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          borderRadius: 28,
+          borderWidth: 1,
+          justifyContent: "center",
+          minHeight: 120,
+          minWidth: 168,
+          paddingHorizontal: 22,
+          paddingVertical: 18,
+          ...elevation,
+        }}
+      >
+        {waiting ? (
+          <View
+            style={{
+              backgroundColor: colors.primarySoft,
+              borderRadius: 18,
+              height: 64,
+              width: 64,
+            }}
+          />
+        ) : source ? (
+          <Image
+            accessibilityIgnoresInvertColors
+            accessibilityLabel={tx("Gym logo")}
+            accessibilityRole="image"
+            resizeMode="contain"
+            source={{ uri: source }}
+            style={{ height: 72, width: 168 }}
+          />
+        ) : (
+          <View style={{ alignItems: "center", gap: 8 }}>
+            <BrandMark size={56} />
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "700",
+                letterSpacing: 0.3,
+              }}
+            >
+              {tx("GymPilot MM")}
+            </Text>
+          </View>
+        )}
+      </View>
+      {name ? (
+        <View style={{ alignItems: "center", gap: 10 }}>
+          <Text
+            accessibilityRole="header"
+            style={{
+              fontSize: 28,
+              fontWeight: "700",
+              letterSpacing: locale === "mm" ? 0 : -0.4,
+              lineHeight: locale === "mm" ? 44 : 34,
+              textAlign: "center",
+            }}
+          >
+            {name}
+          </Text>
+          <View
+            style={{
+              backgroundColor: colors.accent,
+              borderRadius: 2,
+              height: 3,
+              width: 32,
+            }}
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function MemberAvatar({
+  firstName,
+  lastName,
+  photoUrl,
+}: {
+  firstName: string;
+  lastName: string;
+  photoUrl?: string;
+}) {
+  const tx = useTx();
+  const [failed, setFailed] = useState(false);
+  const initials = `${Array.from(firstName.trim())[0] ?? ""}${Array.from(lastName.trim())[0] ?? ""}`;
+  if (photoUrl && !failed) {
+    return (
+      <Image
+        accessibilityLabel={tx("Profile photo")}
+        onError={() => setFailed(true)}
+        source={{ uri: photoUrl }}
+        style={{
+          backgroundColor: colors.primarySoft,
+          borderRadius: 28,
+          height: 56,
+          width: 56,
+        }}
+      />
+    );
+  }
+  return (
+    <View
+      accessibilityLabel={tx("Profile photo")}
+      style={{
+        alignItems: "center",
+        backgroundColor: colors.primarySoft,
+        borderRadius: 28,
+        height: 56,
+        justifyContent: "center",
+        width: 56,
+      }}
+    >
+      <Text style={{ color: colors.primary, fontWeight: "700" }}>
+        {initials || "?"}
+      </Text>
+    </View>
+  );
+}
+
 function DashboardBody({
   data,
 }: {
   data: Awaited<ReturnType<ReturnType<typeof useMemberApi>["dashboard"]>>;
 }) {
   const tx = useTx();
+  const api = useMemberApi();
   const name = `${data.member.first_name} ${data.member.last_name}`.trim();
   const payment = data.payment_summary;
+  const photoId = data.member.profile_photo_asset_id;
+  const photo = useQuery({
+    queryKey: queryKeys.photo(photoId ?? "none"),
+    enabled: Boolean(photoId),
+    queryFn: () => api.photoDownloadUrl(photoId ?? ""),
+  });
+  const days =
+    data.days_remaining === null
+      ? tx("Unavailable")
+      : String(data.days_remaining);
   return (
     <>
       <Card>
-        <Text
-          accessibilityLabel={tx("Signed in as {name}", { name })}
-          style={{ fontSize: 22, fontWeight: "700" }}
-        >
-          {name}
-        </Text>
-        <Text style={{ color: colors.muted }}>
-          {tx("Member number")} {data.member.member_number}
-        </Text>
+        <View style={{ alignItems: "center", flexDirection: "row", gap: 14 }}>
+          <MemberAvatar
+            firstName={data.member.first_name}
+            lastName={data.member.last_name}
+            photoUrl={photo.data?.url}
+          />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text
+              accessibilityLabel={tx("Signed in as {name}", { name })}
+              style={{ fontSize: 20, fontWeight: "700" }}
+            >
+              {name}
+            </Text>
+            <Text style={{ color: colors.muted, fontSize: 14 }}>
+              {tx("Member number")} {data.member.member_number}
+            </Text>
+          </View>
+        </View>
         {data.current_membership ? (
           <Text>
             {data.current_membership.plan_name} {tx("until")}{" "}
@@ -85,22 +260,29 @@ function DashboardBody({
         ) : (
           <EmptyState message={tx("No current membership is on file.")} />
         )}
-        <Text
+        <View
           style={{
             backgroundColor: colors.primarySoft,
-            borderRadius: 12,
-            color: colors.primary,
-            fontWeight: "700",
-            overflow: "hidden",
-            paddingHorizontal: 12,
-            paddingVertical: 10,
+            borderRadius: radius.sm,
+            gap: 2,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
           }}
         >
-          {tx("Days remaining:")}{" "}
-          {data.days_remaining === null
-            ? tx("Unavailable")
-            : String(data.days_remaining)}
-        </Text>
+          <Text
+            style={{
+              color: colors.primary,
+              fontSize: 32,
+              fontWeight: "700",
+              lineHeight: 38,
+            }}
+          >
+            {days}
+          </Text>
+          <Text style={{ color: colors.primary, fontWeight: "600" }}>
+            {tx("Days remaining:")}
+          </Text>
+        </View>
         <Text style={{ color: colors.muted }}>
           {data.is_pt_client
             ? tx("Personal training client")
@@ -108,7 +290,10 @@ function DashboardBody({
         </Text>
       </Card>
       <Card>
-        <Text accessibilityRole="header" style={{ fontWeight: "700" }}>
+        <Text
+          accessibilityRole="header"
+          style={{ fontSize: 18, fontWeight: "700" }}
+        >
           {tx("Payments")}
         </Text>
         {payment.available ? (
@@ -141,7 +326,10 @@ function DashboardBody({
         )}
       </Card>
       <Card>
-        <Text accessibilityRole="header" style={{ fontWeight: "700" }}>
+        <Text
+          accessibilityRole="header"
+          style={{ fontSize: 18, fontWeight: "700" }}
+        >
           {tx("Check-in")}
         </Text>
         {data.check_in_summary.available ? (

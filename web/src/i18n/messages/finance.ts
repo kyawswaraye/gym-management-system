@@ -26,8 +26,10 @@ export const financeEn = {
   "Approve payment": "Approve payment",
   "Approve retail sale": "Approve retail sale",
   "Approve salary period": "Approve salary period",
+  "Assigned after approval": "Assigned after approval",
   "At or below the threshold of": "At or below the threshold of",
   Attached: "Attached",
+  "Back to payments": "Back to payments",
   Barcode: "Barcode",
   "Cancel salary draft": "Cancel salary draft",
   "Cancel sale draft": "Cancel sale draft",
@@ -48,6 +50,7 @@ export const financeEn = {
   "Cost of goods sold": "Cost of goods sold",
   "Create category": "Create category",
   "Create product": "Create product",
+  "Current member": "Current member",
   "Current unit cost": "Current unit cost",
   "Dates and the description stay on this draft.":
     "Dates and the description stay on this draft.",
@@ -57,6 +60,7 @@ export const financeEn = {
   Direction: "Direction",
   "Display order": "Display order",
   "Download receipt": "Download receipt",
+  "DRAFT — not a receipt": "DRAFT — not a receipt",
   "Drafts you save will show up here.": "Drafts you save will show up here.",
   "Each person appears once. Saving replaces every line on this draft.":
     "Each person appears once. Saving replaces every line on this draft.",
@@ -73,6 +77,8 @@ export const financeEn = {
     "Group products here before they go into the catalog.",
   "Inventory sections": "Inventory sections",
   "Issued receipt": "Issued receipt",
+  "Last receipt {number}.": "Last receipt {number}.",
+  Issuer: "Issuer",
   Line: "Line",
   "Loading cash sessions.": "Loading cash sessions.",
   "Loading categories.": "Loading categories.",
@@ -85,7 +91,11 @@ export const financeEn = {
   "Loading salary periods.": "Loading salary periods.",
   "Loading stock movements.": "Loading stock movements.",
   "Loading the expense.": "Loading the expense.",
+  "Loading the last receipt.": "Loading the last receipt.",
+  "Loading the printer test.": "Loading the printer test.",
   "Loading the product.": "Loading the product.",
+  "Loading the receipt.": "Loading the receipt.",
+  "Loading the receipt preview.": "Loading the receipt preview.",
   "Loading the salary period.": "Loading the salary period.",
   "Loading the sale.": "Loading the sale.",
   "Loading the session.": "Loading the session.",
@@ -115,6 +125,8 @@ export const financeEn = {
   "No expenses yet.": "No expenses yet.",
   "No low-stock products in this category.":
     "No low-stock products in this category.",
+  "No issued receipt is available to reprint.":
+    "No issued receipt is available to reprint.",
   "No member": "No member",
   "No membership": "No membership",
   "No movements match these filters.": "No movements match these filters.",
@@ -160,6 +172,9 @@ export const financeEn = {
   "Preview only:": "Preview only:",
   "Previous page": "Previous page",
   Pricing: "Pricing",
+  "Print receipt": "Print receipt",
+  "Print the receipt manually.": "Print the receipt manually.",
+  "Print test slip": "Print test slip",
   Product: "Product",
   "Product categories": "Product categories",
   "Protected salary and commission categories stay fixed. Custom categories can be renamed or archived here.":
@@ -173,15 +188,20 @@ export const financeEn = {
   "Quantity on hand": "Quantity on hand",
   Receipt: "Receipt",
   "Receipt evidence": "Receipt evidence",
+  "Receipt print": "Receipt print",
   "Receipt void reason": "Receipt void reason",
+  REPLACED: "REPLACED",
   "Reconcile and close": "Reconcile and close",
   "Record an expense": "Record an expense",
   "Record payment": "Record payment",
+  "Record this payment": "Record this payment",
+  "Record this payment?": "Record this payment?",
   "Recorded drafts and posted payments will show up here.":
     "Recorded drafts and posted payments will show up here.",
   "Refine the filters to see older rows.":
     "Refine the filters to see older rows.",
   Refund: "Refund",
+  "Reprint last receipt": "Reprint last receipt",
   "Refund amount": "Refund amount",
   "Refund method": "Refund method",
   "Refund payment": "Refund payment",
@@ -198,6 +218,8 @@ export const financeEn = {
   "Replace staff lines": "Replace staff lines",
   "RETAIL_CORRECTION_UNAVAILABLE. This product payment cannot be voided or refunded here. Use the retail sale full void so the payment, receipt, and stock return stay together.":
     "RETAIL_CORRECTION_UNAVAILABLE. This product payment cannot be voided or refunded here. Use the retail sale full void so the payment, receipt, and stock return stay together.",
+  "Review only. Submitting this draft does not print a receipt.":
+    "Review only. Submitting this draft does not print a receipt.",
   "Return part of the sale": "Return part of the sale",
   "Return quantity for": "Return quantity for",
   "Return reason": "Return reason",
@@ -247,11 +269,21 @@ export const financeEn = {
   "Submit this salary period?": "Submit this salary period?",
   "Submit this sale?": "Submit this sale?",
   Subtotal: "Subtotal",
+  "TEST — not a receipt": "TEST — not a receipt",
+  "Test print": "Test print",
   "The adjustment could not be recorded.":
     "The adjustment could not be recorded.",
   "The expense could not be loaded.": "The expense could not be loaded.",
   "The payment could not be loaded.": "The payment could not be loaded.",
+  "The last receipt could not be loaded.":
+    "The last receipt could not be loaded.",
+  "The member on this draft could not be loaded.":
+    "The member on this draft could not be loaded.",
+  "The print window was blocked.": "The print window was blocked.",
+  "The printer setup could not be loaded.":
+    "The printer setup could not be loaded.",
   "The product could not be loaded.": "The product could not be loaded.",
+  "The receipt could not be printed.": "The receipt could not be printed.",
   "The salary period could not be loaded.":
     "The salary period could not be loaded.",
   "The session could not be closed.": "The session could not be closed.",
@@ -263,8 +295,12 @@ export const financeEn = {
     "This expense uses a protected salary or commission category. Void the salary period instead of voiding it here.",
   "This is not a cash payment, so no cash session is sent.":
     "This is not a cash payment, so no cash session is sent.",
+  "This records the payment now. You can print the receipt again if the paper does not come out.":
+    "This records the payment now. You can print the receipt again if the paper does not come out.",
   "This posted cash payment has no linked movement, so the void does not name a destination session.":
     "This posted cash payment has no linked movement, so the void does not name a destination session.",
+  "This slip is a printer test. It is not a receipt.":
+    "This slip is a printer test. It is not a receipt.",
   "This voids the document. It does not change the payment, cash, or stock.":
     "This voids the document. It does not change the payment, cash, or stock.",
   Threshold: "Threshold",
@@ -277,6 +313,7 @@ export const financeEn = {
   "Unit cost": "Unit cost",
   "Use three decimals, such as 1.000. A leading minus removes stock.":
     "Use three decimals, such as 1.000. A leading minus removes stock.",
+  VOID: "VOID",
   Void: "Void",
   "Void expense": "Void expense",
   "Void only this receipt document": "Void only this receipt document",
@@ -287,6 +324,10 @@ export const financeEn = {
   "Void salary period": "Void salary period",
   "Void the full sale": "Void the full sale",
   "Walk-in": "Walk-in",
+  "You need receipt access before a test slip can be printed.":
+    "You need receipt access before a test slip can be printed.",
+  "You need receipt access before the last receipt can be reprinted.":
+    "You need receipt access before the last receipt can be reprinted.",
   "You see the sessions your access allows. Reception staff see the sessions they opened. Totals are the server's figures.":
     "You see the sessions your access allows. Reception staff see the sessions they opened. Totals are the server's figures.",
 } as const;
@@ -319,9 +360,11 @@ export const financeMm = {
   "Approve payment": "ငွေပေးချေမှု အတည်ပြုရန်",
   "Approve retail sale": "လက်လီအရောင်း အတည်ပြုရန်",
   "Approve salary period": "လစာကာလ အတည်ပြုရန်",
+  "Assigned after approval": "အတည်ပြုပြီးမှ သတ်မှတ်မည်",
   "At or below the threshold of":
     "လက်ကျန်သည် သတ်မှတ်ချက်နှင့် ညီမျှသော သို့မဟုတ် ၎င်းအောက်ဖြစ်သည်။ သတ်မှတ်ချက်",
   Attached: "ပူးတွဲထားသည်",
+  "Back to payments": "ငွေပေးချေမှုများသို့ ပြန်ရန်",
   Barcode: "ဘားကုဒ်",
   "Cancel salary draft": "လစာမူကြမ်း ဖျက်သိမ်းရန်",
   "Cancel sale draft": "အရောင်းမူကြမ်း ဖျက်သိမ်းရန်",
@@ -342,6 +385,7 @@ export const financeMm = {
   "Cost of goods sold": "ရောင်းကုန်ကုန်ကျစရိတ်",
   "Create category": "အမျိုးအစား ဖန်တီးရန်",
   "Create product": "ကုန်ပစ္စည်း ဖန်တီးရန်",
+  "Current member": "လက်ရှိအဖွဲ့ဝင်",
   "Current unit cost": "လက်ရှိ တစ်ခုလျှင် ကုန်ကျစရိတ်",
   "Dates and the description stay on this draft.":
     "ရက်စွဲများနှင့် ဖော်ပြချက်သည် ဤမူကြမ်းပေါ်တွင် ရှိပါသည်။",
@@ -351,6 +395,7 @@ export const financeMm = {
   Direction: "ဦးတည်ချက်",
   "Display order": "ပြသအစဉ်",
   "Download receipt": "ပြေစာ ဒေါင်းလုဒ်လုပ်ရန်",
+  "DRAFT — not a receipt": "မူကြမ်း — ပြေစာ မဟုတ်ပါ",
   "Drafts you save will show up here.":
     "သိမ်းထားသော မူကြမ်းများ ဤနေရာတွင် ပေါ်လာပါမည်။",
   "Each person appears once. Saving replaces every line on this draft.":
@@ -368,6 +413,8 @@ export const financeMm = {
     "ကုန်ပစ္စည်းစာရင်းထဲ မသွင်းမီ ကုန်ပစ္စည်းများကို ဤနေရာတွင် အုပ်စုဖွဲ့ပါ။",
   "Inventory sections": "ကုန်ပစ္စည်းကဏ္ဍများ",
   "Issued receipt": "ထုတ်ပေးထားသော ပြေစာ",
+  "Last receipt {number}.": "နောက်ဆုံးပြေစာ {number}။",
+  Issuer: "ထုတ်ပေးသူ",
   Line: "စာရင်း",
   "Loading cash sessions.": "ငွေသားကာလများ ရယူနေပါသည်။",
   "Loading categories.": "အမျိုးအစားများ ရယူနေပါသည်။",
@@ -380,7 +427,11 @@ export const financeMm = {
   "Loading salary periods.": "လစာကာလများ ရယူနေပါသည်။",
   "Loading stock movements.": "ကုန်ကုန်ပစ္စည်းအဝင်အထွက်များ ရယူနေပါသည်။",
   "Loading the expense.": "ကုန်ကျစရိတ်ကို ရယူနေပါသည်။",
+  "Loading the last receipt.": "နောက်ဆုံးပြေစာကို ရယူနေပါသည်။",
+  "Loading the printer test.": "ပရင်တာစမ်းသပ်ချက်ကို ရယူနေပါသည်။",
   "Loading the product.": "ကုန်ပစ္စည်းကို ရယူနေပါသည်။",
+  "Loading the receipt.": "ပြေစာကို ရယူနေပါသည်။",
+  "Loading the receipt preview.": "ပြေစာနမူနာကို ရယူနေပါသည်။",
   "Loading the salary period.": "လစာကာလကို ရယူနေပါသည်။",
   "Loading the sale.": "အရောင်းကို ရယူနေပါသည်။",
   "Loading the session.": "ကာလကို ရယူနေပါသည်။",
@@ -411,6 +462,8 @@ export const financeMm = {
   "No expenses yet.": "ကုန်ကျစရိတ် မရှိသေးပါ။",
   "No low-stock products in this category.":
     "ဤအမျိုးအစားတွင် လက်ကျန်နည်းသော ကုန်ပစ္စည်း မရှိပါ။",
+  "No issued receipt is available to reprint.":
+    "ပြန်ပုံနှိပ်ရန် ထုတ်ပြီးသား ပြေစာ မရှိပါ။",
   "No member": "အဖွဲ့ဝင် မရှိ",
   "No membership": "အသင်းဝင်မှု မရှိ",
   "No movements match these filters.":
@@ -457,6 +510,9 @@ export const financeMm = {
   "Preview only:": "အစမ်းကြည့်ရန်သာ:",
   "Previous page": "ရှေ့စာမျက်နှာ",
   Pricing: "စျေးနှုန်း",
+  "Print receipt": "ပြေစာ ပုံနှိပ်ရန်",
+  "Print the receipt manually.": "ပြေစာကို ကိုယ်တိုင် ပုံနှိပ်ပါ။",
+  "Print test slip": "စမ်းသပ်စာရွက် ပုံနှိပ်ရန်",
   Product: "ကုန်ပစ္စည်း",
   "Product categories": "ကုန်ပစ္စည်းအမျိုးအစားများ",
   "Protected salary and commission categories stay fixed. Custom categories can be renamed or archived here.":
@@ -470,15 +526,20 @@ export const financeMm = {
   "Quantity on hand": "လက်ကျန်အရေအတွက်",
   Receipt: "ပြေစာ",
   "Receipt evidence": "ပြေစာအထောက်အထား",
+  "Receipt print": "ပြေစာ ပုံနှိပ်ခြင်း",
   "Receipt void reason": "ပြေစာပယ်ဖျက်ရခြင်း အကြောင်းရင်း",
+  REPLACED: "အစားထိုးပြီး",
   "Reconcile and close": "တိုက်ဆိုင်စစ်ပြီး ပိတ်ရန်",
   "Record an expense": "ကုန်ကျစရိတ် မှတ်တမ်းတင်ရန်",
   "Record payment": "ငွေပေးချေမှု မှတ်တမ်းတင်ရန်",
+  "Record this payment": "ဤငွေကို မှတ်ရန်",
+  "Record this payment?": "ဤငွေကို မှတ်မည်လား။",
   "Recorded drafts and posted payments will show up here.":
     "မှတ်တမ်းတင်ထားသော မူကြမ်းများနှင့် စာရင်းသွင်းပြီး ငွေပေးချေမှုများ ဤနေရာတွင် ပေါ်လာပါမည်။",
   "Refine the filters to see older rows.":
     "အဟောင်းတန်းများကို ကြည့်ရန် စစ်ထုတ်ချက်များကို ချိန်ညှိပါ။",
   Refund: "ပြန်အမ်း",
+  "Reprint last receipt": "နောက်ဆုံးပြေစာ ပြန်ပုံနှိပ်ရန်",
   "Refund amount": "ပြန်အမ်းငွေပမာဏ",
   "Refund method": "ပြန်အမ်းနည်းလမ်း",
   "Refund payment": "ငွေပေးချေမှု ပြန်အမ်းရန်",
@@ -495,6 +556,8 @@ export const financeMm = {
   "Replace staff lines": "ဝန်ထမ်းစာရင်းများ အစားထိုးရန်",
   "RETAIL_CORRECTION_UNAVAILABLE. This product payment cannot be voided or refunded here. Use the retail sale full void so the payment, receipt, and stock return stay together.":
     "RETAIL_CORRECTION_UNAVAILABLE။ ဤကုန်ပစ္စည်း ငွေပေးချေမှုကို ဤနေရာတွင် ပယ်ဖျက်ခြင်း သို့မဟုတ် ပြန်အမ်းခြင်း မပြုနိုင်ပါ။ ငွေပေးချေမှု၊ ပြေစာနှင့် ကုန်လက်ကျန်ပြန်အပ်မှု တစ်ပါတည်းရှိနေစေရန် လက်လီအရောင်းတစ်ခုလုံး ပယ်ဖျက်ခြင်းကို သုံးပါ။",
+  "Review only. Submitting this draft does not print a receipt.":
+    "ပြန်လည်စစ်ဆေးရန်သာ ဖြစ်ပါသည်။ ဤမူကြမ်းကို တင်သွင်းခြင်းသည် ပြေစာကို မပုံနှိပ်ပါ။",
   "Return part of the sale": "အရောင်း၏ တစ်စိတ်တစ်ပိုင်း ပြန်အပ်ရန်",
   "Return quantity for": "ပြန်အပ်အရေအတွက် —",
   "Return reason": "ပြန်အပ်ရခြင်း အကြောင်းရင်း",
@@ -544,10 +607,18 @@ export const financeMm = {
   "Submit this salary period?": "ဤလစာကာလကို တင်သွင်းမည်လား။",
   "Submit this sale?": "ဤအရောင်းကို တင်သွင်းမည်လား။",
   Subtotal: "စုစုပေါင်းခွဲ",
+  "TEST — not a receipt": "စမ်းသပ်ချက် — ပြေစာ မဟုတ်ပါ",
+  "Test print": "စမ်းသပ် ပုံနှိပ်ရန်",
   "The adjustment could not be recorded.": "ပြင်ဆင်ချက်ကို မှတ်တမ်းတင်၍ မရပါ။",
   "The expense could not be loaded.": "ကုန်ကျစရိတ်ကို မရယူနိုင်ပါ။",
   "The payment could not be loaded.": "ငွေပေးချေမှုကို မရယူနိုင်ပါ။",
+  "The last receipt could not be loaded.": "နောက်ဆုံးပြေစာကို မရယူနိုင်ပါ။",
+  "The member on this draft could not be loaded.":
+    "ဤမူကြမ်းရှိ အဖွဲ့ဝင်ကို မရယူနိုင်ပါ။",
+  "The print window was blocked.": "ပုံနှိပ်ဝင်းဒိုးကို ပိတ်ထားပါသည်။",
+  "The printer setup could not be loaded.": "ပရင်တာပြင်ဆင်ချက်ကို မရယူနိုင်ပါ။",
   "The product could not be loaded.": "ကုန်ပစ္စည်းကို မရယူနိုင်ပါ။",
+  "The receipt could not be printed.": "ပြေစာကို ပုံနှိပ်၍ မရပါ။",
   "The salary period could not be loaded.": "လစာကာလကို မရယူနိုင်ပါ။",
   "The session could not be closed.": "ကာလကို ပိတ်၍ မရပါ။",
   "The session could not be loaded.": "ကာလကို မရယူနိုင်ပါ။",
@@ -558,8 +629,12 @@ export const financeMm = {
     "ဤကုန်ကျစရိတ်သည် ကာကွယ်ထားသော လစာ သို့မဟုတ် ကော်မရှင် အမျိုးအစားကို သုံးထားပါသည်။ ဤနေရာတွင် ပယ်ဖျက်မည့်အစား လစာကာလကို ပယ်ဖျက်ပါ။",
   "This is not a cash payment, so no cash session is sent.":
     "ဤသည် ငွေသားဖြင့် ငွေပေးချေမှု မဟုတ်သောကြောင့် ငွေသားကာလ မပို့ပါ။",
+  "This records the payment now. You can print the receipt again if the paper does not come out.":
+    "ဤခလုတ်က ငွေကို ချက်ချင်းမှတ်ပါတယ်။ စက္ကူမထွက်ရင် ပြေစာကို ပြန်ပုံနှိပ်နိုင်ပါတယ်။",
   "This posted cash payment has no linked movement, so the void does not name a destination session.":
     "စာရင်းသွင်းပြီး ဤငွေသား ငွေပေးချေမှုတွင် ချိတ်ဆက်ထားသော အဝင်အထွက် မရှိသောကြောင့် ပယ်ဖျက်ရာတွင် လက်ခံမည့် ကာလကို မဖော်ပြပါ။",
+  "This slip is a printer test. It is not a receipt.":
+    "ဤစာရွက်သည် ပရင်တာစမ်းသပ်ချက်ဖြစ်ပြီး ပြေစာ မဟုတ်ပါ။",
   "This voids the document. It does not change the payment, cash, or stock.":
     "ဤလုပ်ဆောင်ချက်သည် စာရွက်စာတမ်းကို ပယ်ဖျက်ပါသည်။ ငွေပေးချေမှု၊ ငွေသား သို့မဟုတ် လက်ကျန်ကို မပြောင်းလဲပါ။",
   Threshold: "သတ်မှတ်ချက်",
@@ -573,6 +648,7 @@ export const financeMm = {
   "Unit cost": "တစ်ခုလျှင် ကုန်ကျစရိတ်",
   "Use three decimals, such as 1.000. A leading minus removes stock.":
     "ဒသမသုံးလုံး သုံးပါ၊ ဥပမာ 1.000။ အရှေ့တွင် အနုတ်လက္ခဏာထားလျှင် လက်ကျန်လျော့ပါသည်။",
+  VOID: "ပယ်ဖျက်",
   Void: "ပယ်ဖျက်",
   "Void expense": "ကုန်ကျစရိတ် ပယ်ဖျက်ရန်",
   "Void only this receipt document": "ဤပြေစာစာရွက်ကိုသာ ပယ်ဖျက်ရန်",
@@ -583,6 +659,10 @@ export const financeMm = {
   "Void salary period": "လစာကာလ ပယ်ဖျက်ရန်",
   "Void the full sale": "အရောင်းတစ်ခုလုံး ပယ်ဖျက်ရန်",
   "Walk-in": "လာရောက်ဝယ်သူ",
+  "You need receipt access before a test slip can be printed.":
+    "စမ်းသပ်ပြေစာ ပုံနှိပ်ရန် ပြေစာကြည့်ရှုခွင့် လိုအပ်ပါသည်။",
+  "You need receipt access before the last receipt can be reprinted.":
+    "နောက်ဆုံးပြေစာကို ပြန်ပုံနှိပ်ရန် ပြေစာကြည့်ရှုခွင့် လိုအပ်ပါသည်။",
   "You see the sessions your access allows. Reception staff see the sessions they opened. Totals are the server's figures.":
     "သင့်ဝင်ရောက်ခွင့်ရှိသော ကာလများကိုသာ မြင်ရပါသည်။ ဧည့်ကြိုဝန်ထမ်းများသည် မိမိဖွင့်ထားသော ကာလများကို မြင်ရပါသည်။ စုစုပေါင်းများသည် ဆာဗာ၏ ကိန်းဂဏန်းများ ဖြစ်ပါသည်။",
 } satisfies Record<keyof typeof financeEn, string>;

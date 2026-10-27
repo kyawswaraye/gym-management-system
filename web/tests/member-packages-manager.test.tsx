@@ -160,7 +160,7 @@ describe("member package catalog", () => {
     expect(compact(grants[0]?.textContent ?? "")).toContain(
       "ACTIVE · remaining 9 of 10",
     );
-    expect(grants[0]).toHaveTextContent("2026-10-01 to 2027-01-01");
+    expect(grants[0]).toHaveTextContent("01-10-2026 to 01-01-2027");
     expect(within(grants[0]!).getByTitle(MEMBER)).toHaveTextContent(
       MEMBER.slice(-6),
     );
@@ -421,8 +421,8 @@ describe("session ledger", () => {
     expect(compact(ledger.textContent ?? "")).toContain("ATTENDED · -1");
     expect(ledger).toHaveTextContent("+10");
     expect(ledger).toHaveTextContent("-1");
-    expect(ledger).toHaveTextContent("2026-10-01 00:00 UTC");
-    expect(ledger).toHaveTextContent("2026-10-02 09:30 UTC");
+    expect(ledger).toHaveTextContent("01-10-2026 00:00");
+    expect(ledger).toHaveTextContent("02-10-2026 09:30");
     expect(within(ledger).getByText("+10")).toHaveClass("text-emerald-700");
     expect(within(ledger).getByText("-1")).toHaveClass("text-red-700");
     expect(ledger).toHaveTextContent("PT booking");
@@ -826,7 +826,7 @@ describe("correct ledger dialog", () => {
     expect(within(dialog).getByTitle(BOOKING)).toHaveTextContent(
       BOOKING.slice(-6),
     );
-    expect(dialog).toHaveTextContent("2026-10-02 09:30 UTC");
+    expect(dialog).toHaveTextContent("02-10-2026 09:30");
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(

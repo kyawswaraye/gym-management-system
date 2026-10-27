@@ -1289,7 +1289,7 @@ def test_daily_sales_keeps_void_gross_and_dates_returns() -> None:
 
 
 @override_settings(**jwt_settings())
-def test_receipt_issuer_uses_staff_name_then_email() -> None:
+def test_receipt_issuer_uses_staff_code_then_email() -> None:
     api, gym, _owner, headers = _gym("PAYISS")
     named = add_staff(gym, email="payiss-named@example.test", role_key="MANAGER")
     plain = add_staff(gym, email="payiss-plain@example.test", role_key="MANAGER")
@@ -1305,7 +1305,7 @@ def test_receipt_issuer_uses_staff_name_then_email() -> None:
     member_id = _member(api, headers, gym)
     membership_id = _membership(api, headers, gym, member_id)
     for actor, expected in (
-        (named, "Desk Lead"),
+        (named, "DESK"),
         (plain, plain.user.email),
     ):
         created = _draft(
