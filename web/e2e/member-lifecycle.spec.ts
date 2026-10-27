@@ -460,7 +460,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   await expect(
     profile.getByRole("textbox", { name: "Notes", exact: true }),
   ).toHaveValue("E2E intake note");
-  await expect(page.locator("p.muted")).toHaveText(memberNumber);
+  await expect(page.getByText(memberNumber, { exact: true })).toBeVisible();
   await expect(
     page.getByText("No profile photo.", { exact: true }),
   ).toBeVisible();

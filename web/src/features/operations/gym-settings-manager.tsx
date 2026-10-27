@@ -1170,6 +1170,7 @@ function ProfileSection({
               <label className="field">
                 <span>Currency</span>
                 <select
+                  aria-label="Currency"
                   className="input"
                   defaultValue={profile.currency === "MMK" ? "MMK" : "THB"}
                   name="currency"
@@ -1436,6 +1437,7 @@ function SettingsSection({
                   Week starts on
                 </span>
                 <select
+                  aria-label="Week starts on"
                   className="input"
                   defaultValue={String(settings.week_starts_on)}
                   name="week_starts_on"
