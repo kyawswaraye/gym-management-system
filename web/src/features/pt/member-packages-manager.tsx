@@ -314,7 +314,8 @@ function GrantRow({
           </span>
           <span className="sr-only"> · </span>
           <span className="text-sm font-semibold text-slate-700">
-            {tx("remaining")} {row.remaining_sessions} {tx("of")} {row.granted_sessions}
+            {tx("remaining")} {row.remaining_sessions} {tx("of")}{" "}
+            {row.granted_sessions}
           </span>
         </p>
         <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">

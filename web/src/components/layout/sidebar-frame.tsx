@@ -96,10 +96,11 @@ function AccountMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [anchor, setAnchor] = useState<MenuAnchor | null>(null);
-
-  useEffect(() => {
-    if (!sidebarOpen) setMenuOpen(false);
-  }, [sidebarOpen]);
+  const [sidebarWasOpen, setSidebarWasOpen] = useState(sidebarOpen);
+  if (sidebarOpen !== sidebarWasOpen) {
+    setSidebarWasOpen(sidebarOpen);
+    if (!sidebarOpen && menuOpen) setMenuOpen(false);
+  }
 
   useEffect(() => {
     if (!menuOpen) return;

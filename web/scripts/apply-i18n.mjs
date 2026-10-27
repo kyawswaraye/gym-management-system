@@ -81,7 +81,10 @@ function featureFor(file) {
   if (rel.includes("/features/platform/") || rel.includes("/super-admin/")) {
     return "platform";
   }
-  if (rel.includes("/components/layout/") || rel.endsWith("/workspace-nav.ts")) {
+  if (
+    rel.includes("/components/layout/") ||
+    rel.endsWith("/workspace-nav.ts")
+  ) {
     return "nav";
   }
   if (rel.includes("/features/operations/") || rel.includes("/app/(tenant)/")) {
@@ -121,13 +124,24 @@ function walk(dir, files = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === "api" || entry.name === "i18n" || entry.name === "types") {
+      if (
+        entry.name === "api" ||
+        entry.name === "i18n" ||
+        entry.name === "types"
+      ) {
         continue;
       }
       walk(full, files);
-    } else if (/\.(tsx|ts)$/.test(entry.name) && !entry.name.endsWith(".d.ts")) {
+    } else if (
+      /\.(tsx|ts)$/.test(entry.name) &&
+      !entry.name.endsWith(".d.ts")
+    ) {
       const rel = full.replaceAll("\\", "/");
-      if (rel.includes("/lib/") && !rel.includes("/lib/ui/") && !rel.endsWith("/errors.ts")) {
+      if (
+        rel.includes("/lib/") &&
+        !rel.includes("/lib/ui/") &&
+        !rel.endsWith("/errors.ts")
+      ) {
         continue;
       }
       files.push(full);
@@ -146,7 +160,11 @@ function parse(file, source) {
 
 function componentPath(nodePath) {
   return nodePath.findParent((parent) => {
-    if (parent.isFunctionDeclaration() && parent.node.id && /^[A-Z]/.test(parent.node.id.name)) {
+    if (
+      parent.isFunctionDeclaration() &&
+      parent.node.id &&
+      /^[A-Z]/.test(parent.node.id.name)
+    ) {
       return true;
     }
     if (
@@ -164,7 +182,11 @@ function componentPath(nodePath) {
 function skipString(nodePath) {
   const parent = nodePath.parent;
   if (!parent) return true;
-  if (parent.type === "ImportDeclaration" || parent.type === "ExportNamedDeclaration") return true;
+  if (
+    parent.type === "ImportDeclaration" ||
+    parent.type === "ExportNamedDeclaration"
+  )
+    return true;
   if (parent.type === "TSLiteralType") return true;
   if (parent.type === "JSXAttribute") {
     const name = parent.name.name;
@@ -179,7 +201,10 @@ function skipString(nodePath) {
   ) {
     return true;
   }
-  if (parent.type === "BinaryExpression" && ["===", "!==", "==", "!="].includes(parent.operator)) {
+  if (
+    parent.type === "BinaryExpression" &&
+    ["===", "!==", "==", "!="].includes(parent.operator)
+  ) {
     return true;
   }
   if (parent.type === "NewExpression") return true;
@@ -192,21 +217,33 @@ function shouldWrap(nodePath) {
   if (!isHumanCopy(node.value) || isClassList(node.value)) return false;
   if (!componentPath(nodePath)) return false;
   if (skipString(nodePath)) return false;
-  if (nodePath.findParent((parent) => parent.isJSXAttribute() && parent.node.name?.name === "className")) {
+  if (
+    nodePath.findParent(
+      (parent) =>
+        parent.isJSXAttribute() && parent.node.name?.name === "className",
+    )
+  ) {
     return false;
   }
   const parent = nodePath.parent;
   if (parent.type === "JSXAttribute") return ATTRS.has(parent.name.name);
   if (parent.type === "JSXExpressionContainer") return true;
-  if (parent.type === "ConditionalExpression" && (parent.consequent === node || parent.alternate === node)) {
-    return Boolean(nodePath.findParent((item) => item.isJSXExpressionContainer()));
+  if (
+    parent.type === "ConditionalExpression" &&
+    (parent.consequent === node || parent.alternate === node)
+  ) {
+    return Boolean(
+      nodePath.findParent((item) => item.isJSXExpressionContainer()),
+    );
   }
   if (
     parent.type === "LogicalExpression" &&
     parent.operator === "&&" &&
     parent.right === node
   ) {
-    return Boolean(nodePath.findParent((item) => item.isJSXExpressionContainer()));
+    return Boolean(
+      nodePath.findParent((item) => item.isJSXExpressionContainer()),
+    );
   }
   if (
     parent.type === "ObjectProperty" &&
@@ -223,7 +260,10 @@ function shouldWrap(nodePath) {
   ) {
     return true;
   }
-  if (parent.type === "ReturnStatement" || parent.type === "ArrowFunctionExpression") {
+  if (
+    parent.type === "ReturnStatement" ||
+    parent.type === "ArrowFunctionExpression"
+  ) {
     return true;
   }
   return false;
@@ -239,7 +279,8 @@ function escapeText(text, quote) {
 
 function quoteCall(text) {
   const normalized = text.replace(/\s+/g, " ").trim();
-  const quote = normalized.includes('"') && !normalized.includes("'") ? "'" : '"';
+  const quote =
+    normalized.includes('"') && !normalized.includes("'") ? "'" : '"';
   return `tx(${quote}${escapeText(normalized, quote)}${quote})`;
 }
 
@@ -256,8 +297,10 @@ function collectKeys(file, source, found) {
         parent.type === "JSXText" ||
         (parent.type === "ObjectProperty" &&
           !parent.computed &&
-          ((parent.key.type === "Identifier" && PROP_NAMES.has(parent.key.name)) ||
-            (parent.key.type === "StringLiteral" && PROP_NAMES.has(parent.key.value)))) ||
+          ((parent.key.type === "Identifier" &&
+            PROP_NAMES.has(parent.key.name)) ||
+            (parent.key.type === "StringLiteral" &&
+              PROP_NAMES.has(parent.key.value)))) ||
         (parent.type === "CallExpression" &&
           parent.callee.type === "Identifier" &&
           CALLS.has(parent.callee.name)) ||
@@ -278,8 +321,13 @@ function collectKeys(file, source, found) {
 
 function transform(file) {
   const original = fs.readFileSync(file, "utf8");
-  const client = original.includes('"use client"') || original.includes("'use client'");
-  if (!client || file.endsWith(`${path.sep}language-switch.tsx`) || file.endsWith(`${path.sep}use-tx.tsx`)) {
+  const client =
+    original.includes('"use client"') || original.includes("'use client'");
+  if (
+    !client ||
+    file.endsWith(`${path.sep}language-switch.tsx`) ||
+    file.endsWith(`${path.sep}use-tx.tsx`)
+  ) {
     return false;
   }
   const ast = parse(file, original);
@@ -316,7 +364,8 @@ function transform(file) {
       if (parent.type !== "JSXElement" && parent.type !== "JSXFragment") return;
       const expr = nodePath.node.expression;
       if (!expr || expr.type === "JSXEmptyExpression") return;
-      const displayId = expr.type === "Identifier" && DISPLAY_IDS.has(expr.name);
+      const displayId =
+        expr.type === "Identifier" && DISPLAY_IDS.has(expr.name);
       const displayProp =
         expr.type === "MemberExpression" &&
         !expr.computed &&
@@ -325,14 +374,21 @@ function transform(file) {
       if (!displayId && !displayProp) return;
       const raw = original.slice(expr.start, expr.end);
       if (raw.startsWith("tx(")) return;
-      replacements.push({ start: expr.start, end: expr.end, text: `tx(${raw})` });
+      replacements.push({
+        start: expr.start,
+        end: expr.end,
+        text: `tx(${raw})`,
+      });
     },
   });
   if (replacements.length === 0) return false;
   replacements.sort((a, b) => b.start - a.start);
   let next = original;
   for (const replacement of replacements) {
-    next = next.slice(0, replacement.start) + replacement.text + next.slice(replacement.end);
+    next =
+      next.slice(0, replacement.start) +
+      replacement.text +
+      next.slice(replacement.end);
   }
 
   const updated = parse(file, next);
@@ -359,7 +415,11 @@ function transform(file) {
       }
       const block = next.slice(body.start, body.end);
       if (!block.includes("tx(") || block.includes("const tx = useTx(")) return;
-      inserts.push({ start: body.start + 1, end: body.start + 1, text: "\n  const tx = useTx();" });
+      inserts.push({
+        start: body.start + 1,
+        end: body.start + 1,
+        text: "\n  const tx = useTx();",
+      });
     },
   });
   inserts.sort((a, b) => b.start - a.start);

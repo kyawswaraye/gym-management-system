@@ -983,17 +983,17 @@ A `SCANNING` row holds `scan_attempt_id` and `scan_started_at`. The claim is sta
 
 The claim transaction evaluates a `REJECTED` row before delete retention, so a rejected asset keeps returning its stored code after object removal:
 
-| Asset state                                      | Confirmation body              | Result                                                                                          |
-| ------------------------------------------------ | ------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `PENDING` or `ERROR`, `QUARANTINED`              | Differs from stored `upload_*` | `422 FILE_CONFIRMATION_MISMATCH`; asset unchanged                                               |
-| `PENDING` or `ERROR`, `QUARANTINED`              | Matches `upload_*`             | Claim, commit, then external verification                                                       |
-| `SCANNING`, `QUARANTINED`, younger than 120s     | Any syntactically valid body   | `409 FILE_SCAN_IN_PROGRESS`; asset unchanged                                                    |
-| `SCANNING`, `QUARANTINED`, stale                 | Differs from stored `upload_*` | `422 FILE_CONFIRMATION_MISMATCH`; the stale claim stays                                         |
-| `SCANNING`, `QUARANTINED`, stale                 | Matches `upload_*`             | Replace the claim, commit, then external verification                                           |
-| `CLEAN`, `ACTIVE`                                | Matches stored `upload_*`      | `200` with the stored sanitized metadata; no claim, no MinIO call, no second scan, no rewrite |
-| `CLEAN`, `ACTIVE`                                | Differs from stored `upload_*` | `422 FILE_CONFIRMATION_MISMATCH`; asset unchanged                                               |
-| `REJECTED`, any retention                        | Any                            | `422` using the stored `rejection_code`; no second scan                                         |
-| `DELETE_PENDING` or `DELETED`, scan not `REJECTED` | Any                          | `409 FILE_STATE_CONFLICT`; asset unchanged                                                      |
+| Asset state                                        | Confirmation body              | Result                                                                                        |
+| -------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------- |
+| `PENDING` or `ERROR`, `QUARANTINED`                | Differs from stored `upload_*` | `422 FILE_CONFIRMATION_MISMATCH`; asset unchanged                                             |
+| `PENDING` or `ERROR`, `QUARANTINED`                | Matches `upload_*`             | Claim, commit, then external verification                                                     |
+| `SCANNING`, `QUARANTINED`, younger than 120s       | Any syntactically valid body   | `409 FILE_SCAN_IN_PROGRESS`; asset unchanged                                                  |
+| `SCANNING`, `QUARANTINED`, stale                   | Differs from stored `upload_*` | `422 FILE_CONFIRMATION_MISMATCH`; the stale claim stays                                       |
+| `SCANNING`, `QUARANTINED`, stale                   | Matches `upload_*`             | Replace the claim, commit, then external verification                                         |
+| `CLEAN`, `ACTIVE`                                  | Matches stored `upload_*`      | `200` with the stored sanitized metadata; no claim, no MinIO call, no second scan, no rewrite |
+| `CLEAN`, `ACTIVE`                                  | Differs from stored `upload_*` | `422 FILE_CONFIRMATION_MISMATCH`; asset unchanged                                             |
+| `REJECTED`, any retention                          | Any                            | `422` using the stored `rejection_code`; no second scan                                       |
+| `DELETE_PENDING` or `DELETED`, scan not `REJECTED` | Any                            | `409 FILE_STATE_CONFLICT`; asset unchanged                                                    |
 
 `409 FILE_SCAN_IN_PROGRESS` uses the standard error envelope. The response includes header `Retry-After`: the whole seconds remaining until `scan_started_at` plus 120 seconds, rounded up, at least 1 and at most 120. The body omits the attempt id, object key, and object bytes.
 

@@ -1804,7 +1804,9 @@ export function ClassesManager({
 
       {mode?.kind === "edit-type" && canManage ? (
         <ClassDialog
-          description={tx("Code {code} stays unchanged.", { code: mode.row.code })}
+          description={tx("Code {code} stays unchanged.", {
+            code: mode.row.code,
+          })}
           descriptionId="edit-class-type-description"
           dialogId="edit-class-type-dialog"
           dialogRef={dialogRef}

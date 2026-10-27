@@ -24,7 +24,7 @@ test("manager returns one unit of a posted card sale", async ({ page }) => {
 
   const sale = page.getByRole("region", { name: "Sale detail" });
   await page
-    .getByRole("row", { name: /POSTED/ })
+    .getByRole("row", { name: /Posted/ })
     .getByRole("button")
     .click();
   await expect(sale.getByText("E2E Bottle")).toBeVisible();

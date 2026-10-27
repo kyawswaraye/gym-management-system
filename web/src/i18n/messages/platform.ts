@@ -169,8 +169,7 @@ export const platformMm = {
   "Platform sections": "ပလက်ဖောင်း အပိုင်းများ",
   "Price for": "ဤကုဒ်အတွက် ဈေးနှုန်း",
   "Provision gym": "Gym ဖန်တီးရန်",
-  "Provision gym and email Owner":
-    "Gym ဖန်တီးပြီး ပိုင်ရှင်ထံ အီးမေးလ်ပို့ရန်",
+  "Provision gym and email Owner": "Gym ဖန်တီးပြီး ပိုင်ရှင်ထံ အီးမေးလ်ပို့ရန်",
   "Provisioning…": "ဖန်တီးနေသည်…",
   "Reason *": "အကြောင်းပြချက် *",
   "Recent MFA verification is required.":

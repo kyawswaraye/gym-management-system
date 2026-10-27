@@ -1529,7 +1529,9 @@ export function SalesManager({
               collectionError={sessions.error}
               currency={currency}
               key={row.id}
-              label={tx("Payout destination for {amount}", { amount: row.amount })}
+              label={tx("Payout destination for {amount}", {
+                amount: row.amount,
+              })}
               name={`payout_${row.id}`}
               pending={sessions.pending}
               resetKey={voidDate}

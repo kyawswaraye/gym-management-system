@@ -31,7 +31,11 @@ export class NetworkError extends Error {
   readonly status = 0;
   readonly code = "NETWORK";
 
-  constructor(message = tx("You appear to be offline. Check the connection and try again.")) {
+  constructor(
+    message = tx(
+      "You appear to be offline. Check the connection and try again.",
+    ),
+  ) {
     super(message);
     this.name = "NetworkError";
   }

@@ -68,7 +68,8 @@ function componentPath(nodePath) {
 
 function shouldWrap(nodePath) {
   if (nodePath.node.type !== "StringLiteral") return false;
-  if (!isHumanCopy(nodePath.node.value) || !componentPath(nodePath)) return false;
+  if (!isHumanCopy(nodePath.node.value) || !componentPath(nodePath))
+    return false;
   const parent = nodePath.parent;
   if (
     parent.type === "CallExpression" &&
@@ -78,16 +79,16 @@ function shouldWrap(nodePath) {
     return false;
   }
   if (parent.type === "JSXAttribute") {
-    return (
-      parent.name.type === "JSXIdentifier" && ATTRS.has(parent.name.name)
-    );
+    return parent.name.type === "JSXIdentifier" && ATTRS.has(parent.name.name);
   }
   if (parent.type === "JSXExpressionContainer") return true;
   if (
     parent.type === "ConditionalExpression" &&
     (parent.consequent === nodePath.node || parent.alternate === nodePath.node)
   ) {
-    return Boolean(nodePath.findParent((item) => item.isJSXExpressionContainer()));
+    return Boolean(
+      nodePath.findParent((item) => item.isJSXExpressionContainer()),
+    );
   }
   if (
     parent.type === "ObjectProperty" &&
@@ -109,8 +110,11 @@ function shouldWrap(nodePath) {
 
 function quoteCall(text) {
   const normalized = text.replace(/\s+/g, " ").trim();
-  const quote = normalized.includes('"') && !normalized.includes("'") ? "'" : '"';
-  const escaped = normalized.replaceAll("\\", "\\\\").replaceAll(quote, `\\${quote}`);
+  const quote =
+    normalized.includes('"') && !normalized.includes("'") ? "'" : '"';
+  const escaped = normalized
+    .replaceAll("\\", "\\\\")
+    .replaceAll(quote, `\\${quote}`);
   return `tx(${quote}${escaped}${quote})`;
 }
 
@@ -142,7 +146,9 @@ for (const file of walk(root)) {
       if (!isHumanCopy(text)) return;
       keys.add(text);
       const quote = text.includes('"') && !text.includes("'") ? "'" : '"';
-      const escaped = text.replaceAll("\\", "\\\\").replaceAll(quote, `\\${quote}`);
+      const escaped = text
+        .replaceAll("\\", "\\\\")
+        .replaceAll(quote, `\\${quote}`);
       let replacement = `{tx(${quote}${escaped}${quote})}`;
       if (/^\s/.test(raw)) replacement = `{" "}${replacement}`;
       if (/\s$/.test(raw)) replacement = `${replacement}{" "}`;
@@ -157,7 +163,10 @@ for (const file of walk(root)) {
   replacements.sort((a, b) => b.start - a.start);
   let next = original;
   for (const replacement of replacements) {
-    next = next.slice(0, replacement.start) + replacement.text + next.slice(replacement.end);
+    next =
+      next.slice(0, replacement.start) +
+      replacement.text +
+      next.slice(replacement.end);
   }
   const updated = parser.parse(next, {
     sourceType: "module",
@@ -204,9 +213,11 @@ for (const file of walk(root)) {
   fs.writeFileSync(file, next);
   changed += 1;
 }
-fs.mkdirSync(path.resolve(import.meta.dirname, "i18n-keys"), { recursive: true });
+fs.mkdirSync(path.resolve(import.meta.dirname, "i18n-keys"), {
+  recursive: true,
+});
 fs.writeFileSync(
   path.resolve(import.meta.dirname, "i18n-keys/mobile.json"),
   JSON.stringify([...keys].sort(), null, 2),
 );
-console.log(JSON.stringify({ changed, keys: keys.size }));
+process.stdout.write(`${JSON.stringify({ changed, keys: keys.size })}\n`);

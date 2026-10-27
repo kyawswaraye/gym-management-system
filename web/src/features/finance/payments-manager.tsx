@@ -1578,7 +1578,8 @@ function PaymentFields({
           <option value="">{tx("No membership")}</option>
           {memberships.map((row) => (
             <option key={row.id} value={row.id}>
-              {row.plan_name} · {tx(row.status)} · {row.final_amount} {tx(row.currency)}
+              {row.plan_name} · {tx(row.status)} · {row.final_amount}{" "}
+              {tx(row.currency)}
             </option>
           ))}
         </SelectInput>
@@ -1590,7 +1591,10 @@ function PaymentFields({
           required
         />
       </Field>
-      <Field error={fields.amount} label={tx("Amount ({currency})", { currency: tx(currency) })}>
+      <Field
+        error={fields.amount}
+        label={tx("Amount ({currency})", { currency: tx(currency) })}
+      >
         <TextInput
           defaultValue={payment?.amount ?? ""}
           inputMode="decimal"

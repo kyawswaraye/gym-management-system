@@ -436,12 +436,8 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   await expect(
     profile.getByLabel("Address line 2", { exact: true }),
   ).toHaveValue("Floor 2");
-  await expect(profile.getByLabel("City", { exact: true })).toHaveValue(
-    "Yangon",
-  );
-  await expect(profile.getByLabel("Region", { exact: true })).toHaveValue(
-    "Yangon Region",
-  );
+  await expect(combobox(profile, "City")).toHaveValue("Yangon");
+  await expect(combobox(profile, "Region")).toHaveValue("Yangon Region");
   await expect(profile.getByLabel("Postal code", { exact: true })).toHaveValue(
     "11181",
   );
@@ -621,9 +617,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
       UPDATED_PHONE,
     );
     await expect(combobox(profile, "Gender")).toHaveValue("MALE");
-    await expect(profile.getByLabel("City", { exact: true })).toHaveValue(
-      "Mandalay",
-    );
+    await expect(combobox(profile, "City")).toHaveValue("Mandalay");
     await expect(
       profile.getByRole("textbox", { name: "Notes", exact: true }),
     ).toHaveValue("E2E updated lifecycle note");

@@ -101,7 +101,11 @@ def test_membership_plan_validation_rejects_invalid_price_and_duration() -> None
     )
 
     assert not blank.is_valid()
-    assert set(blank.errors) >= {"code", "name"}
+    assert "name" in blank.errors
+    assert "code" not in blank.errors
+    omitted = MembershipPlanCreateSerializer(data=_create_body(code="   "))
+    assert omitted.is_valid(), omitted.errors
+    assert omitted.validated_data["code"] == ""
     assert not negative.is_valid()
     assert "price" in negative.errors
     assert not scale.is_valid()

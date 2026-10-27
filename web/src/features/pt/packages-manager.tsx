@@ -50,11 +50,7 @@ function validityLabel(
     YEAR: "year",
   };
   const word = words[unit];
-  const label = word
-    ? value === 1
-      ? word
-      : `${word}s`
-    : unit.toLowerCase();
+  const label = word ? (value === 1 ? word : `${word}s`) : unit.toLowerCase();
   return tx("{count} {unit}", { count: value, unit: tx(label) });
 }
 
@@ -410,7 +406,11 @@ export function PackagesManager({
                             {tx("Validity")}
                           </dt>
                           <dd className="mt-0.5 font-semibold text-slate-900">
-                            {validityLabel(row.validity_value, row.validity_unit, tx)}
+                            {validityLabel(
+                              row.validity_value,
+                              row.validity_unit,
+                              tx,
+                            )}
                           </dd>
                         </div>
                         <div className="col-span-2 sm:col-span-1">

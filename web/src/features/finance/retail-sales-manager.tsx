@@ -760,7 +760,11 @@ export function RetailSalesManager({
                           value={line.quantity}
                         />
                       </Field>
-                      <Field label={tx("Discount ({currency})", { currency: tx(currency) })}>
+                      <Field
+                        label={tx("Discount ({currency})", {
+                          currency: tx(currency),
+                        })}
+                      >
                         <TextInput
                           inputMode="decimal"
                           onChange={(event) =>
@@ -1032,8 +1036,8 @@ export function RetailSalesManager({
                         {tx("Sale")}{" "}
                       </p>
                       <p className="mt-1 text-sm text-slate-500">
-                        {sale.business_date} · {tx(pretty(sale.payment_method))} ·{" "}
-                        {memberLabel(members, sale.member_id, tx)}
+                        {sale.business_date} · {tx(pretty(sale.payment_method))}{" "}
+                        · {memberLabel(members, sale.member_id, tx)}
                       </p>
                     </div>
                     <StatusPill status={sale.status} />
@@ -1482,10 +1486,12 @@ export function RetailSalesManager({
                           continue;
                         }
                         if (entered > remaining) {
-                          nextFields[line.id] =
-                            tx("Enter no more than the remaining {quantity}.", {
+                          nextFields[line.id] = tx(
+                            "Enter no more than the remaining {quantity}.",
+                            {
                               quantity: line.remaining_quantity,
-                            });
+                            },
+                          );
                           continue;
                         }
                         chosen.push({ line_id: line.id, quantity });

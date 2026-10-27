@@ -344,7 +344,9 @@ function StaffLineList({ lines }: { lines: StaffSalaryLine[] }) {
           </div>
           <p className="shrink-0 text-sm font-bold text-slate-900 tabular-nums">
             {line.amount}{" "}
-            <span className="font-medium text-slate-400">{tx(line.currency)}</span>
+            <span className="font-medium text-slate-400">
+              {tx(line.currency)}
+            </span>
           </p>
         </li>
       ))}

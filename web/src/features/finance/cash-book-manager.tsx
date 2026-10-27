@@ -93,7 +93,11 @@ function DirectionPill({ direction }: { direction: string }) {
           : "bg-rose-100 text-rose-700"
       }`}
     >
-      {inbound ? tx("In") : direction === "OUT" ? tx("Out") : tx(pretty(direction))}
+      {inbound
+        ? tx("In")
+        : direction === "OUT"
+          ? tx("Out")
+          : tx(pretty(direction))}
     </span>
   );
 }
@@ -742,10 +746,13 @@ export function CashBookManager({
                         confirmClass="button button-success"
                         confirmLabel="Confirm close"
                         error={formError}
-                        hint={tx("Server expected closing: {amount} {currency}.", {
-                          amount: session.expected_closing,
-                          currency: tx(session.currency),
-                        })}
+                        hint={tx(
+                          "Server expected closing: {amount} {currency}.",
+                          {
+                            amount: session.expected_closing,
+                            currency: tx(session.currency),
+                          },
+                        )}
                         onCancel={() => {
                           setMode(null);
                           setActualClosing("");
@@ -1065,7 +1072,9 @@ export function CashBookManager({
             </Field>
             <Field
               error={fields.opening_cash}
-              label={tx("Opening cash ({currency})", { currency: tx(currency) })}
+              label={tx("Opening cash ({currency})", {
+                currency: tx(currency),
+              })}
             >
               <TextInput inputMode="decimal" name="opening_cash" required />
             </Field>

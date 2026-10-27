@@ -27,9 +27,8 @@ export async function requestGoogleIdToken(
   if (!config.googleWebClientId) {
     throw new Error("Google sign-in is not configured.");
   }
-  const loaded = (await import(
-    "@react-native-google-signin/google-signin"
-  )) as GoogleSignInModule;
+  const loaded =
+    (await import("@react-native-google-signin/google-signin")) as GoogleSignInModule;
   loaded.GoogleSignin.configure({
     webClientId: config.googleWebClientId,
     iosClientId: config.googleIosClientId || undefined,
@@ -63,5 +62,7 @@ function isCancelled(error: unknown, cancelledCode: string): boolean {
     return false;
   }
   const code = String(error.code);
-  return code === cancelledCode || code === "SIGN_IN_CANCELLED" || code === "-5";
+  return (
+    code === cancelledCode || code === "SIGN_IN_CANCELLED" || code === "-5"
+  );
 }

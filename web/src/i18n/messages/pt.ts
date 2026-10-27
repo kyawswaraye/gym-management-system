@@ -603,7 +603,8 @@ export const ptMm = {
   "min ·": "မိနစ် ·",
   "No active class packages are available for this member.":
     "ဤအဖွဲ့ဝင်အတွက် အသုံးပြုနေသော အတန်း ပက်ကေ့ဂျ် မရှိပါ။",
-  "No active class types are available.": "အသုံးပြုနေသော အတန်း အမျိုးအစား မရှိပါ။",
+  "No active class types are available.":
+    "အသုံးပြုနေသော အတန်း အမျိုးအစား မရှိပါ။",
   "No active PT packages are available for this member.":
     "ဤအဖွဲ့ဝင်အတွက် အသုံးပြုနေသော PT ပက်ကေ့ဂျ် မရှိပါ။",
   "No assignments match.": "ကိုက်ညီသော တာဝန်ပေးအပ်မှု မရှိပါ။",
@@ -619,7 +620,8 @@ export const ptMm = {
   "No packages match.": "ကိုက်ညီသော ပက်ကေ့ဂျ် မရှိပါ။",
   "No payouts are recorded.": "ထုတ်ပေးငွေ မှတ်တမ်း မရှိပါ။",
   "No payouts have been recorded.": "ထုတ်ပေးငွေ မှတ်တမ်းတင်ထားခြင်း မရှိသေးပါ။",
-  "No PT bookings are in this range.": "ဤအပိုင်းအခြားတွင် PT ကြိုတင်စာရင်း မရှိပါ။",
+  "No PT bookings are in this range.":
+    "ဤအပိုင်းအခြားတွင် PT ကြိုတင်စာရင်း မရှိပါ။",
   "No PT sales match.": "ကိုက်ညီသော PT အရောင်း မရှိပါ။",
   "No reversible entries are on this page. Grant entries cannot be corrected. Move to another page to reach an earlier entry.":
     "ဤစာမျက်နှာတွင် ပြန်လှန်နိုင်သော စာရင်းချက် မရှိပါ။ ပေးအပ်ချက် စာရင်းချက်များကို ပြင်ဆင်၍ မရပါ။ စောသော စာရင်းချက်သို့ ရောက်ရန် အခြားစာမျက်နှာသို့ သွားပါ။",
@@ -797,7 +799,8 @@ export const ptMm = {
     "အခြား အပိုင်းအခြားကို စမ်းကြည့်ပါ၊ သို့မဟုတ် အဖွဲ့ဝင် စစ်ထုတ်မှုကို ရှင်းပါ။",
   "Try changing or clearing the current filter.":
     "လက်ရှိ စစ်ထုတ်မှုကို ပြောင်းပါ သို့မဟုတ် ရှင်းပါ။",
-  "Unmetered manager booking": "လေ့ကျင့်ချိန်မနှုတ်သော စီမံခန့်ခွဲသူ ကြိုတင်စာရင်း",
+  "Unmetered manager booking":
+    "လေ့ကျင့်ချိန်မနှုတ်သော စီမံခန့်ခွဲသူ ကြိုတင်စာရင်း",
   "Unmetered reason": "လေ့ကျင့်ချိန်မနှုတ်ရသည့် အကြောင်းပြချက်",
   "Upcoming sessions": "လာမည့် လေ့ကျင့်ချိန်များ",
   "Update schedule": "အချိန်ဇယား မွမ်းမံရန်",

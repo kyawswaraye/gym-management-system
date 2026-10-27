@@ -232,7 +232,12 @@ function readInteger(
   return value;
 }
 
-function readPrefix(form: FormData, name: string, label: string, tx: Tx): string {
+function readPrefix(
+  form: FormData,
+  name: string,
+  label: string,
+  tx: Tx,
+): string {
   const prefix = String(form.get(name) ?? "")
     .trim()
     .toUpperCase();

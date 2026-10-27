@@ -338,7 +338,10 @@ function ExpenseFields({
           type="date"
         />
       </Field>
-      <Field error={fields.amount} label={tx("Amount ({currency})", { currency: tx(currency) })}>
+      <Field
+        error={fields.amount}
+        label={tx("Amount ({currency})", { currency: tx(currency) })}
+      >
         <TextInput
           defaultValue={expense?.amount}
           inputMode="decimal"
