@@ -264,6 +264,7 @@ export function CheckInsManager({
       idempotency.current = null;
       setNote("");
       setOccurredAt("");
+      setCheckInOpen(false);
       setNotice("Checked in.");
       await Promise.all([refreshHistory(selected.id), refreshOpenVisits()]);
     } catch (caught) {
@@ -284,6 +285,7 @@ export function CheckInsManager({
         : undefined;
       await checkOutCheckIn(checkInId, occurred);
       setCheckoutAt("");
+      setCheckOutOpen(false);
       setNotice("Checked out.");
       await refreshOpenVisits();
       if (selected) await refreshHistory(selected.id);

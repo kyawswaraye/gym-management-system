@@ -382,8 +382,12 @@ test("manager voids the untouched sale and runs the class cutoff", async ({
   await page.goto("/cash-book");
   await page.getByRole("button", { name: "MAIN", exact: true }).click();
   const table = movements(page);
-  await expect(table.getByText("E2E consumed pack")).toBeVisible();
-  await expect(table.getByText("E2E untouched pack")).toBeVisible();
+  await expect(
+    table.getByText("E2E consumed pack", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    table.getByText("E2E untouched pack", { exact: true }),
+  ).toBeVisible();
   await expect(table.getByRole("cell", { name: /100\.00\s*THB/ })).toHaveCount(
     1,
   );
