@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import type { FormEvent, ReactNode, Ref } from "react";
 
@@ -35,6 +36,7 @@ export function SaleCommandDialog({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const tx = useTx();
   return (
     <div
       className="fixed inset-0 z-50 grid overflow-hidden p-2 sm:place-items-center sm:p-6"
@@ -69,10 +71,10 @@ export function SaleCommandDialog({
         <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold text-slate-900" id={titleId}>
-              {title}
+              {tx(title)}
             </h2>
             <p className="mt-1 text-sm text-slate-500" id={descriptionId}>
-              {description}
+              {tx(description)}
             </p>
           </div>
           <button
@@ -81,7 +83,8 @@ export function SaleCommandDialog({
             onClick={onClose}
             type="button"
           >
-            Close
+            {" "}
+            {tx("Close")}{" "}
           </button>
         </div>
         <fieldset
@@ -103,14 +106,15 @@ export function SaleCommandDialog({
               onClick={onClose}
               type="button"
             >
-              Cancel
+              {" "}
+              {tx("Cancel")}{" "}
             </button>
             <button
               className={`button w-full sm:w-auto ${submitClass}`}
               disabled={pending || submitDisabled}
               type="submit"
             >
-              {submitLabel}
+              {tx(submitLabel)}
             </button>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { useTx } from "../i18n/useTx";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { View } from "react-native";
@@ -17,9 +18,10 @@ import { ProfileScreen } from "../screens/ProfileScreen";
 import { ScanScreen } from "../screens/ScanScreen";
 import { ScheduleScreen } from "../screens/ScheduleScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
+import { BrandMark } from "../ui/BrandMark";
 import { Button } from "../ui/Button";
 import { ErrorState, LoadingState } from "../ui/StateView";
-import { colors } from "../ui/theme";
+import { colors, space } from "../ui/theme";
 import type {
   AccountStackParamList,
   AuthStackParamList,
@@ -41,18 +43,22 @@ const Tabs = createBottomTabNavigator<MainTabParamList>();
 const stackOptions = { headerShown: false } as const;
 
 export function RootNavigator() {
+  const tx = useTx();
   const auth = useAuth();
   if (auth.status === "loading") {
     return (
       <View
         style={{
-          flex: 1,
-          justifyContent: "center",
-          padding: 24,
+          alignItems: "center",
           backgroundColor: colors.background,
+          flex: 1,
+          gap: space.md,
+          justifyContent: "center",
+          padding: space.lg,
         }}
       >
-        <LoadingState label="Checking your session" />
+        <BrandMark size={96} />
+        <LoadingState label={tx("Checking your session")} />
       </View>
     );
   }
@@ -60,11 +66,11 @@ export function RootNavigator() {
     return (
       <View
         style={{
-          flex: 1,
-          justifyContent: "center",
-          padding: 24,
-          gap: 12,
           backgroundColor: colors.background,
+          flex: 1,
+          gap: space.md,
+          justifyContent: "center",
+          padding: space.lg,
         }}
       >
         <ErrorState
@@ -73,8 +79,8 @@ export function RootNavigator() {
           onRetry={auth.retry}
         />
         <Button
-          label="Sign out of this phone"
-          hint="Removes the saved session from this phone"
+          label={tx("Sign out of this phone")}
+          hint={tx("Removes the saved session from this phone")}
           onPress={() => auth.logout()}
         />
       </View>
@@ -93,11 +99,20 @@ export function RootNavigator() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
+        tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+        },
       }}
     >
       <Tabs.Screen
         name="Home"
-        options={{ tabBarLabel: "Home", tabBarAccessibilityLabel: "Home" }}
+        options={{
+          tabBarLabel: tx("Home"),
+          tabBarAccessibilityLabel: tx("Home"),
+        }}
       >
         {() => (
           <HomeStack.Navigator screenOptions={stackOptions}>
@@ -108,8 +123,8 @@ export function RootNavigator() {
       <Tabs.Screen
         name="Schedule"
         options={{
-          tabBarLabel: "Schedule",
-          tabBarAccessibilityLabel: "Schedule",
+          tabBarLabel: tx("Schedule"),
+          tabBarAccessibilityLabel: tx("Schedule"),
         }}
       >
         {() => (
@@ -121,8 +136,8 @@ export function RootNavigator() {
       <Tabs.Screen
         name="CheckIn"
         options={{
-          tabBarLabel: "Check in",
-          tabBarAccessibilityLabel: "Check in",
+          tabBarLabel: tx("Check in"),
+          tabBarAccessibilityLabel: tx("Check in"),
         }}
       >
         {() => (
@@ -133,7 +148,10 @@ export function RootNavigator() {
       </Tabs.Screen>
       <Tabs.Screen
         name="Inbox"
-        options={{ tabBarLabel: "Inbox", tabBarAccessibilityLabel: "Inbox" }}
+        options={{
+          tabBarLabel: tx("Inbox"),
+          tabBarAccessibilityLabel: tx("Inbox"),
+        }}
       >
         {() => (
           <InboxStack.Navigator screenOptions={stackOptions}>
@@ -144,8 +162,8 @@ export function RootNavigator() {
       <Tabs.Screen
         name="Account"
         options={{
-          tabBarLabel: "Account",
-          tabBarAccessibilityLabel: "Account",
+          tabBarLabel: tx("Account"),
+          tabBarAccessibilityLabel: tx("Account"),
         }}
       >
         {() => (

@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -112,21 +113,23 @@ function namedFieldError(
 }
 
 function StatusPill({ status }: { status: string }) {
+  const tx = useTx();
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ${statusTone(status)}`}
     >
-      {status}
+      {tx(status)}
     </span>
   );
 }
 
 function FactGrid({ rows }: { rows: Array<{ label: string; value: string }> }) {
+  const tx = useTx();
   return (
     <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
       {rows.map((row) => (
         <div key={row.label}>
-          <dt className="text-xs text-slate-500">{row.label}</dt>
+          <dt className="text-xs text-slate-500">{tx(row.label)}</dt>
           <dd className="mt-0.5 text-sm font-semibold break-words text-slate-900">
             <IdentifierValue value={row.value} />
           </dd>
@@ -137,9 +140,10 @@ function FactGrid({ rows }: { rows: Array<{ label: string; value: string }> }) {
 }
 
 function LoadingRows({ label }: { label: string }) {
+  const tx = useTx();
   return (
     <div className="grid gap-3 p-4 sm:p-5" role="status">
-      <p className="text-sm font-medium text-slate-600">{label}</p>
+      <p className="text-sm font-medium text-slate-600">{tx(label)}</p>
       <div className="grid gap-2">
         {[0, 1, 2].map((item) => (
           <div
@@ -153,10 +157,11 @@ function LoadingRows({ label }: { label: string }) {
 }
 
 function EmptyState({ title, detail }: { title: string; detail: string }) {
+  const tx = useTx();
   return (
     <div className="px-5 py-14 text-center">
-      <p className="font-semibold text-slate-800">{title}</p>
-      <p className="mt-1 text-sm text-slate-500">{detail}</p>
+      <p className="font-semibold text-slate-800">{tx(title)}</p>
+      <p className="mt-1 text-sm text-slate-500">{tx(detail)}</p>
     </div>
   );
 }
@@ -170,6 +175,7 @@ function ProductFields({
   categories: ProductCategory[];
   fields: Record<string, string>;
 }) {
+  const tx = useTx();
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <Field error={fields.barcode} label="Barcode">
@@ -184,7 +190,7 @@ function ProductFields({
           name="category_id"
           required
         >
-          <option value="">Select a category</option>
+          <option value="">{tx("Select a category")}</option>
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
@@ -241,8 +247,8 @@ function ProductFields({
             defaultChecked={product.is_active}
             name="is_active"
             type="checkbox"
-          />
-          Active
+          />{" "}
+          {tx("Active")}{" "}
         </label>
       ) : null}
     </div>
@@ -258,6 +264,7 @@ export function InventoryManager({
   canAdjust: boolean;
   defaultDate: string;
 }) {
+  const tx = useTx();
   const [view, setView] = useState<InventorySection>("catalog");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [appliedCategory, setAppliedCategory] = useState("");
@@ -326,7 +333,7 @@ export function InventoryManager({
           if (!active) return;
           setProduct(null);
           setFormError(
-            financeError(caught, "The product could not be loaded."),
+            financeError(caught, tx("The product could not be loaded.")),
           );
         });
     }, 0);
@@ -334,7 +341,7 @@ export function InventoryManager({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [selectedId, products.rows]);
+  }, [selectedId, products.rows, tx]);
 
   function fail(caught: unknown, fallback: string) {
     setFields(fieldMap(caught));
@@ -448,39 +455,39 @@ export function InventoryManager({
   const productCopy =
     view === "low"
       ? {
-          title: "Low stock",
+          title: tx("Low stock"),
           detail: "These products are at or below their threshold.",
           loading: "Loading low stock.",
         }
       : {
-          title: "Products",
+          title: tx("Products"),
           detail: "Select a row to see stock, price, and sales.",
           loading: "Loading products.",
         };
   const productEmpty = appliedCategory
     ? view === "low"
       ? {
-          title: "No low-stock products in this category.",
+          title: tx("No low-stock products in this category."),
           detail: "Try another category, or check the full catalog.",
         }
       : {
-          title: "No products in this category.",
+          title: tx("No products in this category."),
           detail: "Try another category, or add a product.",
         }
     : view === "low"
       ? {
-          title: "Nothing is low on stock.",
+          title: tx("Nothing is low on stock."),
           detail: "Products at or below their threshold will show up here.",
         }
       : {
-          title: "No products yet.",
+          title: tx("No products yet."),
           detail: "Add a category, then create the first product.",
         };
 
   return (
     <div className="grid gap-6">
       <div
-        aria-label="Inventory sections"
+        aria-label={tx("Inventory sections")}
         className="flex flex-wrap gap-2"
         role="tablist"
       >
@@ -495,7 +502,7 @@ export function InventoryManager({
             role="tab"
             type="button"
           >
-            {label}
+            {tx(label)}
           </button>
         ))}
       </div>
@@ -513,7 +520,8 @@ export function InventoryManager({
                 className="text-lg font-bold text-slate-900"
                 id="product-categories-title"
               >
-                Product categories
+                {" "}
+                {tx("Product categories")}{" "}
               </h2>
               {canManage ? (
                 <button
@@ -524,7 +532,8 @@ export function InventoryManager({
                   }}
                   type="button"
                 >
-                  New category
+                  {" "}
+                  {tx("New category")}{" "}
                 </button>
               ) : null}
               {categories.rows.length > 0 ? (
@@ -534,7 +543,8 @@ export function InventoryManager({
               ) : null}
             </div>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-              Group products here before they go into the catalog.
+              {" "}
+              {tx("Group products here before they go into the catalog.")}{" "}
             </p>
           </div>
           {categories.error ? (
@@ -550,7 +560,7 @@ export function InventoryManager({
           categories.rows.length === 0 ? (
             <EmptyState
               detail="Create one before adding products."
-              title="No categories yet."
+              title={tx("No categories yet.")}
             />
           ) : null}
           {categories.rows.length > 0 ? (
@@ -571,7 +581,7 @@ export function InventoryManager({
                     </p>
                   </div>
                   <StatusPill
-                    status={category.is_active ? "Active" : "Inactive"}
+                    status={category.is_active ? tx("Active") : tx("Inactive")}
                   />
                 </li>
               ))}
@@ -619,7 +629,7 @@ export function InventoryManager({
                   .finally(() => setPending(false));
               }}
               pending={pending}
-              title="New category"
+              title={tx("New category")}
             >
               <div className={fieldTone}>
                 <Alert
@@ -628,6 +638,7 @@ export function InventoryManager({
                     code: "Category code",
                   })}
                 />
+
                 <div className="grid gap-4 sm:grid-cols-[minmax(0,20rem)_auto] sm:items-end">
                   <Field error={fields.name} label="Category name">
                     <TextInput name="name" required />
@@ -637,7 +648,8 @@ export function InventoryManager({
                     disabled={pending}
                     type="submit"
                   >
-                    Create category
+                    {" "}
+                    {tx("Create category")}{" "}
                   </button>
                 </div>
               </div>
@@ -682,21 +694,25 @@ export function InventoryManager({
                     className="text-xl font-bold text-slate-900"
                     id="new-product-title"
                   >
-                    New product
+                    {" "}
+                    {tx("New product")}{" "}
                   </h2>
                   <p
                     className="mt-1 text-sm leading-6 text-slate-500"
                     id="new-product-description"
                   >
-                    A SKU is assigned from the name. Prices use two decimals,
-                    such as 12.50. Quantities use three, such as 1.000.
+                    {" "}
+                    {tx(
+                      "A SKU is assigned from the name. Prices use two decimals, such as 12.50. Quantities use three, such as 1.000.",
+                    )}{" "}
                   </p>
                 </div>
                 <div className="grid gap-4 px-5 py-4 sm:px-6">
                   <Alert message={formError} />
                   {!categories.pending && categories.rows.length === 0 ? (
                     <p className="text-sm text-slate-500">
-                      Add a category before creating a product.
+                      {" "}
+                      {tx("Add a category before creating a product.")}{" "}
                     </p>
                   ) : null}
                   <ProductFields
@@ -712,14 +728,16 @@ export function InventoryManager({
                     onClick={closeCreate}
                     type="button"
                   >
-                    Cancel
+                    {" "}
+                    {tx("Cancel")}{" "}
                   </button>
                   <button
                     className={actionButtonClass("Create product")}
                     disabled={pending}
                     type="submit"
                   >
-                    Create product
+                    {" "}
+                    {tx("Create product")}{" "}
                   </button>
                 </div>
               </form>
@@ -738,7 +756,7 @@ export function InventoryManager({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">
-                      {productCopy.title}
+                      {tx(productCopy.title)}
                     </h2>
                     <p className="mt-1 text-sm leading-6 text-slate-500">
                       {productCopy.detail}
@@ -756,7 +774,8 @@ export function InventoryManager({
                       ref={createButtonRef}
                       type="button"
                     >
-                      New product
+                      {" "}
+                      {tx("New product")}{" "}
                     </button>
                   ) : null}
                 </div>
@@ -770,7 +789,7 @@ export function InventoryManager({
                       }}
                       value={categoryFilter}
                     >
-                      <option value="">All categories</option>
+                      <option value="">{tx("All categories")}</option>
                       {categories.rows.map((category) => (
                         <option key={category.id} value={category.id}>
                           {category.name}
@@ -816,7 +835,7 @@ export function InventoryManager({
                 >
                   <table className="w-full text-left text-sm">
                     <caption className="sr-only">
-                      {view === "low" ? "Low stock" : "Products"}
+                      {view === "low" ? tx("Low stock") : tx("Products")}
                     </caption>
                     <thead className="border-b border-slate-200 text-slate-500">
                       <tr>
@@ -824,40 +843,45 @@ export function InventoryManager({
                           className="px-5 py-2.5 text-xs font-semibold"
                           scope="col"
                         >
-                          SKU
+                          {tx("SKU")}
                         </th>
                         <th
                           className="px-5 py-2.5 text-xs font-semibold"
                           scope="col"
                         >
-                          Name
+                          {" "}
+                          {tx("Name")}{" "}
                         </th>
                         <th
                           className="px-5 py-2.5 text-right text-xs font-semibold"
                           scope="col"
                         >
-                          On hand
+                          {" "}
+                          {tx("On hand")}{" "}
                         </th>
                         {view === "low" ? (
                           <th
                             className="hidden px-5 py-2.5 text-right text-xs font-semibold sm:table-cell"
                             scope="col"
                           >
-                            Threshold
+                            {" "}
+                            {tx("Threshold")}{" "}
                           </th>
                         ) : (
                           <th
                             className="hidden px-5 py-2.5 text-right text-xs font-semibold md:table-cell"
                             scope="col"
                           >
-                            Sale price
+                            {" "}
+                            {tx("Sale price")}{" "}
                           </th>
                         )}
                         <th
                           className="px-5 py-2.5 text-xs font-semibold"
                           scope="col"
                         >
-                          Status
+                          {" "}
+                          {tx("Status")}{" "}
                         </th>
                       </tr>
                     </thead>
@@ -903,7 +927,8 @@ export function InventoryManager({
                               </span>
                               {view === "catalog" && low ? (
                                 <span className="mt-1 block text-[11px] font-bold tracking-wide text-amber-700 uppercase">
-                                  Low
+                                  {" "}
+                                  {tx("Low")}{" "}
                                 </span>
                               ) : null}
                             </td>
@@ -918,7 +943,9 @@ export function InventoryManager({
                             )}
                             <td className="px-5 py-3">
                               <StatusPill
-                                status={row.is_active ? "Active" : "Inactive"}
+                                status={
+                                  row.is_active ? tx("Active") : tx("Inactive")
+                                }
                               />
                             </td>
                           </tr>
@@ -951,10 +978,12 @@ export function InventoryManager({
                 {!product && !formError ? (
                   <div className="grid gap-3 p-5" role="status">
                     <h2 className="sr-only" id="product-detail-title">
-                      Product
+                      {" "}
+                      {tx("Product")}{" "}
                     </h2>
                     <p className="text-sm font-medium text-slate-600">
-                      Loading the product.
+                      {" "}
+                      {tx("Loading the product.")}{" "}
                     </p>
                     <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
                     <div className="grid grid-cols-2 gap-2">
@@ -966,7 +995,8 @@ export function InventoryManager({
                 {!product && formError ? (
                   <div className="p-5">
                     <h2 className="sr-only" id="product-detail-title">
-                      Product
+                      {" "}
+                      {tx("Product")}{" "}
                     </h2>
                     <Alert message={formError} />
                   </div>
@@ -977,7 +1007,8 @@ export function InventoryManager({
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
-                            Product
+                            {" "}
+                            {tx("Product")}{" "}
                           </p>
                           <h2
                             className="mt-1 text-xl font-black tracking-tight break-words text-slate-900"
@@ -990,7 +1021,9 @@ export function InventoryManager({
                           </p>
                         </div>
                         <StatusPill
-                          status={product.is_active ? "Active" : "Inactive"}
+                          status={
+                            product.is_active ? tx("Active") : tx("Inactive")
+                          }
                         />
                       </div>
                       <div
@@ -1002,7 +1035,8 @@ export function InventoryManager({
                       >
                         <div>
                           <p className="text-xs font-medium text-slate-500">
-                            Quantity on hand
+                            {" "}
+                            {tx("Quantity on hand")}{" "}
                           </p>
                           <p
                             className={`mt-1 text-2xl font-black tracking-tight tabular-nums ${
@@ -1015,70 +1049,80 @@ export function InventoryManager({
                           </p>
                           {isLow(product) ? (
                             <p className="mt-1 text-xs font-medium text-amber-800">
-                              At or below the threshold of{" "}
+                              {" "}
+                              {tx("At or below the threshold of")}{" "}
                               {product.low_stock_threshold}.
                             </p>
                           ) : null}
                         </div>
                         <p className="pb-1 text-sm font-semibold text-slate-500">
-                          {pretty(product.unit)}
+                          {tx(pretty(product.unit))}
                         </p>
                       </div>
                     </div>
                     <div className="px-5 py-4">
                       <p className="mb-3 text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase">
-                        Pricing
+                        {" "}
+                        {tx("Pricing")}{" "}
                       </p>
                       <FactGrid
                         rows={[
-                          { label: "Sale price", value: product.sale_price },
                           {
-                            label: "Current unit cost",
+                            label: tx("Sale price"),
+                            value: product.sale_price,
+                          },
+                          {
+                            label: tx("Current unit cost"),
                             value: product.current_unit_cost,
                           },
                           {
-                            label: "Default unit cost",
+                            label: tx("Default unit cost"),
                             value: product.default_unit_cost,
                           },
                           {
-                            label: "Low-stock threshold",
+                            label: tx("Low-stock threshold"),
                             value: product.low_stock_threshold,
                           },
                           {
-                            label: "Category",
+                            label: tx("Category"),
                             value:
                               categoryById.get(product.category_id) ??
                               "Unavailable",
                           },
                           ...(product.barcode
-                            ? [{ label: "Barcode", value: product.barcode }]
+                            ? [{ label: tx("Barcode"), value: product.barcode }]
                             : []),
                         ]}
                       />
                     </div>
                     <div className="border-t border-slate-100 px-5 py-4">
                       <p className="mb-3 text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase">
-                        Sales totals
+                        {" "}
+                        {tx("Sales totals")}{" "}
                       </p>
                       <FactGrid
                         rows={[
                           {
-                            label: "Sold quantity",
+                            label: tx("Sold quantity"),
                             value: product.sold_quantity,
                           },
-                          { label: "Revenue", value: product.revenue },
+                          { label: tx("Revenue"), value: product.revenue },
                           {
-                            label: "Cost of goods sold",
+                            label: tx("Cost of goods sold"),
                             value: product.cost_of_goods_sold,
                           },
                           {
-                            label: "Gross profit",
+                            label: tx("Gross profit"),
                             value: product.gross_profit,
                           },
                         ]}
                       />
+
                       <p className="mt-3 text-xs leading-5 text-slate-500">
-                        These stock and money totals are returned by the server.
+                        {" "}
+                        {tx(
+                          "These stock and money totals are returned by the server.",
+                        )}{" "}
                       </p>
                     </div>
                     {(canManage || canAdjust) && !editing && !adjusting ? (
@@ -1094,7 +1138,8 @@ export function InventoryManager({
                             }}
                             type="button"
                           >
-                            Edit product
+                            {" "}
+                            {tx("Edit product")}{" "}
                           </button>
                         ) : null}
                         {canAdjust ? (
@@ -1107,14 +1152,18 @@ export function InventoryManager({
                             }}
                             type="button"
                           >
-                            Adjust stock
+                            {" "}
+                            {tx("Adjust stock")}{" "}
                           </button>
                         ) : null}
                       </div>
                     ) : null}
                     {editing && canManage ? (
                       <FormDialog
-                        description={`SKU ${product.sku}. Prices use two decimals. Quantities use three.`}
+                        description={tx(
+                          "SKU {sku}. Prices use two decimals. Quantities use three.",
+                          { sku: product.sku },
+                        )}
                         key={product.id}
                         onClose={() => {
                           if (pending) return;
@@ -1123,7 +1172,7 @@ export function InventoryManager({
                         }}
                         onSubmit={saveProduct}
                         pending={pending}
-                        title="Edit product"
+                        title={tx("Edit product")}
                         wide
                       >
                         <Alert message={formError} />
@@ -1133,6 +1182,7 @@ export function InventoryManager({
                             fields={fields}
                             product={product}
                           />
+
                           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
                             <button
                               className="button button-cancel"
@@ -1143,14 +1193,16 @@ export function InventoryManager({
                               }}
                               type="button"
                             >
-                              Cancel
+                              {" "}
+                              {tx("Cancel")}{" "}
                             </button>
                             <button
                               className={actionButtonClass("Save product")}
                               disabled={pending}
                               type="submit"
                             >
-                              Save product
+                              {" "}
+                              {tx("Save product")}{" "}
                             </button>
                           </div>
                         </div>
@@ -1206,7 +1258,7 @@ export function InventoryManager({
                             .finally(() => setPending(false));
                         }}
                         pending={pending}
-                        title="Manual stock adjustment"
+                        title={tx("Manual stock adjustment")}
                       >
                         <Alert message={formError} />
                         <div className={fieldTone}>
@@ -1224,10 +1276,10 @@ export function InventoryManager({
                               label="Movement type"
                             >
                               <SelectInput name="movement_type" required>
-                                <option value="">Select a type</option>
+                                <option value="">{tx("Select a type")}</option>
                                 {MANUAL_TYPES.map((item) => (
                                   <option key={item} value={item}>
-                                    {pretty(item)}
+                                    {tx(pretty(item))}
                                   </option>
                                 ))}
                               </SelectInput>
@@ -1260,7 +1312,8 @@ export function InventoryManager({
                               }}
                               type="button"
                             >
-                              Back
+                              {" "}
+                              {tx("Back")}{" "}
                             </button>
                             <button
                               className={actionButtonClass(
@@ -1269,7 +1322,8 @@ export function InventoryManager({
                               disabled={pending}
                               type="submit"
                             >
-                              Confirm adjustment
+                              {" "}
+                              {tx("Confirm adjustment")}{" "}
                             </button>
                           </div>
                         </div>
@@ -1292,10 +1346,12 @@ export function InventoryManager({
         >
           <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
             <h2 className="text-lg font-bold text-slate-900">
-              Stock movements
+              {" "}
+              {tx("Stock movements")}{" "}
             </h2>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-              Purchases, sales, damage, and manual corrections.
+              {" "}
+              {tx("Purchases, sales, damage, and manual corrections.")}{" "}
             </p>
             <form
               className={`mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end ${fieldTone}`}
@@ -1309,7 +1365,7 @@ export function InventoryManager({
             >
               <Field label="Product">
                 <SelectInput name="product_id">
-                  <option value="">Any product</option>
+                  <option value="">{tx("Any product")}</option>
                   {products.rows.map((row) => (
                     <option key={row.id} value={row.id}>
                       {row.sku} — {row.name}
@@ -1323,10 +1379,10 @@ export function InventoryManager({
                   onChange={(event) => setMovementType(event.target.value)}
                   value={movementType}
                 >
-                  <option value="">Any type</option>
+                  <option value="">{tx("Any type")}</option>
                   {HISTORY_TYPES.map((item) => (
                     <option key={item} value={item}>
-                      {pretty(item)}
+                      {tx(pretty(item))}
                     </option>
                   ))}
                 </SelectInput>
@@ -1336,7 +1392,8 @@ export function InventoryManager({
               </Field>
               <div className="flex items-end justify-end sm:col-span-2 xl:col-span-1">
                 <button className="button" type="submit">
-                  Apply filters
+                  {" "}
+                  {tx("Apply filters")}{" "}
                 </button>
               </div>
             </form>
@@ -1349,7 +1406,8 @@ export function InventoryManager({
               className="px-5 pt-4 text-sm font-medium text-slate-600"
               role="status"
             >
-              Loading stock movements.
+              {" "}
+              {tx("Loading stock movements.")}{" "}
             </p>
           ) : null}
           {!movements.pending && movements.error ? (
@@ -1363,13 +1421,13 @@ export function InventoryManager({
             <EmptyState
               detail={
                 movementFiltered
-                  ? "Try another product, type, or date."
-                  : "Purchases, sales, and adjustments will show up here."
+                  ? tx("Try another product, type, or date.")
+                  : tx("Purchases, sales, and adjustments will show up here.")
               }
               title={
                 movementFiltered
-                  ? "No movements match these filters."
-                  : "No stock movements yet."
+                  ? tx("No movements match these filters.")
+                  : tx("No stock movements yet.")
               }
             />
           ) : null}
@@ -1378,38 +1436,43 @@ export function InventoryManager({
               className={`overflow-x-auto ${movements.pending ? "opacity-60" : ""}`}
             >
               <table className="w-full text-left text-sm">
-                <caption className="sr-only">Stock movements</caption>
+                <caption className="sr-only">{tx("Stock movements")}</caption>
                 <thead className="border-b border-slate-200 text-slate-500">
                   <tr>
                     <th
                       className="px-5 py-2.5 text-xs font-semibold"
                       scope="col"
                     >
-                      Product
+                      {" "}
+                      {tx("Product")}{" "}
                     </th>
                     <th
                       className="px-5 py-2.5 text-xs font-semibold"
                       scope="col"
                     >
-                      Type
+                      {" "}
+                      {tx("Type")}{" "}
                     </th>
                     <th
                       className="px-5 py-2.5 text-right text-xs font-semibold"
                       scope="col"
                     >
-                      Quantity
+                      {" "}
+                      {tx("Quantity")}{" "}
                     </th>
                     <th
                       className="hidden px-5 py-2.5 text-right text-xs font-semibold sm:table-cell"
                       scope="col"
                     >
-                      Unit cost
+                      {" "}
+                      {tx("Unit cost")}{" "}
                     </th>
                     <th
                       className="hidden px-5 py-2.5 text-xs font-semibold md:table-cell"
                       scope="col"
                     >
-                      Date
+                      {" "}
+                      {tx("Date")}{" "}
                     </th>
                   </tr>
                 </thead>
@@ -1434,7 +1497,7 @@ export function InventoryManager({
                         </td>
                         <td className="px-5 py-3">
                           <p className="font-medium text-slate-900">
-                            {pretty(row.movement_type)}
+                            {tx(pretty(row.movement_type))}
                           </p>
                           {row.reason ? (
                             <p className="mt-0.5 max-w-xs text-xs leading-5 text-slate-500">

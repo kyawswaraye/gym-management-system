@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useRef, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -50,6 +51,7 @@ export function CheckInsWorkspace({
   membershipId?: string;
   timeZone: string;
 }) {
+  const tx = useTx();
   const router = useRouter();
   const tabs = useRef<
     Partial<Record<CheckInWorkspaceMode, HTMLButtonElement | null>>
@@ -103,7 +105,7 @@ export function CheckInsWorkspace({
       {showTabs ? (
         <div className="max-w-2xl">
           <div
-            aria-label="Check-in mode"
+            aria-label={tx("Check-in mode")}
             className="grid grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-slate-100 p-1 shadow-sm"
             onKeyDown={onTabsKeyDown}
             role="tablist"
@@ -114,7 +116,7 @@ export function CheckInsWorkspace({
                 <button
                   aria-controls="check-in-workspace-panel"
                   aria-describedby={`check-in-tab-${item}-hint`}
-                  aria-label={MODE_LABEL[item]}
+                  aria-label={tx(MODE_LABEL[item])}
                   aria-selected={selected}
                   className={tabClass(selected)}
                   id={`check-in-tab-${item}`}
@@ -133,12 +135,14 @@ export function CheckInsWorkspace({
                       selected ? "bg-amber-400" : "bg-slate-300"
                     }`}
                   />
-                  <span className="text-sm font-bold">{MODE_LABEL[item]}</span>
+                  <span className="text-sm font-bold">
+                    {tx(MODE_LABEL[item])}
+                  </span>
                   <span
                     className="text-xs font-medium leading-4 text-balance text-slate-500"
                     id={`check-in-tab-${item}-hint`}
                   >
-                    {MODE_HINT[item]}
+                    {tx(MODE_HINT[item])}
                   </span>
                 </button>
               );

@@ -37,6 +37,7 @@ DIRECT_FUNCTIONS = frozenset(
         "app_bump_password_reset_authz(uuid)",
         "app_check_in_device(text)",
         "app_linked_members()",
+        "app_member_email_candidates(text)",
         "app_owner_invitation(text)",
         "app_staff_invitation(text)",
         "app_staff_memberships()",

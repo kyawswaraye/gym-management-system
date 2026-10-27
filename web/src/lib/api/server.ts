@@ -1,11 +1,18 @@
 import "server-only";
 
 import { AsyncLocalStorage } from "node:async_hooks";
-import { headers as nextHeaders } from "next/headers";
+import { cookies, headers as nextHeaders } from "next/headers";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 import { redactTenantAuditValue } from "@/features/operations/audit-policy";
+import {
+  LOCALE_COOKIE,
+  acceptLanguage,
+  parseLocale,
+  type Locale,
+} from "@/i18n/locale";
+import { translate } from "@/i18n/translate";
 import {
   allowsFinanceRoute,
   FINANCE_PATH_PATTERNS,
@@ -601,6 +608,7 @@ type BffContext = {
   requestId: string;
   method: string;
   route: string;
+  locale: Locale;
 };
 
 const bffContext = new AsyncLocalStorage<BffContext>();
@@ -615,6 +623,7 @@ function runWithBffRequest<T>(
       requestId: resolveRequestId(request.headers.get("x-request-id")),
       method: request.method,
       route: normalizedRoute(route),
+      locale: parseLocale(request.cookies.get(LOCALE_COOKIE)?.value),
     },
     fn,
   );
@@ -685,6 +694,7 @@ async function callDjango(path: string, init: RequestInit): Promise<Response> {
       Accept: "application/json",
       [BFF_SECRET_HEADER]: bffSharedSecret,
       ...init.headers,
+      "Accept-Language": acceptLanguage(context?.locale ?? "en"),
       ...(context ? { "X-Request-ID": context.requestId } : {}),
       // Production Django redirects plain HTTP. This marks the private hop
       // after the browser already used HTTPS at Caddy. It is not a TLS proof.
@@ -694,6 +704,36 @@ async function callDjango(path: string, init: RequestInit): Promise<Response> {
 }
 
 type UpstreamPresenter = (status: number, body: unknown) => unknown;
+
+function bffLocale(): Locale {
+  return bffContext.getStore()?.locale ?? "en";
+}
+
+function localizeFields(value: unknown, locale: Locale): unknown {
+  if (typeof value === "string") return translate(locale, value);
+  if (Array.isArray(value))
+    return value.map((item) => localizeFields(item, locale));
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        localizeFields(item, locale),
+      ]),
+    );
+  }
+  return value;
+}
+
+function localizeErrorBody(body: unknown): unknown {
+  const locale = bffLocale();
+  if (locale === "en" || !isRecord(body) || !isRecord(body.error)) return body;
+  const error = { ...body.error };
+  if (typeof error.message === "string") {
+    error.message = translate(locale, error.message);
+  }
+  if ("fields" in error) error.fields = localizeFields(error.fields, locale);
+  return { ...body, error };
+}
 
 function responseFromUpstream(
   status: number,
@@ -707,13 +747,13 @@ function responseFromUpstream(
   if (body === null) {
     return finishBffResponse(
       NextResponse.json(
-        {
+        localizeErrorBody({
           success: false,
           error: {
             code: "INVALID_UPSTREAM_RESPONSE",
             message: "The service returned an invalid response.",
           },
-        },
+        }),
         { status: 502, headers },
       ),
       body,
@@ -721,7 +761,9 @@ function responseFromUpstream(
   }
   return finishBffResponse(
     NextResponse.json(
-      present ? present(status, body) : stripCredentials(body),
+      localizeErrorBody(
+        present ? present(status, body) : stripCredentials(body),
+      ),
       {
         status,
         headers,
@@ -1538,11 +1580,17 @@ export function normalizeStaffId(value: string): string | null {
   return normalizeResourceId(value);
 }
 
-export function unknownStaffResponse(): NextResponse {
+export function unknownStaffResponse(request: NextRequest): NextResponse {
   return NextResponse.json(
     {
       success: false,
-      error: { code: "NOT_FOUND", message: "Staff was not found." },
+      error: {
+        code: "NOT_FOUND",
+        message: translate(
+          parseLocale(request.cookies.get(LOCALE_COOKIE)?.value),
+          "Staff was not found.",
+        ),
+      },
     },
     { status: 404, headers: { "Cache-Control": "no-store, private" } },
   );
@@ -1665,21 +1713,33 @@ function collectionPath(
   return `${pathname}${query}`;
 }
 
-export function unknownRoleResponse(): NextResponse {
+export function unknownRoleResponse(request: NextRequest): NextResponse {
   return NextResponse.json(
     {
       success: false,
-      error: { code: "NOT_FOUND", message: "Role was not found." },
+      error: {
+        code: "NOT_FOUND",
+        message: translate(
+          parseLocale(request.cookies.get(LOCALE_COOKIE)?.value),
+          "Role was not found.",
+        ),
+      },
     },
     { status: 404, headers: { "Cache-Control": "no-store, private" } },
   );
 }
 
-export function unknownMembershipResponse(): NextResponse {
+export function unknownMembershipResponse(request: NextRequest): NextResponse {
   return NextResponse.json(
     {
       success: false,
-      error: { code: "NOT_FOUND", message: "Membership was not found." },
+      error: {
+        code: "NOT_FOUND",
+        message: translate(
+          parseLocale(request.cookies.get(LOCALE_COOKIE)?.value),
+          "Membership was not found.",
+        ),
+      },
     },
     { status: 404, headers: { "Cache-Control": "no-store, private" } },
   );
@@ -1941,11 +2001,18 @@ export async function serverAuthMe(accessToken: string): Promise<Response> {
     }
   };
   if (existing) return load();
+  let locale: Locale = "en";
+  try {
+    locale = parseLocale((await cookies()).get(LOCALE_COOKIE)?.value);
+  } catch {
+    locale = "en";
+  }
   return bffContext.run(
     {
       requestId,
       method: "GET",
       route: normalizedRoute("/api/v1/auth/me/"),
+      locale,
     },
     load,
   );

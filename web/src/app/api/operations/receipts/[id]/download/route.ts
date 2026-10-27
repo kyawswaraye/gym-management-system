@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { translate } from "@/i18n/translate";
+import { requestLocale } from "@/lib/api/errors";
 import {
   authenticatedDocumentGet,
   normalizeResourceId,
@@ -12,7 +14,10 @@ export async function GET(request: NextRequest, context: Context) {
     return NextResponse.json(
       {
         success: false,
-        error: { code: "INVALID_REQUEST", message: "Invalid request." },
+        error: {
+          code: "INVALID_REQUEST",
+          message: translate(requestLocale(request), "Invalid request."),
+        },
       },
       { status: 400, headers: { "Cache-Control": "no-store, private" } },
     );
@@ -23,7 +28,10 @@ export async function GET(request: NextRequest, context: Context) {
     return NextResponse.json(
       {
         success: false,
-        error: { code: "NOT_FOUND", message: "Receipt was not found." },
+        error: {
+          code: "NOT_FOUND",
+          message: translate(requestLocale(request), "Receipt was not found."),
+        },
       },
       { status: 404, headers: { "Cache-Control": "no-store, private" } },
     );

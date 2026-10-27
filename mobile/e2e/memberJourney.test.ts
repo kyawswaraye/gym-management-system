@@ -16,7 +16,7 @@ describe("member journey", () => {
   it("signs in, reads the profile, books a class once, and signs out", async () => {
     const bookings: string[] = [];
     const fetchImpl: FetchLike = jest.fn(async (url, init) => {
-      if (url.endsWith("/api/v1/member-auth/login/")) {
+      if (url.endsWith("/api/v1/member-auth/google/")) {
         return json(200, {
           success: true,
           message: "",
@@ -66,6 +66,10 @@ describe("member journey", () => {
       setDeviceId: async () => undefined,
       getBiometricGate: async () => false,
       setBiometricGate: async () => undefined,
+      getLocale: async () => (values.locale === "mm" ? "mm" : "en"),
+      setLocale: async (locale) => {
+        values.locale = locale;
+      },
       resetAll: async () => {
         delete values.refresh;
       },
@@ -88,7 +92,7 @@ describe("member journey", () => {
       clearCache: cleared,
     });
     const api = createMemberApi(client);
-    await session.login("member@example.com", "secret");
+    await session.login("google-id-token");
     const me = await api.me();
     expect(me).toMatchObject({ first_name: "Ana" });
     const key = "journey-key-123456";

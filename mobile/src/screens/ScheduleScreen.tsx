@@ -1,6 +1,7 @@
+import { useTx } from "../i18n/useTx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { RefreshControl, View } from "react-native";
+import { RefreshControl } from "react-native";
 
 import { ApiError } from "../api/errors";
 import type { Schemas } from "../api/memberApi";
@@ -13,6 +14,7 @@ import {
 } from "../dates/gymLocal";
 import { queryKeys } from "../query/keys";
 import { Button } from "../ui/Button";
+import { Card } from "../ui/Card";
 import { Screen } from "../ui/Screen";
 import {
   EmptyState,
@@ -21,8 +23,10 @@ import {
   OfflineBanner,
 } from "../ui/StateView";
 import { Text } from "../ui/Text";
+import { colors } from "../ui/theme";
 
 export function ScheduleScreen() {
+  const tx = useTx();
   const api = useMemberApi();
   const online = useOnline();
   const queryClient = useQueryClient();
@@ -48,7 +52,7 @@ export function ScheduleScreen() {
 
   async function book(occurrenceId: string) {
     if (!selectedPackage) {
-      setMessage("Choose a class package with remaining sessions.");
+      setMessage(tx("Choose a class package with remaining sessions."));
       return;
     }
     const attempt = `${occurrenceId}:${selectedPackage}`;
@@ -65,7 +69,7 @@ export function ScheduleScreen() {
         idempotencyKey,
       );
       keys.current.delete(attempt);
-      setMessage("Class booked.");
+      setMessage(tx("Class booked."));
       await queryClient.invalidateQueries({
         queryKey: queryKeys.schedule(range.date_from, range.date_to),
       });
@@ -88,7 +92,7 @@ export function ScheduleScreen() {
 
   return (
     <Screen
-      title="Schedule"
+      title={tx("Schedule")}
       refreshControl={
         <RefreshControl
           refreshing={schedule.isRefetching}
@@ -100,10 +104,13 @@ export function ScheduleScreen() {
       }
     >
       <OfflineBanner visible={!online} />
-      <Text>
-        Showing {range.date_from} through {range.date_to}, 42 gym-local days.
+      <Text style={{ color: colors.muted }}>
+        {tx("Showing")} {range.date_from} {tx("through")} {range.date_to}
+        {tx(", 42 gym-local days.")}
       </Text>
-      {schedule.isLoading ? <LoadingState label="Loading schedule" /> : null}
+      {schedule.isLoading ? (
+        <LoadingState label={tx("Loading schedule")} />
+      ) : null}
       {schedule.isError ? (
         <ErrorState
           error={schedule.error}
@@ -112,60 +119,70 @@ export function ScheduleScreen() {
         />
       ) : null}
       {message ? <Text accessibilityRole="alert">{message}</Text> : null}
-      <Text accessibilityRole="header" style={{ fontWeight: "700" }}>
-        Your bookings
+      <Text
+        accessibilityRole="header"
+        style={{ fontSize: 20, fontWeight: "700" }}
+      >
+        {tx("Your bookings")}
       </Text>
       {schedule.data && schedule.data.bookings.length === 0 ? (
-        <EmptyState message="No bookings in this window." />
+        <EmptyState message={tx("No bookings in this window.")} />
       ) : null}
       {schedule.data?.bookings.map((booking) => (
         <BookingRow key={booking.id} booking={booking} />
       ))}
-      <Text accessibilityRole="header" style={{ fontWeight: "700" }}>
-        Classes
+      <Text
+        accessibilityRole="header"
+        style={{ fontSize: 20, fontWeight: "700" }}
+      >
+        {tx("Classes")}
       </Text>
       {classPackages.length === 0 ? (
-        <Text>
-          No active class package with remaining sessions is available for
-          booking.
+        <Text style={{ color: colors.muted }}>
+          {tx(
+            "No active class package with remaining sessions is available for booking.",
+          )}
         </Text>
       ) : (
         classPackages.map((item) => (
           <Button
             key={item.id}
-            label={`${item.package_name}, ${item.remaining_sessions} remaining`}
+            label={tx("{name}, {count} remaining", {
+              name: item.package_name,
+              count: item.remaining_sessions,
+            })}
             variant={selectedPackage === item.id ? "primary" : "secondary"}
-            hint="Selects this package for the next class booking"
+            hint={tx("Selects this package for the next class booking")}
             onPress={() => setSelectedPackage(item.id)}
           />
         ))
       )}
       {schedule.data && schedule.data.occurrences.length === 0 ? (
-        <EmptyState message="No classes are scheduled in this window." />
+        <EmptyState message={tx("No classes are scheduled in this window.")} />
       ) : null}
       {schedule.data?.occurrences.map((occurrence) => (
-        <View key={occurrence.id} style={{ gap: 8 }}>
-          <Text>
+        <Card key={occurrence.id}>
+          <Text style={{ fontWeight: "700" }}>
             {occurrence.class_name} · {formatGymDateTime(occurrence.starts_at)}
           </Text>
-          <Text>
+          <Text style={{ color: colors.muted }}>
             {occurrence.trainer_display_name}
             {occurrence.location ? ` · ${occurrence.location}` : ""} ·{" "}
             {occurrence.booked_count}/{occurrence.capacity}
           </Text>
           {occurrence.member_booking_id ? (
-            <Text>You are booked.</Text>
+            <Text>{tx("You are booked.")}</Text>
           ) : (
             <Button
-              label="Book class"
-              hint={`Books ${occurrence.class_name}`}
+              label={tx("Book class")}
+              hint={tx("Books {name}", { name: occurrence.class_name })}
               disabled={
                 !selectedPackage || bookingId === occurrence.id || !online
               }
               onPress={() => book(occurrence.id)}
             />
           )}
-        </View>
+        </Card>
       ))}
     </Screen>
   );
@@ -176,19 +193,22 @@ function BookingRow({
 }: {
   booking: Schemas["MemberScheduleBooking"];
 }) {
+  const tx = useTx();
   return (
-    <View>
-      <Text>
+    <Card>
+      <Text style={{ fontWeight: "700" }}>
         {booking.kind === "CLASS"
-          ? (booking.class_name ?? "Class")
-          : "Personal training"}{" "}
-        · {booking.status}
+          ? (booking.class_name ?? tx("Class"))
+          : tx("Personal training")}{" "}
+        · {tx(booking.status)}
       </Text>
-      <Text>
-        {formatGymDateTime(booking.starts_at)} to{" "}
+      <Text style={{ color: colors.muted }}>
+        {formatGymDateTime(booking.starts_at)} {tx("to")}{" "}
         {formatGymDateTime(booking.ends_at)}
       </Text>
-      <Text>{booking.trainer_display_name}</Text>
-    </View>
+      <Text style={{ color: colors.muted }}>
+        {booking.trainer_display_name}
+      </Text>
+    </Card>
   );
 }

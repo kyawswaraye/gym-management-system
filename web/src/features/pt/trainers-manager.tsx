@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useRef, useState } from "react";
 
@@ -61,6 +62,7 @@ export function TrainersManager({
   canClose: boolean;
   today: string;
 }) {
+  const tx = useTx();
   const [status, setStatus] = useState("");
   const [trainerId, setTrainerId] = useState("");
   const [memberFilter, setMemberFilter] = useState<PickedMember | null>(null);
@@ -135,7 +137,9 @@ export function TrainersManager({
       assignments.reload();
       assigned.reload();
     } catch (caught) {
-      setCommandError(phase5Error(caught, "The assignment command failed."));
+      setCommandError(
+        phase5Error(caught, tx("The assignment command failed.")),
+      );
     } finally {
       pendingRef.current = false;
       setPending(false);
@@ -157,7 +161,7 @@ export function TrainersManager({
           className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
           role="status"
         >
-          {notice}
+          {tx(notice)}
         </p>
       ) : null}
 
@@ -168,16 +172,19 @@ export function TrainersManager({
         >
           <div className="border-b border-slate-100 px-5 py-4">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
-              Team
+              {" "}
+              {tx("Team")}{" "}
             </p>
             <h2
               className="mt-1 text-xl font-bold text-slate-900"
               id="trainer-directory-title"
             >
-              Trainer directory
+              {" "}
+              {tx("Trainer directory")}{" "}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Select a trainer to view today&apos;s members.
+              {" "}
+              {tx("Select a trainer to view today's members.")}{" "}
             </p>
           </div>
           <div className="grid gap-3 p-4">
@@ -248,17 +255,20 @@ export function TrainersManager({
         >
           <div className="border-b border-slate-100 px-5 py-4">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">
-              Today
+              {" "}
+              {tx("Today")}{" "}
             </p>
             <h2
               className="mt-1 text-xl font-bold text-slate-900"
               id="assigned-members-title"
             >
-              Assigned members
+              {" "}
+              {tx("Assigned members")}{" "}
             </h2>
             {selectedTrainer ? (
               <p className="mt-1 text-sm text-slate-500">
-                Members assigned to{" "}
+                {" "}
+                {tx("Members assigned to")}{" "}
                 <span className="font-semibold text-slate-700">
                   {selectedTrainer.display_name}
                 </span>
@@ -307,7 +317,7 @@ export function TrainersManager({
                         {memberLabel(row)}
                       </span>
                       <span className="block text-xs text-slate-500">
-                        {row.member_number} · From {row.effective_from}
+                        {row.member_number} {tx("· From")} {row.effective_from}
                         {row.effective_until
                           ? ` to ${row.effective_until}`
                           : ""}
@@ -338,13 +348,15 @@ export function TrainersManager({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
-              History
+              {" "}
+              {tx("History")}{" "}
             </p>
             <h2
               className="mt-1 text-xl font-bold text-slate-900"
               id="assignment-list-title"
             >
-              Assignments
+              {" "}
+              {tx("Assignments")}{" "}
             </h2>
           </div>
           {canCreate ? (
@@ -360,8 +372,7 @@ export function TrainersManager({
               }}
               type="button"
             >
-              <span aria-hidden="true">+</span>
-              Create assignment
+              <span aria-hidden="true">+</span> {tx("Create assignment")}{" "}
             </button>
           ) : null}
         </div>
@@ -379,10 +390,10 @@ export function TrainersManager({
                 onChange={(event) => setStatus(event.target.value)}
                 value={status}
               >
-                <option value="">All statuses</option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="ENDED">ENDED</option>
-                <option value="CANCELLED">CANCELLED</option>
+                <option value="">{tx("All statuses")}</option>
+                <option value="ACTIVE">{tx("ACTIVE")}</option>
+                <option value="ENDED">{tx("ENDED")}</option>
+                <option value="CANCELLED">{tx("CANCELLED")}</option>
               </select>
             </Field>
             {memberFilter ? (
@@ -391,7 +402,8 @@ export function TrainersManager({
                 onClick={() => setMemberFilter(null)}
                 type="button"
               >
-                Clear member filter
+                {" "}
+                {tx("Clear member filter")}{" "}
               </button>
             ) : (
               <span />
@@ -438,7 +450,7 @@ export function TrainersManager({
                     <span
                       className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${statusClass(row.status)}`}
                     >
-                      {row.status}
+                      {tx(row.status)}
                     </span>
                   </div>
                   {canClose && row.status === "ACTIVE" ? (
@@ -452,7 +464,8 @@ export function TrainersManager({
                         }}
                         type="button"
                       >
-                        End assignment
+                        {" "}
+                        {tx("End assignment")}{" "}
                       </button>
                       <button
                         className="rounded-lg px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
@@ -463,7 +476,8 @@ export function TrainersManager({
                         }}
                         type="button"
                       >
-                        Cancel assignment
+                        {" "}
+                        {tx("Cancel assignment")}{" "}
                       </button>
                     </div>
                   ) : null}
@@ -536,18 +550,21 @@ export function TrainersManager({
                 aria-hidden="true"
                 className="grid min-h-9 shrink-0 place-items-center rounded-lg bg-blue-100 px-2 text-[0.65rem] font-black tracking-wide text-blue-800"
               >
-                PT
+                {tx("PT")}
               </span>
               <div className="min-w-0 flex-1">
                 <h2
                   className="text-xl font-bold text-slate-900"
                   id="create-assignment-title"
                 >
-                  Create assignment
+                  {" "}
+                  {tx("Create assignment")}{" "}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Choose a trainer, an active member, and the dates this
-                  assignment covers.
+                  {" "}
+                  {tx(
+                    "Choose a trainer, an active member, and the dates this assignment covers.",
+                  )}{" "}
                 </p>
               </div>
               <button
@@ -556,7 +573,8 @@ export function TrainersManager({
                 onClick={closeCreateAssignment}
                 type="button"
               >
-                Close
+                {" "}
+                {tx("Close")}{" "}
               </button>
             </div>
             <div className="grid gap-4 px-5 py-4 sm:px-6">
@@ -567,7 +585,7 @@ export function TrainersManager({
                   name="trainer_staff_profile_id"
                   required
                 >
-                  <option value="">Select a trainer</option>
+                  <option value="">{tx("Select a trainer")}</option>
                   {trainerChoices.items.map((trainer) => (
                     <option key={trainer.id} value={trainer.id}>
                       {trainer.display_name} ({trainer.staff_code})
@@ -610,14 +628,16 @@ export function TrainersManager({
                   onClick={closeCreateAssignment}
                   type="button"
                 >
-                  Cancel
+                  {" "}
+                  {tx("Cancel")}{" "}
                 </button>
                 <button
                   className="button button-edit w-full sm:w-auto"
                   disabled={pending}
                   type="submit"
                 >
-                  Save assignment
+                  {" "}
+                  {tx("Save assignment")}{" "}
                 </button>
               </div>
             </div>
@@ -652,7 +672,8 @@ export function TrainersManager({
             role="dialog"
           >
             <h3 className="font-semibold" id="end-assignment-title">
-              End assignment
+              {" "}
+              {tx("End assignment")}{" "}
             </h3>
             <Field label="Effective until">
               <TextInput
@@ -668,7 +689,8 @@ export function TrainersManager({
               disabled={pending}
               type="submit"
             >
-              Confirm end
+              {" "}
+              {tx("Confirm end")}{" "}
             </button>
           </form>
         </div>
@@ -700,7 +722,8 @@ export function TrainersManager({
             role="dialog"
           >
             <h3 className="font-semibold" id="cancel-assignment-title">
-              Cancel assignment
+              {" "}
+              {tx("Cancel assignment")}{" "}
             </h3>
             <ReasonField label="Reason for cancelling" />
             <button
@@ -708,7 +731,8 @@ export function TrainersManager({
               disabled={pending}
               type="submit"
             >
-              Confirm cancel
+              {" "}
+              {tx("Confirm cancel")}{" "}
             </button>
           </form>
         </div>

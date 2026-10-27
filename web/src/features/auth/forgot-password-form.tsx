@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useState, type FormEvent } from "react";
 
@@ -9,6 +10,7 @@ import {
 } from "@/features/auth/client";
 
 export function ForgotPasswordForm() {
+  const tx = useTx();
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [pending, setPending] = useState(false);
@@ -19,7 +21,7 @@ export function ForgotPasswordForm() {
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     if (!email) {
-      setError("Enter the email for your account.");
+      setError(tx("Enter the email for your account."));
       return;
     }
     setPending(true);
@@ -32,12 +34,14 @@ export function ForgotPasswordForm() {
         body: JSON.stringify({ email }),
       });
       if (!response.ok) {
-        setError(await errorMessage(response, "Unable to send a reset link."));
+        setError(
+          await errorMessage(response, tx("Unable to send a reset link.")),
+        );
         return;
       }
       setSent(true);
     } catch {
-      setError("The network is unavailable. Please try again.");
+      setError(tx("The network is unavailable. Please try again."));
     } finally {
       setPending(false);
     }
@@ -46,7 +50,10 @@ export function ForgotPasswordForm() {
   if (sent) {
     return (
       <p className="mt-6" role="status">
-        If an account exists for that email, a reset link will be sent.
+        {" "}
+        {tx(
+          "If an account exists for that email, a reset link will be sent.",
+        )}{" "}
       </p>
     );
   }
@@ -55,11 +62,11 @@ export function ForgotPasswordForm() {
     <form className="mt-6 grid gap-4" onSubmit={submit} noValidate>
       {error ? (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       ) : null}
       <label className="field">
-        <span>Email</span>
+        <span>{tx("Email")}</span>
         <input
           className="input"
           name="email"
@@ -70,7 +77,7 @@ export function ForgotPasswordForm() {
         />
       </label>
       <button className="button" type="submit" disabled={pending}>
-        {pending ? "Sending…" : "Send reset link"}
+        {pending ? tx("Sending…") : tx("Send reset link")}
       </button>
     </form>
   );

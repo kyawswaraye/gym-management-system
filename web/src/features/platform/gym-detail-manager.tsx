@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
@@ -20,10 +21,11 @@ const panelClass =
   "w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6";
 
 function Fact({ label, value }: { label: string; value: string }) {
+  const tx = useTx();
   return (
     <div className="rounded-xl bg-slate-50 px-3 py-2.5">
       <dt className="text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase">
-        {label}
+        {tx(label)}
       </dt>
       <dd className="mt-1 text-sm font-semibold break-words text-slate-900">
         {value || "—"}
@@ -58,6 +60,7 @@ export function GymDetailManager({
   gymId: string;
   capabilities: Capabilities;
 }) {
+  const tx = useTx();
   const [gym, setGym] = useState<PlatformGymDetail | null>(null);
   const [plans, setPlans] = useState<PlatformSubscription[]>([]);
   const [audits, setAudits] = useState<PlatformAuditItem[]>([]);
@@ -175,11 +178,11 @@ export function GymDetailManager({
     setError(null);
     setSuccess(null);
     if (reason.trim().length < 3) {
-      setError("Enter a reason of at least 3 characters.");
+      setError(tx("Enter a reason of at least 3 characters."));
       return;
     }
     if (!confirmed) {
-      setError("Confirm the lifecycle change before continuing.");
+      setError(tx("Confirm the lifecycle change before continuing."));
       return;
     }
     setPending(true);
@@ -193,14 +196,16 @@ export function GymDetailManager({
       setReason("");
       setConfirmed(false);
       setLifecycleOpen(false);
-      setSuccess(`Gym ${action} request completed.`);
+      setSuccess(tx("Gym {action} request completed.", { action: tx(action) }));
       const data = await fetchData();
       setGym(data.detail);
       setPlans([...data.subscriptions].sort(compareSubscriptionPlans));
       setAudits(data.audits);
     } catch (failure) {
       setError(
-        failure instanceof Error ? failure.message : `Unable to ${action} gym.`,
+        failure instanceof Error
+          ? failure.message
+          : tx("Unable to {action} gym.", { action }),
       );
     } finally {
       setPending(false);
@@ -236,7 +241,7 @@ export function GymDetailManager({
     }
   }
 
-  if (!gym && !error) return <p className="muted">Loading gym…</p>;
+  if (!gym && !error) return <p className="muted">{tx("Loading gym…")}</p>;
 
   return (
     <div className="grid gap-6">
@@ -244,16 +249,17 @@ export function GymDetailManager({
         className="w-fit text-sm font-semibold text-[#0866ff] hover:underline"
         href="/super-admin/gyms"
       >
-        ← Back to gyms
+        {" "}
+        {tx("← Back to gyms")}{" "}
       </Link>
       {error && (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       )}
       {success && (
         <p className="text-sm font-medium text-emerald-700" role="status">
-          {success}
+          {tx(success)}
         </p>
       )}
       {gym && (
@@ -262,7 +268,8 @@ export function GymDetailManager({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold tracking-[0.16em] text-[#0866ff] uppercase">
-                  Gyms
+                  {" "}
+                  {tx("Gyms")}{" "}
                 </p>
                 <h2
                   className="mt-2 text-3xl font-black tracking-tight text-slate-900"
@@ -271,11 +278,11 @@ export function GymDetailManager({
                   {gym.name}
                 </h2>
                 <p className="muted mt-2">
-                  {gym.code} · {gym.status}
+                  {gym.code} · {tx(gym.status)}
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
-                {gym.subscription_status}
+                {tx(gym.subscription_status)}
               </span>
             </div>
             <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -294,14 +301,16 @@ export function GymDetailManager({
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h2 id="gym-settings-title" className="text-xl font-bold">
-                    Gym settings
+                    {" "}
+                    {tx("Gym settings")}{" "}
                   </h2>
                   <button
                     className="button button-edit"
                     onClick={() => setEditingSettings(true)}
                     type="button"
                   >
-                    Edit gym settings
+                    {" "}
+                    {tx("Edit gym settings")}{" "}
                   </button>
                 </div>
               </section>
@@ -312,26 +321,28 @@ export function GymDetailManager({
                   }}
                   onSubmit={save}
                   pending={pending}
-                  title="Gym settings"
+                  title={tx("Gym settings")}
                   wide
                 >
                   <div className="grid gap-4 md:grid-cols-2">
                     {capabilities.canUpdate && (
                       <>
-                        {[
-                          ["name", "Name"],
-                          ["email", "Email"],
-                          ["phone", "Phone"],
-                          ["address_line1", "Address line 1"],
-                          ["address_line2", "Address line 2"],
-                          ["city", "City"],
-                          ["region", "Region"],
-                          ["postal_code", "Postal code"],
-                          ["country_code", "Country code"],
-                          ["timezone", "Timezone"],
-                        ].map(([field, label]) => (
+                        {(
+                          [
+                            ["name", "Name"],
+                            ["email", "Email"],
+                            ["phone", "Phone"],
+                            ["address_line1", "Address line 1"],
+                            ["address_line2", "Address line 2"],
+                            ["city", "City"],
+                            ["region", "Region"],
+                            ["postal_code", "Postal code"],
+                            ["country_code", "Country code"],
+                            ["timezone", "Timezone"],
+                          ] as const
+                        ).map(([field, label]) => (
                           <label className="field" key={field}>
-                            <span>{label}</span>
+                            <span>{tx(label)}</span>
                             <input
                               className="input"
                               name={field}
@@ -343,7 +354,7 @@ export function GymDetailManager({
                           </label>
                         ))}
                         <label className="field">
-                          <span>Currency</span>
+                          <span>{tx("Currency")}</span>
                           <select
                             className="input"
                             name="currency"
@@ -352,8 +363,8 @@ export function GymDetailManager({
                             }
                             disabled={pending}
                           >
-                            <option value="THB">THB</option>
-                            <option value="MMK">MMK</option>
+                            <option value="THB">{tx("THB")}</option>
+                            <option value="MMK">{tx("MMK")}</option>
                           </select>
                         </label>
                       </>
@@ -361,7 +372,7 @@ export function GymDetailManager({
                     {capabilities.canManageSubscriptions && (
                       <>
                         <label className="field">
-                          <span>Subscription plan</span>
+                          <span>{tx("Subscription plan")}</span>
                           <select
                             className="input"
                             name="subscription_plan_id"
@@ -370,13 +381,13 @@ export function GymDetailManager({
                           >
                             {plans.map((plan) => (
                               <option key={plan.id} value={plan.id}>
-                                {plan.name} ({plan.currency})
+                                {plan.name} ({tx(plan.currency)})
                               </option>
                             ))}
                           </select>
                         </label>
                         <label className="field">
-                          <span>Subscription status</span>
+                          <span>{tx("Subscription status")}</span>
                           <select
                             className="input"
                             name="subscription_status"
@@ -386,14 +397,14 @@ export function GymDetailManager({
                             {["TRIAL", "ACTIVE", "PAST_DUE", "CANCELLED"].map(
                               (status) => (
                                 <option key={status} value={status}>
-                                  {status}
+                                  {tx(status)}
                                 </option>
                               ),
                             )}
                           </select>
                         </label>
                         <label className="field">
-                          <span>Subscription starts</span>
+                          <span>{tx("Subscription starts")}</span>
                           <input
                             className="input"
                             name="subscription_starts_at"
@@ -405,7 +416,7 @@ export function GymDetailManager({
                           />
                         </label>
                         <label className="field">
-                          <span>Subscription ends</span>
+                          <span>{tx("Subscription ends")}</span>
                           <input
                             className="input"
                             name="subscription_ends_at"
@@ -422,7 +433,7 @@ export function GymDetailManager({
                       className="button button-edit md:col-span-2"
                       disabled={pending}
                     >
-                      {pending ? "Saving…" : "Save changes"}
+                      {pending ? tx("Saving…") : tx("Save changes")}
                     </button>
                   </div>
                 </FormDialog>
@@ -434,17 +445,22 @@ export function GymDetailManager({
             <>
               <section className={panelClass} aria-labelledby="lifecycle-title">
                 <h2 id="lifecycle-title" className="text-xl font-bold">
-                  Lifecycle
+                  {" "}
+                  {tx("Lifecycle")}{" "}
                 </h2>
                 <p className="muted mt-2 text-sm">
-                  Suspending immediately revokes tenant staff sessions.
+                  {" "}
+                  {tx(
+                    "Suspending immediately revokes tenant staff sessions.",
+                  )}{" "}
                 </p>
                 <button
                   className="button button-warn mt-4"
                   onClick={() => setLifecycleOpen(true)}
                   type="button"
                 >
-                  Change lifecycle
+                  {" "}
+                  {tx("Change lifecycle")}{" "}
                 </button>
               </section>
               {lifecycleOpen ? (
@@ -454,10 +470,10 @@ export function GymDetailManager({
                     if (!pending) setLifecycleOpen(false);
                   }}
                   pending={pending}
-                  title="Lifecycle"
+                  title={tx("Lifecycle")}
                 >
                   <label className="field">
-                    <span>Reason *</span>
+                    <span>{tx("Reason *")}</span>
                     <textarea
                       className="input min-h-24"
                       value={reason}
@@ -472,8 +488,8 @@ export function GymDetailManager({
                       checked={confirmed}
                       onChange={(event) => setConfirmed(event.target.checked)}
                       disabled={pending}
-                    />
-                    I confirm this lifecycle change.
+                    />{" "}
+                    {tx("I confirm this lifecycle change.")}{" "}
                   </label>
                   <div className="mt-4 flex flex-wrap gap-3">
                     {capabilities.canActivate && (
@@ -483,7 +499,8 @@ export function GymDetailManager({
                         disabled={pending}
                         onClick={() => void transition("activate")}
                       >
-                        Activate gym
+                        {" "}
+                        {tx("Activate gym")}{" "}
                       </button>
                     )}
                     {capabilities.canSuspend && (
@@ -493,7 +510,8 @@ export function GymDetailManager({
                         disabled={pending}
                         onClick={() => void transition("suspend")}
                       >
-                        Suspend gym
+                        {" "}
+                        {tx("Suspend gym")}{" "}
                       </button>
                     )}
                   </div>
@@ -506,7 +524,8 @@ export function GymDetailManager({
             <section className={panelClass} aria-labelledby="add-owner-title">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 id="add-owner-title" className="text-xl font-bold">
-                  Add Owner
+                  {" "}
+                  {tx("Add Owner")}{" "}
                 </h2>
                 {capabilities.mfaRecent ? (
                   <button
@@ -514,23 +533,27 @@ export function GymDetailManager({
                     onClick={() => setInvitingOwner(true)}
                     type="button"
                   >
-                    Add Owner
+                    {" "}
+                    {tx("Add Owner")}{" "}
                   </button>
                 ) : null}
               </div>
               <p className="muted mt-2 text-sm">
-                Email delivery is required. A live pending invitation is not
-                resent. A new link is possible after expiry for a passwordless
-                active Owner.
+                {" "}
+                {tx(
+                  "Email delivery is required. A live pending invitation is not resent. A new link is possible after expiry for a passwordless active Owner.",
+                )}{" "}
               </p>
               {!capabilities.mfaRecent ? (
                 <p className="mt-3 text-sm">
-                  Recent MFA verification is required.{" "}
+                  {" "}
+                  {tx("Recent MFA verification is required.")}{" "}
                   <Link
                     className="text-blue-700 hover:underline"
                     href="/mfa-setup"
                   >
-                    Set up or verify MFA
+                    {" "}
+                    {tx("Set up or verify MFA")}{" "}
                   </Link>
                 </p>
               ) : invitingOwner ? (
@@ -540,12 +563,12 @@ export function GymDetailManager({
                   }}
                   onSubmit={inviteOwner}
                   pending={pending}
-                  title="Add Owner"
+                  title={tx("Add Owner")}
                 >
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="field">
                       <label>
-                        <span>Email</span>
+                        <span>{tx("Email")}</span>
                         <input
                           className="input"
                           name="owner_email"
@@ -559,11 +582,14 @@ export function GymDetailManager({
                         id="platform-owner-email-delivery"
                         className="muted text-sm"
                       >
-                        Required. The setup link is emailed to this address.
+                        {" "}
+                        {tx(
+                          "Required. The setup link is emailed to this address.",
+                        )}{" "}
                       </p>
                     </div>
                     <label className="field">
-                      <span>Phone</span>
+                      <span>{tx("Phone")}</span>
                       <input
                         className="input"
                         name="owner_phone"
@@ -571,7 +597,7 @@ export function GymDetailManager({
                       />
                     </label>
                     <label className="field">
-                      <span>First name</span>
+                      <span>{tx("First name")}</span>
                       <input
                         className="input"
                         name="owner_first_name"
@@ -580,7 +606,7 @@ export function GymDetailManager({
                       />
                     </label>
                     <label className="field">
-                      <span>Last name</span>
+                      <span>{tx("Last name")}</span>
                       <input
                         className="input"
                         name="owner_last_name"
@@ -593,7 +619,7 @@ export function GymDetailManager({
                       type="submit"
                       disabled={pending}
                     >
-                      {pending ? "Sending…" : "Send Owner invitation"}
+                      {pending ? tx("Sending…") : tx("Send Owner invitation")}
                     </button>
                   </div>
                 </FormDialog>
@@ -604,7 +630,8 @@ export function GymDetailManager({
           {capabilities.canViewAudit && (
             <section className={panelClass} aria-labelledby="audit-title">
               <h2 id="audit-title" className="text-xl font-bold">
-                Audit timeline
+                {" "}
+                {tx("Audit timeline")}{" "}
               </h2>
               <ol className="mt-4 grid gap-3">
                 {audits.map((audit) => (
@@ -624,7 +651,9 @@ export function GymDetailManager({
                   </li>
                 ))}
                 {audits.length === 0 && (
-                  <li className="muted text-sm">No audit events found.</li>
+                  <li className="muted text-sm">
+                    {tx("No audit events found.")}
+                  </li>
                 )}
               </ol>
             </section>

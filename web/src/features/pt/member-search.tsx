@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useState, type MouseEvent } from "react";
 
@@ -30,6 +31,7 @@ export function MemberSearch({
   label?: string;
   action?: string;
 }) {
+  const tx = useTx();
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<PickedMember[]>([]);
   const [error, setError] = useState("");
@@ -46,10 +48,10 @@ export function MemberSearch({
         limit: 25,
       });
       setResults(page.data);
-      if (page.data.length === 0) setError("No active members match.");
+      if (page.data.length === 0) setError(tx("No active members match."));
     } catch (caught) {
       setResults([]);
-      setError(phase5Error(caught, "Members could not be searched."));
+      setError(phase5Error(caught, tx("Members could not be searched.")));
     } finally {
       setPending(false);
     }
@@ -71,15 +73,19 @@ export function MemberSearch({
           onClick={(event) => void submit(event)}
           type="button"
         >
-          {action}
+          {tx(action)}
         </button>
       </div>
       {error ? (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       ) : null}
-      {selected ? <p>Selected member: {memberLabel(selected)}</p> : null}
+      {selected ? (
+        <p>
+          {tx("Selected member:")} {memberLabel(selected)}
+        </p>
+      ) : null}
       {results.length > 0 ? (
         <ul className="grid gap-2">
           {results.map((member) => (

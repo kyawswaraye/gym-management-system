@@ -958,8 +958,11 @@ describe("Member profile editor", () => {
     fireEvent.change(screen.getByLabelText("Address line 1"), {
       target: { value: "  9  Oak  " },
     });
+    fireEvent.change(screen.getByLabelText("Region"), {
+      target: { value: "Yangon Region" },
+    });
     fireEvent.change(screen.getByLabelText("City"), {
-      target: { value: "  Dallas  " },
+      target: { value: "Yangon" },
     });
     fireEvent.change(screen.getByLabelText("Country code"), {
       target: { value: " th " },
@@ -991,8 +994,8 @@ describe("Member profile editor", () => {
           address: {
             address_line1: "9 Oak",
             address_line2: "",
-            city: "Dallas",
-            region: "",
+            city: "Yangon",
+            region: "Yangon Region",
             postal_code: "",
             country_code: "TH",
           },

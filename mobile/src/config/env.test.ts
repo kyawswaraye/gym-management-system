@@ -25,7 +25,12 @@ describe("environment config", () => {
     ).toThrow(/HTTPS/);
     expect(() =>
       assertRuntimeEnv(
-        { apiBaseUrl: "http://10.0.2.2:8000", appEnv: "debug" },
+        {
+          apiBaseUrl: "http://10.0.2.2:8000",
+          appEnv: "debug",
+          googleWebClientId: "",
+          googleIosClientId: "",
+        },
         false,
       ),
     ).toThrow(/release/);

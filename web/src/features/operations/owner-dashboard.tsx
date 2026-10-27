@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
@@ -63,6 +64,7 @@ const MEMBERSHIP_METRICS: {
 ];
 
 export function OwnerDashboard() {
+  const tx = useTx();
   const [preset, setPreset] = useState<DashboardRangePreset>("today");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -105,14 +107,17 @@ export function OwnerDashboard() {
         className="rounded-2xl border border-red-200 bg-red-50 p-5"
         role="alert"
       >
-        <p className="font-semibold text-red-900">Dashboard unavailable</p>
-        <p className="mt-1 text-sm text-red-700">{error}</p>
+        <p className="font-semibold text-red-900">
+          {tx("Dashboard unavailable")}
+        </p>
+        <p className="mt-1 text-sm text-red-700">{tx(error)}</p>
         <button
           className="button mt-4"
           onClick={() => void load()}
           type="button"
         >
-          Try again
+          {" "}
+          {tx("Try again")}{" "}
         </button>
       </div>
     );
@@ -120,7 +125,7 @@ export function OwnerDashboard() {
   if (!dashboard) {
     return (
       <div className="grid gap-5" role="status">
-        <span className="sr-only">Loading dashboard…</span>
+        <span className="sr-only">{tx("Loading dashboard…")}</span>
         <div className="h-24 animate-pulse rounded-2xl bg-slate-200" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((item) => (
@@ -134,7 +139,7 @@ export function OwnerDashboard() {
     );
   }
 
-  const money = (value: string) => `${value} ${dashboard.currency}`;
+  const money = (value: string) => `${value} ${tx(dashboard.currency)}`;
   const financial = dashboard.financial;
   const largestRevenue = financial
     ? Math.max(
@@ -148,10 +153,11 @@ export function OwnerDashboard() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-bold tracking-[0.16em] text-slate-500 uppercase">
-              Reporting period
+              {" "}
+              {tx("Reporting period")}{" "}
             </p>
             <div
-              aria-label="Dashboard range"
+              aria-label={tx("Dashboard range")}
               className="mt-3 flex gap-2 overflow-x-auto pb-1"
               role="group"
             >
@@ -170,7 +176,7 @@ export function OwnerDashboard() {
                     onClick={() => selectPreset(item.value)}
                     type="button"
                   >
-                    {item.label}
+                    {tx(item.label)}
                   </button>
                 );
               })}
@@ -184,7 +190,8 @@ export function OwnerDashboard() {
             }}
           >
             <label className="grid gap-1 text-xs font-semibold text-slate-600">
-              From
+              {" "}
+              {tx("From")}{" "}
               <input
                 className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-800"
                 onChange={(event) => setCustomFrom(event.target.value)}
@@ -193,7 +200,8 @@ export function OwnerDashboard() {
               />
             </label>
             <label className="grid gap-1 text-xs font-semibold text-slate-600">
-              To
+              {" "}
+              {tx("To")}{" "}
               <input
                 className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-800"
                 onChange={(event) => setCustomTo(event.target.value)}
@@ -206,16 +214,17 @@ export function OwnerDashboard() {
               disabled={!customFrom || !customTo}
               type="submit"
             >
-              Apply custom range
+              {" "}
+              {tx("Apply custom range")}{" "}
             </button>
           </form>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-slate-100 pt-4 text-xs text-slate-500">
           <span>
-            {dashboard.range.date_from} to {dashboard.range.date_to}
+            {dashboard.range.date_from} {tx("to")} {dashboard.range.date_to}
           </span>
           <span>{dashboard.timezone}</span>
-          <span>{dashboard.currency}</span>
+          <span>{tx(dashboard.currency)}</span>
         </div>
       </section>
 
@@ -223,7 +232,7 @@ export function OwnerDashboard() {
         <SectionHeading
           eyebrow="At a glance"
           id="dashboard-operational"
-          title="Operational totals"
+          title={tx("Operational totals")}
         />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {OPERATIONAL_METRICS.map((metric) => (
@@ -242,7 +251,7 @@ export function OwnerDashboard() {
               key={metric.key}
             >
               <span className="text-sm font-medium text-slate-600">
-                {metric.label}
+                {tx(metric.label)}
               </span>
               <strong className="text-xl text-slate-900">
                 {dashboard.operational[metric.key]}
@@ -253,14 +262,15 @@ export function OwnerDashboard() {
       </section>
       {financial === null ? (
         <div className="rounded-2xl bg-white p-6 text-sm text-slate-600 shadow-sm">
-          Financial totals are not included in this response.
+          {" "}
+          {tx("Financial totals are not included in this response.")}{" "}
         </div>
       ) : (
         <section aria-labelledby="dashboard-financial" className="grid gap-5">
           <SectionHeading
             eyebrow="Business performance"
             id="dashboard-financial"
-            title="Financial totals"
+            title={tx("Financial totals")}
           />
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <FinancialMetric
@@ -268,7 +278,9 @@ export function OwnerDashboard() {
               value={money(financial.total_revenue)}
             />
             <FinancialMetric
-              detail={`${financial.pending_payment_member_count} members`}
+              detail={tx("{count} members", {
+                count: financial.pending_payment_member_count,
+              })}
               label="Pending payments"
               value={money(financial.pending_payment_amount)}
             />
@@ -282,7 +294,7 @@ export function OwnerDashboard() {
             />
           </div>
           <div className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
-            <DashboardPanel title="Revenue sources">
+            <DashboardPanel title={tx("Revenue sources")}>
               <ol className="grid gap-4">
                 {financial.revenue_sources_ranked.map((item, index) => {
                   const amount = Number(item.amount);
@@ -314,7 +326,7 @@ export function OwnerDashboard() {
                 })}
               </ol>
             </DashboardPanel>
-            <DashboardPanel title="Expense overview">
+            <DashboardPanel title={tx("Expense overview")}>
               <div className="mb-5 grid grid-cols-2 gap-3">
                 <MiniTotal
                   label="Staff salary"
@@ -338,7 +350,7 @@ export function OwnerDashboard() {
               </ul>
             </DashboardPanel>
           </div>
-          <DashboardPanel title="Top products">
+          <DashboardPanel title={tx("Top products")}>
             <ul className="grid gap-3 md:grid-cols-2">
               {financial.top_product_items.map((item) => (
                 <li
@@ -350,20 +362,21 @@ export function OwnerDashboard() {
                       {item.name}
                     </strong>
                     <span className="mt-1 block text-xs text-slate-500">
-                      {item.quantity_sold} sold
+                      {item.quantity_sold} {tx("sold")}
                     </span>
                   </span>
                   <span className="text-right text-xs text-slate-500">
                     <strong className="block text-sm text-slate-900">
                       {money(item.revenue)}
                     </strong>
-                    {money(item.gross_profit)} profit
+                    {money(item.gross_profit)} {tx("profit")}
                   </span>
                 </li>
               ))}
               {!financial.top_product_items.length && (
                 <li className="rounded-xl bg-slate-50 p-5 text-sm text-slate-500 md:col-span-2">
-                  No product sales in this period.
+                  {" "}
+                  {tx("No product sales in this period.")}{" "}
                 </li>
               )}
             </ul>
@@ -383,13 +396,14 @@ function Metric({
   value: string;
   detail: string;
 }) {
+  const tx = useTx();
   return (
     <article className="min-h-36 rounded-2xl bg-white p-5 shadow-sm">
-      <p className="text-sm font-semibold text-slate-500">{label}</p>
+      <p className="text-sm font-semibold text-slate-500">{tx(label)}</p>
       <p className="mt-3 text-3xl font-black tracking-tight text-slate-900">
         {value}
       </p>
-      <p className="mt-2 text-xs text-slate-400">{detail}</p>
+      <p className="mt-2 text-xs text-slate-400">{tx(detail)}</p>
     </article>
   );
 }
@@ -403,16 +417,17 @@ function SectionHeading({
   id: string;
   title: string;
 }) {
+  const tx = useTx();
   return (
     <div>
       <p className="text-xs font-bold tracking-[0.16em] text-[#0866ff] uppercase">
-        {eyebrow}
+        {tx(eyebrow)}
       </p>
       <h2
         className="mt-1 text-xl font-bold tracking-tight text-slate-900"
         id={id}
       >
-        {title}
+        {tx(title)}
       </h2>
     </div>
   );
@@ -427,15 +442,16 @@ function FinancialMetric({
   label: string;
   value: string;
 }) {
+  const tx = useTx();
   return (
     <article className="rounded-2xl bg-white p-5 shadow-sm">
       <p className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-        {label}
+        {tx(label)}
       </p>
       <p className="mt-3 text-2xl font-black tracking-tight text-slate-900">
         {value}
       </p>
-      {detail && <p className="mt-2 text-xs text-slate-500">{detail}</p>}
+      {detail && <p className="mt-2 text-xs text-slate-500">{tx(detail)}</p>}
     </article>
   );
 }
@@ -447,18 +463,20 @@ function DashboardPanel({
   children: ReactNode;
   title: string;
 }) {
+  const tx = useTx();
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-      <h3 className="mb-5 text-base font-bold text-slate-900">{title}</h3>
+      <h3 className="mb-5 text-base font-bold text-slate-900">{tx(title)}</h3>
       {children}
     </section>
   );
 }
 
 function MiniTotal({ label, value }: { label: string; value: string }) {
+  const tx = useTx();
   return (
     <div className="rounded-xl bg-slate-50 p-3">
-      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-xs text-slate-500">{tx(label)}</p>
       <p className="mt-1 text-sm font-bold text-slate-900">{value}</p>
     </div>
   );

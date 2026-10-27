@@ -1,6 +1,8 @@
+import { Tx } from "@/i18n/tx";
 import { redirect } from "next/navigation";
 
 import { BrandLogo } from "@/components/brand-logo";
+import { LanguageSwitch } from "@/i18n/language-switch";
 import { MFASetup } from "@/features/auth/mfa-setup";
 import { readCurrentUser } from "@/lib/auth/session";
 
@@ -12,10 +14,16 @@ export default async function MFASetupPage() {
 
   return (
     <main className="mx-auto max-w-2xl p-6 md:p-10">
-      <BrandLogo align="start" />
-      <h1 className="mt-6 text-3xl font-bold">Security</h1>
+      <div className="flex items-start justify-between gap-4">
+        <BrandLogo align="start" />
+        <LanguageSwitch className="w-36 shrink-0" />
+      </div>
+      <h1 className="mt-6 text-3xl font-bold">
+        <Tx text="Security" />
+      </h1>
       <p className="muted mt-2">
-        Protect sensitive Owner and platform actions.
+        {" "}
+        <Tx text="Protect sensitive Owner and platform actions." />{" "}
       </p>
       <div className="mt-6">
         <MFASetup />

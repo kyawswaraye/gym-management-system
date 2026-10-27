@@ -5,7 +5,6 @@ from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from django.contrib.auth.password_validation import validate_password
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -18,7 +17,7 @@ from apps.tenants.validation import (
     normalize_timezone,
     normalize_warning_days,
 )
-from apps.users.serializers import StrictSerializer
+from apps.users.serializers import StrictSerializer, validate_new_password
 
 
 class AdminGymInputSerializer(StrictSerializer):
@@ -206,11 +205,10 @@ class OwnerAcceptInputSerializer(StrictSerializer):
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         super().validate(attrs)
-        if attrs["password"] != attrs["password_confirmation"]:
-            raise serializers.ValidationError(
-                {"password_confirmation": ["Passwords do not match."]}
-            )
-        validate_password(str(attrs["password"]))
+        validate_new_password(
+            str(attrs["password"]),
+            str(attrs["password_confirmation"]),
+        )
         return attrs
 
 

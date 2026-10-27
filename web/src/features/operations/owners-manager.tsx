@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import Link from "next/link";
 import {
@@ -52,47 +53,77 @@ function displayName(owner: OwnerItem): string {
   return name || owner.email;
 }
 
-function formatWhen(value: string | null): string | null {
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+function formatWhen(
+  value: string | null,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
+): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  const month = MONTHS[date.getMonth()];
+  if (!month) return null;
+  return `${date.getDate()} ${tx(month)} ${date.getFullYear()}`;
 }
 
-function accessNote(owner: OwnerItem): string | null {
+function accessNote(
+  owner: OwnerItem,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
+): string | null {
   if (owner.status === "ACTIVE") {
-    const when = formatWhen(owner.activated_at);
-    return when ? `Since ${when}` : null;
+    const when = formatWhen(owner.activated_at, tx);
+    return when ? tx("Since {when}", { when }) : null;
   }
   if (owner.status === "INVITED") {
-    const when = formatWhen(owner.invited_at);
-    return when ? `Sent ${when}` : null;
+    const when = formatWhen(owner.invited_at, tx);
+    return when ? tx("Sent {when}", { when }) : null;
   }
-  return formatWhen(owner.activated_at ?? owner.invited_at);
+  return formatWhen(owner.activated_at ?? owner.invited_at, tx);
 }
 
 function listSummary(
   owners: OwnerItem[],
   loading: boolean,
   failed: boolean,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
 ): string {
-  if (loading) return "Fetching the latest list.";
+  if (loading) return tx("Fetching the latest list.");
   if (owners.length === 0) {
-    return failed ? "The list is unavailable." : "No one on this list yet.";
+    return failed
+      ? tx("The list is unavailable.")
+      : tx("No one on this list yet.");
   }
-  return countLine(owners);
+  return countLine(owners, tx);
 }
 
-function countLine(owners: OwnerItem[]): string {
-  const people = owners.length === 1 ? "1 person" : `${owners.length} people`;
+function countLine(
+  owners: OwnerItem[],
+  tx: (text: string, vars?: Record<string, string | number>) => string,
+): string {
+  const people =
+    owners.length === 1
+      ? tx("1 person")
+      : tx("{count} people", { count: owners.length });
   const groups = ["ACTIVE", "INVITED", "SUSPENDED", "REVOKED"].flatMap(
     (status) => {
       const count = owners.filter((owner) => owner.status === status).length;
-      return count > 0 ? [`${count} ${statusLabel(status).toLowerCase()}`] : [];
+      return count > 0
+        ? [tx("{count} {status}", { count, status: tx(statusLabel(status)) })]
+        : [];
     },
   );
   return [people, ...groups].join(" · ");
@@ -131,6 +162,7 @@ export function OwnersManager({
   currentMembershipId: string;
   mfaRecent: boolean;
 }) {
+  const tx = useTx();
   const [owners, setOwners] = useState<OwnerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -186,7 +218,7 @@ export function OwnersManager({
           send_invitation: true,
         },
       );
-      setSuccess(`Invitation sent to ${result.email}.`);
+      setSuccess(tx("Invitation sent to {email}.", { email: result.email }));
       setInviting(false);
       form.reset();
       try {
@@ -215,7 +247,9 @@ export function OwnersManager({
         `owners/${owner.gym_membership_id}/revoke`,
         { reason: trimmed },
       );
-      setSuccess(`${owner.email} no longer has owner access.`);
+      setSuccess(
+        tx("{email} no longer has owner access.", { email: owner.email }),
+      );
       setRevokeTarget(null);
       try {
         await load();
@@ -242,7 +276,9 @@ export function OwnersManager({
         `owners/${owner.gym_membership_id}/cancel-invitation`,
         {},
       );
-      setSuccess(`${owner.email} was removed from the owner list.`);
+      setSuccess(
+        tx("{email} was removed from the owner list.", { email: owner.email }),
+      );
       setRemoveTarget(null);
       try {
         await load();
@@ -267,21 +303,25 @@ export function OwnersManager({
         <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-amber-950">
-              Authenticator check needed
+              {" "}
+              {tx("Authenticator check needed")}{" "}
             </p>
             <p className="mt-0.5 text-sm leading-6 text-amber-900/80">
-              Invite and revoke stay locked until you verify with your
-              authenticator.
+              {" "}
+              {tx(
+                "Invite and revoke stay locked until you verify with your authenticator.",
+              )}{" "}
             </p>
           </div>
           <Link className="button w-full sm:w-fit" href="/mfa-setup">
-            Set up or verify MFA
+            {" "}
+            {tx("Set up or verify MFA")}{" "}
           </Link>
         </div>
       ) : null}
       {error ? (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       ) : null}
       {success ? (
@@ -289,7 +329,7 @@ export function OwnersManager({
           className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900"
           role="status"
         >
-          {success}
+          {tx(success)}
         </p>
       ) : null}
 
@@ -303,10 +343,11 @@ export function OwnersManager({
               className="text-lg font-bold text-slate-900"
               id="owner-list-title"
             >
-              Owner list
+              {" "}
+              {tx("Owner list")}{" "}
             </h2>
             <p className="mt-0.5 text-sm text-slate-500">
-              {listSummary(owners, loading, Boolean(error))}
+              {listSummary(owners, loading, Boolean(error), tx)}
             </p>
           </div>
           {mfaRecent ? (
@@ -320,7 +361,8 @@ export function OwnersManager({
               }}
               type="button"
             >
-              Invite owner
+              {" "}
+              {tx("Invite owner")}{" "}
             </button>
           ) : null}
         </div>
@@ -328,7 +370,8 @@ export function OwnersManager({
         {loading ? (
           <div className="grid gap-3 p-5">
             <p className="text-sm font-medium text-slate-500" role="status">
-              Loading owners.
+              {" "}
+              {tx("Loading owners.")}{" "}
             </p>
             {[0, 1].map((item) => (
               <div
@@ -342,19 +385,21 @@ export function OwnersManager({
         {!loading && owners.length === 0 && !error ? (
           <div className="px-6 py-16 text-center" role="status">
             <p className="font-semibold text-slate-800">
-              No owners are listed.
+              {" "}
+              {tx("No owners are listed.")}{" "}
             </p>
             <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500">
               {mfaRecent
-                ? "Invite someone who should run this gym with you."
-                : "Owners appear here after an invitation is accepted."}
+                ? tx("Invite someone who should run this gym with you.")
+                : tx("Owners appear here after an invitation is accepted.")}
             </p>
           </div>
         ) : null}
 
         {!loading && owners.length === 0 && error ? (
           <p className="px-6 py-12 text-center text-sm text-slate-500">
-            The owner list could not be loaded.
+            {" "}
+            {tx("The owner list could not be loaded.")}{" "}
           </p>
         ) : null}
 
@@ -362,7 +407,7 @@ export function OwnersManager({
           <ul className="divide-y divide-slate-100">
             {listed.map((owner) => {
               const isYou = owner.gym_membership_id === currentMembershipId;
-              const note = accessNote(owner);
+              const note = accessNote(owner, tx);
               const canRevoke =
                 mfaRecent && owner.status === "ACTIVE" && !isYou;
               const canRemove =
@@ -387,7 +432,8 @@ export function OwnersManager({
                         </p>
                         {isYou ? (
                           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-bold tracking-wide text-slate-600 uppercase">
-                            You
+                            {" "}
+                            {tx("You")}{" "}
                           </span>
                         ) : null}
                       </div>
@@ -418,7 +464,8 @@ export function OwnersManager({
                           }}
                           type="button"
                         >
-                          Revoke
+                          {" "}
+                          {tx("Revoke")}{" "}
                         </button>
                       ) : null}
                       {canRemove ? (
@@ -432,7 +479,8 @@ export function OwnersManager({
                           }}
                           type="button"
                         >
-                          Remove
+                          {" "}
+                          {tx("Remove")}{" "}
                         </button>
                       ) : null}
                     </div>
@@ -453,7 +501,7 @@ export function OwnersManager({
           }}
           onSubmit={invite}
           pending={pending}
-          title="Invite owner"
+          title={tx("Invite owner")}
         >
           {inviteError ? (
             <p className="error" role="alert">
@@ -500,7 +548,7 @@ export function OwnersManager({
               disabled={pending}
               type="submit"
             >
-              {pending ? "Sending…" : "Send invitation"}
+              {pending ? tx("Sending…") : tx("Send invitation")}
             </button>
           </div>
         </FormDialog>
@@ -533,11 +581,12 @@ export function OwnersManager({
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const tx = useTx();
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${statusTone(status)}`}
     >
-      {statusLabel(status)}
+      {tx(statusLabel(status))}
     </span>
   );
 }
@@ -561,15 +610,16 @@ function TextField({
   autoComplete?: string;
   className?: string;
 }) {
+  const tx = useTx();
   const id = useId();
   return (
     <div className={className ? `field ${className}` : "field"}>
       <label className="text-sm font-semibold text-slate-700" htmlFor={id}>
-        {label}
+        {tx(label)}
         {optional ? (
           <span aria-hidden="true" className="font-medium text-slate-400">
             {" "}
-            · Optional
+            {tx("· Optional")}{" "}
           </span>
         ) : null}
       </label>
@@ -599,6 +649,7 @@ function RevokeOwnerDialog({
   onCancel: () => void;
   onConfirm: (reason: string) => void;
 }) {
+  const tx = useTx();
   const reasonId = useId();
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
@@ -607,7 +658,7 @@ function RevokeOwnerDialog({
     event.preventDefault();
     const trimmed = reason.trim();
     if (trimmed.length < 3) {
-      setError("A reason of at least 3 characters is required.");
+      setError(tx("A reason of at least 3 characters is required."));
       return;
     }
     setError("");
@@ -621,14 +672,15 @@ function RevokeOwnerDialog({
       onClose={onCancel}
       onSubmit={submit}
       pending={pending}
-      title={`Revoke ${email}?`}
+      title={tx("Revoke {email}?", { email })}
     >
       <div className="field">
         <label
           className="text-sm font-semibold text-slate-700"
           htmlFor={reasonId}
         >
-          Reason
+          {" "}
+          {tx("Reason")}{" "}
         </label>
         <textarea
           className="input min-h-28"
@@ -638,7 +690,8 @@ function RevokeOwnerDialog({
           value={reason}
         />
         <p className="text-xs leading-5 text-slate-500">
-          At least 3 characters.
+          {" "}
+          {tx("At least 3 characters.")}{" "}
         </p>
       </div>
       {error || serverError ? (
@@ -652,7 +705,7 @@ function RevokeOwnerDialog({
           disabled={pending}
           type="submit"
         >
-          {pending ? "Revoking…" : "Revoke owner"}
+          {pending ? tx("Revoking…") : tx("Revoke owner")}
         </button>
       </div>
     </FormDialog>
@@ -672,6 +725,7 @@ function RemoveInvitationDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const tx = useTx();
   return (
     <FormDialog
       compact
@@ -682,7 +736,7 @@ function RemoveInvitationDialog({
         onConfirm();
       }}
       pending={pending}
-      title={`Remove ${email}?`}
+      title={tx("Remove {email}?", { email })}
     >
       {serverError ? (
         <p className="error" role="alert">
@@ -695,7 +749,7 @@ function RemoveInvitationDialog({
           disabled={pending}
           type="submit"
         >
-          {pending ? "Removing…" : "Remove invitation"}
+          {pending ? tx("Removing…") : tx("Remove invitation")}
         </button>
       </div>
     </FormDialog>

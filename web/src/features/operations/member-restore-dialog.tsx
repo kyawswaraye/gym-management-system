@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useId } from "react";
 
@@ -24,6 +25,7 @@ export function RestoreMemberDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const tx = useTx();
   const titleId = useId();
   return (
     <div
@@ -44,19 +46,23 @@ export function RestoreMemberDialog({
       >
         <div className="border-b border-slate-200 px-5 py-4">
           <p className="text-xs font-bold tracking-[0.16em] text-teal-700 uppercase">
-            Restore member
+            {" "}
+            {tx("Restore member")}{" "}
           </p>
           <h2
             className="mt-1 text-xl font-black tracking-tight text-slate-900"
             id={titleId}
           >
-            Restore {identity}?
+            {" "}
+            {tx("Restore")} {identity}?
           </h2>
         </div>
         <div className="p-5">
           <p className="text-sm leading-6 text-slate-600">
-            This member becomes active again. Membership and payment history
-            stay as they are. The member record is not deleted.
+            {" "}
+            {tx(
+              "This member becomes active again. Membership and payment history stay as they are. The member record is not deleted.",
+            )}{" "}
           </p>
           <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
             {identity}
@@ -67,14 +73,16 @@ export function RestoreMemberDialog({
               onClick={onCancel}
               type="button"
             >
-              Cancel
+              {" "}
+              {tx("Cancel")}{" "}
             </button>
             <button
               className="button button-success"
               onClick={onConfirm}
               type="button"
             >
-              Restore
+              {" "}
+              {tx("Restore")}{" "}
             </button>
           </div>
         </div>
@@ -92,6 +100,7 @@ export function ArchiveMemberDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const tx = useTx();
   const titleId = useId();
   return (
     <div
@@ -112,19 +121,23 @@ export function ArchiveMemberDialog({
       >
         <div className="border-b border-slate-200 px-5 py-4">
           <p className="text-xs font-bold tracking-[0.16em] text-red-600 uppercase">
-            Archive member
+            {" "}
+            {tx("Archive member")}{" "}
           </p>
           <h2
             className="mt-1 text-xl font-black tracking-tight text-slate-900"
             id={titleId}
           >
-            Archive {identity}?
+            {" "}
+            {tx("Archive")} {identity}?
           </h2>
         </div>
         <div className="p-5">
           <p className="text-sm leading-6 text-slate-600">
-            This member will no longer appear as active. Membership and payment
-            history remain. The member record is not deleted.
+            {" "}
+            {tx(
+              "This member will no longer appear as active. Membership and payment history remain. The member record is not deleted.",
+            )}{" "}
           </p>
           <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
             {identity}
@@ -135,14 +148,16 @@ export function ArchiveMemberDialog({
               onClick={onCancel}
               type="button"
             >
-              Cancel
+              {" "}
+              {tx("Cancel")}{" "}
             </button>
             <button
               className="button button-archive"
               onClick={onConfirm}
               type="button"
             >
-              Archive
+              {" "}
+              {tx("Archive")}{" "}
             </button>
           </div>
         </div>

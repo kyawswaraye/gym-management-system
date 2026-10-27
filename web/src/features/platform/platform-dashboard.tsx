@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
@@ -49,9 +50,10 @@ function attention(label: string, count: number): boolean {
 }
 
 function Stat({ label, count }: { label: string; count: number }) {
+  const tx = useTx();
   return (
     <div className="rounded-xl bg-slate-50 px-4 py-3">
-      <p className="text-sm font-medium text-slate-500">{label}</p>
+      <p className="text-sm font-medium text-slate-500">{tx(label)}</p>
       <p
         className={`mt-1 text-2xl font-black tracking-tight ${
           attention(label, count) ? "text-amber-700" : "text-slate-900"
@@ -64,18 +66,20 @@ function Stat({ label, count }: { label: string; count: number }) {
 }
 
 function Board({ title, children }: { title: string; children: ReactNode }) {
+  const tx = useTx();
   return (
     <section
       aria-label={title}
       className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
     >
-      <h2 className="text-base font-bold text-slate-900">{title}</h2>
+      <h2 className="text-base font-bold text-slate-900">{tx(title)}</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">{children}</div>
     </section>
   );
 }
 
 export function PlatformDashboard({ canView }: { canView: boolean }) {
+  const tx = useTx();
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(canView);
@@ -107,7 +111,8 @@ export function PlatformDashboard({ canView }: { canView: boolean }) {
   if (!canView) {
     return (
       <p className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm font-semibold text-slate-700 shadow-sm">
-        You do not have access to the platform dashboard.
+        {" "}
+        {tx("You do not have access to the platform dashboard.")}{" "}
       </p>
     );
   }
@@ -115,7 +120,8 @@ export function PlatformDashboard({ canView }: { canView: boolean }) {
     return (
       <div className="grid gap-4" role="status">
         <p className="text-sm font-medium text-slate-500">
-          Loading platform summary.
+          {" "}
+          {tx("Loading platform summary.")}{" "}
         </p>
         <div className="grid gap-4 lg:grid-cols-3">
           {[0, 1, 2].map((item) => (
@@ -138,7 +144,10 @@ export function PlatformDashboard({ canView }: { canView: boolean }) {
 
   return (
     <div className="grid gap-6">
-      <nav aria-label="Platform sections" className="grid gap-3 sm:grid-cols-3">
+      <nav
+        aria-label={tx("Platform sections")}
+        className="grid gap-3 sm:grid-cols-3"
+      >
         {SHORTCUTS.map((item) => (
           <Link
             className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm transition-colors hover:border-[#0866ff] hover:bg-[#e7f3ff]"
@@ -146,7 +155,7 @@ export function PlatformDashboard({ canView }: { canView: boolean }) {
             key={item.href}
           >
             <span className="block text-sm font-bold text-slate-900">
-              {item.label}
+              {tx(item.label)}
             </span>
             <span className="mt-1 block text-sm text-slate-500">
               {item.detail}
@@ -155,7 +164,7 @@ export function PlatformDashboard({ canView }: { canView: boolean }) {
         ))}
       </nav>
       <div className="grid gap-4 xl:grid-cols-3">
-        <Board title="Gym statuses">
+        <Board title={tx("Gym statuses")}>
           {GYM_STATUSES.map((status) => (
             <Stat
               count={dashboard.gym_statuses[status.key]}
@@ -164,7 +173,7 @@ export function PlatformDashboard({ canView }: { canView: boolean }) {
             />
           ))}
         </Board>
-        <Board title="Gym subscription statuses">
+        <Board title={tx("Gym subscription statuses")}>
           {SUBSCRIPTION_STATUSES.map((status) => (
             <Stat
               count={dashboard.gym_subscription_statuses[status.key]}
@@ -173,7 +182,7 @@ export function PlatformDashboard({ canView }: { canView: boolean }) {
             />
           ))}
         </Board>
-        <Board title="Subscription plan statuses">
+        <Board title={tx("Subscription plan statuses")}>
           {PLAN_STATUSES.map((status) => (
             <Stat
               count={dashboard.subscription_plan_statuses[status.key]}

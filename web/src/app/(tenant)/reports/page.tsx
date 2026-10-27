@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/i18n/metadata";
+import { Tx } from "@/i18n/tx";
 import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -10,7 +11,9 @@ import {
 } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
 
-export const metadata: Metadata = { title: "Reports" };
+export async function generateMetadata() {
+  return pageMetadata("Reports");
+}
 
 export default async function ReportsPage() {
   const session = await requireTenantSession();
@@ -37,13 +40,16 @@ export default async function ReportsPage() {
       >
         <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-slate-600">
           <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">
-            Financial totals
+            {" "}
+            <Tx text="Financial totals" />{" "}
           </span>
           <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">
-            Member activity
+            {" "}
+            <Tx text="Member activity" />{" "}
           </span>
           <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">
-            Inventory insights
+            {" "}
+            <Tx text="Inventory insights" />{" "}
           </span>
         </div>
       </PageHeader>

@@ -364,7 +364,7 @@ def test_member_bootstrap_returns_only_the_linked_identity_for_the_current_trans
     assert "first_name" not in definition
     assert "email" not in definition
     assert "phone" not in definition
-    assert privileges == (False, False, False, True, True)
+    assert privileges == (False, True, False, True, True)
     with transaction.atomic():
         with connection.cursor() as cursor:
             cursor.execute("SET LOCAL ROLE gym_runtime")

@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { createApiClient, type ApiClient } from "../api/client";
+import { acceptLanguage } from "../i18n/locale";
 import { createMemberApi, type MemberApi } from "../api/memberApi";
 import { createTokenMemory } from "../auth/memory";
 import { createSecureStore } from "../auth/secureStore";
@@ -19,6 +20,8 @@ import {
   type SessionStatus,
 } from "../auth/session";
 import { env } from "../config/env";
+import { setActiveLocale, type Locale } from "../i18n/locale";
+import { LocaleProvider } from "../i18n/useTx";
 import { createQueryClient } from "../query/client";
 
 type AuthValue = {
@@ -31,6 +34,13 @@ type AuthValue = {
 const AuthContext = createContext<AuthValue | null>(null);
 const MemberApiContext = createContext<MemberApi | null>(null);
 const OnlineContext = createContext(true);
+const SetLocaleContext = createContext<(locale: Locale) => Promise<void>>(
+  async () => undefined,
+);
+
+export function useSetLocale(): (locale: Locale) => Promise<void> {
+  return useContext(SetLocaleContext);
+}
 
 export function useAuth(): AuthValue {
   const value = useContext(AuthContext);
@@ -68,6 +78,25 @@ export function AppProviders({
     sessionStatus ?? "loading",
   );
   const [online, setOnline] = useState(true);
+  const [locale, setLocale] = useState<Locale>("en");
+
+  useEffect(() => {
+    let active = true;
+    void runtime.store.getLocale().then((value) => {
+      if (!active) return;
+      setActiveLocale(value);
+      setLocale(value);
+    });
+    return () => {
+      active = false;
+    };
+  }, [runtime.store]);
+
+  async function chooseLocale(next: Locale) {
+    setActiveLocale(next);
+    setLocale(next);
+    await runtime.store.setLocale(next);
+  }
 
   useEffect(() => {
     if (sessionStatus) {
@@ -95,8 +124,8 @@ export function AppProviders({
 
   const authValue = auth ?? {
     status,
-    login: async (email: string, password: string) => {
-      await runtime.session.login(email, password);
+    login: async (idToken: string) => {
+      await runtime.session.login(idToken);
       setStatus("signed-in");
     },
     logout: async () => {
@@ -112,13 +141,17 @@ export function AppProviders({
 
   return (
     <QueryClientProvider client={runtime.queryClient}>
-      <OnlineContext.Provider value={online}>
-        <MemberApiContext.Provider value={api ?? runtime.memberApi}>
-          <AuthContext.Provider value={authValue}>
-            {children}
-          </AuthContext.Provider>
-        </MemberApiContext.Provider>
-      </OnlineContext.Provider>
+      <LocaleProvider locale={locale}>
+        <SetLocaleContext.Provider value={chooseLocale}>
+          <OnlineContext.Provider value={online}>
+            <MemberApiContext.Provider value={api ?? runtime.memberApi}>
+              <AuthContext.Provider value={authValue}>
+                {children}
+              </AuthContext.Provider>
+            </MemberApiContext.Provider>
+          </OnlineContext.Provider>
+        </SetLocaleContext.Provider>
+      </LocaleProvider>
     </QueryClientProvider>
   );
 }
@@ -128,6 +161,7 @@ function createRuntime(): {
   memberApi: MemberApi;
   queryClient: ReturnType<typeof createQueryClient>;
   client: ApiClient;
+  store: ReturnType<typeof createSecureStore>;
 } {
   const memory = createTokenMemory();
   const store = createSecureStore();
@@ -140,6 +174,7 @@ function createRuntime(): {
     getRefreshToken: () => store.getRefreshToken(),
     setRefreshToken: (token) => store.setRefreshToken(token),
     onSessionRevoked: () => sessionWipe(),
+    getAcceptLanguage: () => acceptLanguage(),
   });
   const session = createSession({
     api: client,
@@ -148,5 +183,11 @@ function createRuntime(): {
     clearCache: () => queryClient.clear(),
   });
   sessionWipe = () => session.wipe();
-  return { session, memberApi: createMemberApi(client), queryClient, client };
+  return {
+    session,
+    memberApi: createMemberApi(client),
+    queryClient,
+    client,
+    store,
+  };
 }

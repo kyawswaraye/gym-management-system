@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import {
   useEffect,
@@ -148,24 +149,32 @@ function failureMessage(failure: unknown, fallback: string): string {
   return failure instanceof Error ? failure.message : fallback;
 }
 
+type Tx = (text: string, vars?: Record<string, string | number>) => string;
+
 function limitedText(
   form: FormData,
   field: ProfileTextField,
   label: string,
+  tx: Tx,
   required = false,
 ): string {
   const value = String(form.get(field) ?? "").trim();
   const max = PROFILE_LIMITS[field];
   if (required && value.length === 0) {
-    throw new Error(`Enter a ${label.toLowerCase()}.`);
+    throw new Error(tx("Enter a {label}.", { label: label.toLowerCase() }));
   }
   if (value.length > max) {
-    throw new Error(`Enter a ${label.toLowerCase()} up to ${max} characters.`);
+    throw new Error(
+      tx("Enter a {label} up to {max} characters.", {
+        label: label.toLowerCase(),
+        max,
+      }),
+    );
   }
   return value;
 }
 
-function readProfile(form: FormData): GymProfileUpdate {
+function readProfile(form: FormData, tx: Tx): GymProfileUpdate {
   const email = String(form.get("email") ?? "").trim();
   if (
     email.length > 254 ||
@@ -185,19 +194,19 @@ function readProfile(form: FormData): GymProfileUpdate {
   if (currency !== "THB" && currency !== "MMK") {
     throw new Error("Choose THB or MMK.");
   }
-  const name = limitedText(form, "name", "Name", true);
+  const name = limitedText(form, "name", "Name", tx, true);
   return {
     name,
     legal_name: name,
     email,
-    phone: limitedText(form, "phone", "Phone"),
-    address_line1: limitedText(form, "address_line1", "Address line 1"),
-    address_line2: limitedText(form, "address_line2", "Address line 2"),
-    city: limitedText(form, "city", "City"),
-    region: limitedText(form, "region", "Region"),
-    postal_code: limitedText(form, "postal_code", "Postal code"),
+    phone: limitedText(form, "phone", "Phone", tx),
+    address_line1: limitedText(form, "address_line1", "Address line 1", tx),
+    address_line2: limitedText(form, "address_line2", "Address line 2", tx),
+    city: limitedText(form, "city", "City", tx),
+    region: limitedText(form, "region", "Region", tx),
+    postal_code: limitedText(form, "postal_code", "Postal code", tx),
     country_code: countryCode,
-    timezone: limitedText(form, "timezone", "Timezone", true),
+    timezone: limitedText(form, "timezone", "Timezone", tx, true),
     currency,
   };
 }
@@ -208,31 +217,36 @@ function readInteger(
   label: string,
   min: number,
   max: number,
+  tx: Tx,
 ): number {
   const text = String(form.get(name) ?? "").trim();
   if (!/^\d+$/.test(text)) {
-    throw new Error(`Enter a whole number for ${label}.`);
+    throw new Error(tx("Enter a whole number for {label}.", { label }));
   }
   const value = Number(text);
   if (value < min || value > max) {
-    throw new Error(`Enter a value from ${min} to ${max} for ${label}.`);
+    throw new Error(
+      tx("Enter a value from {min} to {max} for {label}.", { min, max, label }),
+    );
   }
   return value;
 }
 
-function readPrefix(form: FormData, name: string, label: string): string {
+function readPrefix(form: FormData, name: string, label: string, tx: Tx): string {
   const prefix = String(form.get(name) ?? "")
     .trim()
     .toUpperCase();
   if (!/^[A-Z0-9-]{1,20}$/.test(prefix)) {
     throw new Error(
-      `${label} must be 1 to 20 uppercase letters, digits, or hyphens.`,
+      tx("{label} must be 1 to 20 uppercase letters, digits, or hyphens.", {
+        label,
+      }),
     );
   }
   return prefix;
 }
 
-function readWarningDays(form: FormData): number[] {
+function readWarningDays(form: FormData, tx: Tx): number[] {
   const text = String(form.get("membership_expiry_warning_days") ?? "").trim();
   if (!text) return [];
   const parts = text
@@ -240,34 +254,45 @@ function readWarningDays(form: FormData): number[] {
     .map((part) => part.trim())
     .filter(Boolean);
   if (parts.length > 366) {
-    throw new Error("Enter at most 366 warning days.");
+    throw new Error(tx("Enter at most 366 warning days."));
   }
   const days = parts.map((part) => {
     if (!/^\d+$/.test(part) || Number(part) > 365) {
-      throw new Error("Each warning day must be a whole number from 0 to 365.");
+      throw new Error(
+        tx("Each warning day must be a whole number from 0 to 365."),
+      );
     }
     return Number(part);
   });
   if (new Set(days).size !== days.length) {
-    throw new Error("Warning days must be unique.");
+    throw new Error(tx("Warning days must be unique."));
   }
   return [...days].sort((left, right) => left - right);
 }
 
-function readSettings(form: FormData): GymSettingsUpdate {
+function readSettings(form: FormData, tx: Tx): GymSettingsUpdate {
   return {
-    week_starts_on: readInteger(form, "week_starts_on", "Week starts on", 0, 6),
+    week_starts_on: readInteger(
+      form,
+      "week_starts_on",
+      "Week starts on",
+      0,
+      6,
+      tx,
+    ),
     allow_manual_member_numbers:
       form.get("allow_manual_member_numbers") === "on",
     member_number_prefix: readPrefix(
       form,
       "member_number_prefix",
       "Member number prefix",
+      tx,
     ),
     receipt_number_prefix: readPrefix(
       form,
       "receipt_number_prefix",
       "Receipt number prefix",
+      tx,
     ),
     check_in_duplicate_window_seconds: readInteger(
       form,
@@ -275,6 +300,7 @@ function readSettings(form: FormData): GymSettingsUpdate {
       "Check-in duplicate window (seconds)",
       0,
       86_400,
+      tx,
     ),
     check_in_challenge_ttl_seconds: readInteger(
       form,
@@ -282,6 +308,7 @@ function readSettings(form: FormData): GymSettingsUpdate {
       "Check-in challenge lifetime (seconds)",
       30,
       600,
+      tx,
     ),
     check_in_challenge_max_uses: readInteger(
       form,
@@ -289,8 +316,9 @@ function readSettings(form: FormData): GymSettingsUpdate {
       "Check-in challenge maximum uses",
       1,
       100,
+      tx,
     ),
-    membership_expiry_warning_days: readWarningDays(form),
+    membership_expiry_warning_days: readWarningDays(form, tx),
     membership_expiry_email_enabled:
       form.get("membership_expiry_email_enabled") === "on",
     membership_expiry_push_enabled:
@@ -301,6 +329,7 @@ function readSettings(form: FormData): GymSettingsUpdate {
       "Class cancellation cutoff (minutes)",
       0,
       2_147_483_647,
+      tx,
     ),
     class_no_show_consumes_session:
       form.get("class_no_show_consumes_session") === "on",
@@ -341,12 +370,13 @@ function Notice({
   error: string | null;
   success: string | null;
 }) {
+  const tx = useTx();
   if (!error && !success) return null;
   return (
     <>
       {error ? (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       ) : null}
       {success ? (
@@ -354,7 +384,7 @@ function Notice({
           className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900"
           role="status"
         >
-          {success}
+          {tx(success)}
         </p>
       ) : null}
     </>
@@ -421,12 +451,13 @@ function Fact({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const tx = useTx();
   return (
     <div
       className={`rounded-xl bg-slate-50 px-3 py-2.5 ${wide ? "sm:col-span-2" : ""}`}
     >
       <dt className="text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase">
-        {label}
+        {tx(label)}
       </dt>
       <dd className="mt-1 text-sm font-semibold break-words text-slate-900">
         {children}
@@ -444,17 +475,18 @@ function ProfileBlock({
   hint?: string;
   rows: { label: string; value: ReactNode }[];
 }) {
+  const tx = useTx();
   return (
     <div>
-      <h3 className="text-base font-bold text-[#050505]">{title}</h3>
-      {hint ? <p className="mt-1 text-sm text-[#65676b]">{hint}</p> : null}
+      <h3 className="text-base font-bold text-[#050505]">{tx(title)}</h3>
+      {hint ? <p className="mt-1 text-sm text-slate-500">{tx(hint)}</p> : null}
       <dl className="mt-3 border-t border-[#e4e6eb]">
         {rows.map((row) => (
           <div
             className="grid gap-1 border-b border-[#e4e6eb] py-3 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-baseline sm:gap-6"
             key={row.label}
           >
-            <dt className="text-sm text-[#65676b]">{row.label}</dt>
+            <dt className="text-sm text-slate-500">{tx(row.label)}</dt>
             <dd className="min-w-0 text-sm font-semibold break-words text-[#050505]">
               {row.value}
             </dd>
@@ -474,16 +506,20 @@ function SettingGroup({
   hint?: string;
   children: ReactNode;
 }) {
+  const tx = useTx();
   return (
     <div>
-      <h3 className="text-sm font-bold text-slate-900">{title}</h3>
-      {hint ? <p className="mt-0.5 text-sm text-slate-500">{hint}</p> : null}
+      <h3 className="text-sm font-bold text-slate-900">{tx(title)}</h3>
+      {hint ? (
+        <p className="mt-0.5 text-sm text-slate-500">{tx(hint)}</p>
+      ) : null}
       <dl className="mt-3 grid gap-2 sm:grid-cols-2">{children}</dl>
     </div>
   );
 }
 
 function Choice({ on }: { on: boolean }) {
+  const tx = useTx();
   return (
     <Pill
       tone={
@@ -492,7 +528,7 @@ function Choice({ on }: { on: boolean }) {
           : "bg-slate-100 text-slate-600 ring-slate-500/10"
       }
     >
-      {on ? "Yes" : "No"}
+      {on ? tx("Yes") : tx("No")}
     </Pill>
   );
 }
@@ -502,12 +538,13 @@ function ReadOnlyRows({
 }: {
   rows: { label: string; value: ReactNode }[];
 }) {
+  const tx = useTx();
   return (
     <dl className="grid gap-2 sm:grid-cols-3">
       {rows.map((row) => (
         <div className="rounded-xl bg-slate-50 px-3 py-2.5" key={row.label}>
           <dt className="text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase">
-            {row.label}
+            {tx(row.label)}
           </dt>
           <dd className="mt-1 text-sm font-semibold text-slate-900">
             {row.value === "" ||
@@ -535,11 +572,14 @@ function FormSection({
   hint?: string;
   children: ReactNode;
 }) {
+  const tx = useTx();
   return (
     <fieldset className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-      <legend className="px-1 text-sm font-bold text-slate-900">{title}</legend>
+      <legend className="px-1 text-sm font-bold text-slate-900">
+        {tx(title)}
+      </legend>
       {hint ? (
-        <p className="mb-3 text-xs leading-5 text-slate-500">{hint}</p>
+        <p className="mb-3 text-xs leading-5 text-slate-500">{tx(hint)}</p>
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2">{children}</div>
     </fieldset>
@@ -577,11 +617,14 @@ function TextControl({
   spellCheck?: boolean;
   uppercase?: boolean;
 }) {
+  const tx = useTx();
   const hintId = hint ? `${name}-hint` : undefined;
   return (
     <div className={className}>
       <label className="field">
-        <span className="text-sm font-semibold text-slate-700">{label}</span>
+        <span className="text-sm font-semibold text-slate-700">
+          {tx(label)}
+        </span>
         <input
           aria-describedby={hintId}
           autoComplete={autoComplete}
@@ -599,7 +642,7 @@ function TextControl({
       </label>
       {hint ? (
         <p className="mt-1 text-xs leading-5 text-slate-500" id={hintId}>
-          {hint}
+          {tx(hint)}
         </p>
       ) : null}
     </div>
@@ -617,11 +660,14 @@ function ToggleRow({
   defaultChecked: boolean;
   hint: string;
 }) {
+  const tx = useTx();
   const hintId = `${name}-hint`;
   return (
     <div className="sm:col-span-2">
       <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-3 py-3">
-        <span className="text-sm font-semibold text-slate-800">{label}</span>
+        <span className="text-sm font-semibold text-slate-800">
+          {tx(label)}
+        </span>
         <input
           aria-describedby={hintId}
           className="size-4 shrink-0 accent-indigo-600"
@@ -631,7 +677,7 @@ function ToggleRow({
         />
       </label>
       <p className="mt-1 px-1 text-xs leading-5 text-slate-500" id={hintId}>
-        {hint}
+        {tx(hint)}
       </p>
     </div>
   );
@@ -797,6 +843,7 @@ function GymLogoPicker({
   onFile: (event: ChangeEvent<HTMLInputElement>) => void;
   onRemove: () => void;
 }) {
+  const tx = useTx();
   if (!canUpdate && !hasLogo && !previewUrl) return null;
   const preview = previewUrl ? (
     <img
@@ -819,11 +866,13 @@ function GymLogoPicker({
           <ImageFrameIcon />
         </span>
         <div>
-          <p className="text-sm font-bold text-[#050505]">Gym logo</p>
-          <p className="text-sm text-[#65676b]">Max 1 MB · PNG, JPEG, WebP.</p>
+          <p className="text-sm font-bold text-[#050505]">{tx("Gym logo")}</p>
+          <p className="text-sm text-slate-500">
+            {tx("Max 1 MB · PNG, JPEG, WebP.")}
+          </p>
         </div>
       </div>
-      <p className="mt-4 text-sm font-semibold text-[#65676b]">Image</p>
+      <p className="mt-4 text-sm font-semibold text-slate-500">{tx("Image")}</p>
       {preview ? (
         <div className="mt-2">
           <div className="grid min-h-40 place-items-center rounded-xl bg-[#f0f2f5] p-4">
@@ -834,7 +883,7 @@ function GymLogoPicker({
               <label
                 className={`button button-sm relative w-full ${pending ? "pointer-events-none opacity-55" : ""}`}
               >
-                <UploadArrowIcon /> Change
+                <UploadArrowIcon /> {tx("Change")}{" "}
                 <LogoFileInput pending={pending} onFile={onFile} />
               </label>
               <button
@@ -843,17 +892,16 @@ function GymLogoPicker({
                 type="button"
                 onClick={onRemove}
               >
-                <RemoveIcon /> Remove
+                <RemoveIcon /> {tx("Remove")}{" "}
               </button>
             </div>
           ) : null}
         </div>
       ) : (
         <label
-          className={`relative mt-2 flex min-h-40 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#c5cad3] bg-[#f0f2f5] px-4 py-6 text-sm font-semibold text-[#65676b] hover:border-[#0866ff] hover:text-[#0866ff] ${pending ? "pointer-events-none opacity-55" : ""}`}
+          className={`relative mt-2 flex min-h-40 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#c5cad3] bg-[#f0f2f5] px-4 py-6 text-sm font-semibold text-slate-500 hover:border-[#0866ff] hover:text-[#0866ff] ${pending ? "pointer-events-none opacity-55" : ""}`}
         >
-          <ImageFrameIcon />
-          Click to select an image
+          <ImageFrameIcon /> {tx("Click to select an image")}{" "}
           <LogoFileInput pending={pending} onFile={onFile} />
         </label>
       )}
@@ -870,6 +918,7 @@ function ProfileSection({
   pending: boolean;
   onPending: (value: boolean) => void;
 }) {
+  const tx = useTx();
   const [profile, setProfile] = useState<GymProfile | null>(null);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -902,7 +951,7 @@ function ProfileSection({
     const form = new FormData(event.currentTarget);
     let payload: GymProfileUpdate;
     try {
-      payload = readProfile(form);
+      payload = readProfile(form, tx);
     } catch (failure) {
       setError(failureMessage(failure, "Check the gym profile and try again."));
       return;
@@ -974,10 +1023,12 @@ function ProfileSection({
             className="text-lg font-bold text-slate-900"
             id="gym-profile-title"
           >
-            Gym profile
+            {" "}
+            {tx("Gym profile")}{" "}
           </h2>
           <p className="mt-0.5 text-sm text-slate-500">
-            Name, contact, and address for this gym.
+            {" "}
+            {tx("Name, contact, and address for this gym.")}{" "}
           </p>
         </div>
         {profile && canUpdate ? (
@@ -986,14 +1037,16 @@ function ProfileSection({
             onClick={() => setEditing(true)}
             type="button"
           >
-            Edit gym profile
+            {" "}
+            {tx("Edit gym profile")}{" "}
           </button>
         ) : null}
       </div>
       {loading ? (
         <div className="grid gap-3 p-5">
           <p className="text-sm font-medium text-slate-500" role="status">
-            Loading gym profile.
+            {" "}
+            {tx("Loading gym profile.")}{" "}
           </p>
           {[0, 1, 2].map((item) => (
             <div
@@ -1022,10 +1075,10 @@ function ProfileSection({
                       {profile.name}
                     </p>
                     <Pill tone={recordTone(profile.status)}>
-                      {profile.status}
+                      {tx(profile.status)}
                     </Pill>
                   </div>
-                  <p className="mt-1 text-sm text-[#65676b]">{profile.code}</p>
+                  <p className="mt-1 text-sm text-slate-500">{profile.code}</p>
                   <div className="mt-6">
                     <ProfileBlock
                       hint="How members and staff reach this gym."
@@ -1034,9 +1087,9 @@ function ProfileSection({
                           label: field.label,
                           value: textValue(profile[field.name]),
                         })),
-                        { label: "Email", value: textValue(profile.email) },
+                        { label: tx("Email"), value: textValue(profile.email) },
                       ]}
-                      title="Contact"
+                      title={tx("Contact")}
                     />
                   </div>
                 </div>
@@ -1049,11 +1102,11 @@ function ProfileSection({
                       value: textValue(profile[field.name]),
                     })),
                     {
-                      label: "Country code",
+                      label: tx("Country code"),
                       value: textValue(profile.country_code),
                     },
                   ]}
-                  title="Address"
+                  title={tx("Address")}
                 />
                 <ProfileBlock
                   hint="Schedules, receipts, and reports use these."
@@ -1062,48 +1115,51 @@ function ProfileSection({
                       label: field.label,
                       value: textValue(profile[field.name]),
                     })),
-                    { label: "Currency", value: textValue(profile.currency) },
+                    {
+                      label: tx("Currency"),
+                      value: textValue(profile.currency),
+                    },
                   ]}
-                  title="Time and currency"
+                  title={tx("Time and currency")}
                 />
               </div>
               <ProfileBlock
                 hint="Lifecycle and subscription stay with platform administration."
                 rows={[
                   {
-                    label: "Subscription plan",
+                    label: tx("Subscription plan"),
                     value: textValue(profile.subscription_plan_name ?? ""),
                   },
                   {
-                    label: "Subscription plan ID",
+                    label: tx("Subscription plan ID"),
                     value: textValue(profile.subscription_plan_id ?? ""),
                   },
                   {
-                    label: "Subscription status",
+                    label: tx("Subscription status"),
                     value: (
                       <Pill tone={recordTone(profile.subscription_status)}>
-                        {profile.subscription_status}
+                        {tx(profile.subscription_status)}
                       </Pill>
                     ),
                   },
                   {
-                    label: "Subscription starts",
+                    label: tx("Subscription starts"),
                     value: profileWhen(profile.subscription_starts_at),
                   },
                   {
-                    label: "Subscription ends",
+                    label: tx("Subscription ends"),
                     value: profileWhen(profile.subscription_ends_at),
                   },
                   {
-                    label: "Created",
+                    label: tx("Created"),
                     value: profileWhen(profile.created_at),
                   },
                   {
-                    label: "Updated",
+                    label: tx("Updated"),
                     value: profileWhen(profile.updated_at),
                   },
                 ]}
-                title="Platform record"
+                title={tx("Platform record")}
               />
             </>
           ) : null}
@@ -1118,15 +1174,15 @@ function ProfileSection({
           }}
           onSubmit={save}
           pending={pending}
-          title="Gym profile"
+          title={tx("Gym profile")}
           wide
         >
-          <FormSection title="Identity">
+          <FormSection title={tx("Identity")}>
             <ProfileControl name="name" profile={profile} />
           </FormSection>
           <FormSection
             hint="Leave email blank if this gym has none."
-            title="Contact"
+            title={tx("Contact")}
           >
             <ProfileControl name="phone" profile={profile} />
             <TextControl
@@ -1138,7 +1194,7 @@ function ProfileSection({
               type="email"
             />
           </FormSection>
-          <FormSection title="Address">
+          <FormSection title={tx("Address")}>
             {profileFields("address").map((field) => (
               <ProfileControl
                 key={field.name}
@@ -1160,7 +1216,7 @@ function ProfileSection({
               uppercase
             />
           </FormSection>
-          <FormSection title="Time and currency">
+          <FormSection title={tx("Time and currency")}>
             <ProfileControl
               hint="Example: Asia/Yangon"
               name="timezone"
@@ -1168,26 +1224,27 @@ function ProfileSection({
             />
             <div>
               <label className="field">
-                <span>Currency</span>
+                <span>{tx("Currency")}</span>
                 <select
-                  aria-label="Currency"
+                  aria-label={tx("Currency")}
                   className="input"
                   defaultValue={profile.currency === "MMK" ? "MMK" : "THB"}
                   name="currency"
                   required
                 >
-                  <option value="THB">THB</option>
-                  <option value="MMK">MMK</option>
+                  <option value="THB">{tx("THB")}</option>
+                  <option value="MMK">{tx("MMK")}</option>
                 </select>
               </label>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                THB or MMK. It must match the subscription plan.
+                {" "}
+                {tx("THB or MMK. It must match the subscription plan.")}{" "}
               </p>
             </div>
           </FormSection>
           {error ? (
             <p className="error" role="alert">
-              {error}
+              {tx(error)}
             </p>
           ) : null}
           <div>
@@ -1196,7 +1253,8 @@ function ProfileSection({
               disabled={pending}
               type="submit"
             >
-              Save gym profile
+              {" "}
+              {tx("Save gym profile")}{" "}
             </button>
           </div>
         </FormDialog>
@@ -1214,6 +1272,7 @@ function SettingsSection({
   pending: boolean;
   onPending: (value: boolean) => void;
 }) {
+  const tx = useTx();
   const [settings, setSettings] = useState<GymSettings | null>(null);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1245,7 +1304,7 @@ function SettingsSection({
     setSuccess(null);
     let payload: GymSettingsUpdate;
     try {
-      payload = readSettings(new FormData(event.currentTarget));
+      payload = readSettings(new FormData(event.currentTarget), tx);
     } catch (failure) {
       setError(
         failureMessage(
@@ -1284,10 +1343,12 @@ function SettingsSection({
             className="text-lg font-bold text-slate-900"
             id="operational-settings-title"
           >
-            Operational settings
+            {" "}
+            {tx("Operational settings")}{" "}
           </h2>
           <p className="mt-0.5 text-sm text-slate-500">
-            Check-in, numbers, classes, and reminders.
+            {" "}
+            {tx("Check-in, numbers, classes, and reminders.")}{" "}
           </p>
         </div>
         {settings && canManage ? (
@@ -1296,14 +1357,16 @@ function SettingsSection({
             onClick={() => setEditing(true)}
             type="button"
           >
-            Edit operational settings
+            {" "}
+            {tx("Edit operational settings")}{" "}
           </button>
         ) : null}
       </div>
       {loading ? (
         <div className="grid gap-3 p-5">
           <p className="text-sm font-medium text-slate-500" role="status">
-            Loading operational settings.
+            {" "}
+            {tx("Loading operational settings.")}{" "}
           </p>
           {[0, 1, 2].map((item) => (
             <div
@@ -1319,13 +1382,13 @@ function SettingsSection({
             <>
               <SettingGroup
                 hint="Weekly schedules and reports start on this day."
-                title="Calendar"
+                title={tx("Calendar")}
               >
                 <Fact label="Week starts on">{textValue(weekday)}</Fact>
               </SettingGroup>
               <SettingGroup
                 hint="New members receive the next number unless manual numbers are allowed."
-                title="Member numbers"
+                title={tx("Member numbers")}
               >
                 <Fact label="Next member number">
                   {assignedMemberNumber(
@@ -1339,7 +1402,7 @@ function SettingsSection({
               </SettingGroup>
               <SettingGroup
                 hint="Example of the printed number. The sequence increases with each receipt."
-                title="Receipts"
+                title={tx("Receipts")}
               >
                 <Fact label="Receipt number">
                   {receiptExample(settings.receipt_number_prefix)}
@@ -1347,7 +1410,7 @@ function SettingsSection({
               </SettingGroup>
               <SettingGroup
                 hint="How the front desk accepts a check-in code."
-                title="Check-in"
+                title={tx("Check-in")}
               >
                 <Fact label="Check-in duplicate window (seconds)">
                   {textValue(settings.check_in_duplicate_window_seconds)}
@@ -1361,7 +1424,7 @@ function SettingsSection({
               </SettingGroup>
               <SettingGroup
                 hint="Days before a membership ends. Example: 7 means one week before."
-                title="Membership reminders"
+                title={tx("Membership reminders")}
               >
                 <Fact label="Membership expiry warning days" wide>
                   {settings.membership_expiry_warning_days.length === 0 ? (
@@ -1386,7 +1449,7 @@ function SettingsSection({
                   <Choice on={settings.membership_expiry_push_enabled} />
                 </Fact>
               </SettingGroup>
-              <SettingGroup title="Classes">
+              <SettingGroup title={tx("Classes")}>
                 <Fact label="Class cancellation cutoff (minutes)">
                   {textValue(settings.class_cancellation_cutoff_minutes)}
                 </Fact>
@@ -1397,17 +1460,19 @@ function SettingsSection({
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h3 className="text-sm font-bold text-amber-950">
-                    Finance approval
+                    {" "}
+                    {tx("Finance approval")}{" "}
                   </h3>
                   <Pill tone="bg-amber-50 text-amber-800 ring-amber-600/15">
-                    Required
+                    {" "}
+                    {tx("Required")}{" "}
                   </Pill>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-amber-950">
                   {approvalCopy()}
                 </p>
               </div>
-              <SettingGroup title="Record">
+              <SettingGroup title={tx("Record")}>
                 <Fact label="Created">{textValue(settings.created_at)}</Fact>
                 <Fact label="Updated">{textValue(settings.updated_at)}</Fact>
               </SettingGroup>
@@ -1424,20 +1489,21 @@ function SettingsSection({
           }}
           onSubmit={save}
           pending={pending}
-          title="Operational settings"
+          title={tx("Operational settings")}
           wide
         >
           <FormSection
             hint="Weekly schedules and reports start on this day."
-            title="Calendar"
+            title={tx("Calendar")}
           >
             <div>
               <label className="field">
                 <span className="text-sm font-semibold text-slate-700">
-                  Week starts on
+                  {" "}
+                  {tx("Week starts on")}{" "}
                 </span>
                 <select
-                  aria-label="Week starts on"
+                  aria-label={tx("Week starts on")}
                   className="input"
                   defaultValue={String(settings.week_starts_on)}
                   name="week_starts_on"
@@ -1451,13 +1517,18 @@ function SettingsSection({
               </label>
             </div>
           </FormSection>
-          <FormSection title="Member numbers">
+          <FormSection title={tx("Member numbers")}>
             <TextControl
               defaultValue={settings.member_number_prefix}
-              hint={`The next member number will look like ${assignedMemberNumber(
-                settings.member_number_prefix,
-                settings.next_member_number,
-              )}. Use 1–20 letters, digits, or hyphens.`}
+              hint={tx(
+                "The next member number will look like {example}. Use 1–20 letters, digits, or hyphens.",
+                {
+                  example: assignedMemberNumber(
+                    settings.member_number_prefix,
+                    settings.next_member_number,
+                  ),
+                },
+              )}
               label="Member number prefix"
               maxLength={20}
               name="member_number_prefix"
@@ -1471,12 +1542,15 @@ function SettingsSection({
               settings={settings}
             />
           </FormSection>
-          <FormSection title="Receipts">
+          <FormSection title={tx("Receipts")}>
             <TextControl
               defaultValue={settings.receipt_number_prefix}
-              hint={`A receipt will look like ${receiptExample(
-                settings.receipt_number_prefix,
-              )}. Use 1–20 letters, digits, or hyphens.`}
+              hint={tx(
+                "A receipt will look like {example}. Use 1–20 letters, digits, or hyphens.",
+                {
+                  example: receiptExample(settings.receipt_number_prefix),
+                },
+              )}
               label="Receipt number prefix"
               maxLength={20}
               name="receipt_number_prefix"
@@ -1487,7 +1561,7 @@ function SettingsSection({
           </FormSection>
           <FormSection
             hint="How the front desk accepts a check-in code."
-            title="Check-in"
+            title={tx("Check-in")}
           >
             <IntegerControl
               name="check_in_duplicate_window_seconds"
@@ -1504,7 +1578,7 @@ function SettingsSection({
           </FormSection>
           <FormSection
             hint="Comma-separated days before expiry, from 0 to 365."
-            title="Membership reminders"
+            title={tx("Membership reminders")}
           >
             <TextControl
               className="sm:col-span-2"
@@ -1525,7 +1599,7 @@ function SettingsSection({
               settings={settings}
             />
           </FormSection>
-          <FormSection title="Classes">
+          <FormSection title={tx("Classes")}>
             <IntegerControl
               name="class_cancellation_cutoff_minutes"
               settings={settings}
@@ -1538,11 +1612,13 @@ function SettingsSection({
           </FormSection>
           <fieldset className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
             <legend className="px-1 text-sm font-bold text-amber-950">
-              Finance approval
+              {" "}
+              {tx("Finance approval")}{" "}
             </legend>
             <label className="flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-white px-3 py-3">
               <span className="text-sm font-semibold text-slate-800">
-                Require separate finance approval
+                {" "}
+                {tx("Require separate finance approval")}{" "}
               </span>
               <input
                 aria-describedby="finance-approval-note"
@@ -1563,16 +1639,16 @@ function SettingsSection({
           <ReadOnlyRows
             rows={[
               {
-                label: "Next member number",
+                label: tx("Next member number"),
                 value: settings.next_member_number,
               },
-              { label: "Created", value: settings.created_at },
-              { label: "Updated", value: settings.updated_at },
+              { label: tx("Created"), value: settings.created_at },
+              { label: tx("Updated"), value: settings.updated_at },
             ]}
           />
           {error ? (
             <p className="error" role="alert">
-              {error}
+              {tx(error)}
             </p>
           ) : null}
           <div>
@@ -1581,7 +1657,8 @@ function SettingsSection({
               disabled={pending}
               type="submit"
             >
-              Save operational settings
+              {" "}
+              {tx("Save operational settings")}{" "}
             </button>
           </div>
         </FormDialog>
@@ -1596,6 +1673,7 @@ export function GymSettingsManager({
   canViewSettings,
   canManageSettings,
 }: GymSettingsAccess) {
+  const tx = useTx();
   const [pending, setPending] = useState(false);
   const [tab, setTab] = useState<"profile" | "operations">(
     canViewProfile ? "profile" : "operations",
@@ -1610,7 +1688,7 @@ export function GymSettingsManager({
     <div className="grid gap-5">
       {both ? (
         <div
-          aria-label="Gym settings sections"
+          aria-label={tx("Gym settings sections")}
           className="inline-flex w-fit rounded-xl bg-slate-200/70 p-1"
           role="tablist"
         >
@@ -1625,7 +1703,7 @@ export function GymSettingsManager({
               role="tab"
               type="button"
             >
-              {label}
+              {tx(label)}
             </button>
           ))}
         </div>

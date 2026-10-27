@@ -202,4 +202,23 @@ describe("member API client", () => {
     );
     expect(JSON.stringify(calls)).not.toContain(BFF_SECRET_HEADER);
   });
+
+  it("sends the member language on each request", async () => {
+    const fetchImpl: FetchLike = jest.fn(async () =>
+      json(200, { success: true, data: { ok: true }, message: "" }),
+    );
+    const client = createApiClient({
+      baseUrl: "https://api.example.com",
+      fetchImpl,
+      getAccessToken: () => "access",
+      setAccessToken: () => undefined,
+      getRefreshToken: async () => "refresh",
+      setRefreshToken: async () => undefined,
+      onSessionRevoked: async () => undefined,
+      getAcceptLanguage: () => "my",
+    });
+    await client.request("/api/v1/member/me/");
+    const init = (fetchImpl as jest.Mock).mock.calls[0][1];
+    expect(init.headers["Accept-Language"]).toBe("my");
+  });
 });

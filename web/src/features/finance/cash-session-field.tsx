@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useState } from "react";
 
@@ -103,6 +104,7 @@ export function CashSessionSelect({
   required?: boolean;
   resetKey?: string;
 }) {
+  const tx = useTx();
   const matches = collectionError
     ? []
     : sessions.filter(
@@ -112,7 +114,8 @@ export function CashSessionSelect({
     <div className="grid gap-1">
       {pending ? (
         <p className="muted" role="status">
-          Loading open sessions.
+          {" "}
+          {tx("Loading open sessions.")}{" "}
         </p>
       ) : null}
       {collectionError ? (
@@ -122,17 +125,18 @@ export function CashSessionSelect({
       ) : null}
       <Field error={error} label={label}>
         <SelectInput key={resetKey} name={name} required={required}>
-          <option value="">Select an open session</option>
+          <option value="">{tx("Select an open session")}</option>
           {matches.map((session) => (
             <option key={session.id} value={session.id}>
               {session.register_code} · {session.business_date} ·{" "}
-              {session.currency}
+              {tx(session.currency)}
             </option>
           ))}
         </SelectInput>
       </Field>
       <p className="text-sm text-slate-500">
-        Only open sessions returned for your access are listed.
+        {" "}
+        {tx("Only open sessions returned for your access are listed.")}{" "}
       </p>
     </div>
   );

@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useId, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -33,7 +34,10 @@ async function readFailure(
         if (message) fields[key] = message;
       }
     }
-    const fieldMessage = Object.values(fields)[0];
+    if (!fields.password && fields.non_field_errors) {
+      fields.password = fields.non_field_errors;
+    }
+    const fieldMessage = fields.password || Object.values(fields)[0];
     const message =
       fieldMessage ||
       (typeof body.error?.message === "string" && body.error.message
@@ -46,6 +50,7 @@ async function readFailure(
 }
 
 export function ResetPasswordForm({ token }: { token: string }) {
+  const tx = useTx();
   const router = useRouter();
   const passwordId = useId();
   const confirmId = useId();
@@ -59,8 +64,12 @@ export function ResetPasswordForm({ token }: { token: string }) {
     const password = String(values.get("password") ?? "");
     const confirmation = String(values.get("password_confirmation") ?? "");
     if (password.length < 12 || confirmation.length < 12) {
-      setError("Use a password of at least 12 characters.");
-      setFields({});
+      const message = "Use a password of at least 12 characters.";
+      const next: FieldErrors = {};
+      if (password.length < 12) next.password = message;
+      if (confirmation.length < 12) next.password_confirmation = message;
+      setError(message);
+      setFields(next);
       return;
     }
     if (password !== confirmation) {
@@ -104,11 +113,11 @@ export function ResetPasswordForm({ token }: { token: string }) {
     <form className="mt-6 grid gap-4" noValidate onSubmit={submit}>
       {error ? (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       ) : null}
       <div className="field">
-        <label htmlFor={passwordId}>New password</label>
+        <label htmlFor={passwordId}>{tx("New password")}</label>
         <PasswordInput
           id={passwordId}
           name="password"
@@ -118,12 +127,13 @@ export function ResetPasswordForm({ token }: { token: string }) {
           disabled={pending}
           aria-invalid={fields.password ? true : undefined}
         />
+
         {fields.password ? (
-          <span className="error">{fields.password}</span>
+          <span className="error">{tx(fields.password)}</span>
         ) : null}
       </div>
       <div className="field">
-        <label htmlFor={confirmId}>Confirm password</label>
+        <label htmlFor={confirmId}>{tx("Confirm password")}</label>
         <PasswordInput
           id={confirmId}
           name="password_confirmation"
@@ -133,12 +143,13 @@ export function ResetPasswordForm({ token }: { token: string }) {
           disabled={pending}
           aria-invalid={fields.password_confirmation ? true : undefined}
         />
+
         {fields.password_confirmation ? (
-          <span className="error">{fields.password_confirmation}</span>
+          <span className="error">{tx(fields.password_confirmation)}</span>
         ) : null}
       </div>
       <button className="button button-edit" type="submit" disabled={pending}>
-        {pending ? "Updating…" : "Update password"}
+        {pending ? tx("Updating…") : tx("Update password")}
       </button>
     </form>
   );

@@ -15,12 +15,12 @@ async function staffId(context: Context) {
 
 export async function GET(request: NextRequest, context: Context) {
   const id = await staffId(context);
-  if (!id) return unknownStaffResponse();
+  if (!id) return unknownStaffResponse(request);
   return getTenantStaff(request, id);
 }
 
 export async function PATCH(request: NextRequest, context: Context) {
   const id = await staffId(context);
-  if (!id) return unknownStaffResponse();
+  if (!id) return unknownStaffResponse(request);
   return updateTenantStaff(request, id);
 }

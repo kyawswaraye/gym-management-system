@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
@@ -71,16 +72,18 @@ function figureClass(
 }
 
 function StatusPill({ status }: { status: string }) {
+  const tx = useTx();
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ${statusTone(status)}`}
     >
-      {pretty(status)}
+      {tx(pretty(status))}
     </span>
   );
 }
 
 function DirectionPill({ direction }: { direction: string }) {
+  const tx = useTx();
   const inbound = direction === "IN";
   return (
     <span
@@ -90,7 +93,7 @@ function DirectionPill({ direction }: { direction: string }) {
           : "bg-rose-100 text-rose-700"
       }`}
     >
-      {inbound ? "In" : direction === "OUT" ? "Out" : pretty(direction)}
+      {inbound ? tx("In") : direction === "OUT" ? tx("Out") : tx(pretty(direction))}
     </span>
   );
 }
@@ -104,9 +107,10 @@ function MoneyFigure({
   value: string;
   tone?: "neutral" | "in" | "out" | "difference";
 }) {
+  const tx = useTx();
   return (
     <div>
-      <dt className="text-xs text-slate-500">{label}</dt>
+      <dt className="text-xs text-slate-500">{tx(label)}</dt>
       <dd
         className={`mt-0.5 text-sm font-semibold tabular-nums ${figureClass(value, tone)}`}
       >
@@ -137,6 +141,7 @@ function ActionPanel({
   onCancel: () => void;
   children?: ReactNode;
 }) {
+  const tx = useTx();
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit(new FormData(event.currentTarget));
@@ -159,10 +164,11 @@ function ActionPanel({
           onClick={onCancel}
           type="button"
         >
-          Back
+          {" "}
+          {tx("Back")}{" "}
         </button>
         <button className={confirmClass} disabled={pending} type="submit">
-          {confirmLabel}
+          {tx(confirmLabel)}
         </button>
       </div>
     </FormDialog>
@@ -182,6 +188,7 @@ export function CashBookManager({
   currency: string;
   defaultDate: string;
 }) {
+  const tx = useTx();
   const [status, setStatus] = useState("");
   const [registerCode, setRegisterCode] = useState("");
   const [businessDate, setBusinessDate] = useState("");
@@ -234,7 +241,7 @@ export function CashBookManager({
           if (!active) return;
           setSession(null);
           setDetailError(
-            financeError(caught, "The session could not be loaded."),
+            financeError(caught, tx("The session could not be loaded.")),
           );
         });
     }, 0);
@@ -242,7 +249,7 @@ export function CashBookManager({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [selectedId, sessions.rows]);
+  }, [selectedId, sessions.rows, tx]);
 
   const preview =
     session && actualClosing
@@ -298,7 +305,8 @@ export function CashBookManager({
                 className="text-lg font-bold text-slate-900"
                 id="cash-sessions-title"
               >
-                Sessions
+                {" "}
+                {tx("Sessions")}{" "}
               </h2>
               {canOpen ? (
                 <button
@@ -310,13 +318,16 @@ export function CashBookManager({
                   }}
                   type="button"
                 >
-                  Open session
+                  {" "}
+                  {tx("Open session")}{" "}
                 </button>
               ) : null}
             </div>
             <p className="max-w-2xl text-sm leading-6 text-slate-500">
-              You see the sessions your access allows. Reception staff see the
-              sessions they opened. Totals are the server&apos;s figures.
+              {" "}
+              {tx(
+                "You see the sessions your access allows. Reception staff see the sessions they opened. Totals are the server's figures.",
+              )}{" "}
             </p>
             <form
               onSubmit={(event) => {
@@ -337,10 +348,10 @@ export function CashBookManager({
                     onChange={(event) => setStatus(event.target.value)}
                     value={status}
                   >
-                    <option value="">Any status</option>
-                    <option value="OPEN">Open</option>
-                    <option value="CLOSED">Closed</option>
-                    <option value="VOID">Void</option>
+                    <option value="">{tx("Any status")}</option>
+                    <option value="OPEN">{tx("Open")}</option>
+                    <option value="CLOSED">{tx("Closed")}</option>
+                    <option value="VOID">{tx("Void")}</option>
                   </SelectInput>
                 </Field>
                 <Field label="Register code">
@@ -362,7 +373,8 @@ export function CashBookManager({
                   className="button w-full sm:w-auto sm:justify-self-start"
                   type="submit"
                 >
-                  Apply filters
+                  {" "}
+                  {tx("Apply filters")}{" "}
                 </button>
               </div>
             </form>
@@ -371,7 +383,8 @@ export function CashBookManager({
           {sessions.pending && sessions.rows.length === 0 ? (
             <div className="grid gap-3 p-4 sm:p-5" role="status">
               <p className="text-sm font-medium text-slate-600">
-                Loading cash sessions.
+                {" "}
+                {tx("Loading cash sessions.")}{" "}
               </p>
               <div className="grid gap-2">
                 {[0, 1, 2].map((item) => (
@@ -388,7 +401,8 @@ export function CashBookManager({
               className="px-5 pt-4 text-sm font-medium text-slate-600"
               role="status"
             >
-              Loading cash sessions.
+              {" "}
+              {tx("Loading cash sessions.")}{" "}
             </p>
           ) : null}
           {!sessions.pending && sessions.error ? (
@@ -401,44 +415,49 @@ export function CashBookManager({
           sessions.rows.length === 0 ? (
             <div className="px-4 py-16 text-center sm:px-5">
               <p className="font-semibold text-slate-800">
-                No cash sessions were returned.
+                {" "}
+                {tx("No cash sessions were returned.")}{" "}
               </p>
               <p className="mt-1 text-sm text-slate-500">
                 {filtered
-                  ? "Try another status, register, or date."
-                  : "Open a session to start the register."}
+                  ? tx("Try another status, register, or date.")
+                  : tx("Open a session to start the register.")}
               </p>
             </div>
           ) : null}
           {sessions.rows.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[36rem] text-left text-sm">
-                <caption className="sr-only">Cash sessions</caption>
+                <caption className="sr-only">{tx("Cash sessions")}</caption>
                 <thead className="border-b border-slate-200 text-slate-500">
                   <tr>
                     <th
                       className="px-5 py-2.5 text-xs font-semibold"
                       scope="col"
                     >
-                      Register
+                      {" "}
+                      {tx("Register")}{" "}
                     </th>
                     <th
                       className="px-5 py-2.5 text-xs font-semibold"
                       scope="col"
                     >
-                      Business date
+                      {" "}
+                      {tx("Business date")}{" "}
                     </th>
                     <th
                       className="px-5 py-2.5 text-right text-xs font-semibold"
                       scope="col"
                     >
-                      Expected closing
+                      {" "}
+                      {tx("Expected closing")}{" "}
                     </th>
                     <th
                       className="px-5 py-2.5 text-xs font-semibold"
                       scope="col"
                     >
-                      Status
+                      {" "}
+                      {tx("Status")}{" "}
                     </th>
                   </tr>
                 </thead>
@@ -475,7 +494,7 @@ export function CashBookManager({
                         <td className="px-5 py-3 text-right font-semibold whitespace-nowrap text-slate-900 tabular-nums">
                           {row.expected_closing}{" "}
                           <span className="font-medium text-slate-400">
-                            {row.currency}
+                            {tx(row.currency)}
                           </span>
                         </td>
                         <td className="px-5 py-3">
@@ -509,13 +528,15 @@ export function CashBookManager({
           >
             {session ? null : (
               <h2 className="sr-only" id="session-detail-title">
-                Session detail
+                {" "}
+                {tx("Session detail")}{" "}
               </h2>
             )}
             {!session && !detailError ? (
               <div className="grid gap-3 p-5" role="status">
                 <p className="text-sm font-medium text-slate-600">
-                  Loading the session.
+                  {" "}
+                  {tx("Loading the session.")}{" "}
                 </p>
                 <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
                 <div className="grid grid-cols-2 gap-2">
@@ -538,7 +559,8 @@ export function CashBookManager({
                         className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase"
                         id="session-detail-title"
                       >
-                        Session detail
+                        {" "}
+                        {tx("Session detail")}{" "}
                       </h2>
                       <p className="mt-1 text-2xl font-black tracking-tight text-slate-900">
                         {session.register_code}
@@ -552,14 +574,15 @@ export function CashBookManager({
                   <div className="mt-4 flex items-end justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/80">
                     <div>
                       <p className="text-xs font-medium text-slate-500">
-                        Expected closing
+                        {" "}
+                        {tx("Expected closing")}{" "}
                       </p>
                       <p className="mt-1 text-2xl font-black tracking-tight text-slate-900 tabular-nums">
                         {session.expected_closing}
                       </p>
                     </div>
                     <p className="pb-1 text-sm font-semibold text-slate-500">
-                      {session.currency}
+                      {tx(session.currency)}
                     </p>
                   </div>
                 </div>
@@ -594,7 +617,8 @@ export function CashBookManager({
                     />
                     <div className="col-span-2">
                       <dt className="text-xs text-slate-500">
-                        Difference reason
+                        {" "}
+                        {tx("Difference reason")}{" "}
                       </dt>
                       <dd className="mt-0.5 text-sm font-medium break-words text-slate-800">
                         {session.difference_reason || "None"}
@@ -611,7 +635,8 @@ export function CashBookManager({
                           onClick={() => begin("adjust")}
                           type="button"
                         >
-                          Manual adjustment
+                          {" "}
+                          {tx("Manual adjustment")}{" "}
                         </button>
                       ) : null}
                       {canReconcile && mode !== "reconcile" ? (
@@ -620,7 +645,8 @@ export function CashBookManager({
                           onClick={() => begin("reconcile")}
                           type="button"
                         >
-                          Reconcile and close
+                          {" "}
+                          {tx("Reconcile and close")}{" "}
                         </button>
                       ) : null}
                     </div>
@@ -664,20 +690,20 @@ export function CashBookManager({
                               setFormError(
                                 financeError(
                                   caught,
-                                  "The adjustment could not be recorded.",
+                                  tx("The adjustment could not be recorded."),
                                 ),
                               );
                             })
                             .finally(() => setPending(false));
                         }}
                         pending={pending}
-                        title="Manual adjustment"
+                        title={tx("Manual adjustment")}
                       >
                         <Field error={fields.direction} label="Direction">
                           <SelectInput name="direction" required>
-                            <option value="">Select direction</option>
-                            <option value="IN">In</option>
-                            <option value="OUT">Out</option>
+                            <option value="">{tx("Select direction")}</option>
+                            <option value="IN">{tx("In")}</option>
+                            <option value="OUT">{tx("Out")}</option>
                           </SelectInput>
                         </Field>
                         <Field error={fields.amount} label="Amount">
@@ -716,7 +742,10 @@ export function CashBookManager({
                         confirmClass="button button-success"
                         confirmLabel="Confirm close"
                         error={formError}
-                        hint={`Server expected closing: ${session.expected_closing} ${session.currency}.`}
+                        hint={tx("Server expected closing: {amount} {currency}.", {
+                          amount: session.expected_closing,
+                          currency: tx(session.currency),
+                        })}
                         onCancel={() => {
                           setMode(null);
                           setActualClosing("");
@@ -763,14 +792,14 @@ export function CashBookManager({
                               setFormError(
                                 financeError(
                                   caught,
-                                  "The session could not be closed.",
+                                  tx("The session could not be closed."),
                                 ),
                               );
                             })
                             .finally(() => setPending(false));
                         }}
                         pending={pending}
-                        title="Reconcile and close"
+                        title={tx("Reconcile and close")}
                       >
                         <Field
                           error={fields.actual_closing}
@@ -788,14 +817,16 @@ export function CashBookManager({
                         </Field>
                         {preview ? (
                           <p className="rounded-xl bg-white px-3 py-2.5 text-sm text-slate-600 ring-1 ring-slate-200">
-                            Preview difference:{" "}
+                            {" "}
+                            {tx("Preview difference:")}{" "}
                             <span
                               className={`font-semibold tabular-nums ${figureClass(preview, "difference")}`}
                             >
                               {preview}
-                            </span>
-                            . The server calculates the difference when the
-                            session closes.
+                            </span>{" "}
+                            {tx(
+                              ". The server calculates the difference when the session closes.",
+                            )}{" "}
                           </p>
                         ) : null}
                         <Field
@@ -827,7 +858,8 @@ export function CashBookManager({
                 className="text-base font-bold text-slate-900"
                 id="movement-history-title"
               >
-                Movement history
+                {" "}
+                {tx("Movement history")}{" "}
               </h2>
               {session ? (
                 <p className="mt-1 text-sm text-slate-500">
@@ -835,14 +867,18 @@ export function CashBookManager({
                 </p>
               ) : (
                 <p className="mt-1 text-sm text-slate-500">
-                  Sales, expenses, and manual adjustments for this session.
+                  {" "}
+                  {tx(
+                    "Sales, expenses, and manual adjustments for this session.",
+                  )}{" "}
                 </p>
               )}
             </div>
             {movements.pending && movements.rows.length === 0 ? (
               <div className="grid gap-3 p-4 sm:p-5" role="status">
                 <p className="text-sm font-medium text-slate-600">
-                  Loading movements.
+                  {" "}
+                  {tx("Loading movements.")}{" "}
                 </p>
                 <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
               </div>
@@ -852,7 +888,8 @@ export function CashBookManager({
                 className="px-5 pt-4 text-sm font-medium text-slate-600"
                 role="status"
               >
-                Loading movements.
+                {" "}
+                {tx("Loading movements.")}{" "}
               </p>
             ) : null}
             {!movements.pending && movements.error ? (
@@ -865,36 +902,43 @@ export function CashBookManager({
             movements.rows.length === 0 ? (
               <div className="px-4 py-14 text-center sm:px-5">
                 <p className="font-semibold text-slate-800">
-                  No movements were returned for this session.
+                  {" "}
+                  {tx("No movements were returned for this session.")}{" "}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Sales, expenses, and manual adjustments will show up here.
+                  {" "}
+                  {tx(
+                    "Sales, expenses, and manual adjustments will show up here.",
+                  )}{" "}
                 </p>
               </div>
             ) : null}
             {movements.rows.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[40rem] text-left text-sm">
-                  <caption className="sr-only">Cash movements</caption>
+                  <caption className="sr-only">{tx("Cash movements")}</caption>
                   <thead className="border-b border-slate-200 text-slate-500">
                     <tr>
                       <th
                         className="px-5 py-2.5 text-xs font-semibold"
                         scope="col"
                       >
-                        Movement
+                        {" "}
+                        {tx("Movement")}{" "}
                       </th>
                       <th
                         className="px-5 py-2.5 text-right text-xs font-semibold"
                         scope="col"
                       >
-                        Amount
+                        {" "}
+                        {tx("Amount")}{" "}
                       </th>
                       <th
                         className="px-5 py-2.5 text-xs font-semibold"
                         scope="col"
                       >
-                        Business date
+                        {" "}
+                        {tx("Business date")}{" "}
                       </th>
                     </tr>
                   </thead>
@@ -908,7 +952,7 @@ export function CashBookManager({
                             <div className="flex flex-wrap items-center gap-2">
                               <DirectionPill direction={row.direction} />
                               <span className="font-medium text-slate-800">
-                                {pretty(row.source_type)}
+                                {tx(pretty(row.source_type))}
                               </span>
                             </div>
                             {note ? (
@@ -927,7 +971,7 @@ export function CashBookManager({
                               {row.amount}
                             </span>
                             <span className="ml-1.5 text-xs font-medium text-slate-400">
-                              {row.currency}
+                              {tx(row.currency)}
                             </span>
                           </td>
                           <td className="px-5 py-3 whitespace-nowrap text-slate-600">
@@ -958,7 +1002,10 @@ export function CashBookManager({
 
       {canOpen && opening ? (
         <FormDialog
-          description={`The session opens on the main register. Currency is the gym currency, ${currency}, and the server records it.`}
+          description={tx(
+            "The session opens on the main register. Currency is the gym currency, {currency}, and the server records it.",
+            { currency: tx(currency) },
+          )}
           onClose={() => {
             if (pending) return;
             setOpening(false);
@@ -994,13 +1041,13 @@ export function CashBookManager({
               .catch((caught: unknown) => {
                 setFields(fieldMap(caught));
                 setFormError(
-                  financeError(caught, "The session could not be opened."),
+                  financeError(caught, tx("The session could not be opened.")),
                 );
               })
               .finally(() => setPending(false));
           }}
           pending={pending}
-          title="Open session"
+          title={tx("Open session")}
         >
           <div className={`grid gap-4 sm:grid-cols-2 ${fieldTone}`}>
             {formError ? (
@@ -1018,7 +1065,7 @@ export function CashBookManager({
             </Field>
             <Field
               error={fields.opening_cash}
-              label={`Opening cash (${currency})`}
+              label={tx("Opening cash ({currency})", { currency: tx(currency) })}
             >
               <TextInput inputMode="decimal" name="opening_cash" required />
             </Field>
@@ -1029,7 +1076,8 @@ export function CashBookManager({
               disabled={pending}
               type="submit"
             >
-              Open session
+              {" "}
+              {tx("Open session")}{" "}
             </button>
           </div>
         </FormDialog>

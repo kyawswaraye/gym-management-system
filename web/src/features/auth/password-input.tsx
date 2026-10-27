@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useState, type ComponentProps } from "react";
 
@@ -29,6 +30,7 @@ export function PasswordInput({
   disabled,
   ...props
 }: Omit<ComponentProps<"input">, "type">) {
+  const tx = useTx();
   const [visible, setVisible] = useState(false);
   return (
     <div className="password-field">
@@ -39,7 +41,7 @@ export function PasswordInput({
         type={visible ? "text" : "password"}
       />
       <button
-        aria-label={visible ? "Hide password" : "Show password"}
+        aria-label={visible ? tx("Hide password") : tx("Show password")}
         aria-pressed={visible}
         className="password-toggle"
         disabled={disabled}

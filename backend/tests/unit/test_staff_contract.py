@@ -11,6 +11,7 @@ from apps.tenants.delegation import (
     RoleGrant,
     role_grant_is_allowed,
 )
+from apps.tenants.serializers import OwnerAcceptInputSerializer
 from apps.tenants.staff_serializers import (
     StaffAcceptInputSerializer,
     StaffInviteInputSerializer,
@@ -132,7 +133,27 @@ def test_acceptance_serializer_owns_gym_and_password_policy() -> None:
     assert not rejected.is_valid()
     assert set(rejected.errors) >= {"gym_id", "role_ids", "is_owner"}
     assert not mismatch.is_valid()
+    assert "password_confirmation" in mismatch.errors
     assert not short.is_valid()
+    assert "too short" in str(short.errors["password"])
+    common = StaffAcceptInputSerializer(
+        data={
+            "invitation_token": "token",
+            "password": "Password1234",
+            "password_confirmation": "Password1234",
+        }
+    )
+    assert not common.is_valid()
+    assert common.errors["password"] == ["This password is too common."]
+    owner = OwnerAcceptInputSerializer(
+        data={
+            "invitation_token": "token",
+            "password": "Password1234",
+            "password_confirmation": "Password1234",
+        }
+    )
+    assert not owner.is_valid()
+    assert owner.errors["password"] == ["This password is too common."]
     assert accepted.is_valid(), accepted.errors
 
 

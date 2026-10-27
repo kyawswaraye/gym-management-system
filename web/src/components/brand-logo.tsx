@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 export function BrandLogo({
   align = "center",
 }: {
@@ -15,12 +13,11 @@ export function BrandLogo({
           : "flex items-center gap-3"
       }
     >
-      <Image
+      <img
         src="/brand/gympilot-mark.png"
         alt=""
-        width={512}
-        height={512}
-        priority
+        width={72}
+        height={72}
         className={centered ? "h-[4.5rem] w-[4.5rem]" : "h-12 w-12"}
       />
       <p

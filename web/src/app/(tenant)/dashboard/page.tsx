@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/i18n/metadata";
+import { Tx } from "@/i18n/tx";
 import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -10,7 +11,9 @@ import {
 } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
 
-export const metadata: Metadata = { title: "Dashboard" };
+export async function generateMetadata() {
+  return pageMetadata("Dashboard");
+}
 
 export default async function DashboardPage() {
   const session = await requireTenantSession();
@@ -40,8 +43,8 @@ export default async function DashboardPage() {
             <span
               className="size-2 rounded-full bg-emerald-500"
               aria-hidden="true"
-            />
-            Live overview
+            />{" "}
+            <Tx text="Live overview" />{" "}
           </div>
         }
         description="Monitor member activity, revenue, expenses, and the health of your gym from one place."

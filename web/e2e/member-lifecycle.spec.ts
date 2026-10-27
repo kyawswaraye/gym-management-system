@@ -238,8 +238,8 @@ async function fillProfile(
   await scope.getByLabel("Date of birth", { exact: true }).fill(values.birth);
   await scope.getByLabel("Address line 1", { exact: true }).fill(values.line1);
   await scope.getByLabel("Address line 2", { exact: true }).fill(values.line2);
-  await scope.getByLabel("City", { exact: true }).fill(values.city);
-  await scope.getByLabel("Region", { exact: true }).fill(values.region);
+  await combobox(scope, "Region").selectOption(values.region);
+  await combobox(scope, "City").selectOption(values.city);
   await scope.getByLabel("Postal code", { exact: true }).fill(values.postal);
   await scope.getByLabel("Country code", { exact: true }).fill(values.country);
   await scope
@@ -586,7 +586,8 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     await profile.getByLabel("First name", { exact: true }).fill(UPDATED_FIRST);
     await profile.getByLabel("Phone", { exact: true }).fill(UPDATED_PHONE);
     await combobox(profile, "Gender").selectOption({ label: "Male" });
-    await profile.getByLabel("City", { exact: true }).fill("Mandalay");
+    await combobox(profile, "Region").selectOption("Mandalay Region");
+    await combobox(profile, "City").selectOption("Mandalay");
     await profile
       .getByRole("textbox", { name: "Notes", exact: true })
       .fill("E2E updated lifecycle note");

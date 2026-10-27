@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { translate } from "@/i18n/translate";
+import { requestLocale } from "@/lib/api/errors";
 import { allowsReportExport } from "@/lib/api/reports-routes";
 import { authenticatedDocumentGet } from "@/lib/api/server";
 
@@ -8,9 +10,17 @@ const KIND =
 
 type Context = { params: Promise<{ kind: string }> };
 
-function rejected(status: number, code: string, message: string) {
+function rejected(
+  request: NextRequest,
+  status: number,
+  code: string,
+  message: string,
+) {
   return NextResponse.json(
-    { success: false, error: { code, message } },
+    {
+      success: false,
+      error: { code, message: translate(requestLocale(request), message) },
+    },
     { status, headers: { "Cache-Control": "no-store, private" } },
   );
 }
@@ -18,11 +28,11 @@ function rejected(status: number, code: string, message: string) {
 export async function GET(request: NextRequest, context: Context) {
   const { kind } = await context.params;
   if (!KIND.test(kind)) {
-    return rejected(404, "NOT_FOUND", "Report export was not found.");
+    return rejected(request, 404, "NOT_FOUND", "Report export was not found.");
   }
   const pathname = `/api/v1/reports/${kind}/export/`;
   if (!allowsReportExport(pathname, request.nextUrl.search, "GET")) {
-    return rejected(400, "INVALID_REQUEST", "Invalid request.");
+    return rejected(request, 400, "INVALID_REQUEST", "Invalid request.");
   }
   return authenticatedDocumentGet(
     request,

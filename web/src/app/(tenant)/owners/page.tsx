@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/i18n/metadata";
 import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -7,7 +7,9 @@ import { requireTenantSession } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Owners" };
+export async function generateMetadata() {
+  return pageMetadata("Owners");
+}
 
 export default async function OwnersPage() {
   const session = await requireTenantSession();

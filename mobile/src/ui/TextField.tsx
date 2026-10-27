@@ -1,6 +1,7 @@
+import { useLocale, useTx } from "../i18n/useTx";
 import { TextInput, View, type TextInputProps } from "react-native";
 
-import { colors, touchTarget } from "./theme";
+import { colors, radius, touchTarget } from "./theme";
 import { Text } from "./Text";
 
 type Props = TextInputProps & {
@@ -10,12 +11,17 @@ type Props = TextInputProps & {
 };
 
 export function TextField({ label, hint, error, style, ...props }: Props) {
-  const describedBy = error ?? hint;
+  const tx = useTx();
+  const locale = useLocale();
+  const labelText = tx(label);
+  const hintText = hint ? tx(hint) : undefined;
+  const errorText = error ? tx(error) : undefined;
+  const describedBy = errorText ?? hintText;
   return (
     <View style={{ gap: 4 }}>
-      <Text style={{ fontWeight: "700" }}>{label}</Text>
+      <Text style={{ fontWeight: "700" }}>{labelText}</Text>
       <TextInput
-        accessibilityLabel={label}
+        accessibilityLabel={labelText}
         accessibilityHint={describedBy}
         allowFontScaling
         maxFontSizeMultiplier={2}
@@ -25,11 +31,12 @@ export function TextField({ label, hint, error, style, ...props }: Props) {
             minHeight: touchTarget,
             borderWidth: 1,
             borderColor: error ? colors.danger : colors.border,
-            borderRadius: 8,
+            borderRadius: radius.md,
             paddingHorizontal: 12,
             color: colors.text,
             backgroundColor: colors.surface,
             fontSize: 16,
+            ...(locale === "mm" ? { lineHeight: 26, paddingVertical: 8 } : {}),
           },
           style,
         ]}
@@ -37,7 +44,7 @@ export function TextField({ label, hint, error, style, ...props }: Props) {
       />
       {error ? (
         <Text accessibilityRole="alert" style={{ color: colors.danger }}>
-          {error}
+          {errorText}
         </Text>
       ) : null}
     </View>

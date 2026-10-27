@@ -815,11 +815,11 @@ describe("Members manager", () => {
     fireEvent.change(screen.getByLabelText("Address line 2"), {
       target: { value: "  Apt 2  " },
     });
-    fireEvent.change(screen.getByLabelText("City"), {
-      target: { value: "  Austin  " },
-    });
     fireEvent.change(screen.getByLabelText("Region"), {
-      target: { value: "  Texas  " },
+      target: { value: "Bago Region" },
+    });
+    fireEvent.change(screen.getByLabelText("City"), {
+      target: { value: "Pyay" },
     });
     fireEvent.change(screen.getByLabelText("Postal code"), {
       target: { value: "  78701  " },
@@ -853,8 +853,8 @@ describe("Members manager", () => {
         address: {
           address_line1: "1 Main",
           address_line2: "Apt 2",
-          city: "Austin",
-          region: "Texas",
+          city: "Pyay",
+          region: "Bago Region",
           postal_code: "78701",
           country_code: "US",
         },

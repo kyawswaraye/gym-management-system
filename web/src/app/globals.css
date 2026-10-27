@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@theme inline {
+  --font-sans:
+    var(--font-latin), var(--font-myanmar), ui-sans-serif, sans-serif;
+}
+
 @theme {
   --color-emerald-50: #e8f8ee;
   --color-emerald-100: #d1f0dc;
@@ -93,10 +98,10 @@
   --color-slate-100: #f0f2f5;
   --color-slate-200: #e4e6eb;
   --color-slate-300: #ced0d4;
-  --color-slate-400: #8a8d91;
-  --color-slate-500: #65676b;
-  --color-slate-600: #4e5154;
-  --color-slate-700: #3a3b3c;
+  --color-slate-400: #5c5f63;
+  --color-slate-500: #3e4146;
+  --color-slate-600: #34363a;
+  --color-slate-700: #2a2c30;
   --color-slate-800: #1c1e21;
   --color-slate-900: #050505;
   --color-slate-950: #000000;
@@ -107,7 +112,7 @@
   --background: #f0f2f5;
   --surface: #ffffff;
   --text: #050505;
-  --muted: #65676b;
+  --muted: #3e4146;
   --border: #e4e6eb;
   --primary: #0866ff;
   --primary-dark: #0056d6;
@@ -119,11 +124,28 @@
   box-sizing: border-box;
 }
 
+html {
+  font-family:
+    var(--font-latin), var(--font-myanmar), ui-sans-serif, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
 body {
   margin: 0;
   background: var(--background);
   color: var(--text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+html[lang="my"] body {
+  line-height: 1.75;
+}
+
+html[lang="my"] body :where(:not(.font-mono, .tabular-nums)) {
+  letter-spacing: 0;
 }
 
 a {
@@ -181,7 +203,7 @@ a {
   border: 0;
   border-radius: 0.375rem;
   background: transparent;
-  color: #65676b;
+  color: #3e4146;
   cursor: pointer;
   transform: translateY(-50%);
 }
@@ -258,7 +280,7 @@ div:has(> [role="dialog"][aria-modal="true"]) {
   color: white;
   font: inherit;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.25;
   cursor: pointer;
   box-shadow: none;
   transition:
@@ -285,6 +307,23 @@ div:has(> [role="dialog"][aria-modal="true"]) {
   font-size: 0.75rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+html[lang="my"] .button,
+html[lang="my"] .button-sm {
+  line-height: 1.6;
+}
+
+html[lang="my"] .button-sm {
+  min-height: 2.35rem;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+
+html[lang="my"] .input,
+html[lang="my"] select,
+html[lang="my"] textarea {
+  line-height: 1.65;
 }
 
 .button-create {
@@ -439,7 +478,7 @@ table .button-cancel,
 [role="dialog"] .button-cancel {
   border-color: #ced0d4;
   background: #f0f2f5;
-  color: #65676b;
+  color: #3e4146;
 }
 
 table .button-cancel:hover:not(:disabled),
@@ -498,7 +537,7 @@ table .button-success:hover:not(:disabled),
 }
 
 .tone-cancel {
-  color: #65676b;
+  color: #3e4146;
   font-weight: 700;
 }
 
@@ -559,7 +598,7 @@ table :is(td, th) :is(a, button):not(.button):hover {
 }
 
 table :is(td, th) :is(a, button):not(.button):disabled {
-  color: #8a8d91;
+  color: #5c5f63;
   cursor: not-allowed;
 }
 

@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
@@ -101,15 +102,22 @@ function textValue(
   label: string,
   max: number,
   required: boolean,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
 ): Checked {
   const value = String(raw ?? "").trim();
   if (required && !value) {
-    return { ok: false, message: `Enter a ${label.toLowerCase()}.` };
+    return {
+      ok: false,
+      message: tx("Enter a {label}.", { label: label.toLowerCase() }),
+    };
   }
   if (value.length > max) {
     return {
       ok: false,
-      message: `Enter a ${label.toLowerCase()} up to ${max} characters.`,
+      message: tx("Enter a {label} up to {max} characters.", {
+        label: label.toLowerCase(),
+        max,
+      }),
     };
   }
   return { ok: true, value };
@@ -157,17 +165,22 @@ function collectErrors(checks: Record<string, Checked>): FieldErrors {
   );
 }
 
-function readInvite(form: FormData, roles: Role[]): InviteResult {
+function readInvite(
+  form: FormData,
+  roles: Role[],
+  tx: (text: string, vars?: Record<string, string | number>) => string,
+): InviteResult {
   const checks = {
     email: emailValue(form.get("email")),
-    first_name: textValue(form.get("first_name"), "First name", 150, true),
-    last_name: textValue(form.get("last_name"), "Last name", 150, true),
-    phone: textValue(form.get("phone"), "Phone", 32, false),
+    first_name: textValue(form.get("first_name"), "First name", 150, true, tx),
+    last_name: textValue(form.get("last_name"), "Last name", 150, true, tx),
+    phone: textValue(form.get("phone"), "Phone", 32, false, tx),
     display_name: textValue(
       form.get("display_name"),
       "Display name",
       150,
       true,
+      tx,
     ),
     joined_date: dateValue(form.get("joined_date")),
     employment_title: textValue(
@@ -175,6 +188,7 @@ function readInvite(form: FormData, roles: Role[]): InviteResult {
       "Employment title",
       100,
       false,
+      tx,
     ),
     default_commission_percent: commissionValue(
       form.get("default_commission_percent"),
@@ -231,21 +245,26 @@ function readInvite(form: FormData, roles: Role[]): InviteResult {
   return { ok: true, body };
 }
 
-function readProfile(form: FormData): ProfileResult {
+function readProfile(
+  form: FormData,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
+): ProfileResult {
   const checks = {
     display_name: textValue(
       form.get("display_name"),
       "Display name",
       150,
       true,
+      tx,
     ),
-    phone: textValue(form.get("phone"), "Phone", 32, false),
+    phone: textValue(form.get("phone"), "Phone", 32, false, tx),
     joined_date: dateValue(form.get("joined_date")),
     employment_title: textValue(
       form.get("employment_title"),
       "Employment title",
       100,
       false,
+      tx,
     ),
     default_commission_percent: commissionValue(
       form.get("default_commission_percent"),
@@ -306,12 +325,13 @@ function InputField({
   maxLength?: number;
   inputMode?: "decimal" | "email" | "tel" | "text";
 }) {
+  const tx = useTx();
   const id = useId();
   const errorId = `${id}-error`;
   return (
     <div className="field">
       <label className="text-sm font-semibold text-slate-700" htmlFor={id}>
-        {label}
+        {tx(label)}
       </label>
       <input
         id={id}
@@ -327,7 +347,7 @@ function InputField({
       />
       {error ? (
         <span id={errorId} className="error">
-          {error}
+          {tx(error)}
         </span>
       ) : null}
     </div>
@@ -375,11 +395,12 @@ function initials(name: string): string {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const tx = useTx();
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${statusTone(status)}`}
     >
-      {statusLabel(status)}
+      {tx(statusLabel(status))}
     </span>
   );
 }
@@ -393,10 +414,11 @@ function Fact({
   value: string;
   suffix?: string | undefined;
 }) {
+  const tx = useTx();
   return (
     <div className="rounded-xl bg-slate-50 px-3 py-2.5">
       <dt className="text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase">
-        {label}
+        {tx(label)}
       </dt>
       <dd className="mt-1 text-sm font-semibold break-words text-slate-900">
         <span>{value}</span>
@@ -409,29 +431,30 @@ function Fact({
 }
 
 function ProfileFacts({ staff }: { staff: StaffRecord }) {
+  const tx = useTx();
   const facts: { label: string; value: string; suffix?: string }[] = [
-    { label: "Email", value: staff.membership.email },
-    { label: "Phone", value: staff.phone || "—" },
-    { label: "Employment title", value: staff.employment_title || "—" },
-    { label: "Joined date", value: staff.joined_date },
+    { label: tx("Email"), value: staff.membership.email },
+    { label: tx("Phone"), value: staff.phone || "—" },
+    { label: tx("Employment title"), value: staff.employment_title || "—" },
+    { label: tx("Joined date"), value: staff.joined_date },
     {
-      label: "Commission",
+      label: tx("Commission"),
       value: staff.default_commission_percent,
       suffix: "%",
     },
-    { label: "Assigned roles", value: String(staff.role_ids.length) },
+    { label: tx("Assigned roles"), value: String(staff.role_ids.length) },
   ];
   if (staff.invited_role_ids.length > 0) {
     facts.push({
-      label: "Pending invitation roles",
+      label: tx("Pending invitation roles"),
       value: String(staff.invited_role_ids.length),
     });
   }
   if (staff.terminated_date) {
-    facts.push({ label: "Terminated date", value: staff.terminated_date });
+    facts.push({ label: tx("Terminated date"), value: staff.terminated_date });
   }
   if (staff.archived_at) {
-    facts.push({ label: "Archived at", value: staff.archived_at });
+    facts.push({ label: tx("Archived at"), value: staff.archived_at });
   }
   return (
     <dl className="mt-5 grid gap-2 sm:grid-cols-2">
@@ -458,6 +481,7 @@ function RoleOption({
   disabled?: boolean;
   note?: string;
 }) {
+  const tx = useTx();
   return (
     <label
       className={`flex items-start gap-3 rounded-xl border px-3 py-3 ${
@@ -480,7 +504,7 @@ function RoleOption({
         <span className="block font-semibold text-slate-900">{role.name}</span>
         {role.description ? (
           <span className="mt-0.5 block text-sm leading-5 text-slate-500">
-            {role.description}
+            {tx(role.description)}
           </span>
         ) : null}
         {note ? (
@@ -506,6 +530,7 @@ function LifecycleDialog({
   onCancel: () => void;
   onConfirm: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const tx = useTx();
   const titleId = useId();
   const reasonRef = useRef<HTMLTextAreaElement>(null);
   const title =
@@ -519,8 +544,12 @@ function LifecycleDialog({
 
   const description =
     action === "suspend"
-      ? `Suspend login access for ${staffName}. The profile stays in place.`
-      : `Activate login access for ${staffName}. The profile stays in place.`;
+      ? tx("Suspend login access for {name}. The profile stays in place.", {
+          name: staffName,
+        })
+      : tx("Activate login access for {name}. The profile stays in place.", {
+          name: staffName,
+        });
 
   return (
     <div
@@ -547,13 +576,13 @@ function LifecycleDialog({
         <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold text-slate-900" id={titleId}>
-              {title}
+              {tx(title)}
             </h2>
             <p
               className="mt-1 text-sm leading-6 text-slate-500"
               id={`${titleId}-description`}
             >
-              {description}
+              {tx(description)}
             </p>
           </div>
           <button
@@ -562,13 +591,14 @@ function LifecycleDialog({
             onClick={onCancel}
             type="button"
           >
-            Close
+            {" "}
+            {tx("Close")}{" "}
           </button>
         </div>
         <div className="grid gap-4 px-5 py-4 sm:px-6">
           {error ? (
             <p className="error" id="staff-lifecycle-error" role="alert">
-              {error}
+              {tx(error)}
             </p>
           ) : null}
           <div className="field">
@@ -576,7 +606,8 @@ function LifecycleDialog({
               className="text-sm font-semibold text-slate-700"
               htmlFor="staff-lifecycle-reason"
             >
-              Reason
+              {" "}
+              {tx("Reason")}{" "}
             </label>
             <textarea
               ref={reasonRef}
@@ -590,7 +621,8 @@ function LifecycleDialog({
               required
             />
             <span className="text-xs text-slate-500">
-              Use 3 to 500 characters.
+              {" "}
+              {tx("Use 3 to 500 characters.")}{" "}
             </span>
           </div>
           <div>
@@ -600,7 +632,8 @@ function LifecycleDialog({
               onClick={onCancel}
               type="button"
             >
-              Cancel
+              {" "}
+              {tx("Cancel")}{" "}
             </button>
             <button
               className={
@@ -611,7 +644,7 @@ function LifecycleDialog({
               disabled={pending}
               type="submit"
             >
-              {pending ? "Saving…" : confirmLabel}
+              {pending ? tx("Saving…") : confirmLabel}
             </button>
           </div>
         </div>
@@ -629,6 +662,7 @@ export function StaffManager({
   isOwner,
   permissions,
 }: StaffAccess) {
+  const tx = useTx();
   const allowMutations = canView && canManage;
   const allowInvite = allowMutations && canViewRoles;
   const [staff, setStaff] = useState<StaffRecord[]>([]);
@@ -873,7 +907,9 @@ export function StaffManager({
       );
       setEditingRoles(false);
       setAssignmentMessage(
-        `Roles saved. Authorization version ${result.authz_version}.`,
+        tx("Roles saved. Authorization version {version}.", {
+          version: result.authz_version,
+        }),
       );
     } catch (failure) {
       setAssignmentError(
@@ -894,7 +930,7 @@ export function StaffManager({
   async function submitInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
-    const parsed = readInvite(new FormData(form), offeredRoles);
+    const parsed = readInvite(new FormData(form), offeredRoles, tx);
     if (!parsed.ok) {
       setInviteErrors(parsed.errors);
       setError(parsed.message);
@@ -907,7 +943,7 @@ export function StaffManager({
     setSuccess(null);
     try {
       const result = await inviteStaff(parsed.body);
-      setSuccess(`Invitation sent to ${result.email}.`);
+      setSuccess(tx("Invitation sent to {email}.", { email: result.email }));
       setInviting(false);
       setInviteErrors({});
       form.reset();
@@ -924,7 +960,7 @@ export function StaffManager({
   async function submitProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selected) return;
-    const parsed = readProfile(new FormData(event.currentTarget));
+    const parsed = readProfile(new FormData(event.currentTarget), tx);
     if (!parsed.ok) {
       setProfileErrors(parsed.errors);
       setError(parsed.message);
@@ -1010,12 +1046,13 @@ export function StaffManager({
     <div className="grid gap-5">
       {allowMutations && !canViewRoles ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          Inviting staff requires permission to view roles.
+          {" "}
+          {tx("Inviting staff requires permission to view roles.")}{" "}
         </p>
       ) : null}
       {!inviting && !editingProfile && !editingRoles && !lifecycle && error ? (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       ) : null}
       {success ? (
@@ -1023,7 +1060,7 @@ export function StaffManager({
           className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900"
           role="status"
         >
-          {success}
+          {tx(success)}
         </p>
       ) : null}
 
@@ -1038,12 +1075,13 @@ export function StaffManager({
                 className="text-lg font-bold text-slate-900"
                 id="staff-directory-title"
               >
-                Directory
+                {" "}
+                {tx("Directory")}{" "}
               </h2>
               <p className="mt-0.5 text-sm text-slate-500">
                 {loading && staff.length === 0
-                  ? "Fetching the latest records."
-                  : `${shownCount} shown`}
+                  ? tx("Fetching the latest records.")
+                  : tx("{count} shown", { count: shownCount })}
               </p>
             </div>
             {allowInvite ? (
@@ -1052,7 +1090,8 @@ export function StaffManager({
                 onClick={() => setInviting(true)}
                 type="button"
               >
-                Invite staff
+                {" "}
+                {tx("Invite staff")}{" "}
               </button>
             ) : null}
           </div>
@@ -1063,42 +1102,45 @@ export function StaffManager({
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="field sm:col-span-2">
                 <span className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-                  Search staff
+                  {" "}
+                  {tx("Search staff")}{" "}
                 </span>
                 <input
                   className="input"
                   maxLength={100}
                   name="search"
-                  placeholder="Name, email, or code"
+                  placeholder={tx("Name, email, or code")}
                   type="search"
                 />
               </label>
               <label className="field">
                 <span className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-                  Profile status
+                  {" "}
+                  {tx("Profile status")}{" "}
                 </span>
                 <select className="input" defaultValue="" name="status">
-                  <option value="">All</option>
+                  <option value="">{tx("All")}</option>
                   {PROFILE_STATUSES.map((status) => (
                     <option key={status} value={status}>
-                      {statusLabel(status)}
+                      {tx(statusLabel(status))}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="field">
                 <span className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-                  Membership status
+                  {" "}
+                  {tx("Membership status")}{" "}
                 </span>
                 <select
                   className="input"
                   defaultValue=""
                   name="membership_status"
                 >
-                  <option value="">All</option>
+                  <option value="">{tx("All")}</option>
                   {MEMBERSHIP_STATUSES.map((status) => (
                     <option key={status} value={status}>
-                      {statusLabel(status)}
+                      {tx(statusLabel(status))}
                     </option>
                   ))}
                 </select>
@@ -1106,14 +1148,16 @@ export function StaffManager({
             </div>
             <div className="mt-3 flex justify-end">
               <button className="button" type="submit">
-                Apply filters
+                {" "}
+                {tx("Apply filters")}{" "}
               </button>
             </div>
           </form>
           {loading && staff.length === 0 ? (
             <div className="grid gap-3 p-5">
               <p className="text-sm font-medium text-slate-500" role="status">
-                Loading staff.
+                {" "}
+                {tx("Loading staff.")}{" "}
               </p>
               {[0, 1, 2].map((item) => (
                 <div
@@ -1126,10 +1170,12 @@ export function StaffManager({
           {!loading && staff.length === 0 && !error && !success ? (
             <div className="px-6 py-16 text-center" role="status">
               <p className="font-semibold text-slate-800">
-                No staff records match this view.
+                {" "}
+                {tx("No staff records match this view.")}{" "}
               </p>
               <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500">
-                Try another name, email, or status.
+                {" "}
+                {tx("Try another name, email, or status.")}{" "}
               </p>
             </div>
           ) : null}
@@ -1141,7 +1187,9 @@ export function StaffManager({
                 return (
                   <li key={person.id}>
                     <button
-                      aria-label={`View details for ${person.display_name}`}
+                      aria-label={tx("View details for {name}", {
+                        name: person.display_name,
+                      })}
                       aria-pressed={active}
                       className={`flex w-full cursor-pointer items-center gap-3 border-0 border-l-4 px-4 py-3.5 text-left font-[inherit] transition sm:px-5 ${
                         active
@@ -1174,13 +1222,15 @@ export function StaffManager({
                         <span className="mt-2 flex flex-wrap gap-2 sm:hidden">
                           <span className="inline-flex items-center gap-1.5">
                             <span className="text-[0.62rem] font-bold tracking-wide text-slate-400 uppercase">
-                              Profile
+                              {" "}
+                              {tx("Profile")}{" "}
                             </span>
                             <StatusBadge status={person.status} />
                           </span>
                           <span className="inline-flex items-center gap-1.5">
                             <span className="text-[0.62rem] font-bold tracking-wide text-slate-400 uppercase">
-                              Access
+                              {" "}
+                              {tx("Access")}{" "}
                             </span>
                             <StatusBadge status={person.membership.status} />
                           </span>
@@ -1189,13 +1239,15 @@ export function StaffManager({
                       <span className="hidden shrink-0 items-center gap-2 sm:flex">
                         <span className="text-right">
                           <span className="mb-1 block text-[0.62rem] font-bold tracking-wide text-slate-400 uppercase">
-                            Profile
+                            {" "}
+                            {tx("Profile")}{" "}
                           </span>
                           <StatusBadge status={person.status} />
                         </span>
                         <span className="text-right">
                           <span className="mb-1 block text-[0.62rem] font-bold tracking-wide text-slate-400 uppercase">
-                            Access
+                            {" "}
+                            {tx("Access")}{" "}
                           </span>
                           <StatusBadge status={person.membership.status} />
                         </span>
@@ -1220,7 +1272,7 @@ export function StaffManager({
                 onClick={() => void loadMore()}
                 type="button"
               >
-                {paging ? "Loading more…" : "Load more"}
+                {paging ? tx("Loading more…") : tx("Load more")}
               </button>
             </div>
           ) : null}
@@ -1229,18 +1281,22 @@ export function StaffManager({
         <div className="xl:sticky xl:top-20">
           {detailLoading ? (
             <p className="mb-3 text-sm text-slate-500" role="status">
-              Loading staff details.
+              {" "}
+              {tx("Loading staff details.")}{" "}
             </p>
           ) : null}
           {!selected && !detailLoading ? (
             <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center shadow-sm">
               <div>
                 <p className="font-semibold text-slate-800">
-                  No person selected
+                  {" "}
+                  {tx("No person selected")}{" "}
                 </p>
                 <p className="mx-auto mt-1 max-w-xs text-sm leading-6 text-slate-500">
-                  Choose someone from the directory to review their profile,
-                  roles, and access.
+                  {" "}
+                  {tx(
+                    "Choose someone from the directory to review their profile, roles, and access.",
+                  )}{" "}
                 </p>
               </div>
             </div>
@@ -1274,13 +1330,15 @@ export function StaffManager({
                   onClick={closeDetails}
                   type="button"
                 >
-                  Close
+                  {" "}
+                  {tx("Close")}{" "}
                 </button>
               </div>
               <div className="mt-4 flex flex-wrap gap-4">
                 <div>
                   <p className="text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase">
-                    Profile
+                    {" "}
+                    {tx("Profile")}{" "}
                   </p>
                   <div className="mt-1">
                     <StatusBadge status={selected.status} />
@@ -1288,7 +1346,8 @@ export function StaffManager({
                 </div>
                 <div>
                   <p className="text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase">
-                    Access
+                    {" "}
+                    {tx("Access")}{" "}
                   </p>
                   <div className="mt-1">
                     <StatusBadge status={selected.membership.status} />
@@ -1298,7 +1357,8 @@ export function StaffManager({
               <ProfileFacts staff={selected} />
               {locked ? (
                 <p className="mt-4 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
-                  Login access stays as it is while this profile is{" "}
+                  {" "}
+                  {tx("Login access stays as it is while this profile is")}{" "}
                   {statusLabel(selected.status).toLowerCase()}.
                 </p>
               ) : null}
@@ -1314,7 +1374,8 @@ export function StaffManager({
                       onClick={() => setEditingProfile(true)}
                       type="button"
                     >
-                      Edit profile
+                      {" "}
+                      {tx("Edit profile")}{" "}
                     </button>
                   ) : null}
                   {allowMutations &&
@@ -1329,7 +1390,8 @@ export function StaffManager({
                       }}
                       type="button"
                     >
-                      Suspend access
+                      {" "}
+                      {tx("Suspend access")}{" "}
                     </button>
                   ) : null}
                   {allowMutations &&
@@ -1344,14 +1406,17 @@ export function StaffManager({
                       }}
                       type="button"
                     >
-                      Activate access
+                      {" "}
+                      {tx("Activate access")}{" "}
                     </button>
                   ) : null}
                 </div>
               ) : null}
               {allowMutations && editingProfile ? (
                 <FormDialog
-                  description={`Staff code ${selected.staff_code}`}
+                  description={tx("Staff code {code}", {
+                    code: selected.staff_code,
+                  })}
                   key={`${selected.id}:${selected.staff_code}:${selected.display_name}:${selected.phone}:${selected.joined_date}:${selected.employment_title}:${selected.default_commission_percent}`}
                   noValidate
                   onClose={() => {
@@ -1359,12 +1424,12 @@ export function StaffManager({
                   }}
                   onSubmit={(event) => void submitProfile(event)}
                   pending={pending}
-                  title="Edit profile"
+                  title={tx("Edit profile")}
                 >
                   <div className="grid gap-3 md:grid-cols-2">
                     {error ? (
                       <p className="error md:col-span-2" role="alert">
-                        {error}
+                        {tx(error)}
                       </p>
                     ) : null}
                     <InputField
@@ -1414,14 +1479,15 @@ export function StaffManager({
                         onClick={() => setEditingProfile(false)}
                         type="button"
                       >
-                        Cancel
+                        {" "}
+                        {tx("Cancel")}{" "}
                       </button>
                       <button
                         className="button button-edit"
                         disabled={pending}
                         type="submit"
                       >
-                        {pending ? "Saving…" : "Save staff profile"}
+                        {pending ? tx("Saving…") : tx("Save staff profile")}
                       </button>
                     </div>
                   </div>
@@ -1429,7 +1495,10 @@ export function StaffManager({
               ) : null}
               {allowMutations && !canViewRoles ? (
                 <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                  Assigning roles requires permission to view roles.
+                  {" "}
+                  {tx(
+                    "Assigning roles requires permission to view roles.",
+                  )}{" "}
                 </p>
               ) : null}
               {allowInvite ? (
@@ -1443,10 +1512,14 @@ export function StaffManager({
                         className="text-base font-bold text-slate-900"
                         id="assign-roles-title"
                       >
-                        Assign roles
+                        {" "}
+                        {tx("Assign roles")}{" "}
                       </h3>
                       <p className="mt-1 text-sm text-slate-500">
-                        Saving replaces the roles this person can use.
+                        {" "}
+                        {tx(
+                          "Saving replaces the roles this person can use.",
+                        )}{" "}
                       </p>
                     </div>
                     {rolesLoaded &&
@@ -1460,13 +1533,15 @@ export function StaffManager({
                         onClick={() => setEditingRoles(true)}
                         type="button"
                       >
-                        Edit assigned roles
+                        {" "}
+                        {tx("Edit assigned roles")}{" "}
                       </button>
                     ) : null}
                   </div>
                   {assignmentLoading || !rolesLoaded ? (
                     <p className="mt-3 text-sm text-slate-500" role="status">
-                      Loading assigned roles.
+                      {" "}
+                      {tx("Loading assigned roles.")}{" "}
                     </p>
                   ) : null}
                   {assignmentError && !editingRoles ? (
@@ -1489,20 +1564,26 @@ export function StaffManager({
                   ) : null}
                   {assignedRoles ? (
                     <p className="mt-3 text-sm text-slate-500">
-                      Authorization version {assignedRoles.authz_version}
+                      {" "}
+                      {tx("Authorization version")}{" "}
+                      {assignedRoles.authz_version}
                     </p>
                   ) : null}
                   {assignedRoles &&
                   !assignmentBlocked &&
                   assignedRoles.roles.every((role) => role.key === "OWNER") ? (
                     <p className="mt-3 text-sm text-slate-500">
-                      No roles are assigned.
+                      {" "}
+                      {tx("No roles are assigned.")}{" "}
                     </p>
                   ) : null}
                   {assignedRoles &&
                   assignedRoles.roles.filter((role) => role.key !== "OWNER")
                     .length > 0 ? (
-                    <ul aria-label="Current roles" className="mt-3 grid gap-2">
+                    <ul
+                      aria-label={tx("Current roles")}
+                      className="mt-3 grid gap-2"
+                    >
                       {assignedRoles.roles
                         .filter((role) => role.key !== "OWNER")
                         .map((role) => {
@@ -1538,7 +1619,8 @@ export function StaffManager({
                   !assignmentBlocked &&
                   offeredRoles.length === 0 ? (
                     <p className="mt-3 text-sm text-slate-500">
-                      No assignable roles are available.
+                      {" "}
+                      {tx("No assignable roles are available.")}{" "}
                     </p>
                   ) : null}
                   {rolesLoaded &&
@@ -1556,7 +1638,7 @@ export function StaffManager({
                       }}
                       onSubmit={(event) => void submitAssignment(event)}
                       pending={pending}
-                      title="Assigned roles"
+                      title={tx("Assigned roles")}
                     >
                       {assignmentError ? (
                         <p className="error" role="alert">
@@ -1565,7 +1647,8 @@ export function StaffManager({
                       ) : null}
                       <fieldset className="grid gap-2">
                         <legend className="text-sm font-semibold text-slate-700">
-                          Role choices
+                          {" "}
+                          {tx("Role choices")}{" "}
                         </legend>
                         {offeredRoles.map((role) => (
                           <RoleOption
@@ -1584,14 +1667,15 @@ export function StaffManager({
                           onClick={() => setEditingRoles(false)}
                           type="button"
                         >
-                          Cancel
+                          {" "}
+                          {tx("Cancel")}{" "}
                         </button>
                         <button
                           className="button button-edit"
                           disabled={pending}
                           type="submit"
                         >
-                          {pending ? "Saving…" : "Save assigned roles"}
+                          {pending ? tx("Saving…") : tx("Save assigned roles")}
                         </button>
                       </div>
                     </FormDialog>
@@ -1630,13 +1714,15 @@ export function StaffManager({
             <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
               <div>
                 <h2 className="text-xl font-bold" id="invite-staff-title">
-                  Invite staff
+                  {" "}
+                  {tx("Invite staff")}{" "}
                 </h2>
                 <p
                   className="mt-1 text-sm text-slate-500"
                   id="invite-staff-description"
                 >
-                  A staff code is assigned from the display name.
+                  {" "}
+                  {tx("A staff code is assigned from the display name.")}{" "}
                 </p>
               </div>
               <button
@@ -1645,7 +1731,8 @@ export function StaffManager({
                 onClick={closeInvite}
                 type="button"
               >
-                Close
+                {" "}
+                {tx("Close")}{" "}
               </button>
             </div>
             {!rolesLoaded ||
@@ -1653,7 +1740,9 @@ export function StaffManager({
             error ||
             (rolesLoaded && !rolesError && offeredRoles.length === 0) ? (
               <div className="grid gap-3 px-5 py-4 sm:px-6">
-                {!rolesLoaded ? <p role="status">Loading roles.</p> : null}
+                {!rolesLoaded ? (
+                  <p role="status">{tx("Loading roles.")}</p>
+                ) : null}
                 {rolesError ? (
                   <p className="error" role="alert">
                     {rolesError}
@@ -1661,12 +1750,13 @@ export function StaffManager({
                 ) : null}
                 {rolesLoaded && !rolesError && offeredRoles.length === 0 ? (
                   <p className="text-sm text-slate-500">
-                    No assignable roles are available.
+                    {" "}
+                    {tx("No assignable roles are available.")}{" "}
                   </p>
                 ) : null}
                 {error ? (
                   <p className="error" role="alert">
-                    {error}
+                    {tx(error)}
                   </p>
                 ) : null}
               </div>
@@ -1732,10 +1822,14 @@ export function StaffManager({
                 />
                 <fieldset className="grid gap-2 md:col-span-2">
                   <legend className="text-sm font-semibold text-slate-700">
-                    Roles
+                    {" "}
+                    {tx("Roles")}{" "}
                   </legend>
                   <p className="text-sm text-slate-500">
-                    Choose at least one role. Owner is not offered here.
+                    {" "}
+                    {tx(
+                      "Choose at least one role. Owner is not offered here.",
+                    )}{" "}
                   </p>
                   {offeredRoles.map((role) => (
                     <RoleOption key={role.id} role={role} />
@@ -1751,14 +1845,15 @@ export function StaffManager({
                     onClick={closeInvite}
                     type="button"
                   >
-                    Cancel
+                    {" "}
+                    {tx("Cancel")}{" "}
                   </button>
                   <button
                     className="button button-create"
                     disabled={pending}
                     type="submit"
                   >
-                    {pending ? "Sending…" : "Send invitation"}
+                    {pending ? tx("Sending…") : tx("Send invitation")}
                   </button>
                 </div>
               </div>

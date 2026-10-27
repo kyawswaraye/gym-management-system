@@ -19,12 +19,19 @@ from apps.common.api.responses import success_response
 from apps.common.api.schema import ErrorEnvelopeSerializer
 from apps.tenants.models import Gym
 
+from .google_login import login_member_with_google_email, verify_google_id_token
 from .member_sessions import login_member, rotate_member_refresh_token
 from .models import User
 from .schema import MemberTokenEnvelopeSerializer
-from .serializers import LogoutInputSerializer, MemberLoginInputSerializer, RefreshInputSerializer
+from .serializers import (
+    LogoutInputSerializer,
+    MemberGoogleLoginInputSerializer,
+    MemberLoginInputSerializer,
+    RefreshInputSerializer,
+)
 from .services import TokenPair, revoke_refresh_token
 from .throttling import (
+    MemberGoogleLoginThrottle,
     MemberLoginIPThrottle,
     MemberLoginThrottle,
     MemberLogoutIPThrottle,
@@ -92,6 +99,54 @@ class MemberLoginView(APIView):
                 request_id=getattr(request, "request_id", "req_unknown"),
                 outcome=Outcome.SUCCESS,
                 details={"gym_id": str(member.gym_id)},
+                ip_address=_client_ip(request),
+                user_agent=str(request.META.get("HTTP_USER_AGENT", "")),
+            )
+        return success_response(
+            _token_data(pair, member_id=str(member.id), gym_id=str(member.gym_id))
+        )
+
+
+@method_decorator(non_atomic_requests, name="dispatch")
+class MemberGoogleLoginView(APIView):
+    authentication_classes: list[type] = []
+    permission_classes = [AllowAny]
+    throttle_classes = [MemberLoginIPThrottle, MemberGoogleLoginThrottle]
+
+    @extend_schema(
+        operation_id="member_auth_google",
+        request=MemberGoogleLoginInputSerializer,
+        responses={
+            200: MemberTokenEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            429: ErrorEnvelopeSerializer,
+        },
+        auth=[],
+    )
+    def post(self, request: Request) -> Response:
+        serializer = MemberGoogleLoginInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = verify_google_id_token(str(serializer.validated_data["id_token"]))
+        with transaction.atomic():
+            pair, member = login_member_with_google_email(
+                email=email,
+                device_name=str(serializer.validated_data.get("device_name", "")),
+                ip_address=_client_ip(request),
+            )
+            linked_user_id = member.linked_user_id
+            if linked_user_id is None:
+                raise AuthenticationFailed()
+            write_platform_audit(
+                actor=User.objects.get(pk=linked_user_id),
+                action="member_auth.login",
+                target_type="Member",
+                target_id=member.id,
+                target_gym=Gym.objects.get(pk=member.gym_id),
+                request_id=getattr(request, "request_id", "req_unknown"),
+                outcome=Outcome.SUCCESS,
+                details={"gym_id": str(member.gym_id), "method": "google"},
                 ip_address=_client_ip(request),
                 user_agent=str(request.META.get("HTTP_USER_AGENT", "")),
             )

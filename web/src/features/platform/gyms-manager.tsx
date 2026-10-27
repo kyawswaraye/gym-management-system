@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import Link from "next/link";
 import {
@@ -51,11 +52,12 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 function StatusBadge({ value }: { value: string }) {
+  const tx = useTx();
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${STATUS_TONE[value] ?? "bg-slate-100 text-slate-600"}`}
     >
-      {STATUS_LABEL[value] ?? value}
+      {tx(STATUS_LABEL[value] ?? value)}
     </span>
   );
 }
@@ -70,6 +72,7 @@ function initials(name: string): string {
 }
 
 export function GymsManager({ canProvision }: { canProvision: boolean }) {
+  const tx = useTx();
   const [gyms, setGyms] = useState<PlatformGym[]>([]);
   const [subscriptions, setSubscriptions] = useState<PlatformSubscription[]>(
     [],
@@ -159,7 +162,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
     const planId = String(values.get("subscription_plan_id") ?? "");
     const plan = subscriptions.find((item) => item.id === planId);
     if (!plan) {
-      setError("Select an active subscription plan.");
+      setError(tx("Select an active subscription plan."));
       return;
     }
     const name = String(values.get("name") ?? "").trim();
@@ -167,7 +170,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
     const firstName = String(values.get("first_name") ?? "").trim();
     const lastName = String(values.get("last_name") ?? "").trim();
     if (!name || !ownerEmail || !firstName || !lastName) {
-      setError("Complete all required gym and owner fields.");
+      setError(tx("Complete all required gym and owner fields."));
       return;
     }
     const request: GymProvisionRequest = {
@@ -199,7 +202,9 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
     try {
       const result = await provisionGym(request, idempotencyKey.current);
       setSuccess(
-        `${result.gym.code} was provisioned and an Owner setup email was sent.`,
+        tx("{code} was provisioned and an Owner setup email was sent.", {
+          code: result.gym.code,
+        }),
       );
       idempotencyKey.current = null;
       setProvisioning(false);
@@ -239,20 +244,22 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
           }}
           onSubmit={submit}
           pending={pending}
-          title="Provision gym"
+          title={tx("Provision gym")}
           wide
         >
           <div className="grid gap-5">
             <section className="grid gap-3">
               <h3 className="text-xs font-bold tracking-[0.16em] text-slate-500 uppercase">
-                Gym
+                {" "}
+                {tx("Gym")}{" "}
               </h3>
               <p className="muted text-sm">
-                A gym code is assigned from the gym name.
+                {" "}
+                {tx("A gym code is assigned from the gym name.")}{" "}
               </p>
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="field md:col-span-2">
-                  <span>Gym name *</span>
+                  <span>{tx("Gym name *")}</span>
                   <input
                     className="input"
                     name="name"
@@ -261,23 +268,23 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                   />
                 </label>
                 <label className="field">
-                  <span>Subscription *</span>
+                  <span>{tx("Subscription *")}</span>
                   <select
                     className="input"
                     name="subscription_plan_id"
                     required
                     disabled={pending || subscriptions.length === 0}
                   >
-                    <option value="">Select a plan</option>
+                    <option value="">{tx("Select a plan")}</option>
                     {subscriptions.map((plan) => (
                       <option key={plan.id} value={plan.id}>
-                        {plan.name} ({plan.currency})
+                        {plan.name} ({tx(plan.currency)})
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="field">
-                  <span>Timezone *</span>
+                  <span>{tx("Timezone *")}</span>
                   <input
                     className="input"
                     name="timezone"
@@ -287,7 +294,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                   />
                 </label>
                 <label className="field">
-                  <span>Gym email</span>
+                  <span>{tx("Gym email")}</span>
                   <input
                     className="input"
                     name="gym_email"
@@ -296,7 +303,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                   />
                 </label>
                 <label className="field">
-                  <span>Gym phone</span>
+                  <span>{tx("Gym phone")}</span>
                   <input
                     className="input"
                     name="gym_phone"
@@ -304,7 +311,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                   />
                 </label>
                 <label className="field md:col-span-2">
-                  <span>Address</span>
+                  <span>{tx("Address")}</span>
                   <input
                     className="input"
                     name="address_line1"
@@ -312,11 +319,11 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                   />
                 </label>
                 <label className="field">
-                  <span>City</span>
+                  <span>{tx("City")}</span>
                   <input className="input" name="city" disabled={pending} />
                 </label>
                 <label className="field">
-                  <span>Country code</span>
+                  <span>{tx("Country code")}</span>
                   <input
                     className="input"
                     name="country_code"
@@ -329,11 +336,12 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
             </section>
             <section className="grid gap-3 border-t border-slate-200 pt-5">
               <h3 className="text-xs font-bold tracking-[0.16em] text-slate-500 uppercase">
-                Owner
+                {" "}
+                {tx("Owner")}{" "}
               </h3>
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="field">
-                  <span>Owner first name *</span>
+                  <span>{tx("Owner first name *")}</span>
                   <input
                     className="input"
                     name="first_name"
@@ -342,7 +350,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                   />
                 </label>
                 <label className="field">
-                  <span>Owner last name *</span>
+                  <span>{tx("Owner last name *")}</span>
                   <input
                     className="input"
                     name="last_name"
@@ -351,7 +359,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                   />
                 </label>
                 <label className="field">
-                  <span>Owner email *</span>
+                  <span>{tx("Owner email *")}</span>
                   <input
                     className="input"
                     name="owner_email"
@@ -362,7 +370,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                   />
                 </label>
                 <label className="field">
-                  <span>Owner phone</span>
+                  <span>{tx("Owner phone")}</span>
                   <input
                     className="input"
                     name="owner_phone"
@@ -371,7 +379,10 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                 </label>
               </div>
               <p id="owner-email-delivery" className="muted text-sm">
-                Required. The Owner setup link is emailed to this address.
+                {" "}
+                {tx(
+                  "Required. The Owner setup link is emailed to this address.",
+                )}{" "}
               </p>
             </section>
             <button
@@ -379,7 +390,9 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
               type="submit"
               disabled={pending}
             >
-              {pending ? "Provisioning…" : "Provision gym and email Owner"}
+              {pending
+                ? tx("Provisioning…")
+                : tx("Provision gym and email Owner")}
             </button>
           </div>
         </FormDialog>
@@ -392,14 +405,15 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
         <div className="flex flex-col gap-4 border-b border-slate-200 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-900" id="gyms-title">
-              Directory
+              {" "}
+              {tx("Directory")}{" "}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               {loading && gyms.length === 0
-                ? "Loading gyms."
+                ? tx("Loading gyms.")
                 : gyms.length === 1
-                  ? "1 gym in this list."
-                  : `${gyms.length} gyms in this list.`}
+                  ? tx("1 gym in this list.")
+                  : tx("{count} gyms in this list.", { count: gyms.length })}
             </p>
           </div>
           {canProvision ? (
@@ -408,13 +422,14 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
               onClick={() => setProvisioning(true)}
               type="button"
             >
-              Provision gym
+              {" "}
+              {tx("Provision gym")}{" "}
             </button>
           ) : null}
         </div>
         <div className="grid gap-3 border-b border-slate-100 bg-slate-50/80 px-4 py-4 sm:px-5">
           <div
-            aria-label="Gym status"
+            aria-label={tx("Gym status")}
             className="flex flex-wrap gap-2"
             role="group"
           >
@@ -432,29 +447,30 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                   onClick={() => applyStatus(filter.value)}
                   type="button"
                 >
-                  {filter.label}
+                  {tx(filter.label)}
                 </button>
               );
             })}
           </div>
           <form className="flex gap-2" onSubmit={searchGyms}>
             <label className="field min-w-0 flex-1">
-              <span className="sr-only">Search gyms</span>
+              <span className="sr-only">{tx("Search gyms")}</span>
               <input
                 className="input"
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by name or code"
+                placeholder={tx("Search by name or code")}
                 value={search}
               />
             </label>
             <button className="button" disabled={loading} type="submit">
-              Search
+              {" "}
+              {tx("Search")}{" "}
             </button>
           </form>
         </div>
         {error ? (
           <p className="error mx-4 mt-4 sm:mx-5" role="alert">
-            {error}
+            {tx(error)}
           </p>
         ) : null}
         {success ? (
@@ -462,7 +478,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
             className="mx-4 mt-4 text-sm font-medium text-emerald-700 sm:mx-5"
             role="status"
           >
-            {success}
+            {tx(success)}
           </p>
         ) : null}
         <div className="overflow-x-auto">
@@ -470,19 +486,24 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
             <thead>
               <tr className="border-b border-slate-100 text-xs font-semibold tracking-wide text-slate-500 uppercase">
                 <th className="px-5 py-3" scope="col">
-                  Gym
+                  {" "}
+                  {tx("Gym")}{" "}
                 </th>
                 <th className="px-5 py-3" scope="col">
-                  Status
+                  {" "}
+                  {tx("Status")}{" "}
                 </th>
                 <th className="px-5 py-3" scope="col">
-                  Plan
+                  {" "}
+                  {tx("Plan")}{" "}
                 </th>
                 <th className="px-5 py-3" scope="col">
-                  Subscription
+                  {" "}
+                  {tx("Subscription")}{" "}
                 </th>
                 <th className="px-5 py-3" scope="col">
-                  Currency
+                  {" "}
+                  {tx("Currency")}{" "}
                 </th>
               </tr>
             </thead>
@@ -523,7 +544,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                     <StatusBadge value={gym.subscription_status} />
                   </td>
                   <td className="px-5 py-4 font-medium text-slate-700">
-                    {gym.currency}
+                    {tx(gym.currency)}
                   </td>
                 </tr>
               ))}
@@ -532,10 +553,12 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
           {!loading && gyms.length === 0 ? (
             <p className="px-6 py-14 text-center">
               <span className="block font-semibold text-slate-800">
-                No gyms found.
+                {" "}
+                {tx("No gyms found.")}{" "}
               </span>
               <span className="mt-1 block text-sm text-slate-500">
-                Try another status or search.
+                {" "}
+                {tx("Try another status or search.")}{" "}
               </span>
             </p>
           ) : null}
@@ -552,14 +575,15 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                     setError(
                       reason instanceof Error
                         ? reason.message
-                        : "Unable to load more gyms.",
+                        : tx("Unable to load more gyms."),
                     ),
                   )
                   .finally(() => setLoading(false));
               }}
               type="button"
             >
-              Load more
+              {" "}
+              {tx("Load more")}{" "}
             </button>
           </div>
         ) : null}

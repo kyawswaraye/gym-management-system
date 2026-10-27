@@ -112,9 +112,9 @@ describe("member screens", () => {
         </MotionProvider>
       </SafeAreaProvider>,
     );
-    expect(view.getByLabelText("Email")).toBeTruthy();
-    expect(view.getByLabelText("Password")).toBeTruthy();
-    expect(view.getByRole("button", { name: "Sign in" })).toBeTruthy();
+    expect(
+      view.getByRole("button", { name: "Continue with Google" }),
+    ).toBeTruthy();
   });
 
   it("shows a dashboard error and the server payment amount after retry", async () => {

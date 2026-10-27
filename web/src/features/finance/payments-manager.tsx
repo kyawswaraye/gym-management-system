@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
@@ -101,11 +102,12 @@ function statusTone(status: string): string {
 }
 
 function StatusPill({ status }: { status: string }) {
+  const tx = useTx();
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ${statusTone(status)}`}
     >
-      {pretty(status)}
+      {tx(pretty(status))}
     </span>
   );
 }
@@ -113,16 +115,17 @@ function StatusPill({ status }: { status: string }) {
 const PRETTY_FACTS = new Set(["Purpose", "Method", "Entry", "Status"]);
 
 function FactGrid({ rows }: { rows: Array<{ label: string; value: string }> }) {
+  const tx = useTx();
   return (
     <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
       {rows.map((row) => (
         <div key={row.label}>
-          <dt className="text-xs text-slate-500">{row.label}</dt>
+          <dt className="text-xs text-slate-500">{tx(row.label)}</dt>
           <dd className="mt-0.5 text-sm font-semibold break-words text-slate-900">
             <IdentifierValue
-              value={
-                PRETTY_FACTS.has(row.label) ? pretty(row.value) : row.value
-              }
+              value={tx(
+                PRETTY_FACTS.has(row.label) ? pretty(row.value) : row.value,
+              )}
             />
           </dd>
         </div>
@@ -150,6 +153,7 @@ function ActionPanel({
   onCancel: () => void;
   children?: ReactNode;
 }) {
+  const tx = useTx();
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit(new FormData(event.currentTarget));
@@ -172,14 +176,15 @@ function ActionPanel({
           onClick={onCancel}
           type="button"
         >
-          Back
+          {" "}
+          {tx("Back")}{" "}
         </button>
         <button
           className={actionButtonClass(confirmLabel)}
           disabled={pending}
           type="submit"
         >
-          {confirmLabel}
+          {tx(confirmLabel)}
         </button>
       </div>
     </FormDialog>
@@ -250,6 +255,7 @@ export function PaymentsManager({
   currency: string;
   defaultDate: string;
 }) {
+  const tx = useTx();
   const [status, setStatus] = useState("");
   const [section, setSection] = useState<"payments" | "receipts">("payments");
   const [method, setMethod] = useState("");
@@ -355,7 +361,7 @@ export function PaymentsManager({
           if (!active) return;
           setPayment(null);
           setFormError(
-            financeError(caught, "The payment could not be loaded."),
+            financeError(caught, tx("The payment could not be loaded.")),
           );
         });
     }, 0);
@@ -363,7 +369,7 @@ export function PaymentsManager({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [selectedId, payments.rows]);
+  }, [selectedId, payments.rows, tx]);
 
   function fail(caught: unknown, fallback: string) {
     setFields(fieldMap(caught));
@@ -430,7 +436,7 @@ export function PaymentsManager({
     <div className="grid gap-6">
       {canViewReceipts ? (
         <div
-          aria-label="Payment sections"
+          aria-label={tx("Payment sections")}
           className="flex flex-wrap gap-2"
           role="tablist"
         >
@@ -450,7 +456,7 @@ export function PaymentsManager({
               role="tab"
               type="button"
             >
-              {label}
+              {tx(label)}
             </button>
           ))}
         </div>
@@ -482,7 +488,8 @@ export function PaymentsManager({
                     className="text-lg font-bold text-slate-900"
                     id="payment-ledger-title"
                   >
-                    Payment ledger
+                    {" "}
+                    {tx("Payment ledger")}{" "}
                   </h2>
                   {canCreate ? (
                     <button
@@ -494,7 +501,8 @@ export function PaymentsManager({
                       }}
                       type="button"
                     >
-                      Record payment
+                      {" "}
+                      {tx("Record payment")}{" "}
                     </button>
                   ) : null}
                 </div>
@@ -513,10 +521,10 @@ export function PaymentsManager({
                         onChange={(event) => setStatus(event.target.value)}
                         value={status}
                       >
-                        <option value="">Any status</option>
+                        <option value="">{tx("Any status")}</option>
                         {STATUSES.map((item) => (
                           <option key={item} value={item}>
-                            {pretty(item)}
+                            {tx(pretty(item))}
                           </option>
                         ))}
                       </SelectInput>
@@ -526,10 +534,10 @@ export function PaymentsManager({
                         onChange={(event) => setMethod(event.target.value)}
                         value={method}
                       >
-                        <option value="">Any method</option>
+                        <option value="">{tx("Any method")}</option>
                         {METHODS.map((item) => (
                           <option key={item} value={item}>
-                            {pretty(item)}
+                            {tx(pretty(item))}
                           </option>
                         ))}
                       </SelectInput>
@@ -539,14 +547,15 @@ export function PaymentsManager({
                         onChange={(event) => setPurpose(event.target.value)}
                         value={purpose}
                       >
-                        <option value="">Any purpose</option>
-                        <option value="MEMBERSHIP">Membership</option>
-                        <option value="OTHER">Other</option>
-                        <option value="PRODUCT">Product</option>
+                        <option value="">{tx("Any purpose")}</option>
+                        <option value="MEMBERSHIP">{tx("Membership")}</option>
+                        <option value="OTHER">{tx("Other")}</option>
+                        <option value="PRODUCT">{tx("Product")}</option>
                       </SelectInput>
                     </Field>
                     <button className="button w-full sm:w-auto" type="submit">
-                      Apply filters
+                      {" "}
+                      {tx("Apply filters")}{" "}
                     </button>
                   </div>
                 </form>
@@ -555,7 +564,8 @@ export function PaymentsManager({
               {payments.pending && payments.rows.length === 0 ? (
                 <div className="grid gap-3 p-4 sm:p-5" role="status">
                   <p className="text-sm font-medium text-slate-600">
-                    Loading payments.
+                    {" "}
+                    {tx("Loading payments.")}{" "}
                   </p>
                   <div className="grid gap-2">
                     {[0, 1, 2].map((item) => (
@@ -572,7 +582,8 @@ export function PaymentsManager({
                   className="px-5 pt-4 text-sm font-medium text-slate-600"
                   role="status"
                 >
-                  Loading payments.
+                  {" "}
+                  {tx("Loading payments.")}{" "}
                 </p>
               ) : null}
               {!payments.pending && payments.error ? (
@@ -585,50 +596,58 @@ export function PaymentsManager({
               payments.rows.length === 0 ? (
                 <div className="px-4 py-12 text-center sm:px-5">
                   <p className="font-semibold text-slate-800">
-                    No payments were returned.
+                    {" "}
+                    {tx("No payments were returned.")}{" "}
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
                     {filtered
-                      ? "Try another status, method, or purpose."
-                      : "Recorded drafts and posted payments will show up here."}
+                      ? tx("Try another status, method, or purpose.")
+                      : tx(
+                          "Recorded drafts and posted payments will show up here.",
+                        )}
                   </p>
                 </div>
               ) : null}
               {payments.rows.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <caption className="sr-only">Payments</caption>
+                    <caption className="sr-only">{tx("Payments")}</caption>
                     <thead className="border-b border-slate-200 text-slate-500">
                       <tr>
                         <th
                           className="px-5 py-2.5 text-xs font-semibold"
                           scope="col"
                         >
-                          Description
+                          {" "}
+                          {tx("Description")}{" "}
                         </th>
                         <th
                           className="px-5 py-2.5 text-xs font-semibold"
                           scope="col"
                         >
-                          Amount
+                          {" "}
+                          {tx("Amount")}{" "}
                         </th>
                         <th
                           className="px-5 py-2.5 text-xs font-semibold"
                           scope="col"
                         >
-                          Method
+                          {" "}
+                          {tx("Method")}{" "}
                         </th>
                         <th
                           className="px-5 py-2.5 text-xs font-semibold"
                           scope="col"
                         >
-                          Date
+                          {" "}
+                          {tx("Date")}{" "}
                         </th>
                         <th
                           className="px-5 py-2.5 text-xs font-semibold"
                           scope="col"
                         >
-                          Status
+                          {" "}
+                          {tx("Status")}{" "}
                         </th>
                       </tr>
                     </thead>
@@ -653,17 +672,17 @@ export function PaymentsManager({
                                 }}
                                 type="button"
                               >
-                                {row.description}
+                                {tx(row.description)}
                               </button>
                             </td>
                             <td className="px-5 py-3 font-semibold whitespace-nowrap text-slate-900 tabular-nums">
                               {row.amount}{" "}
                               <span className="font-medium text-slate-500">
-                                {row.currency}
+                                {tx(row.currency)}
                               </span>
                             </td>
                             <td className="px-5 py-3 whitespace-nowrap text-slate-600">
-                              {pretty(row.method)}
+                              {tx(pretty(row.method))}
                             </td>
                             <td className="px-5 py-3 whitespace-nowrap text-slate-600">
                               {row.business_date}
@@ -703,19 +722,20 @@ export function PaymentsManager({
                       className="text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase"
                       id="payment-detail-title"
                     >
-                      Payment detail
+                      {" "}
+                      {tx("Payment detail")}{" "}
                     </h2>
                     <p className="mt-1 text-lg font-bold break-words text-slate-900">
-                      {payment.description}
+                      {tx(payment.description)}
                     </p>
                     <p className="mt-0.5 text-sm font-semibold text-slate-600 tabular-nums">
-                      {payment.amount} {payment.currency}
+                      {payment.amount} {tx(payment.currency)}
                     </p>
                   </div>
                   <span
                     className={`shrink-0 rounded-full px-2.5 py-1 font-mono text-[0.68rem] font-bold tracking-wide ${statusTone(payment.status)}`}
                   >
-                    {payment.status}
+                    {tx(payment.status)}
                   </span>
                 </div>
                 {formError && (action === "edit" || action === null) ? (
@@ -726,12 +746,15 @@ export function PaymentsManager({
                 <div className="px-5 pt-1 pb-4">
                   <FactGrid
                     rows={[
-                      { label: "Purpose", value: payment.purpose },
-                      { label: "Method", value: payment.method },
-                      { label: "Business date", value: payment.business_date },
-                      { label: "Entry", value: payment.entry_type },
+                      { label: tx("Purpose"), value: payment.purpose },
+                      { label: tx("Method"), value: payment.method },
                       {
-                        label: "Cash session",
+                        label: tx("Business date"),
+                        value: payment.business_date,
+                      },
+                      { label: tx("Entry"), value: payment.entry_type },
+                      {
+                        label: tx("Cash session"),
                         value: payment.cash_session_id ?? "None",
                       },
                     ]}
@@ -743,9 +766,10 @@ export function PaymentsManager({
                       className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950"
                       role="note"
                     >
-                      RETAIL_CORRECTION_UNAVAILABLE. This product payment cannot
-                      be voided or refunded here. Use the retail sale full void
-                      so the payment, receipt, and stock return stay together.
+                      {" "}
+                      {tx(
+                        "RETAIL_CORRECTION_UNAVAILABLE. This product payment cannot be voided or refunded here. Use the retail sale full void so the payment, receipt, and stock return stay together.",
+                      )}{" "}
                     </p>
                   )}
                   {correction && (
@@ -753,8 +777,9 @@ export function PaymentsManager({
                       className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900"
                       role="status"
                     >
-                      Refundable amount returned by the server:{" "}
-                      {correction.refundable_amount} {payment.currency}.
+                      {" "}
+                      {tx("Refundable amount returned by the server:")}{" "}
+                      {correction.refundable_amount} {tx(payment.currency)}.
                     </p>
                   )}
                   <div className="flex flex-wrap gap-2">
@@ -764,7 +789,8 @@ export function PaymentsManager({
                         onClick={() => setAction("edit")}
                         type="button"
                       >
-                        Edit draft
+                        {" "}
+                        {tx("Edit draft")}{" "}
                       </button>
                     )}
                     {payment.status === "DRAFT" && canSubmit && (
@@ -773,7 +799,8 @@ export function PaymentsManager({
                         onClick={() => setAction("submit")}
                         type="button"
                       >
-                        Submit
+                        {" "}
+                        {tx("Submit")}{" "}
                       </button>
                     )}
                     {payment.status === "PENDING_APPROVAL" && canApprove && (
@@ -782,7 +809,8 @@ export function PaymentsManager({
                         onClick={() => setAction("approve")}
                         type="button"
                       >
-                        Approve
+                        {" "}
+                        {tx("Approve")}{" "}
                       </button>
                     )}
                     {payment.status === "PENDING_APPROVAL" && canApprove && (
@@ -791,7 +819,8 @@ export function PaymentsManager({
                         onClick={() => setAction("reject")}
                         type="button"
                       >
-                        Reject
+                        {" "}
+                        {tx("Reject")}{" "}
                       </button>
                     )}
                     {payment.status === "DRAFT" && canUpdate && (
@@ -800,7 +829,8 @@ export function PaymentsManager({
                         onClick={() => setAction("cancel")}
                         type="button"
                       >
-                        Cancel draft
+                        {" "}
+                        {tx("Cancel draft")}{" "}
                       </button>
                     )}
                     {payment.status === "POSTED" &&
@@ -814,7 +844,8 @@ export function PaymentsManager({
                           }}
                           type="button"
                         >
-                          Void
+                          {" "}
+                          {tx("Void")}{" "}
                         </button>
                       )}
                     {payment.status === "POSTED" &&
@@ -828,7 +859,8 @@ export function PaymentsManager({
                           }}
                           type="button"
                         >
-                          Refund
+                          {" "}
+                          {tx("Refund")}{" "}
                         </button>
                       )}
                   </div>
@@ -855,7 +887,7 @@ export function PaymentsManager({
                           .finally(() => setPending(false));
                       }}
                       pending={pending}
-                      title="Edit draft"
+                      title={tx("Edit draft")}
                       wide
                     >
                       <Alert message={formError} />
@@ -879,14 +911,16 @@ export function PaymentsManager({
                           onClick={() => setAction(null)}
                           type="button"
                         >
-                          Back
+                          {" "}
+                          {tx("Back")}{" "}
                         </button>
                         <button
                           className="button button-edit"
                           disabled={pending}
                           type="submit"
                         >
-                          Save changes
+                          {" "}
+                          {tx("Save changes")}{" "}
                         </button>
                       </div>
                     </FormDialog>
@@ -906,7 +940,7 @@ export function PaymentsManager({
                           .finally(() => setPending(false));
                       }}
                       pending={pending}
-                      title="Submit this draft for approval?"
+                      title={tx("Submit this draft for approval?")}
                     />
                   )}
                   {action === "approve" && (
@@ -935,7 +969,7 @@ export function PaymentsManager({
                           .finally(() => setPending(false));
                       }}
                       pending={pending}
-                      title="Approve payment"
+                      title={tx("Approve payment")}
                     >
                       {payment.method === "CASH" ? (
                         <CashSessionSelect
@@ -948,8 +982,10 @@ export function PaymentsManager({
                         />
                       ) : (
                         <p className="text-sm text-slate-600">
-                          This is not a cash payment, so no cash session is
-                          sent.
+                          {" "}
+                          {tx(
+                            "This is not a cash payment, so no cash session is sent.",
+                          )}{" "}
                         </p>
                       )}
                     </ActionPanel>
@@ -973,7 +1009,7 @@ export function PaymentsManager({
                           .finally(() => setPending(false));
                       }}
                       pending={pending}
-                      title="Reject payment"
+                      title={tx("Reject payment")}
                     >
                       <ReasonField
                         error={fields.rejection_reason}
@@ -999,7 +1035,7 @@ export function PaymentsManager({
                           .finally(() => setPending(false));
                       }}
                       pending={pending}
-                      title="Cancel draft"
+                      title={tx("Cancel draft")}
                     >
                       <ReasonField
                         error={fields.reason}
@@ -1044,7 +1080,7 @@ export function PaymentsManager({
                           .finally(() => setPending(false));
                       }}
                       pending={pending}
-                      title="Void payment"
+                      title={tx("Void payment")}
                     >
                       <ReasonField error={fields.reason} label="Void reason" />
                       <Field
@@ -1062,8 +1098,10 @@ export function PaymentsManager({
                       </Field>
                       {legacyUnlinkedCash(payment) ? (
                         <p className="text-sm text-slate-600">
-                          This posted cash payment has no linked movement, so
-                          the void does not name a destination session.
+                          {" "}
+                          {tx(
+                            "This posted cash payment has no linked movement, so the void does not name a destination session.",
+                          )}{" "}
                         </p>
                       ) : payment.method === "CASH" ? (
                         <CashSessionSelect
@@ -1128,11 +1166,12 @@ export function PaymentsManager({
                           .finally(() => setPending(false));
                       }}
                       pending={pending}
-                      title="Refund payment"
+                      title={tx("Refund payment")}
                     >
                       {correction && (
                         <p>
-                          Refundable amount returned by the server:{" "}
+                          {" "}
+                          {tx("Refundable amount returned by the server:")}{" "}
                           {correction.refundable_amount}.
                         </p>
                       )}
@@ -1154,7 +1193,7 @@ export function PaymentsManager({
                         >
                           {METHODS.map((item) => (
                             <option key={item} value={item}>
-                              {item}
+                              {tx(pretty(item))}
                             </option>
                           ))}
                         </SelectInput>
@@ -1215,7 +1254,7 @@ export function PaymentsManager({
                   .finally(() => setPending(false));
               }}
               pending={pending}
-              title="Record payment"
+              title={tx("Record payment")}
               wide
             >
               <Alert message={formError} />
@@ -1238,7 +1277,8 @@ export function PaymentsManager({
                   disabled={pending}
                   type="submit"
                 >
-                  Save draft
+                  {" "}
+                  {tx("Save draft")}{" "}
                 </button>
               </div>
             </FormDialog>
@@ -1258,13 +1298,15 @@ export function PaymentsManager({
               className="text-base font-bold text-slate-900"
               id="receipts-title"
             >
-              Receipts
+              {" "}
+              {tx("Receipts")}{" "}
             </h2>
           </div>
           {receipts.pending && receipts.rows.length === 0 ? (
             <div className="grid gap-3 p-4 sm:p-5" role="status">
               <p className="text-sm font-medium text-slate-600">
-                Loading receipts.
+                {" "}
+                {tx("Loading receipts.")}{" "}
               </p>
               <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
             </div>
@@ -1274,7 +1316,8 @@ export function PaymentsManager({
               className="px-5 pt-4 text-sm font-medium text-slate-600"
               role="status"
             >
-              Loading receipts.
+              {" "}
+              {tx("Loading receipts.")}{" "}
             </p>
           ) : null}
           {!receipts.pending && receipts.error ? (
@@ -1287,36 +1330,41 @@ export function PaymentsManager({
           receipts.rows.length === 0 ? (
             <div className="px-4 py-12 text-center sm:px-5">
               <p className="font-semibold text-slate-800">
-                No receipts were returned.
+                {" "}
+                {tx("No receipts were returned.")}{" "}
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                A receipt appears here after a payment is posted.
+                {" "}
+                {tx("A receipt appears here after a payment is posted.")}{" "}
               </p>
             </div>
           ) : null}
           {receipts.rows.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <caption className="sr-only">Receipts</caption>
+                <caption className="sr-only">{tx("Receipts")}</caption>
                 <thead className="border-b border-slate-200 text-slate-500">
                   <tr>
                     <th
                       className="px-5 py-2.5 text-xs font-semibold"
                       scope="col"
                     >
-                      Number
+                      {" "}
+                      {tx("Number")}{" "}
                     </th>
                     <th
                       className="px-5 py-2.5 text-xs font-semibold"
                       scope="col"
                     >
-                      Amount
+                      {" "}
+                      {tx("Amount")}{" "}
                     </th>
                     <th
                       className="px-5 py-2.5 text-xs font-semibold"
                       scope="col"
                     >
-                      Status
+                      {" "}
+                      {tx("Status")}{" "}
                     </th>
                   </tr>
                 </thead>
@@ -1346,7 +1394,7 @@ export function PaymentsManager({
                         <td className="px-5 py-3 font-semibold whitespace-nowrap text-slate-900 tabular-nums">
                           {row.amount}{" "}
                           <span className="font-medium text-slate-500">
-                            {row.currency}
+                            {tx(row.currency)}
                           </span>
                         </td>
                         <td className="px-5 py-3">
@@ -1378,13 +1426,13 @@ export function PaymentsManager({
               </p>
               <FactGrid
                 rows={[
-                  { label: "Member", value: receipt.member_name || "None" },
+                  { label: tx("Member"), value: receipt.member_name || "None" },
                   {
-                    label: "Amount",
-                    value: `${receipt.amount} ${receipt.currency}`,
+                    label: tx("Amount"),
+                    value: `${receipt.amount} ${tx(receipt.currency)}`,
                   },
-                  { label: "Status", value: receipt.status },
-                  { label: "Business date", value: receipt.business_date },
+                  { label: tx("Status"), value: receipt.status },
+                  { label: tx("Business date"), value: receipt.business_date },
                 ]}
               />
               <div className="flex flex-wrap gap-2">
@@ -1402,7 +1450,8 @@ export function PaymentsManager({
                   }}
                   type="button"
                 >
-                  Download receipt
+                  {" "}
+                  {tx("Download receipt")}{" "}
                 </button>
                 {receipt.status === "ISSUED" && canVoidReceipt && (
                   <button
@@ -1410,7 +1459,8 @@ export function PaymentsManager({
                     onClick={() => setReceiptAction(true)}
                     type="button"
                   >
-                    Void receipt document
+                    {" "}
+                    {tx("Void receipt document")}{" "}
                   </button>
                 )}
               </div>
@@ -1435,11 +1485,13 @@ export function PaymentsManager({
                       .finally(() => setPending(false));
                   }}
                   pending={pending}
-                  title="Void only this receipt document"
+                  title={tx("Void only this receipt document")}
                 >
                   <p className="text-sm text-slate-600">
-                    This voids the document. It does not change the payment,
-                    cash, or stock.
+                    {" "}
+                    {tx(
+                      "This voids the document. It does not change the payment, cash, or stock.",
+                    )}{" "}
                   </p>
                   <ReasonField
                     error={fields.reason}
@@ -1478,6 +1530,7 @@ function PaymentFields({
   payment?: Payment;
   wide?: boolean;
 }) {
+  const tx = useTx();
   return (
     <div
       className={
@@ -1492,14 +1545,14 @@ function PaymentFields({
           name="purpose"
           required
         >
-          <option value="MEMBERSHIP">Membership</option>
-          <option value="OTHER">Other</option>
+          <option value="MEMBERSHIP">{tx("Membership")}</option>
+          <option value="OTHER">{tx("Other")}</option>
         </SelectInput>
       </Field>
       <Field label="Find member">
         <TextInput
           onChange={(event) => onSearch(event.target.value)}
-          placeholder="Name or member number"
+          placeholder={tx("Name or member number")}
           value={memberSearch}
         />
       </Field>
@@ -1509,7 +1562,7 @@ function PaymentFields({
           name="member_id"
           onChange={(event) => onMember(event.target.value)}
         >
-          <option value="">No member</option>
+          <option value="">{tx("No member")}</option>
           {members.map((member) => (
             <option key={member.id} value={member.id}>
               {member.member_number} — {member.first_name} {member.last_name}
@@ -1522,10 +1575,10 @@ function PaymentFields({
           defaultValue={payment?.membership_id ?? ""}
           name="membership_id"
         >
-          <option value="">No membership</option>
+          <option value="">{tx("No membership")}</option>
           {memberships.map((row) => (
             <option key={row.id} value={row.id}>
-              {row.plan_name} · {row.status} · {row.final_amount} {row.currency}
+              {row.plan_name} · {tx(row.status)} · {row.final_amount} {tx(row.currency)}
             </option>
           ))}
         </SelectInput>
@@ -1537,7 +1590,7 @@ function PaymentFields({
           required
         />
       </Field>
-      <Field error={fields.amount} label={`Amount (${currency})`}>
+      <Field error={fields.amount} label={tx("Amount ({currency})", { currency: tx(currency) })}>
         <TextInput
           defaultValue={payment?.amount ?? ""}
           inputMode="decimal"
@@ -1553,7 +1606,7 @@ function PaymentFields({
         >
           {METHODS.map((item) => (
             <option key={item} value={item}>
-              {pretty(item)}
+              {tx(pretty(item))}
             </option>
           ))}
         </SelectInput>

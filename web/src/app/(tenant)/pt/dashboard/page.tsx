@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/i18n/metadata";
 import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -9,7 +9,9 @@ import {
 } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
 
-export const metadata: Metadata = { title: "Trainer dashboard" };
+export async function generateMetadata() {
+  return pageMetadata("Trainer dashboard");
+}
 
 export default async function TrainerDashboardPage() {
   const session = await requireTenantSession();

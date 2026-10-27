@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import {
   useCallback,
@@ -85,10 +86,11 @@ function FilterField({
   label: string;
   children: ReactNode;
 }) {
+  const tx = useTx();
   return (
     <label className="field">
       <span className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-        {label}
+        {tx(label)}
       </span>
       {children}
     </label>
@@ -110,10 +112,11 @@ function Blank() {
 }
 
 function Meta({ label, children }: { label: string; children: ReactNode }) {
+  const tx = useTx();
   return (
     <div className="min-w-0">
       <dt className="text-[0.68rem] font-bold tracking-[0.14em] text-slate-400 uppercase">
-        {label}
+        {tx(label)}
       </dt>
       <dd className="mt-1 text-sm font-semibold break-all text-slate-900">
         {children}
@@ -123,13 +126,16 @@ function Meta({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function ValuePanel({ title, value }: { title: string; value: string }) {
+  const tx = useTx();
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
       <h3 className="border-b border-slate-100 px-3 py-2 text-xs font-bold tracking-wide text-slate-500 uppercase">
-        {title}
+        {tx(title)}
       </h3>
       {isEmptyPayload(value) ? (
-        <p className="px-3 py-6 text-sm text-slate-500">Nothing recorded.</p>
+        <p className="px-3 py-6 text-sm text-slate-500">
+          {tx("Nothing recorded.")}
+        </p>
       ) : (
         <pre className="max-h-72 overflow-auto px-3 py-3 font-mono text-[0.8rem] leading-6 break-words whitespace-pre-wrap text-slate-800">
           {value}
@@ -148,6 +154,7 @@ function Separator() {
 }
 
 export function TenantAuditLog({ canView }: { canView: boolean }) {
+  const tx = useTx();
   const [draft, setDraft] = useState(INITIAL_FILTERS);
   const [applied, setApplied] = useState(INITIAL_FILTERS);
   const [events, setEvents] = useState<TenantAuditItem[]>([]);
@@ -247,17 +254,18 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
   if (!canView) {
     return (
       <p className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm font-semibold text-slate-700 shadow-sm">
-        You do not have access to audit logs.
+        {" "}
+        {tx("You do not have access to audit logs.")}{" "}
       </p>
     );
   }
 
   const shown =
     loading && events.length === 0
-      ? "Fetching the latest events."
+      ? tx("Fetching the latest events.")
       : events.length === 1
-        ? "1 event on this page"
-        : `${events.length} events on this page`;
+        ? tx("1 event on this page")
+        : tx("{count} events on this page", { count: events.length });
   const filtersDirty = !isInitial(draft) || !isInitial(applied);
 
   return (
@@ -268,7 +276,8 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
             className="text-lg font-bold text-slate-900"
             id="audit-activity-title"
           >
-            Activity
+            {" "}
+            {tx("Activity")}{" "}
           </h2>
           {scope ? (
             <span
@@ -279,16 +288,18 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
               }
               data-scope={scope}
             >
-              {tenantAuditScopeLabel(scope)}
+              {tx(tenantAuditScopeLabel(scope))}
             </span>
           ) : null}
         </div>
         <p className="mt-1 text-sm leading-6 text-slate-500">
-          Newest events are first. Open one to read the change.
+          {" "}
+          {tx("Newest events are first. Open one to read the change.")}{" "}
         </p>
         {scope === "SELF" ? (
           <p className="mt-1 text-sm font-medium text-amber-800">
-            Showing only actions recorded for your membership.
+            {" "}
+            {tx("Showing only actions recorded for your membership.")}{" "}
           </p>
         ) : null}
         <p className="mt-1 text-xs font-medium text-slate-400">{shown}</p>
@@ -297,7 +308,8 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
       <div className="flex items-center justify-end gap-3 border-b border-slate-100 px-4 py-3 lg:hidden">
         {!isInitial(applied) ? (
           <p className="mr-auto text-sm font-medium text-slate-600">
-            Filters are on.
+            {" "}
+            {tx("Filters are on.")}{" "}
           </p>
         ) : null}
         <button
@@ -307,11 +319,11 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
           onClick={() => setShowFilters((current) => !current)}
           type="button"
         >
-          {showFilters ? "Hide filters" : "Filters"}
+          {showFilters ? tx("Hide filters") : tx("Filters")}
         </button>
       </div>
       <form
-        aria-label="Audit filters"
+        aria-label={tx("Audit filters")}
         className={`border-b border-slate-100 bg-slate-50/80 px-4 py-4 sm:px-5 ${
           showFilters ? "block" : "hidden lg:block"
         }`}
@@ -331,7 +343,7 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
                   action: event.target.value,
                 }))
               }
-              placeholder="Any action"
+              placeholder={tx("Any action")}
               spellCheck={false}
               value={draft.action}
             />
@@ -348,7 +360,7 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
                   module: event.target.value,
                 }))
               }
-              placeholder="Any module"
+              placeholder={tx("Any module")}
               spellCheck={false}
               value={draft.module}
             />
@@ -365,10 +377,10 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
               }
               value={draft.outcome}
             >
-              <option value="">All outcomes</option>
-              <option value="SUCCESS">Success</option>
-              <option value="DENIED">Denied</option>
-              <option value="ERROR">Error</option>
+              <option value="">{tx("All outcomes")}</option>
+              <option value="SUCCESS">{tx("Success")}</option>
+              <option value="DENIED">{tx("Denied")}</option>
+              <option value="ERROR">{tx("Error")}</option>
             </select>
           </FilterField>
           <FilterField label="Target type">
@@ -383,7 +395,7 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
                   targetType: event.target.value,
                 }))
               }
-              placeholder="Any type"
+              placeholder={tx("Any type")}
               spellCheck={false}
               value={draft.targetType}
             />
@@ -399,7 +411,7 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
                   targetId: event.target.value,
                 }))
               }
-              placeholder="Any identifier"
+              placeholder={tx("Any identifier")}
               spellCheck={false}
               value={draft.targetId}
             />
@@ -422,7 +434,8 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           {!isInitial(applied) ? (
             <p className="text-xs font-medium text-slate-500 sm:mr-auto">
-              These filters are applied to the list.
+              {" "}
+              {tx("These filters are applied to the list.")}{" "}
             </p>
           ) : null}
           <div className="flex justify-end gap-2">
@@ -433,11 +446,13 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
                 onClick={clearFilters}
                 type="button"
               >
-                Clear filters
+                {" "}
+                {tx("Clear filters")}{" "}
               </button>
             ) : null}
             <button className="button" disabled={loading} type="submit">
-              Apply filters
+              {" "}
+              {tx("Apply filters")}{" "}
             </button>
           </div>
         </div>
@@ -446,14 +461,15 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
       {error ? (
         <div className="px-4 pt-4 sm:px-5">
           <p className="error" role="alert">
-            {error}
+            {tx(error)}
           </p>
         </div>
       ) : null}
       {loading && events.length === 0 ? (
         <div className="grid gap-3 p-4 sm:p-5">
           <p className="text-sm font-medium text-slate-500" role="status">
-            Loading audit events.
+            {" "}
+            {tx("Loading audit events.")}{" "}
           </p>
           {[0, 1, 2].map((item) => (
             <div
@@ -465,9 +481,12 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
       ) : null}
       {!loading && !error && events.length === 0 ? (
         <div className="px-6 py-16 text-center" role="status">
-          <p className="font-semibold text-slate-800">No audit events found.</p>
+          <p className="font-semibold text-slate-800">
+            {tx("No audit events found.")}
+          </p>
           <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500">
-            Try another action, module, or outcome.
+            {" "}
+            {tx("Try another action, module, or outcome.")}{" "}
           </p>
         </div>
       ) : null}
@@ -558,11 +577,11 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
                       </dl>
                       <div className="mt-4 grid gap-3 lg:grid-cols-2">
                         <ValuePanel
-                          title="Previous values"
+                          title={tx("Previous values")}
                           value={formatTenantAuditValue(audit.old_values)}
                         />
                         <ValuePanel
-                          title="New values"
+                          title={tx("New values")}
                           value={formatTenantAuditValue(audit.new_values)}
                         />
                       </div>
@@ -583,7 +602,7 @@ export function TenantAuditLog({ canView }: { canView: boolean }) {
             onClick={() => void load(applied, nextAfter)}
             type="button"
           >
-            {loading ? "Loading…" : "Load more"}
+            {loading ? tx("Loading…") : tx("Load more")}
           </button>
         </div>
       ) : null}

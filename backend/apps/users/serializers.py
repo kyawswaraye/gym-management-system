@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 
@@ -17,9 +18,27 @@ class StrictSerializer(serializers.Serializer):
         return cast(dict[str, object], super().to_internal_value(data))
 
 
+def validate_new_password(password: str, confirmation: str) -> None:
+    """Attach a mismatch or policy failure to the field the person can correct."""
+
+    if password != confirmation:
+        raise serializers.ValidationError({"password_confirmation": ["Passwords do not match."]})
+    try:
+        validate_password(password)
+    except DjangoValidationError as exc:
+        raise serializers.ValidationError({"password": list(exc.messages)}) from exc
+
+
 class MemberLoginInputSerializer(StrictSerializer):
     email = serializers.EmailField()
     password = serializers.CharField(trim_whitespace=False, write_only=True)
+    device_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
+
+
+class MemberGoogleLoginInputSerializer(StrictSerializer):
+    id_token = serializers.CharField(
+        trim_whitespace=False, write_only=True, min_length=20, max_length=8192
+    )
     device_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
 
 
@@ -70,9 +89,8 @@ class PasswordResetInputSerializer(StrictSerializer):
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         super().validate(attrs)
-        if attrs["password"] != attrs["password_confirmation"]:
-            raise serializers.ValidationError(
-                {"password_confirmation": ["Passwords do not match."]}
-            )
-        validate_password(str(attrs["password"]))
+        validate_new_password(
+            str(attrs["password"]),
+            str(attrs["password_confirmation"]),
+        )
         return attrs

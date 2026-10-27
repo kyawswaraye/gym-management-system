@@ -3,11 +3,10 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
 from apps.tenants.models import GymMembership, StaffProfile
-from apps.users.serializers import StrictSerializer
+from apps.users.serializers import StrictSerializer, validate_new_password
 
 
 def _commission(**overrides: Any) -> serializers.DecimalField:
@@ -115,11 +114,10 @@ class StaffAcceptInputSerializer(StrictSerializer):
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         super().validate(attrs)
-        if attrs["password"] != attrs["password_confirmation"]:
-            raise serializers.ValidationError(
-                {"password_confirmation": ["Passwords do not match."]}
-            )
-        validate_password(str(attrs["password"]))
+        validate_new_password(
+            str(attrs["password"]),
+            str(attrs["password_confirmation"]),
+        )
         return attrs
 
     def validate_first_name(self, value: str) -> str:

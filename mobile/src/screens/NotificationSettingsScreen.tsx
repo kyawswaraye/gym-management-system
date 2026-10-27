@@ -1,3 +1,4 @@
+import { useTx } from "../i18n/useTx";
 import { useState } from "react";
 import { Platform } from "react-native";
 
@@ -12,12 +13,15 @@ import {
 } from "../notifications/device";
 import { currentPlatform, readPushToken } from "../notifications/push";
 import { Button } from "../ui/Button";
-import { Screen } from "../ui/Screen";
+import { Card } from "../ui/Card";
+import { NestedScreen } from "../ui/NestedScreen";
 import { Text } from "../ui/Text";
+import { colors } from "../ui/theme";
 
 const store = createSecureStore();
 
 export function NotificationSettingsScreen() {
+  const tx = useTx();
   const api = useMemberApi();
   const online = useOnline();
   const [consent, setConsent] = useState(false);
@@ -84,23 +88,26 @@ export function NotificationSettingsScreen() {
   }
 
   return (
-    <Screen title="Notifications">
-      <Text>
-        The inbox does not need push permission. Push is optional and can be
-        turned off without leaving the gym.
-      </Text>
-      {!online ? (
-        <Text accessibilityRole="alert">
-          You are offline, so this phone cannot be updated.
+    <NestedScreen title={tx("Notifications")}>
+      <Card>
+        <Text style={{ color: colors.muted }}>
+          {tx(
+            "The inbox does not need push permission. Push is optional and can be turned off without leaving the gym.",
+          )}
         </Text>
-      ) : null}
-      <Button
-        label={consent ? "Turn push off" : "Turn push on"}
-        hint="Updates notification consent for this installation"
-        disabled={busy || !online}
-        onPress={() => save(!consent)}
-      />
+        {!online ? (
+          <Text accessibilityRole="alert">
+            {tx("You are offline, so this phone cannot be updated.")}
+          </Text>
+        ) : null}
+        <Button
+          disabled={busy || !online}
+          hint="Updates notification consent for this installation"
+          label={consent ? "Turn push off" : "Turn push on"}
+          onPress={() => save(!consent)}
+        />
+      </Card>
       {message ? <Text accessibilityRole="alert">{message}</Text> : null}
-    </Screen>
+    </NestedScreen>
   );
 }

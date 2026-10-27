@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import {
   useEffect,
@@ -202,13 +203,14 @@ function dialogKeyOf(mode: ClassDialogMode | null): string {
 }
 
 function NoticeBanner({ message }: { message: string }) {
+  const tx = useTx();
   return (
     <p
       aria-live="polite"
       className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
       role="status"
     >
-      {message}
+      {tx(message)}
     </p>
   );
 }
@@ -219,19 +221,23 @@ function NamedId({ name, id }: { name: string | null; id: string }) {
 }
 
 function StatusPill({ status }: { status: string }) {
+  const tx = useTx();
   return (
     <span
       className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${statusTone(status)}`}
     >
-      {status}
+      {tx(status)}
     </span>
   );
 }
 
 function WeekdayPicker({ selected }: { selected: number[] | undefined }) {
+  const tx = useTx();
   return (
     <fieldset className="min-w-0 border-0 p-0">
-      <legend className="text-sm font-semibold text-slate-800">Weekdays</legend>
+      <legend className="text-sm font-semibold text-slate-800">
+        {tx("Weekdays")}
+      </legend>
       <div className="mt-2 flex flex-wrap gap-2">
         {WEEKDAYS.map((label, index) => (
           <label
@@ -243,7 +249,7 @@ function WeekdayPicker({ selected }: { selected: number[] | undefined }) {
               name={`weekday_${index}`}
               type="checkbox"
             />
-            {label}
+            {tx(label)}
           </label>
         ))}
       </div>
@@ -252,10 +258,11 @@ function WeekdayPicker({ selected }: { selected: number[] | undefined }) {
 }
 
 function EmptyState({ title, body }: { title: string; body: string }) {
+  const tx = useTx();
   return (
     <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-      <p className="font-semibold text-slate-700">{title}</p>
-      <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
+      <p className="font-semibold text-slate-700">{tx(title)}</p>
+      <p className="mt-1 text-sm leading-6 text-slate-500">{tx(body)}</p>
     </div>
   );
 }
@@ -267,9 +274,10 @@ function LoadingRows({
   label: string;
   cards?: boolean;
 }) {
+  const tx = useTx();
   return (
     <div className="grid gap-3" role="status">
-      <p className="text-sm font-medium text-slate-600">{label}</p>
+      <p className="text-sm font-medium text-slate-600">{tx(label)}</p>
       <div
         className={
           cards ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3" : "grid gap-3"
@@ -295,13 +303,14 @@ function LoadError({
   retry: string;
   onRetry: () => void;
 }) {
+  const tx = useTx();
   return (
     <div className="grid gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
       <p className="text-sm font-medium text-red-800" role="alert">
-        {message}
+        {tx(message)}
       </p>
       <button className="button w-fit" onClick={onRetry} type="button">
-        {retry}
+        {tx(retry)}
       </button>
     </div>
   );
@@ -355,14 +364,15 @@ function SectionIntro({
   description?: string;
   action?: ReactNode;
 }) {
+  const tx = useTx();
   return (
     <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
       <div className="min-w-0">
         <h2 className="text-lg font-bold text-slate-900" id={titleId}>
-          {title}
+          {tx(title)}
         </h2>
         {description ? (
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
+          <p className="mt-1 text-sm text-slate-500">{tx(description)}</p>
         ) : null}
       </div>
       {action}
@@ -401,6 +411,7 @@ function ClassDialog({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const tx = useTx();
   return (
     <div
       className="fixed inset-0 z-50 grid overflow-hidden p-2 sm:place-items-center sm:p-6"
@@ -431,13 +442,13 @@ function ClassDialog({
         <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold text-slate-900" id={titleId}>
-              {title}
+              {tx(title)}
             </h2>
             <p
               className="mt-1 text-sm leading-6 text-slate-500"
               id={descriptionId}
             >
-              {description}
+              {tx(description)}
             </p>
           </div>
           <button
@@ -446,7 +457,8 @@ function ClassDialog({
             onClick={onClose}
             type="button"
           >
-            Close
+            {" "}
+            {tx("Close")}{" "}
           </button>
         </div>
         <fieldset
@@ -468,14 +480,15 @@ function ClassDialog({
               onClick={onClose}
               type="button"
             >
-              Cancel
+              {" "}
+              {tx("Cancel")}{" "}
             </button>
             <button
               className={`button w-full sm:w-auto ${submitClass}`}
               disabled={pending}
               type="submit"
             >
-              {submitLabel}
+              {tx(submitLabel)}
             </button>
           </div>
         </div>
@@ -503,20 +516,26 @@ function ScheduleFields({
   trainersError: string;
   today: string;
 }) {
+  const tx = useTx();
   return (
     <>
       <div className="grid gap-3">
         <div>
           <h3 className="text-sm font-bold text-slate-800">
-            Class and trainer
+            {" "}
+            {tx("Class and trainer")}{" "}
           </h3>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            Choose an active class type and the trainer who leads it.
+            {" "}
+            {tx(
+              "Choose an active class type and the trainer who leads it.",
+            )}{" "}
           </p>
         </div>
         {typesPending || trainersPending ? (
           <p className="text-sm text-slate-500" role="status">
-            Loading choices.
+            {" "}
+            {tx("Loading choices.")}{" "}
           </p>
         ) : null}
         <Alert message={typesError || trainersError} />
@@ -527,11 +546,12 @@ function ScheduleFields({
               name="class_type_id"
               required
             >
-              <option value="">Select a type</option>
+              <option value="">{tx("Select a type")}</option>
               {schedule &&
               !types.some((row) => row.id === schedule.class_type_id) ? (
                 <option value={schedule.class_type_id}>
-                  Current class type
+                  {" "}
+                  {tx("Current class type")}{" "}
                 </option>
               ) : null}
               {types.map((row) => (
@@ -547,13 +567,14 @@ function ScheduleFields({
               name="trainer_staff_profile_id"
               required
             >
-              <option value="">Select a trainer</option>
+              <option value="">{tx("Select a trainer")}</option>
               {schedule &&
               !trainers.some(
                 (row) => row.id === schedule.trainer_staff_profile_id,
               ) ? (
                 <option value={schedule.trainer_staff_profile_id}>
-                  Current trainer
+                  {" "}
+                  {tx("Current trainer")}{" "}
                 </option>
               ) : null}
               {trainers.map((row) => (
@@ -567,9 +588,14 @@ function ScheduleFields({
       </div>
       <div className="grid gap-3 border-t border-slate-100 pt-5">
         <div>
-          <h3 className="text-sm font-bold text-slate-800">Weekly time</h3>
+          <h3 className="text-sm font-bold text-slate-800">
+            {tx("Weekly time")}
+          </h3>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            Pick at least one weekday. The end time is later the same day.
+            {" "}
+            {tx(
+              "Pick at least one weekday. The end time is later the same day.",
+            )}{" "}
           </p>
         </div>
         <WeekdayPicker selected={schedule?.weekdays} />
@@ -596,9 +622,12 @@ function ScheduleFields({
       </div>
       <div className="grid gap-3 border-t border-slate-100 pt-5">
         <div>
-          <h3 className="text-sm font-bold text-slate-800">Dates and place</h3>
+          <h3 className="text-sm font-bold text-slate-800">
+            {tx("Dates and place")}
+          </h3>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            Occurrences are generated inside this gym-local range.
+            {" "}
+            {tx("Occurrences are generated inside this gym-local range.")}{" "}
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -640,8 +669,8 @@ function ScheduleFields({
             defaultChecked={schedule?.location_is_exclusive}
             name="location_is_exclusive"
             type="checkbox"
-          />
-          Exclusive location
+          />{" "}
+          {tx("Exclusive location")}{" "}
         </label>
       </div>
     </>
@@ -665,6 +694,7 @@ export function ClassesManager({
   today: string;
   timeZone?: string;
 }) {
+  const tx = useTx();
   const defaultTo = shiftDate(today, 6);
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(defaultTo);
@@ -840,7 +870,9 @@ export function ClassesManager({
       .catch((caught: unknown) => {
         if (packageToken.current !== token) return;
         setPackages([]);
-        setDialogError(phase5Error(caught, "Packages could not be loaded."));
+        setDialogError(
+          phase5Error(caught, tx("Packages could not be loaded.")),
+        );
       })
       .finally(() => {
         if (packageToken.current === token) setPackagesPending(false);
@@ -870,7 +902,7 @@ export function ClassesManager({
       activeTypes.reload();
       return true;
     } catch (caught) {
-      const message = phase5Error(caught, "The class command failed.");
+      const message = phase5Error(caught, tx("The class command failed."));
       if (scope === "dialog") setDialogError(message);
       else setError(message);
       return false;
@@ -1065,7 +1097,7 @@ export function ClassesManager({
         {notice ? <NoticeBanner message={notice} /> : null}
         {error ? <Alert message={error} /> : null}
         <div
-          aria-label="Class sections"
+          aria-label={tx("Class sections")}
           className="flex flex-wrap gap-2"
           role="tablist"
         >
@@ -1086,7 +1118,7 @@ export function ClassesManager({
               role="tab"
               type="button"
             >
-              {label}
+              {tx(label)}
             </button>
           ))}
         </div>
@@ -1116,13 +1148,13 @@ export function ClassesManager({
                     }
                     type="button"
                   >
-                    <span aria-hidden="true">+</span>
-                    Create class type
+                    <span aria-hidden="true">+</span>{" "}
+                    {tx("Create class type")}{" "}
                   </button>
                 ) : null
               }
               description="Duration and capacity for new schedules."
-              title="Class types"
+              title={tx("Class types")}
               titleId="class-types-title"
             />
             <div className="grid gap-4 p-4 sm:p-5">
@@ -1131,7 +1163,8 @@ export function ClassesManager({
               ) : null}
               {types.pending && types.rows.length > 0 ? (
                 <p className="sr-only" role="status">
-                  Loading class types.
+                  {" "}
+                  {tx("Loading class types.")}{" "}
                 </p>
               ) : null}
               {!types.pending && types.error ? (
@@ -1145,15 +1178,17 @@ export function ClassesManager({
                 <EmptyState
                   body={
                     canManage
-                      ? "Create a class type to set the duration and capacity."
-                      : "Class types will appear here when they are added."
+                      ? tx(
+                          "Create a class type to set the duration and capacity.",
+                        )
+                      : tx("Class types will appear here when they are added.")
                   }
-                  title="No class types exist."
+                  title={tx("No class types exist.")}
                 />
               ) : null}
               {types.rows.length > 0 ? (
                 <ul
-                  aria-label="Class types"
+                  aria-label={tx("Class types")}
                   className="divide-y divide-slate-100"
                 >
                   {types.rows.map((row) => (
@@ -1173,12 +1208,12 @@ export function ClassesManager({
                                 : "bg-slate-200 text-slate-600"
                             }`}
                           >
-                            {row.is_active ? "Active" : "Archived"}
+                            {row.is_active ? tx("Active") : tx("Archived")}
                           </span>
                         </div>
                         <p className="mt-1 text-sm break-words text-slate-500">
-                          {row.code} · {row.default_duration_minutes} min ·{" "}
-                          {row.default_capacity} spots
+                          {row.code} · {row.default_duration_minutes}{" "}
+                          {tx("min ·")} {row.default_capacity} {tx("spots")}
                           {row.description ? ` · ${row.description}` : ""}
                         </p>
                       </div>
@@ -1194,7 +1229,8 @@ export function ClassesManager({
                           }
                           type="button"
                         >
-                          Edit class type
+                          {" "}
+                          {tx("Edit class type")}{" "}
                         </button>
                       ) : null}
                     </li>
@@ -1241,13 +1277,13 @@ export function ClassesManager({
                     }
                     type="button"
                   >
-                    <span aria-hidden="true">+</span>
-                    Create schedule
+                    <span aria-hidden="true">+</span>{" "}
+                    {tx("Create schedule")}{" "}
                   </button>
                 ) : null
               }
               description="Saving regenerates future occurrences that nobody has booked."
-              title="Weekly schedules"
+              title={tx("Weekly schedules")}
               titleId="schedules-title"
             />
             <div className="grid gap-4 p-4 sm:p-5">
@@ -1256,7 +1292,8 @@ export function ClassesManager({
               ) : null}
               {schedules.pending && schedules.rows.length > 0 ? (
                 <p className="sr-only" role="status">
-                  Loading schedules.
+                  {" "}
+                  {tx("Loading schedules.")}{" "}
                 </p>
               ) : null}
               {!schedules.pending && schedules.error ? (
@@ -1272,15 +1309,15 @@ export function ClassesManager({
                 <EmptyState
                   body={
                     canManage
-                      ? "Create a weekly schedule to generate occurrences."
-                      : "Schedules will appear here when they are added."
+                      ? tx("Create a weekly schedule to generate occurrences.")
+                      : tx("Schedules will appear here when they are added.")
                   }
-                  title="No schedules match."
+                  title={tx("No schedules match.")}
                 />
               ) : null}
               {schedules.rows.length > 0 ? (
                 <ul
-                  aria-label="Weekly schedules"
+                  aria-label={tx("Weekly schedules")}
                   className="divide-y divide-slate-100"
                 >
                   {schedules.rows.map((row) => (
@@ -1303,7 +1340,7 @@ export function ClassesManager({
                         <p className="mt-1 text-sm break-words text-slate-500">
                           {row.location}
                           {row.location_is_exclusive
-                            ? " · Exclusive"
+                            ? tx("· Exclusive")
                             : ""} ·{" "}
                           <NamedId
                             id={row.class_type_id}
@@ -1315,7 +1352,7 @@ export function ClassesManager({
                             name={trainerName(row.trainer_staff_profile_id)}
                           />
                           {" · "}
-                          {row.capacity} spots ·{" "}
+                          {row.capacity} {tx("spots ·")}{" "}
                           {formatLocalDate(row.effective_from)} –{" "}
                           {formatLocalDate(row.effective_until)}
                         </p>
@@ -1332,7 +1369,8 @@ export function ClassesManager({
                           }
                           type="button"
                         >
-                          Update schedule
+                          {" "}
+                          {tx("Update schedule")}{" "}
                         </button>
                       ) : null}
                     </li>
@@ -1386,7 +1424,8 @@ export function ClassesManager({
                   </Field>
                 </div>
                 <button className="button w-full sm:w-auto" type="submit">
-                  Show occurrences
+                  {" "}
+                  {tx("Show occurrences")}{" "}
                 </button>
                 {rangeChanged ? (
                   <button
@@ -1394,14 +1433,17 @@ export function ClassesManager({
                     onClick={resetRange}
                     type="button"
                   >
-                    Reset range
+                    {" "}
+                    {tx("Reset range")}{" "}
                   </button>
                 ) : null}
               </form>
               {rangeError ? <Alert message={rangeError} /> : null}
               <p className="text-sm text-slate-500">
-                Showing {formatLocalDate(dateFrom)} to {formatLocalDate(dateTo)}
-                . The range can cover at most 42 days.
+                {" "}
+                {tx("Showing")} {formatLocalDate(dateFrom)} {tx("to")}{" "}
+                {formatLocalDate(dateTo)}{" "}
+                {tx(". The range can cover at most 42 days.")}{" "}
               </p>
             </div>
             <div>
@@ -1416,7 +1458,8 @@ export function ClassesManager({
                     className="text-sm font-semibold text-slate-900"
                     id="occurrences-title"
                   >
-                    Occurrences
+                    {" "}
+                    {tx("Occurrences")}{" "}
                   </h3>
                 </div>
                 <div className="grid gap-4 px-4 py-4 sm:px-5">
@@ -1425,7 +1468,8 @@ export function ClassesManager({
                   ) : null}
                   {occurrences.pending && occurrences.rows.length > 0 ? (
                     <p className="sr-only" role="status">
-                      Loading occurrences.
+                      {" "}
+                      {tx("Loading occurrences.")}{" "}
                     </p>
                   ) : null}
                   {!occurrences.pending && occurrences.error ? (
@@ -1440,12 +1484,12 @@ export function ClassesManager({
                   occurrences.rows.length === 0 ? (
                     <EmptyState
                       body="Try another gym-local range, up to 42 days."
-                      title="No occurrences are in this range."
+                      title={tx("No occurrences are in this range.")}
                     />
                   ) : null}
                   {occurrences.rows.length > 0 ? (
                     <ul
-                      aria-label="Occurrences"
+                      aria-label={tx("Occurrences")}
                       className="divide-y divide-slate-100"
                     >
                       {occurrences.rows.map((row) => (
@@ -1467,7 +1511,7 @@ export function ClassesManager({
                             <p className="mt-1 text-sm break-words text-slate-500">
                               {row.location}
                               {row.location_is_exclusive
-                                ? " · Exclusive"
+                                ? tx("· Exclusive")
                                 : ""}{" "}
                               ·{" "}
                               <NamedId
@@ -1480,7 +1524,7 @@ export function ClassesManager({
                                 name={trainerName(row.trainer_staff_profile_id)}
                               />
                               {" · "}
-                              {row.capacity} spots
+                              {row.capacity} {tx("spots")}
                             </p>
                           </div>
                           {canManage && row.status === "SCHEDULED" ? (
@@ -1495,7 +1539,8 @@ export function ClassesManager({
                               }
                               type="button"
                             >
-                              Cancel occurrence
+                              {" "}
+                              {tx("Cancel occurrence")}{" "}
                             </button>
                           ) : null}
                         </li>
@@ -1524,11 +1569,15 @@ export function ClassesManager({
                       className="text-sm font-semibold text-slate-900"
                       id="class-bookings-title"
                     >
-                      Bookings
+                      {" "}
+                      {tx("Bookings")}{" "}
                     </h3>
                     {canLateCancel ? (
                       <p className="mt-1 text-sm text-slate-500">
-                        A manager can cancel inside the cutoff with a reason.
+                        {" "}
+                        {tx(
+                          "A manager can cancel inside the cutoff with a reason.",
+                        )}{" "}
                       </p>
                     ) : null}
                   </div>
@@ -1545,8 +1594,8 @@ export function ClassesManager({
                       }
                       type="button"
                     >
-                      <span aria-hidden="true">+</span>
-                      Book a class
+                      <span aria-hidden="true">+</span>{" "}
+                      {tx("Book a class")}{" "}
                     </button>
                   ) : null}
                 </div>
@@ -1563,7 +1612,8 @@ export function ClassesManager({
                       onClick={() => setBookingMember(null)}
                       type="button"
                     >
-                      Clear member filter
+                      {" "}
+                      {tx("Clear member filter")}{" "}
                     </button>
                   ) : null}
                 </div>
@@ -1573,7 +1623,8 @@ export function ClassesManager({
                   ) : null}
                   {bookings.pending && bookings.rows.length > 0 ? (
                     <p className="sr-only" role="status">
-                      Loading class bookings.
+                      {" "}
+                      {tx("Loading class bookings.")}{" "}
                     </p>
                   ) : null}
                   {pending && mode === null ? (
@@ -1581,7 +1632,8 @@ export function ClassesManager({
                       className="text-sm font-medium text-slate-600"
                       role="status"
                     >
-                      Updating the booking.
+                      {" "}
+                      {tx("Updating the booking.")}{" "}
                     </p>
                   ) : null}
                   {!bookings.pending && bookings.error ? (
@@ -1597,17 +1649,17 @@ export function ClassesManager({
                     <EmptyState
                       body={
                         bookingsFiltered
-                          ? "Try another range or clear the member filter."
+                          ? tx("Try another range or clear the member filter.")
                           : canCreateBooking
-                            ? "Book a class to add it to this range."
-                            : "Bookings in this range will appear here."
+                            ? tx("Book a class to add it to this range.")
+                            : tx("Bookings in this range will appear here.")
                       }
-                      title="No class bookings are in this range."
+                      title={tx("No class bookings are in this range.")}
                     />
                   ) : null}
                   {bookings.rows.length > 0 ? (
                     <ul
-                      aria-label="Class bookings"
+                      aria-label={tx("Class bookings")}
                       className="divide-y divide-slate-100"
                     >
                       {bookings.rows.map((row) => (
@@ -1623,10 +1675,12 @@ export function ClassesManager({
                               <StatusPill status={row.status} />
                             </div>
                             <p className="mt-1 text-sm break-words text-slate-500">
-                              Member <IdentifierValue value={row.member_id} />
+                              {" "}
+                              {tx("Member")}{" "}
+                              <IdentifierValue value={row.member_id} />
                               {" · "}
                               {row.unmetered ? (
-                                `Unmetered · ${row.unmetered_reason}`
+                                `${tx("Unmetered")} · ${tx(row.unmetered_reason)}`
                               ) : (
                                 <IdentifierValue
                                   value={
@@ -1639,7 +1693,7 @@ export function ClassesManager({
                           {row.status === "BOOKED" &&
                           (canAttend || canCancelBooking) ? (
                             <div
-                              aria-label="Booking actions"
+                              aria-label={tx("Booking actions")}
                               className="flex shrink-0 flex-col gap-2 sm:flex-row"
                               role="group"
                             >
@@ -1651,7 +1705,8 @@ export function ClassesManager({
                                     onClick={() => attend(row)}
                                     type="button"
                                   >
-                                    Mark attended
+                                    {" "}
+                                    {tx("Mark attended")}{" "}
                                   </button>
                                   <button
                                     className="button button-warn button-sm w-full sm:w-auto"
@@ -1659,7 +1714,8 @@ export function ClassesManager({
                                     onClick={() => markNoShow(row)}
                                     type="button"
                                   >
-                                    Mark no-show
+                                    {" "}
+                                    {tx("Mark no-show")}{" "}
                                   </button>
                                 </>
                               ) : null}
@@ -1675,7 +1731,8 @@ export function ClassesManager({
                                   }
                                   type="button"
                                 >
-                                  Cancel booking
+                                  {" "}
+                                  {tx("Cancel booking")}{" "}
                                 </button>
                               ) : null}
                             </div>
@@ -1711,7 +1768,7 @@ export function ClassesManager({
           pending={pending}
           submitClass="button-create"
           submitLabel="Create class type"
-          title="Create class type"
+          title={tx("Create class type")}
           titleId="create-class-type-title"
         >
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1747,7 +1804,7 @@ export function ClassesManager({
 
       {mode?.kind === "edit-type" && canManage ? (
         <ClassDialog
-          description={`Code ${mode.row.code} stays unchanged.`}
+          description={tx("Code {code} stays unchanged.", { code: mode.row.code })}
           descriptionId="edit-class-type-description"
           dialogId="edit-class-type-dialog"
           dialogRef={dialogRef}
@@ -1757,7 +1814,7 @@ export function ClassesManager({
           pending={pending}
           submitClass="button-edit"
           submitLabel="Save class type"
-          title="Edit class type"
+          title={tx("Edit class type")}
           titleId="edit-class-type-title"
         >
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1769,8 +1826,8 @@ export function ClassesManager({
                 defaultValue={mode.row.is_active ? "true" : "false"}
                 name="is_active"
               >
-                <option value="true">Active</option>
-                <option value="false">Archived</option>
+                <option value="true">{tx("Active")}</option>
+                <option value="false">{tx("Archived")}</option>
               </SelectInput>
             </Field>
             <div className="sm:col-span-2">
@@ -1815,7 +1872,7 @@ export function ClassesManager({
           pending={pending}
           submitClass="button-create"
           submitLabel="Create schedule"
-          title="Create schedule"
+          title={tx("Create schedule")}
           titleId="create-schedule-title"
         >
           <ScheduleFields
@@ -1843,7 +1900,7 @@ export function ClassesManager({
           pending={pending}
           submitClass="button-edit"
           submitLabel="Save schedule"
-          title="Update schedule"
+          title={tx("Update schedule")}
           titleId="edit-schedule-title"
         >
           <ScheduleFields
@@ -1871,7 +1928,7 @@ export function ClassesManager({
           pending={pending}
           submitClass="button-cancel"
           submitLabel="Confirm occurrence cancellation"
-          title="Cancel occurrence"
+          title={tx("Cancel occurrence")}
           titleId="cancel-occurrence-title"
           widthClass="sm:max-w-lg"
         >
@@ -1887,8 +1944,12 @@ export function ClassesManager({
         <ClassDialog
           description={
             canLateCancel
-              ? "Enter a reason. A cancellation inside the cutoff is rejected without one."
-              : "The reason is optional. Only the text entered here is sent."
+              ? tx(
+                  "Enter a reason. A cancellation inside the cutoff is rejected without one.",
+                )
+              : tx(
+                  "The reason is optional. Only the text entered here is sent.",
+                )
           }
           descriptionId="cancel-class-booking-description"
           dialogId="cancel-class-booking-dialog"
@@ -1899,7 +1960,7 @@ export function ClassesManager({
           pending={pending}
           submitClass="button-cancel"
           submitLabel="Confirm class booking cancellation"
-          title="Cancel class booking"
+          title={tx("Cancel class booking")}
           titleId="cancel-class-booking-title"
           widthClass="sm:max-w-lg"
         >
@@ -1907,7 +1968,8 @@ export function ClassesManager({
             <time dateTime={mode.row.starts_at}>{bookingClock(mode.row)}</time>
           </p>
           <p className="text-sm text-slate-600">
-            Member <IdentifierValue value={mode.row.member_id} />
+            {" "}
+            {tx("Member")} <IdentifierValue value={mode.row.member_id} />
           </p>
           <ReasonField
             label="Class booking cancellation reason"
@@ -1928,30 +1990,36 @@ export function ClassesManager({
           pending={pending}
           submitClass="button-edit"
           submitLabel="Save class booking"
-          title="Book a class"
+          title={tx("Book a class")}
           titleId="book-class-title"
         >
           <div className="grid gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-800">Occurrence</h3>
+              <h3 className="text-sm font-bold text-slate-800">
+                {tx("Occurrence")}
+              </h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Only scheduled occurrences in the current range are listed.
+                {" "}
+                {tx(
+                  "Only scheduled occurrences in the current range are listed.",
+                )}{" "}
               </p>
             </div>
             {scheduled.length === 0 ? (
               <p className="text-sm text-slate-500">
-                No scheduled occurrences are in this range.
+                {" "}
+                {tx("No scheduled occurrences are in this range.")}{" "}
               </p>
             ) : null}
             <Field label="Occurrence">
               <SelectInput name="class_occurrence_id" required>
-                <option value="">Select an occurrence</option>
+                <option value="">{tx("Select an occurrence")}</option>
                 {scheduled.map((row) => (
                   <option key={row.id} title={row.class_type_id} value={row.id}>
                     {row.local_date} · {occurrenceClock(row)} · {row.location} ·{" "}
                     {typeName(row.class_type_id) ??
                       compactIdentifier(row.class_type_id)}{" "}
-                    · capacity {row.capacity}
+                    {tx("· capacity")} {row.capacity}
                   </option>
                 ))}
               </SelectInput>
@@ -1959,9 +2027,12 @@ export function ClassesManager({
           </div>
           <div className="grid gap-3 border-t border-slate-100 pt-5">
             <div>
-              <h3 className="text-sm font-bold text-slate-800">Member</h3>
+              <h3 className="text-sm font-bold text-slate-800">
+                {tx("Member")}
+              </h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Search active members, then choose one.
+                {" "}
+                {tx("Search active members, then choose one.")}{" "}
               </p>
             </div>
             <MemberSearch
@@ -1972,11 +2043,15 @@ export function ClassesManager({
           </div>
           <div className="grid gap-3 border-t border-slate-100 pt-5">
             <div>
-              <h3 className="text-sm font-bold text-slate-800">Package</h3>
+              <h3 className="text-sm font-bold text-slate-800">
+                {tx("Package")}
+              </h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 {canUnmetered
-                  ? "Use an active class package, or record an unmetered manager reason."
-                  : "The booking uses one session from this class package."}
+                  ? tx(
+                      "Use an active class package, or record an unmetered manager reason.",
+                    )
+                  : tx("The booking uses one session from this class package.")}
               </p>
             </div>
             {canUnmetered ? (
@@ -1988,8 +2063,8 @@ export function ClassesManager({
                     setDialogError("");
                   }}
                   type="checkbox"
-                />
-                Unmetered manager booking
+                />{" "}
+                {tx("Unmetered manager booking")}{" "}
               </label>
             ) : null}
             {canUnmetered && unmetered ? (
@@ -1998,7 +2073,8 @@ export function ClassesManager({
               <>
                 {packagesPending ? (
                   <p className="text-sm text-slate-500" role="status">
-                    Loading packages.
+                    {" "}
+                    {tx("Loading packages.")}{" "}
                   </p>
                 ) : null}
                 <Alert message={packageNotice} />
@@ -2007,7 +2083,10 @@ export function ClassesManager({
                 !packageNotice &&
                 packages.length === 0 ? (
                   <p className="text-sm text-slate-500">
-                    No active class packages are available for this member.
+                    {" "}
+                    {tx(
+                      "No active class packages are available for this member.",
+                    )}{" "}
                   </p>
                 ) : null}
                 <Field label="Class package">
@@ -2016,11 +2095,11 @@ export function ClassesManager({
                     name="member_service_package_id"
                     required
                   >
-                    <option value="">Select a package</option>
+                    <option value="">{tx("Select a package")}</option>
                     {packages.map((row) => (
                       <option key={row.id} value={row.id}>
                         {row.package_code} · {row.package_name} ·{" "}
-                        {row.remaining_sessions} left · {row.status}
+                        {row.remaining_sessions} {tx("left ·")} {tx(row.status)}
                       </option>
                     ))}
                   </SelectInput>

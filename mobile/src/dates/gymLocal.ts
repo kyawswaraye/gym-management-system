@@ -1,3 +1,5 @@
+import { tx } from "../i18n/translate";
+
 export type CalendarDate = {
   year: number;
   month: number;
@@ -69,7 +71,7 @@ export function formatGymDate(value: string): string {
   if (!month) {
     return value;
   }
-  return `${Number(match[3])} ${month} ${match[1]}`;
+  return `${Number(match[3])} ${tx(month)} ${match[1]}`;
 }
 
 export function formatGymDateTime(value: string): string {
@@ -88,9 +90,9 @@ export function formatServerMoney(
   currency: string,
 ): string {
   if (amount === null) {
-    return "Unavailable";
+    return tx("Unavailable");
   }
-  return `${currency} ${amount}`;
+  return `${tx(currency)} ${amount}`;
 }
 
 export function formatRemainingSessions(remainingSessions: number): string {

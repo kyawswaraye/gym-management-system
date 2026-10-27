@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -33,6 +34,7 @@ const SESSION_FIELDS: { key: keyof TrainerSessionCounts; label: string }[] = [
 ];
 
 export function TrainerDashboardManager() {
+  const tx = useTx();
   const [preset, setPreset] = useState<DashboardRangePreset>("today");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -118,7 +120,7 @@ export function TrainerDashboardManager() {
   return (
     <div className="grid gap-6">
       <div
-        aria-label="Dashboard range"
+        aria-label={tx("Dashboard range")}
         className="flex flex-wrap gap-2"
         role="group"
       >
@@ -134,12 +136,12 @@ export function TrainerDashboardManager() {
             onClick={() => selectPreset(item.value)}
             type="button"
           >
-            {item.label}
+            {tx(item.label)}
           </button>
         ))}
       </div>
       <form
-        aria-label="Custom dashboard range"
+        aria-label={tx("Custom dashboard range")}
         className="flex flex-wrap items-end gap-3"
         onSubmit={(event) => {
           event.preventDefault();
@@ -147,7 +149,8 @@ export function TrainerDashboardManager() {
         }}
       >
         <label className="grid gap-1 text-sm">
-          From
+          {" "}
+          {tx("From")}{" "}
           <input
             className="rounded-md border px-3 py-2"
             onChange={(event) => setCustomFrom(event.target.value)}
@@ -156,7 +159,8 @@ export function TrainerDashboardManager() {
           />
         </label>
         <label className="grid gap-1 text-sm">
-          To
+          {" "}
+          {tx("To")}{" "}
           <input
             className="rounded-md border px-3 py-2"
             onChange={(event) => setCustomTo(event.target.value)}
@@ -169,28 +173,31 @@ export function TrainerDashboardManager() {
           disabled={!customFrom || !customTo}
           type="submit"
         >
-          Apply custom range
+          {" "}
+          {tx("Apply custom range")}{" "}
         </button>
       </form>
       {error ? (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       ) : null}
       {!dashboard && !error ? (
         <p className="muted" role="status">
-          Loading trainer dashboard…
+          {" "}
+          {tx("Loading trainer dashboard…")}{" "}
         </p>
       ) : null}
       {dashboard ? (
         <>
           <p className="muted text-sm">
-            {dashboard.today}. {dashboard.range.date_from} to{" "}
-            {dashboard.range.date_to}. {dashboard.timezone}. Generated{" "}
-            {dashboard.generated_at}.
+            {dashboard.today}. {dashboard.range.date_from} {tx("to")}{" "}
+            {dashboard.range.date_to}. {dashboard.timezone}
+            {tx(". Generated")} {dashboard.generated_at}.
           </p>
           <p className="text-sm">
-            Trainer profile{" "}
+            {" "}
+            {tx("Trainer profile")}{" "}
             <span className="font-mono">
               <IdentifierValue value={dashboard.trainer_staff_profile_id} />
             </span>
@@ -200,7 +207,8 @@ export function TrainerDashboardManager() {
             className="grid gap-4"
           >
             <h2 className="text-lg font-bold" id="trainer-summary-title">
-              Session summary
+              {" "}
+              {tx("Session summary")}{" "}
             </h2>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <Metric
@@ -221,29 +229,37 @@ export function TrainerDashboardManager() {
             className="grid gap-4"
           >
             <h2 className="text-lg font-bold" id="upcoming-sessions-title">
-              Upcoming sessions
+              {" "}
+              {tx("Upcoming sessions")}{" "}
             </h2>
             {dashboard.upcoming_bookings.length === 0 ? (
               <p className="muted" role="status">
-                No upcoming sessions.
+                {" "}
+                {tx("No upcoming sessions.")}{" "}
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
-                  <caption className="sr-only">Upcoming sessions</caption>
+                  <caption className="sr-only">
+                    {tx("Upcoming sessions")}
+                  </caption>
                   <thead>
                     <tr>
                       <th className="px-2 py-1" scope="col">
-                        Member
+                        {" "}
+                        {tx("Member")}{" "}
                       </th>
                       <th className="px-2 py-1" scope="col">
-                        Member number
+                        {" "}
+                        {tx("Member number")}{" "}
                       </th>
                       <th className="px-2 py-1" scope="col">
-                        Starts
+                        {" "}
+                        {tx("Starts")}{" "}
                       </th>
                       <th className="px-2 py-1" scope="col">
-                        Ends
+                        {" "}
+                        {tx("Ends")}{" "}
                       </th>
                     </tr>
                   </thead>
@@ -278,10 +294,11 @@ export function TrainerDashboardManager() {
         className="grid gap-4"
       >
         <h2 className="text-lg font-bold" id="trainer-session-report-title">
-          Session report
+          {" "}
+          {tx("Session report")}{" "}
         </h2>
         <form
-          aria-label="Session report range"
+          aria-label={tx("Session report range")}
           className="flex flex-wrap items-end gap-3"
           onSubmit={(event) => {
             event.preventDefault();
@@ -289,7 +306,8 @@ export function TrainerDashboardManager() {
           }}
         >
           <label className="grid gap-1 text-sm">
-            From date
+            {" "}
+            {tx("From date")}{" "}
             <input
               className="rounded-md border px-3 py-2"
               onChange={(event) => setReportFrom(event.target.value)}
@@ -299,7 +317,8 @@ export function TrainerDashboardManager() {
             />
           </label>
           <label className="grid gap-1 text-sm">
-            To date
+            {" "}
+            {tx("To date")}{" "}
             <input
               className="rounded-md border px-3 py-2"
               onChange={(event) => setReportTo(event.target.value)}
@@ -313,7 +332,8 @@ export function TrainerDashboardManager() {
             disabled={!reportFrom || !reportTo || reportLoading}
             type="submit"
           >
-            Show session report
+            {" "}
+            {tx("Show session report")}{" "}
           </button>
         </form>
         {reportError ? (
@@ -323,12 +343,14 @@ export function TrainerDashboardManager() {
         ) : null}
         {reportLoading ? (
           <p className="muted" role="status">
-            Loading session report…
+            {" "}
+            {tx("Loading session report…")}{" "}
           </p>
         ) : null}
         {!reportLoading && !reportError && !report ? (
           <p className="muted" role="status">
-            Choose a date range to load your sessions.
+            {" "}
+            {tx("Choose a date range to load your sessions.")}{" "}
           </p>
         ) : null}
         {report && !reportLoading ? (
@@ -340,35 +362,38 @@ export function TrainerDashboardManager() {
 }
 
 function SessionReportView({ report }: { report: TrainerSessionReport }) {
+  const tx = useTx();
   return (
     <div className="grid gap-4">
       <p>{report.gym.name}</p>
       <p>{report.gym.code}</p>
       <p>
-        {report.range.date_from} to {report.range.date_to}
+        {report.range.date_from} {tx("to")} {report.range.date_to}
       </p>
       <p>{report.timezone}</p>
       <p>{report.generated_at}</p>
       <p>
-        <span className="sr-only">Source status </span>
+        <span className="sr-only">{tx("Source status")} </span>
         {report.source_status_policy}
       </p>
       {report.rows.length === 0 ? (
         <p className="muted" role="status">
-          No session days in this range.
+          {" "}
+          {tx("No session days in this range.")}{" "}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <caption className="sr-only">Session report rows</caption>
+            <caption className="sr-only">{tx("Session report rows")}</caption>
             <thead>
               <tr>
                 <th className="px-2 py-1" scope="col">
-                  Date
+                  {" "}
+                  {tx("Date")}{" "}
                 </th>
                 {SESSION_FIELDS.map((field) => (
                   <th className="px-2 py-1" key={field.key} scope="col">
-                    {field.label}
+                    {tx(field.label)}
                   </th>
                 ))}
               </tr>
@@ -392,12 +417,13 @@ function SessionReportView({ report }: { report: TrainerSessionReport }) {
       )}
       <section aria-labelledby="trainer-session-totals">
         <h3 className="text-lg font-semibold" id="trainer-session-totals">
-          Totals
+          {" "}
+          {tx("Totals")}{" "}
         </h3>
         <dl className="mt-3 grid gap-2">
           {SESSION_FIELDS.map((field) => (
             <div key={field.key}>
-              <dt>{field.label}</dt>
+              <dt>{tx(field.label)}</dt>
               <dd>{report.totals[field.key]}</dd>
             </div>
           ))}
@@ -408,9 +434,10 @@ function SessionReportView({ report }: { report: TrainerSessionReport }) {
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
+  const tx = useTx();
   return (
     <article className="card p-5">
-      <p className="muted text-sm">{label}</p>
+      <p className="muted text-sm">{tx(label)}</p>
       <p className="mt-2 text-2xl font-bold">{value}</p>
     </article>
   );

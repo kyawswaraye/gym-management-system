@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
@@ -32,7 +33,7 @@ function activeFolder(
 
 function folderClass(open: boolean, current: boolean): string {
   const shared =
-    "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0866ff]";
+    "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left text-sm/8 transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0866ff]";
   if (current) {
     return `${shared} border-transparent bg-[#e7f3ff] font-semibold text-[#0866ff]`;
   }
@@ -46,7 +47,7 @@ function Chevron({ open }: { open: boolean }) {
   return (
     <svg
       aria-hidden="true"
-      className={`h-4 w-4 shrink-0 text-[#65676b] transition-transform duration-150 ${open ? "rotate-90" : ""}`}
+      className={`h-4 w-4 shrink-0 text-slate-500 transition-transform duration-150 ${open ? "rotate-90" : ""}`}
       viewBox="0 0 20 20"
       fill="none"
     >
@@ -62,6 +63,7 @@ function Chevron({ open }: { open: boolean }) {
 }
 
 export function SidebarNav({ entries }: { entries: readonly NavEntry[] }) {
+  const tx = useTx();
   const pathname = usePathname() ?? "";
   const currentFolder = activeFolder(entries, pathname);
   const [open, setOpen] = useState<string | null>(currentFolder);
@@ -73,12 +75,12 @@ export function SidebarNav({ entries }: { entries: readonly NavEntry[] }) {
   const hrefs = navigationHrefs(entries);
 
   return (
-    <nav aria-label="Primary" className="mt-4 grid gap-1">
+    <nav aria-label={tx("Primary")} className="mt-4 grid gap-1">
       {entries.map((entry) => {
         if (entry.kind === "link") {
           return (
-            <NavLink href={entry.href} key={entry.href} peers={hrefs}>
-              {entry.label}
+            <NavLink href={entry.href} key={entry.href} parent peers={hrefs}>
+              {tx(entry.label)}
             </NavLink>
           );
         }
@@ -99,7 +101,7 @@ export function SidebarNav({ entries }: { entries: readonly NavEntry[] }) {
                 )
               }
             >
-              <span className="truncate">{entry.label}</span>
+              <span className="truncate leading-8">{tx(entry.label)}</span>
               <Chevron open={expanded} />
             </button>
             {expanded ? (
@@ -107,11 +109,11 @@ export function SidebarNav({ entries }: { entries: readonly NavEntry[] }) {
                 className="grid gap-1 pl-3"
                 id={folderId(entry.label)}
                 role="group"
-                aria-label={entry.label}
+                aria-label={tx(entry.label)}
               >
                 {entry.links.map((link) => (
                   <NavLink href={link.href} key={link.href} peers={hrefs}>
-                    {link.label}
+                    {tx(link.label)}
                   </NavLink>
                 ))}
               </div>

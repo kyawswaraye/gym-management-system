@@ -32,6 +32,7 @@ RUN apt-get update \
     && useradd --uid 10001 --home-dir /tmp --no-create-home --shell /usr/sbin/nologin web
 COPY --from=build --chown=web:web /app/.next/standalone ./
 COPY --from=build --chown=web:web /app/.next/static ./.next/static
+COPY --from=build --chown=web:web /app/public ./public
 ENV HOME=/tmp
 USER web
 

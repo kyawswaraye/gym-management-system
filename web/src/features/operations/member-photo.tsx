@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useRef, useState } from "react";
 
@@ -54,6 +55,7 @@ export function MemberPhoto({
   onAttach: (fileId: string) => Promise<void>;
   onRemove: () => Promise<void>;
 }) {
+  const tx = useTx();
   const viewKey = canView && assetId ? `${memberId}:${assetId}` : "";
   const [seenMemberId, setSeenMemberId] = useState(memberId);
   const [seenViewKey, setSeenViewKey] = useState(viewKey);
@@ -104,12 +106,14 @@ export function MemberPhoto({
         if (request !== photoRequest.current) return;
         setPhotoUrl(null);
         setPhotoLoading(false);
-        setPhotoError(errorText(caught, "Unable to load the profile photo."));
+        setPhotoError(
+          errorText(caught, tx("Unable to load the profile photo.")),
+        );
       });
     return () => {
       photoRequest.current += 1;
     };
-  }, [assetId, canView, memberId]);
+  }, [assetId, canView, memberId, tx]);
 
   if (!canUpload && !canView && !canDelete) return null;
 
@@ -143,7 +147,9 @@ export function MemberPhoto({
       setCleanupWarning("");
       setRecovery({ fileId, canAttach: true });
       setStatus("");
-      setPhotoError(errorText(caught, "Unable to attach the profile photo."));
+      setPhotoError(
+        errorText(caught, tx("Unable to attach the profile photo.")),
+      );
     }
   }
 
@@ -166,7 +172,9 @@ export function MemberPhoto({
       const pending = recoveryFrom(caught);
       setRecovery(pending);
       setStatus("");
-      setPhotoError(errorText(caught, "Unable to upload the profile photo."));
+      setPhotoError(
+        errorText(caught, tx("Unable to upload the profile photo.")),
+      );
     } finally {
       if (request === actionGeneration.current) {
         actionLock.current = false;
@@ -212,7 +220,7 @@ export function MemberPhoto({
       if (request !== actionGeneration.current) return;
       setStatus("");
       setPhotoError(
-        errorText(caught, "Unable to delete the unattached profile photo."),
+        errorText(caught, tx("Unable to delete the unattached profile photo.")),
       );
     } finally {
       if (request === actionGeneration.current) {
@@ -239,7 +247,9 @@ export function MemberPhoto({
     } catch (caught) {
       if (request !== actionGeneration.current) return;
       setStatus("");
-      setPhotoError(errorText(caught, "Unable to remove the profile photo."));
+      setPhotoError(
+        errorText(caught, tx("Unable to remove the profile photo.")),
+      );
     } finally {
       if (request === actionGeneration.current) {
         actionLock.current = false;
@@ -258,22 +268,26 @@ export function MemberPhoto({
       aria-busy={busy || photoLoading}
       aria-labelledby="profile-photo-title"
     >
-      <h2 className="font-bold" id="profile-photo-title">
-        Profile photo
+      <h2
+        className="text-sm font-semibold text-slate-500"
+        id="profile-photo-title"
+      >
+        {tx("Profile photo")}
       </h2>
       {photoLoading ? (
         <p className="muted" role="status">
-          Loading profile photo.
+          {" "}
+          {tx("Loading profile photo.")}{" "}
         </p>
       ) : null}
       {status ? (
         <p className="muted" role="status">
-          {status}
+          {tx(status)}
         </p>
       ) : null}
       {cleanupWarning ? (
         <p className="muted" role="status">
-          {cleanupWarning}
+          {tx(cleanupWarning)}
         </p>
       ) : null}
       {photoError ? (
@@ -283,8 +297,10 @@ export function MemberPhoto({
       ) : null}
       {canView && photoUrl ? (
         <img
-          alt={`Profile photo of ${safeMemberName(memberName)}`}
-          className="mt-3 h-32 w-32 rounded object-cover"
+          alt={tx("Profile photo of {name}", {
+            name: safeMemberName(memberName),
+          })}
+          className="mx-auto mt-3 h-36 w-36 rounded-full object-cover ring-4 ring-slate-100"
           onError={() => {
             setPhotoUrl(null);
             setPhotoError("Unable to display the profile photo.");
@@ -293,7 +309,11 @@ export function MemberPhoto({
         />
       ) : null}
       {canView && !assetId && !photoLoading ? (
-        <p className="muted mt-3">No profile photo.</p>
+        <div className="mx-auto mt-3 grid h-36 w-36 place-items-center rounded-full bg-slate-100 px-4 text-center">
+          <p className="text-xs leading-5 text-slate-500">
+            {tx("No profile photo.")}
+          </p>
+        </div>
       ) : null}
       {photoError && canView && assetId && !photoUrl && !photoLoading ? (
         <button
@@ -314,13 +334,14 @@ export function MemberPhoto({
                 if (request !== photoRequest.current) return;
                 setPhotoLoading(false);
                 setPhotoError(
-                  errorText(caught, "Unable to load the profile photo."),
+                  errorText(caught, tx("Unable to load the profile photo.")),
                 );
               });
           }}
           type="button"
         >
-          Retry loading profile photo
+          {" "}
+          {tx("Retry loading profile photo")}{" "}
         </button>
       ) : null}
       <div className="mt-3 grid gap-3">
@@ -348,7 +369,8 @@ export function MemberPhoto({
               />
             </label>
             <span className="muted" id="profile-photo-hint">
-              JPEG, PNG, or WebP up to 5 MB.
+              {" "}
+              {tx("JPEG, PNG, or WebP up to 5 MB.")}{" "}
             </span>
           </div>
         ) : null}
@@ -359,15 +381,18 @@ export function MemberPhoto({
             onClick={() => void removeCurrent()}
             type="button"
           >
-            Remove profile photo
+            {" "}
+            {tx("Remove profile photo")}{" "}
           </button>
         ) : null}
         {recovery ? (
           <div className="grid gap-3">
             <p>
               {recovery.canAttach
-                ? "The profile photo was uploaded and still needs to be attached."
-                : "The profile photo upload did not finish."}
+                ? tx(
+                    "The profile photo was uploaded and still needs to be attached.",
+                  )
+                : tx("The profile photo upload did not finish.")}
             </p>
             {recovery.canAttach ? (
               <button
@@ -376,7 +401,8 @@ export function MemberPhoto({
                 onClick={() => void retryAttach()}
                 type="button"
               >
-                Retry attaching profile photo
+                {" "}
+                {tx("Retry attaching profile photo")}{" "}
               </button>
             ) : null}
             {canDelete ? (
@@ -386,12 +412,15 @@ export function MemberPhoto({
                 onClick={() => void deleteRecoverable()}
                 type="button"
               >
-                Delete unattached profile photo
+                {" "}
+                {tx("Delete unattached profile photo")}{" "}
               </button>
             ) : (
               <p className="muted">
-                You do not have permission to delete this unfinished photo.
-                Another upload stays paused.
+                {" "}
+                {tx(
+                  "You do not have permission to delete this unfinished photo. Another upload stays paused.",
+                )}{" "}
               </p>
             )}
           </div>

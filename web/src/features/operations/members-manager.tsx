@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { Fragment, type FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -139,6 +140,7 @@ export function MembersManager({
   canRestore?: boolean;
   defaultDate: string;
 }) {
+  const tx = useTx();
   const [members, setMembers] = useState<Member[]>([]);
   const [nextAfter, setNextAfter] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -214,7 +216,7 @@ export function MembersManager({
       setMembers([]);
       setNextAfter(null);
       setHasMore(false);
-      setError(errorText(caught, "Unable to load members."));
+      setError(errorText(caught, tx("Unable to load members.")));
       setErrorScope("list");
     } finally {
       if (version === requestVersion.current) setLoading(false);
@@ -244,7 +246,7 @@ export function MembersManager({
           setMembers([]);
           setNextAfter(null);
           setHasMore(false);
-          setError(errorText(caught, "Unable to load members."));
+          setError(errorText(caught, tx("Unable to load members.")));
           setErrorScope("list");
         } finally {
           if (version === requestVersion.current) setLoading(false);
@@ -255,7 +257,7 @@ export function MembersManager({
       window.clearTimeout(timer);
       requestVersion.current += 1;
     };
-  }, [joinedFrom, joinedTo, ptClient, search, status]);
+  }, [joinedFrom, joinedTo, ptClient, search, status, tx]);
 
   useEffect(() => {
     if (!showCreate) return;
@@ -317,7 +319,7 @@ export function MembersManager({
     } catch (caught) {
       appliedCursors.current.delete(cursor);
       if (version === requestVersion.current) {
-        setError(errorText(caught, "Unable to load members."));
+        setError(errorText(caught, tx("Unable to load members.")));
         setErrorScope("page");
       }
     } finally {
@@ -368,10 +370,10 @@ export function MembersManager({
           ? current.map((row) => (row.id === archived.id ? archived : row))
           : current.filter((row) => row.id !== target.id),
       );
-      setNotice(`${memberDisplayName(target)} archived.`);
+      setNotice(tx("{name} archived.", { name: memberDisplayName(target) }));
     } catch (caught) {
       if (version !== requestVersion.current) return;
-      setError(errorText(caught, "Unable to archive member."));
+      setError(errorText(caught, tx("Unable to archive member.")));
       setErrorScope("action");
     } finally {
       archiveLock.current = false;
@@ -408,10 +410,14 @@ export function MembersManager({
           ? current.map((row) => (row.id === restored.id ? restored : row))
           : current.filter((row) => row.id !== target.id),
       );
-      setNotice(`${memberDisplayName(target)} restored to Active.`);
+      setNotice(
+        tx("{name} restored to Active.", {
+          name: memberDisplayName(target),
+        }),
+      );
     } catch (caught) {
       if (version !== requestVersion.current) return;
-      setError(errorText(caught, "Unable to restore member."));
+      setError(errorText(caught, tx("Unable to restore member.")));
       setErrorScope("action");
     } finally {
       restoreLock.current = false;
@@ -432,7 +438,7 @@ export function MembersManager({
     if (submitLock.current) return;
     const payload = memberCreatePayload({ ...draft, member_number: "" });
     if (!payload.first_name || !payload.last_name || !payload.join_date) {
-      setError("Enter a first name, last name, and join date.");
+      setError(tx("Enter a first name, last name, and join date."));
       setErrorScope(null);
       return;
     }
@@ -444,7 +450,7 @@ export function MembersManager({
       setShowCreate(false);
       await loadFirst();
     } catch (caught) {
-      setError(errorText(caught, "Unable to create member."));
+      setError(errorText(caught, tx("Unable to create member.")));
       setErrorScope(null);
     } finally {
       submitLock.current = false;
@@ -466,16 +472,18 @@ export function MembersManager({
           <p className="text-sm font-semibold text-slate-700">
             {loading
               ? showingArchived
-                ? "Loading archived members…"
-                : "Loading directory…"
+                ? tx("Loading archived members…")
+                : tx("Loading directory…")
               : showingArchived
-                ? `${members.length} archived members shown`
-                : `${members.length} members shown`}
+                ? tx("{count} archived members shown", {
+                    count: members.length,
+                  })
+                : tx("{count} members shown", { count: members.length })}
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
             {showingArchived
-              ? "Open a member for the full profile."
-              : "Select a member to view their full profile."}
+              ? tx("Open a member for the full profile.")
+              : tx("Select a member to view their full profile.")}
           </p>
         </div>
         {canCreate && (
@@ -485,7 +493,8 @@ export function MembersManager({
             onClick={openCreate}
             type="button"
           >
-            Add member
+            {" "}
+            {tx("Add member")}{" "}
           </button>
         )}
       </div>
@@ -518,13 +527,17 @@ export function MembersManager({
                 className="text-xl font-bold text-slate-900"
                 id="add-member-title"
               >
-                Add member
+                {" "}
+                {tx("Add member")}{" "}
               </h2>
               <p
                 className="mt-1 text-sm text-slate-500"
                 id="add-member-description"
               >
-                Enter the member&apos;s personal and contact information.
+                {" "}
+                {tx(
+                  "Enter the member's personal and contact information.",
+                )}{" "}
               </p>
             </div>
             <div className="grid gap-4 px-5 py-4 sm:grid-cols-2 sm:px-6 [&>fieldset]:sm:col-span-2 [&>label:last-child]:sm:col-span-2">
@@ -542,7 +555,7 @@ export function MembersManager({
                   className="mb-3 text-sm font-medium text-red-800"
                   role="alert"
                 >
-                  {error}
+                  {tx(error)}
                 </p>
               ) : null}
               <div className="flex flex-wrap justify-end gap-2">
@@ -552,14 +565,15 @@ export function MembersManager({
                   onClick={closeCreate}
                   type="button"
                 >
-                  Cancel
+                  {" "}
+                  {tx("Cancel")}{" "}
                 </button>
                 <button
                   className="button button-edit"
                   disabled={pending}
                   type="submit"
                 >
-                  {pending ? "Saving…" : "Save member"}
+                  {pending ? tx("Saving…") : tx("Save member")}
                 </button>
               </div>
             </div>
@@ -572,17 +586,24 @@ export function MembersManager({
       >
         <div className="border-b border-slate-200 px-4 py-4 sm:px-5">
           <h2 className="text-sm font-bold tracking-wide text-slate-700 uppercase">
-            Directory view
+            {" "}
+            {tx("Directory view")}{" "}
           </h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
             {showingArchived
               ? canRestore
-                ? "These members are archived. Open a name for the full profile, or restore them to Active. Membership and payment history stay in place, and the record is not deleted."
-                : "These members are archived. Open a name for the full profile."
-              : "Choose who appears in this table. Archived members are listed in their own view."}
+                ? tx(
+                    "These members are archived. Open a name for the full profile, or restore them to Active. Membership and payment history stay in place, and the record is not deleted.",
+                  )
+                : tx(
+                    "These members are archived. Open a name for the full profile.",
+                  )
+              : tx(
+                  "Choose who appears in this table. Archived members are listed in their own view.",
+                )}
           </p>
           <div
-            aria-label="Member status"
+            aria-label={tx("Member status")}
             className="mt-3 flex flex-wrap items-center gap-2"
             role="radiogroup"
           >
@@ -604,7 +625,7 @@ export function MembersManager({
                   role="radio"
                   type="button"
                 >
-                  {view.label}
+                  {tx(view.label)}
                 </button>
               </Fragment>
             ))}
@@ -613,7 +634,8 @@ export function MembersManager({
         <div className="border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-sm font-bold tracking-wide text-slate-700 uppercase">
-              Search and filters
+              {" "}
+              {tx("Search and filters")}{" "}
             </h2>
             {(search || status || joinedFrom || joinedTo || ptClient) && (
               <button
@@ -628,24 +650,25 @@ export function MembersManager({
                 }}
                 type="button"
               >
-                Clear filters
+                {" "}
+                {tx("Clear filters")}{" "}
               </button>
             )}
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_repeat(3,auto)]">
             <input
-              aria-label="Search members"
+              aria-label={tx("Search members")}
               className="input w-full"
               maxLength={100}
               onChange={(event) => {
                 setSearch(event.target.value);
                 resetPage();
               }}
-              placeholder="Search name, number, phone, email"
+              placeholder={tx("Search name, number, phone, email")}
               value={search}
             />
             <select
-              aria-label="Filter by PT client"
+              aria-label={tx("Filter by PT client")}
               className="input xl:w-44"
               onChange={(event) => {
                 setPtClient(event.target.value === "true" ? "true" : "");
@@ -653,11 +676,11 @@ export function MembersManager({
               }}
               value={ptClient}
             >
-              <option value="">All members</option>
-              <option value="true">Active PT clients</option>
+              <option value="">{tx("All members")}</option>
+              <option value="true">{tx("Active PT clients")}</option>
             </select>
             <input
-              aria-label="Joined from"
+              aria-label={tx("Joined from")}
               className="input xl:w-40"
               max={joinedTo || undefined}
               onChange={(event) => {
@@ -670,7 +693,7 @@ export function MembersManager({
               value={joinedFrom}
             />
             <input
-              aria-label="Joined to"
+              aria-label={tx("Joined to")}
               className="input xl:w-40"
               min={joinedFrom || undefined}
               onChange={(event) => {
@@ -684,7 +707,7 @@ export function MembersManager({
         </div>
         {loading ? (
           <div className="grid gap-3 p-5" role="status">
-            <span className="sr-only">Loading members.</span>
+            <span className="sr-only">{tx("Loading members.")}</span>
             {[0, 1, 2].map((item) => (
               <div
                 className="h-16 animate-pulse rounded-xl bg-slate-100"
@@ -696,11 +719,13 @@ export function MembersManager({
         {error && errorScope ? (
           <div className="m-4 grid gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
             <p className="text-sm font-medium text-red-800" role="alert">
-              {error}
+              {tx(error)}
             </p>
             {errorScope === "list" || errorScope === "page" ? (
               <button className="button w-fit" onClick={retry} type="button">
-                {errorScope === "page" ? "Retry loading members" : "Retry"}
+                {errorScope === "page"
+                  ? tx("Retry loading members")
+                  : tx("Retry")}
               </button>
             ) : null}
           </div>
@@ -710,7 +735,7 @@ export function MembersManager({
             className="m-4 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-900"
             role="status"
           >
-            {notice}
+            {tx(notice)}
           </p>
         ) : null}
         <div className="overflow-x-auto">
@@ -718,20 +743,25 @@ export function MembersManager({
             <thead>
               <tr>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                  Member
+                  {" "}
+                  {tx("Member")}{" "}
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                  Phone
+                  {" "}
+                  {tx("Phone")}{" "}
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                  Joined
+                  {" "}
+                  {tx("Joined")}{" "}
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                  Status
+                  {" "}
+                  {tx("Status")}{" "}
                 </th>
                 {showActions ? (
                   <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                    Action
+                    {" "}
+                    {tx("Action")}{" "}
                   </th>
                 ) : null}
               </tr>
@@ -767,7 +797,7 @@ export function MembersManager({
                             {`${member.first_name} ${member.last_name}`.trim()}
                             {member.is_pt_client && (
                               <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
-                                PT
+                                {tx("PT")}
                               </span>
                             )}
                           </Link>
@@ -790,7 +820,7 @@ export function MembersManager({
                       <td className="whitespace-nowrap px-5 py-4">
                         {canArchive && !archived ? (
                           <button
-                            aria-label={`Archive ${name}`}
+                            aria-label={tx("Archive {name}", { name })}
                             className={actionButtonClass(
                               "Archive member",
                               "button-sm",
@@ -813,12 +843,13 @@ export function MembersManager({
                             }}
                             type="button"
                           >
-                            Archive
+                            {" "}
+                            {tx("Archive")}{" "}
                           </button>
                         ) : null}
                         {archived && canRestore ? (
                           <button
-                            aria-label={`Restore ${name}`}
+                            aria-label={tx("Restore {name}", { name })}
                             className={actionButtonClass(
                               "Restore member",
                               "button-sm",
@@ -841,7 +872,8 @@ export function MembersManager({
                             }}
                             type="button"
                           >
-                            Restore
+                            {" "}
+                            {tx("Restore")}{" "}
                           </button>
                         ) : null}
                       </td>
@@ -854,13 +886,13 @@ export function MembersManager({
                   <td className="px-6 py-14 text-center" colSpan={tableColumns}>
                     <p className="font-semibold text-slate-700">
                       {archivedDirectoryEmpty
-                        ? "No archived members."
-                        : "No members found."}
+                        ? tx("No archived members.")
+                        : tx("No members found.")}
                     </p>
                     <p className="mt-1 text-sm text-slate-500">
                       {archivedDirectoryEmpty
-                        ? "Members you archive will appear in this view."
-                        : "Try changing or clearing the current filters."}
+                        ? tx("Members you archive will appear in this view.")
+                        : tx("Try changing or clearing the current filters.")}
                     </p>
                   </td>
                 </tr>
@@ -870,7 +902,8 @@ export function MembersManager({
         </div>
         {paging ? (
           <p className="m-4 text-center text-sm text-slate-500" role="status">
-            Loading more members.
+            {" "}
+            {tx("Loading more members.")}{" "}
           </p>
         ) : null}
         {hasMore && nextAfter ? (
@@ -881,7 +914,8 @@ export function MembersManager({
               onClick={() => void loadMore()}
               type="button"
             >
-              Load more members
+              {" "}
+              {tx("Load more members")}{" "}
             </button>
           </div>
         ) : null}
@@ -905,6 +939,7 @@ export function MembersManager({
 }
 
 function MemberStatusBadge({ status }: { status: string }) {
+  const tx = useTx();
   const tones: Record<string, string> = {
     ACTIVE: "bg-emerald-100 text-emerald-700",
     EXPIRED: "bg-slate-100 text-slate-600",
@@ -916,7 +951,7 @@ function MemberStatusBadge({ status }: { status: string }) {
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${tones[status] ?? "bg-slate-100 text-slate-600"}`}
     >
-      {status}
+      {tx(status)}
     </span>
   );
 }

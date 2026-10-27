@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useState } from "react";
 
@@ -156,6 +157,7 @@ export function ReportsManager({
   canViewFinancial?: boolean;
   canExport?: boolean;
 }) {
+  const tx = useTx();
   const [date, setDate] = useState("");
   const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
@@ -213,7 +215,7 @@ export function ReportsManager({
   function nextProduct(after: string | null) {
     if (!after || productIndex + 1 >= REPORT_PAGE_CAP) return;
     if (productCursors.includes(after)) {
-      setError("This page cursor repeated. Refine the filters.");
+      setError(tx("This page cursor repeated. Refine the filters."));
       return;
     }
     setProductCursors((current) => [
@@ -234,7 +236,7 @@ export function ReportsManager({
   function nextInventory(after: string | null) {
     if (!after || inventoryIndex + 1 >= REPORT_PAGE_CAP) return;
     if (inventoryCursors.includes(after)) {
-      setError("This page cursor repeated. Refine the filters.");
+      setError(tx("This page cursor repeated. Refine the filters."));
       return;
     }
     setInventoryCursors((current) => [
@@ -353,18 +355,22 @@ export function ReportsManager({
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 [&_.button]:hidden">
         <div className="mb-5">
           <p className="text-xs font-bold tracking-[0.16em] text-amber-600 uppercase">
-            Report builder
+            {" "}
+            {tx("Report builder")}{" "}
           </p>
           <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">
-            Choose what you want to review
+            {" "}
+            {tx("Choose what you want to review")}{" "}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Select a date or range, then open the report you need.
+            {" "}
+            {tx("Select a date or range, then open the report you need.")}{" "}
           </p>
         </div>
         <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
-            Report type
+            {" "}
+            {tx("Report type")}{" "}
             <select
               className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800"
               onChange={(event) => {
@@ -375,22 +381,24 @@ export function ReportsManager({
             >
               {canViewFinancial ? (
                 <optgroup label="Financial">
-                  <option value="daily">Daily report</option>
-                  <option value="monthly">Monthly report</option>
-                  <option value="cash-book">Cash book</option>
-                  <option value="profit-loss">Profit and loss</option>
-                  <option value="product-sales">Product sales</option>
+                  <option value="daily">{tx("Daily report")}</option>
+                  <option value="monthly">{tx("Monthly report")}</option>
+                  <option value="cash-book">{tx("Cash book")}</option>
+                  <option value="profit-loss">{tx("Profit and loss")}</option>
+                  <option value="product-sales">{tx("Product sales")}</option>
                 </optgroup>
               ) : null}
               <optgroup label="Operations">
-                <option value="membership-expiry">Membership expiry</option>
-                <option value="check-ins">Check-ins</option>
-                <option value="pt-sessions">PT sessions</option>
-                <option value="classes">Classes</option>
+                <option value="membership-expiry">
+                  {tx("Membership expiry")}
+                </option>
+                <option value="check-ins">{tx("Check-ins")}</option>
+                <option value="pt-sessions">{tx("PT sessions")}</option>
+                <option value="classes">{tx("Classes")}</option>
               </optgroup>
               <optgroup label="Inventory">
-                <option value="stock-movements">Stock movements</option>
-                <option value="inventory">Inventory</option>
+                <option value="stock-movements">{tx("Stock movements")}</option>
+                <option value="inventory">{tx("Inventory")}</option>
               </optgroup>
             </select>
           </label>
@@ -400,7 +408,8 @@ export function ReportsManager({
             onClick={generateSelectedReport}
             type="button"
           >
-            Generate report
+            {" "}
+            {tx("Generate report")}{" "}
           </button>
         </div>
         <div className="grid gap-4 xl:grid-cols-2">
@@ -425,7 +434,8 @@ export function ReportsManager({
                 }}
               >
                 <label className="grid gap-1 text-sm">
-                  Date
+                  {" "}
+                  {tx("Date")}{" "}
                   <input
                     className="rounded-md border px-3 py-2"
                     onChange={(event) => setDate(event.target.value)}
@@ -439,7 +449,8 @@ export function ReportsManager({
                   disabled={!date || loading}
                   type="submit"
                 >
-                  Show daily report
+                  {" "}
+                  {tx("Show daily report")}{" "}
                 </button>
               </form>
               <form
@@ -458,7 +469,8 @@ export function ReportsManager({
                 }}
               >
                 <label className="hidden">
-                  Year
+                  {" "}
+                  {tx("Year")}{" "}
                   <input
                     className="w-28 rounded-md border px-3 py-2"
                     inputMode="numeric"
@@ -468,7 +480,8 @@ export function ReportsManager({
                   />
                 </label>
                 <label className="hidden">
-                  Month
+                  {" "}
+                  {tx("Month")}{" "}
                   <input
                     className="w-24 rounded-md border px-3 py-2"
                     inputMode="numeric"
@@ -478,7 +491,8 @@ export function ReportsManager({
                   />
                 </label>
                 <label className="grid w-full gap-1.5 text-sm font-semibold text-slate-700 sm:max-w-xs">
-                  Reporting month
+                  {" "}
+                  {tx("Reporting month")}{" "}
                   <input
                     className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-800"
                     onChange={(event) => {
@@ -498,7 +512,8 @@ export function ReportsManager({
                   disabled={!year || !month || loading}
                   type="submit"
                 >
-                  Show monthly report
+                  {" "}
+                  {tx("Show monthly report")}{" "}
                 </button>
               </form>
             </>
@@ -511,7 +526,8 @@ export function ReportsManager({
             }
           >
             <label className="grid gap-1 text-sm">
-              From date
+              {" "}
+              {tx("From date")}{" "}
               <input
                 className="rounded-md border px-3 py-2"
                 onChange={(event) => {
@@ -524,7 +540,8 @@ export function ReportsManager({
               />
             </label>
             <label className="grid gap-1 text-sm">
-              To date
+              {" "}
+              {tx("To date")}{" "}
               <input
                 className="rounded-md border px-3 py-2"
                 onChange={(event) => {
@@ -541,7 +558,8 @@ export function ReportsManager({
                 {canViewFinancial ? (
                   <div>
                     <p className="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase">
-                      Financial
+                      {" "}
+                      {tx("Financial")}{" "}
                     </p>
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -558,7 +576,8 @@ export function ReportsManager({
                         }}
                         type="button"
                       >
-                        Show cash book
+                        {" "}
+                        {tx("Show cash book")}{" "}
                       </button>
                       <button
                         className="button"
@@ -574,7 +593,8 @@ export function ReportsManager({
                         }}
                         type="button"
                       >
-                        Show profit and loss
+                        {" "}
+                        {tx("Show profit and loss")}{" "}
                       </button>
                       <button
                         className="button"
@@ -586,14 +606,16 @@ export function ReportsManager({
                         }}
                         type="button"
                       >
-                        Show product sales
+                        {" "}
+                        {tx("Show product sales")}{" "}
                       </button>
                     </div>
                   </div>
                 ) : null}
                 <div>
                   <p className="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase">
-                    Operations
+                    {" "}
+                    {tx("Operations")}{" "}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -610,7 +632,8 @@ export function ReportsManager({
                       }}
                       type="button"
                     >
-                      Show membership expiry
+                      {" "}
+                      {tx("Show membership expiry")}{" "}
                     </button>
                     <button
                       className="button"
@@ -626,7 +649,8 @@ export function ReportsManager({
                       }}
                       type="button"
                     >
-                      Show check-ins
+                      {" "}
+                      {tx("Show check-ins")}{" "}
                     </button>
                     <button
                       className="button"
@@ -642,7 +666,8 @@ export function ReportsManager({
                       }}
                       type="button"
                     >
-                      Show PT sessions
+                      {" "}
+                      {tx("Show PT sessions")}{" "}
                     </button>
                     <button
                       className="button"
@@ -658,13 +683,15 @@ export function ReportsManager({
                       }}
                       type="button"
                     >
-                      Show classes
+                      {" "}
+                      {tx("Show classes")}{" "}
                     </button>
                   </div>
                 </div>
                 <div>
                   <p className="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase">
-                    Inventory
+                    {" "}
+                    {tx("Inventory")}{" "}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -681,7 +708,8 @@ export function ReportsManager({
                       }}
                       type="button"
                     >
-                      Show stock movements
+                      {" "}
+                      {tx("Show stock movements")}{" "}
                     </button>
                     <button
                       className="button"
@@ -693,7 +721,8 @@ export function ReportsManager({
                       }}
                       type="button"
                     >
-                      Show inventory
+                      {" "}
+                      {tx("Show inventory")}{" "}
                     </button>
                   </div>
                 </div>
@@ -707,12 +736,12 @@ export function ReportsManager({
           className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-medium text-red-800"
           role="alert"
         >
-          {error}
+          {tx(error)}
         </div>
       ) : null}
       {loading ? (
         <div className="grid gap-4" role="status">
-          <span className="sr-only">Loading report…</span>
+          <span className="sr-only">{tx("Loading report…")}</span>
           <div className="h-28 animate-pulse rounded-2xl bg-slate-200" />
           <div className="h-72 animate-pulse rounded-2xl bg-slate-200" />
         </div>
@@ -730,11 +759,12 @@ export function ReportsManager({
           </span>
           <p className="mt-4 font-semibold text-slate-700">
             {canViewFinancial
-              ? "Choose a date, month, or range."
-              : "Choose a range."}
+              ? tx("Choose a date, month, or range.")
+              : tx("Choose a range.")}
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            Your selected report will appear here.
+            {" "}
+            {tx("Your selected report will appear here.")}{" "}
           </p>
         </div>
       ) : null}
@@ -745,7 +775,8 @@ export function ReportsManager({
             onClick={() => void exportCurrent()}
             type="button"
           >
-            Export CSV
+            {" "}
+            {tx("Export CSV")}{" "}
           </button>
         </div>
       ) : null}
@@ -850,11 +881,12 @@ function ReportView({
   kind: "daily" | "monthly";
   report: PeriodReport;
 }) {
+  const tx = useTx();
   const title = kind === "daily" ? "Daily report" : "Monthly report";
   return (
     <section aria-labelledby="period-report-title" className="grid gap-4">
       <h2 className="text-xl font-semibold" id="period-report-title">
-        {title}
+        {tx(title)}
       </h2>
       <ReportIdentity report={report} />
       <PolicyDetails
@@ -873,13 +905,14 @@ function ReportView({
           className="text-base font-bold text-slate-900"
           id="report-totals-title"
         >
-          Totals
+          {" "}
+          {tx("Totals")}{" "}
         </h3>
         <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {TOTAL_FIELDS.map((field) => (
             <div className="rounded-lg bg-white p-3" key={field.key}>
               <dt className="text-xs font-medium text-slate-500">
-                {field.label}
+                {tx(field.label)}
               </dt>
               <dd className="mt-1 font-bold text-slate-900">
                 {report.totals[field.key]}
@@ -903,10 +936,12 @@ function ReportView({
 }
 
 function CashBookView({ report }: { report: CashBookReport }) {
+  const tx = useTx();
   return (
     <section aria-labelledby="cash-book-title" className="grid gap-4">
       <h2 className="text-xl font-semibold" id="cash-book-title">
-        Cash book
+        {" "}
+        {tx("Cash book")}{" "}
       </h2>
       <ReportIdentity report={report} />
       <PolicyDetails
@@ -922,10 +957,12 @@ function CashBookView({ report }: { report: CashBookReport }) {
 }
 
 function ProfitLossView({ report }: { report: ProfitLossReport }) {
+  const tx = useTx();
   return (
     <section aria-labelledby="profit-loss-title" className="grid gap-4">
       <h2 className="text-xl font-semibold" id="profit-loss-title">
-        Profit and loss
+        {" "}
+        {tx("Profit and loss")}{" "}
       </h2>
       <ReportIdentity report={report} />
       <PolicyDetails
@@ -944,13 +981,14 @@ function ProfitLossView({ report }: { report: ProfitLossReport }) {
           className="text-base font-bold text-slate-900"
           id="report-totals-title"
         >
-          Totals
+          {" "}
+          {tx("Totals")}{" "}
         </h3>
         <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {PROFIT_TOTALS.map((field) => (
             <div className="rounded-lg bg-white p-3" key={field.key}>
               <dt className="text-xs font-medium text-slate-500">
-                {field.label}
+                {tx(field.label)}
               </dt>
               <dd className="mt-1 font-bold text-slate-900">
                 {report.totals[field.key]}
@@ -1001,10 +1039,12 @@ const CHECK_IN_COLUMNS: {
 ];
 
 function MembershipExpiryView({ report }: { report: MembershipExpiryReport }) {
+  const tx = useTx();
   return (
     <section aria-labelledby="membership-expiry-title" className="grid gap-4">
       <h2 className="text-xl font-semibold" id="membership-expiry-title">
-        Membership expiry
+        {" "}
+        {tx("Membership expiry")}{" "}
       </h2>
       <ReportIdentity report={report} />
       <PolicyDetails entries={[["Source", report.source_status_policy]]} />
@@ -1051,10 +1091,12 @@ const CLASS_COLUMNS: {
 ];
 
 function CheckInReportView({ report }: { report: CheckInReport }) {
+  const tx = useTx();
   return (
     <section aria-labelledby="check-in-report-title" className="grid gap-4">
       <h2 className="text-xl font-semibold" id="check-in-report-title">
-        Check-ins
+        {" "}
+        {tx("Check-ins")}{" "}
       </h2>
       <ReportIdentity report={report} />
       <PolicyDetails entries={[["Source", report.source_status_policy]]} />
@@ -1062,7 +1104,7 @@ function CheckInReportView({ report }: { report: CheckInReport }) {
       <CountTotals
         fields={[
           ...CHECK_IN_COLUMNS.slice(1),
-          { key: "currently_checked_in", label: "Currently checked in" },
+          { key: "currently_checked_in", label: tx("Currently checked in") },
         ]}
         totals={report.totals}
       />
@@ -1071,10 +1113,12 @@ function CheckInReportView({ report }: { report: CheckInReport }) {
 }
 
 function PTSessionReportView({ report }: { report: PTSessionReport }) {
+  const tx = useTx();
   return (
     <section aria-labelledby="pt-session-report-title" className="grid gap-4">
       <h2 className="text-xl font-semibold" id="pt-session-report-title">
-        PT sessions
+        {" "}
+        {tx("PT sessions")}{" "}
       </h2>
       <ReportIdentity report={report} />
       <PolicyDetails entries={[["Source", report.source_status_policy]]} />
@@ -1088,10 +1132,12 @@ function PTSessionReportView({ report }: { report: PTSessionReport }) {
 }
 
 function ClassReportView({ report }: { report: ClassReport }) {
+  const tx = useTx();
   return (
     <section aria-labelledby="class-report-title" className="grid gap-4">
       <h2 className="text-xl font-semibold" id="class-report-title">
-        Classes
+        {" "}
+        {tx("Classes")}{" "}
       </h2>
       <ReportIdentity report={report} />
       <PolicyDetails entries={[["Source", report.source_status_policy]]} />
@@ -1099,7 +1145,7 @@ function ClassReportView({ report }: { report: ClassReport }) {
       <CountTotals
         fields={[
           ...CLASS_COLUMNS.slice(1),
-          { key: "unique_trainers", label: "Unique trainers" },
+          { key: "unique_trainers", label: tx("Unique trainers") },
         ]}
         totals={report.totals}
       />
@@ -1168,22 +1214,24 @@ function ProductSalesView({
   onPrevious: () => void;
   onNext: () => void;
 }) {
+  const tx = useTx();
   return (
     <section aria-labelledby="product-sales-title" className="grid gap-4">
       <h2 className="text-xl font-semibold" id="product-sales-title">
-        Product sales
+        {" "}
+        {tx("Product sales")}{" "}
       </h2>
       <ReportIdentity report={report} />
       <PolicyDetails entries={[["Source", report.source_status_policy]]} />
       <CatalogTable columns={PRODUCT_SALES_COLUMNS} rows={report.rows} />
       <TotalsList
         fields={[
-          { key: "quantity_sold", label: "Quantity sold" },
-          { key: "revenue", label: "Revenue" },
+          { key: "quantity_sold", label: tx("Quantity sold") },
+          { key: "revenue", label: tx("Revenue") },
           { key: "cogs", label: "COGS" },
-          { key: "gross_profit", label: "Gross profit" },
-          { key: "product_count", label: "Products" },
-          { key: "active_product_count", label: "Active products" },
+          { key: "gross_profit", label: tx("Gross profit") },
+          { key: "product_count", label: tx("Products") },
+          { key: "active_product_count", label: tx("Active products") },
         ]}
         totals={report.totals}
       />
@@ -1200,10 +1248,12 @@ function ProductSalesView({
 }
 
 function StockMovementView({ report }: { report: StockMovementReport }) {
+  const tx = useTx();
   return (
     <section aria-labelledby="stock-movement-title" className="grid gap-4">
       <h2 className="text-xl font-semibold" id="stock-movement-title">
-        Stock movements
+        {" "}
+        {tx("Stock movements")}{" "}
       </h2>
       <ReportIdentity report={report} />
       <PolicyDetails entries={[["Source", report.source_status_policy]]} />
@@ -1236,20 +1286,22 @@ function InventoryView({
   onPrevious: () => void;
   onNext: () => void;
 }) {
+  const tx = useTx();
   return (
     <section aria-labelledby="inventory-report-title" className="grid gap-4">
       <h2 className="text-xl font-semibold" id="inventory-report-title">
-        Inventory
+        {" "}
+        {tx("Inventory")}{" "}
       </h2>
       <ReportIdentity report={report} />
       <PolicyDetails entries={[["Source", report.source_status_policy]]} />
       <CatalogTable columns={INVENTORY_COLUMNS} rows={report.rows} />
       <TotalsList
         fields={[
-          { key: "product_count", label: "Products" },
-          { key: "active_product_count", label: "Active products" },
-          { key: "low_stock_product_count", label: "Low stock products" },
-          { key: "total_stock_quantity", label: "Total stock" },
+          { key: "product_count", label: tx("Products") },
+          { key: "active_product_count", label: tx("Active products") },
+          { key: "low_stock_product_count", label: tx("Low stock products") },
+          { key: "total_stock_quantity", label: tx("Total stock") },
         ]}
         totals={report.totals}
       />
@@ -1272,6 +1324,7 @@ function CountTotals({
   fields: readonly { key: string; label: string }[];
   totals: object;
 }) {
+  const tx = useTx();
   return (
     <section
       aria-labelledby="report-totals-title"
@@ -1281,13 +1334,14 @@ function CountTotals({
         className="text-base font-bold text-slate-900"
         id="report-totals-title"
       >
-        Totals
+        {" "}
+        {tx("Totals")}{" "}
       </h3>
       <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {fields.map((field) => (
           <div className="rounded-lg bg-white p-3" key={field.key}>
             <dt className="text-xs font-medium text-slate-500">
-              {field.label}
+              {tx(field.label)}
             </dt>
             <dd className="mt-1 text-lg font-bold text-slate-900">
               {countValue(totals, field.key)}
@@ -1305,6 +1359,7 @@ function countValue(totals: object, key: string): number {
 }
 
 function ReportIdentity({ report }: { report: Identity }) {
+  const tx = useTx();
   const generated = new Date(report.generated_at);
   const generatedLabel = Number.isNaN(generated.getTime())
     ? report.generated_at
@@ -1326,17 +1381,20 @@ function ReportIdentity({ report }: { report: Identity }) {
       </span>
       {report.range ? (
         <span>
-          {report.range.date_from} to {report.range.date_to}
+          {report.range.date_from} {tx("to")} {report.range.date_to}
         </span>
       ) : null}
       <span>{report.timezone}</span>
-      {report.currency ? <span>{report.currency}</span> : null}
-      <span className="ml-auto text-slate-400">Generated {generatedLabel}</span>
+      {report.currency ? <span>{tx(report.currency)}</span> : null}
+      <span className="ml-auto text-slate-400">
+        {tx("Generated")} {generatedLabel}
+      </span>
     </div>
   );
 }
 
 function PolicyDetails({ entries }: { entries: [string, string][] }) {
+  const tx = useTx();
   return (
     <details className="rounded-xl border border-slate-200 bg-white">
       <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-600 marker:hidden">
@@ -1346,14 +1404,14 @@ function PolicyDetails({ entries }: { entries: [string, string][] }) {
             aria-hidden="true"
           >
             ✓
-          </span>
-          Verified data policy
+          </span>{" "}
+          {tx("Verified data policy")}{" "}
         </span>
       </summary>
       <dl className="grid gap-3 border-t border-slate-100 bg-slate-50 p-4">
         {entries.map(([label, value]) => (
           <div key={label}>
-            <dt className="text-xs font-bold text-slate-500">{label}</dt>
+            <dt className="text-xs font-bold text-slate-500">{tx(label)}</dt>
             <dd className="mt-1 break-words text-xs leading-5 text-slate-600">
               {value}
             </dd>
@@ -1371,11 +1429,12 @@ function CatalogTable<Row extends { product_id: string; sku: string }>({
   columns: { key: keyof Row & string; label: string }[];
   rows: Row[];
 }) {
+  const tx = useTx();
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200">
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
-          <caption className="sr-only">Report rows</caption>
+          <caption className="sr-only">{tx("Report rows")}</caption>
           <thead>
             <tr>
               {columns.map((column) => (
@@ -1384,7 +1443,7 @@ function CatalogTable<Row extends { product_id: string; sku: string }>({
                   key={column.key}
                   scope="col"
                 >
-                  {column.label}
+                  {tx(column.label)}
                 </th>
               ))}
             </tr>
@@ -1430,11 +1489,12 @@ function RowsTable<Row extends { date: string }>({
   columns: { key: keyof Row & string; label: string }[];
   rows: Row[];
 }) {
+  const tx = useTx();
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200">
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
-          <caption className="sr-only">Report rows</caption>
+          <caption className="sr-only">{tx("Report rows")}</caption>
           <thead>
             <tr>
               {columns.map((column) => (
@@ -1443,7 +1503,7 @@ function RowsTable<Row extends { date: string }>({
                   key={column.key}
                   scope="col"
                 >
-                  {column.label}
+                  {tx(column.label)}
                 </th>
               ))}
             </tr>
@@ -1481,6 +1541,7 @@ function TotalsList<Key extends string>({
   fields: { key: Key; label: string }[];
   totals: Record<Key, string | number>;
 }) {
+  const tx = useTx();
   return (
     <section
       aria-labelledby="report-totals-title"
@@ -1490,13 +1551,14 @@ function TotalsList<Key extends string>({
         className="text-base font-bold text-slate-900"
         id="report-totals-title"
       >
-        Totals
+        {" "}
+        {tx("Totals")}{" "}
       </h3>
       <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {fields.map((field) => (
           <div className="rounded-lg bg-white p-3" key={field.key}>
             <dt className="text-xs font-medium text-slate-500">
-              {field.label}
+              {tx(field.label)}
             </dt>
             <dd className="mt-1 font-bold text-slate-900">
               {totals[field.key]}

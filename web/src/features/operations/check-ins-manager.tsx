@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -63,10 +64,11 @@ function VisitList({
   onCheckOut?: ((visit: CheckInRecord) => void) | undefined;
   pending?: boolean;
 }) {
+  const tx = useTx();
   if (visits.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center">
-        <p className="text-sm font-medium text-slate-600">{empty}</p>
+        <p className="text-sm font-medium text-slate-600">{tx(empty)}</p>
       </div>
     );
   }
@@ -84,7 +86,7 @@ function VisitList({
             key={visit.id}
           >
             <span className="sr-only">
-              {`${memberLabel(visit.member)} · ${visitStatus(visit.status)}`}
+              {`${memberLabel(visit.member)} · ${tx(visitStatus(visit.status))}`}
             </span>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -95,9 +97,10 @@ function VisitList({
                   {memberLabel(visit.member)}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  In {formatInstant(visit.check_in_at, timeZone)}
+                  {" "}
+                  {tx("In")} {formatInstant(visit.check_in_at, timeZone)}
                   {visit.check_out_at
-                    ? ` · Out ${formatInstant(visit.check_out_at, timeZone)}`
+                    ? ` · ${tx("Out")} ${formatInstant(visit.check_out_at, timeZone)}`
                     : ""}
                 </p>
               </div>
@@ -109,13 +112,13 @@ function VisitList({
                     : "shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-inset ring-slate-200"
                 }
               >
-                {visitStatus(visit.status)}
+                {tx(visitStatus(visit.status))}
               </span>
             </div>
             {visit.eligibility.plan_name ? (
               <p className="mt-3 text-sm text-slate-600">
                 {visit.eligibility.plan_name}
-                {visit.eligibility.backdated ? " · Backdated" : ""}
+                {visit.eligibility.backdated ? tx("· Backdated") : ""}
               </p>
             ) : null}
             {visit.note ? (
@@ -130,7 +133,7 @@ function VisitList({
                 onClick={() => onCheckOut(visit)}
                 type="button"
               >
-                {`Check out ${memberLabel(visit.member)}`}
+                {tx("Check out {name}", { name: memberLabel(visit.member) })}
               </button>
             ) : null}
           </li>
@@ -153,6 +156,7 @@ export function CheckInsManager({
   membershipId?: string;
   timeZone: string;
 }) {
+  const tx = useTx();
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<DeskMember[]>([]);
   const [selected, setSelected] = useState<DeskMember | null>(null);
@@ -208,7 +212,7 @@ export function CheckInsManager({
         limit: 25,
       });
       setResults(page.data);
-      if (page.data.length === 0) setNotice("No active members match.");
+      if (page.data.length === 0) setNotice(tx("No active members match."));
     } catch (caught) {
       setResults([]);
       setError(failureMessage(caught));
@@ -265,7 +269,7 @@ export function CheckInsManager({
       setNote("");
       setOccurredAt("");
       setCheckInOpen(false);
-      setNotice("Checked in.");
+      setNotice(tx("Checked in."));
       await Promise.all([refreshHistory(selected.id), refreshOpenVisits()]);
     } catch (caught) {
       setError(failureMessage(caught));
@@ -286,7 +290,7 @@ export function CheckInsManager({
       await checkOutCheckIn(checkInId, occurred);
       setCheckoutAt("");
       setCheckOutOpen(false);
-      setNotice("Checked out.");
+      setNotice(tx("Checked out."));
       await refreshOpenVisits();
       if (selected) await refreshHistory(selected.id);
     } catch (caught) {
@@ -309,7 +313,7 @@ export function CheckInsManager({
       {canScan ? <TrainerScan membershipId={membershipId} /> : null}
       {error ? (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       ) : null}
       {notice && !searchMiss ? (
@@ -318,7 +322,7 @@ export function CheckInsManager({
           className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
           role="status"
         >
-          {notice}
+          {tx(notice)}
         </p>
       ) : null}
       <div className="grid items-start gap-5 xl:grid-cols-2">
@@ -326,18 +330,20 @@ export function CheckInsManager({
           <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
-                Live floor
+                {" "}
+                {tx("Live floor")}{" "}
               </p>
               <h2
                 className="mt-1 text-xl font-bold text-slate-900"
                 id="open-visits-title"
               >
-                Currently checked in
+                {" "}
+                {tx("Currently checked in")}{" "}
               </h2>
             </div>
             {loadingOpen ? null : (
               <p
-                aria-label={`${openVisits.length} Open`}
+                aria-label={tx("{count} Open", { count: openVisits.length })}
                 className={`grid min-w-[4.5rem] shrink-0 place-items-center rounded-2xl px-3 py-2 text-center ${
                   openVisits.length > 0
                     ? "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-600/15"
@@ -349,7 +355,8 @@ export function CheckInsManager({
                   {openVisits.length}
                 </span>
                 <span className="mt-1 text-xs font-bold tracking-wide">
-                  Open
+                  {" "}
+                  {tx("Open")}{" "}
                 </span>
               </p>
             )}
@@ -361,7 +368,8 @@ export function CheckInsManager({
                 role="status"
               >
                 <p className="text-sm font-medium text-slate-600">
-                  Loading current visits.
+                  {" "}
+                  {tx("Loading current visits.")}{" "}
                 </p>
               </div>
             ) : (
@@ -382,15 +390,18 @@ export function CheckInsManager({
         <form className={cardClass} onSubmit={searchMembers}>
           <div className="border-b border-slate-100 px-5 py-4">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
-              Member lookup
+              {" "}
+              {tx("Member lookup")}{" "}
             </p>
             <h2 className="mt-1 text-xl font-bold text-slate-900">
-              Find a member
+              {" "}
+              {tx("Find a member")}{" "}
             </h2>
           </div>
           <div className="grid gap-4 p-5">
             <label className="grid gap-2 text-sm font-semibold text-slate-800">
-              Search active members
+              {" "}
+              {tx("Search active members")}{" "}
               <input
                 className="input"
                 name="search"
@@ -404,11 +415,12 @@ export function CheckInsManager({
               disabled={pending}
               type="submit"
             >
-              Search
+              {" "}
+              {tx("Search")}{" "}
             </button>
             {results.length > 0 ? (
               <ul
-                aria-label="Matching members"
+                aria-label={tx("Matching members")}
                 className="grid max-h-80 gap-2 overflow-y-auto p-1"
               >
                 {results.map((member) => {
@@ -426,7 +438,7 @@ export function CheckInsManager({
                         onClick={() => void selectMember(member)}
                         type="button"
                       >
-                        {`Select ${memberLabel(member)}`}
+                        {tx("Select {name}", { name: memberLabel(member) })}
                       </button>
                     </li>
                   );
@@ -439,7 +451,7 @@ export function CheckInsManager({
                 className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm font-medium text-slate-600"
                 role="status"
               >
-                {notice}
+                {tx(notice)}
               </p>
             ) : null}
           </div>
@@ -456,7 +468,8 @@ export function CheckInsManager({
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
-                Selected member
+                {" "}
+                {tx("Selected member")}{" "}
               </p>
               <h2
                 className="mt-1 text-xl font-bold break-words text-slate-900"
@@ -470,14 +483,16 @@ export function CheckInsManager({
                 aria-hidden="true"
                 className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 ring-1 ring-inset ring-emerald-600/20"
               >
-                Open
+                {" "}
+                {tx("Open")}{" "}
               </span>
             ) : null}
           </div>
           <div className="grid gap-5 p-5">
             <div>
               <h3 className="text-sm font-bold text-slate-900">
-                Recent visits
+                {" "}
+                {tx("Recent visits")}{" "}
               </h3>
               <div className="mt-3">
                 <VisitList
@@ -499,12 +514,16 @@ export function CheckInsManager({
                     onClick={() => setCheckOutOpen(true)}
                     type="button"
                   >
-                    Check out
+                    {" "}
+                    {tx("Check out")}{" "}
                   </button>
                 ) : null}
                 {showCheckout && openForSelected && checkOutOpen ? (
                   <FormDialog
-                    description={`Leave blank to check out at the current time. A time is read in ${timeZone}.`}
+                    description={tx(
+                      "Leave blank to check out at the current time. A time is read in {zone}.",
+                      { zone: timeZone },
+                    )}
                     onClose={() => {
                       if (!pending) setCheckOutOpen(false);
                     }}
@@ -513,10 +532,11 @@ export function CheckInsManager({
                       void submitCheckout(openForSelected.id, checkoutAt);
                     }}
                     pending={pending}
-                    title="Check out"
+                    title={tx("Check out")}
                   >
                     <label className="grid gap-2 text-sm font-semibold text-slate-800">
-                      Check-out time
+                      {" "}
+                      {tx("Check-out time")}{" "}
                       <input
                         className="input"
                         onChange={(event) => setCheckoutAt(event.target.value)}
@@ -529,7 +549,8 @@ export function CheckInsManager({
                       disabled={pending}
                       type="submit"
                     >
-                      Check out
+                      {" "}
+                      {tx("Check out")}{" "}
                     </button>
                   </FormDialog>
                 ) : null}
@@ -539,14 +560,18 @@ export function CheckInsManager({
                     onClick={() => setCheckInOpen(true)}
                     type="button"
                   >
-                    Check in
+                    {" "}
+                    {tx("Check in")}{" "}
                   </button>
                 ) : null}
                 {showCheckIn && checkInOpen ? (
                   <FormDialog
                     description={
                       canUpdate
-                        ? `Leave blank to use the current time. A time is read in ${timeZone} and can be up to 24 hours earlier.`
+                        ? tx(
+                            "Leave blank to use the current time. A time is read in {zone} and can be up to 24 hours earlier.",
+                            { zone: timeZone },
+                          )
                         : undefined
                     }
                     onClose={() => {
@@ -554,10 +579,11 @@ export function CheckInsManager({
                     }}
                     onSubmit={submitCheckIn}
                     pending={pending}
-                    title="Check in"
+                    title={tx("Check in")}
                   >
                     <label className="grid gap-2 text-sm font-semibold text-slate-800">
-                      Note
+                      {" "}
+                      {tx("Note")}{" "}
                       <input
                         className="input"
                         maxLength={500}
@@ -567,7 +593,8 @@ export function CheckInsManager({
                     </label>
                     {canUpdate ? (
                       <label className="grid gap-2 text-sm font-semibold text-slate-800">
-                        Check-in time
+                        {" "}
+                        {tx("Check-in time")}{" "}
                         <input
                           className="input"
                           onChange={(event) =>
@@ -583,7 +610,8 @@ export function CheckInsManager({
                       disabled={pending}
                       type="submit"
                     >
-                      Check in
+                      {" "}
+                      {tx("Check in")}{" "}
                     </button>
                   </FormDialog>
                 ) : null}

@@ -15,12 +15,12 @@ async function roleId(context: Context) {
 
 export async function GET(request: NextRequest, context: Context) {
   const id = await roleId(context);
-  if (!id) return unknownRoleResponse();
+  if (!id) return unknownRoleResponse(request);
   return getTenantRole(request, id);
 }
 
 export async function PATCH(request: NextRequest, context: Context) {
   const id = await roleId(context);
-  if (!id) return unknownRoleResponse();
+  if (!id) return unknownRoleResponse(request);
   return updateTenantRole(request, id);
 }

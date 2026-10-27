@@ -24,6 +24,7 @@ select = ["E", "F", "I", "B", "UP", "DJ", "RUF"]
 "apps/*/staff_views.py" = ["RUF012"]
 "apps/*/role_views.py" = ["RUF012"]
 "apps/common/api/views.py" = ["RUF012"]
+"apps/common/api/error_messages_my.py" = ["E501", "RUF001"]
 
 [tool.ruff.format]
 quote-style = "double"

@@ -67,11 +67,13 @@ describe("secure storage", () => {
     expect(keychain.writes[1]?.service).toBe(INSTALLATION_SERVICE);
   });
 
-  it("deletes the keychain family", async () => {
+  it("keeps the language choice when the session is deleted", async () => {
     const keychain = port();
     const store = createSecureStore(keychain);
+    await store.setLocale("mm");
     await store.setRefreshToken("refresh-secret");
     await store.resetAll();
+    expect(await store.getLocale()).toBe("mm");
     expect(await store.getRefreshToken()).toBeNull();
   });
 });

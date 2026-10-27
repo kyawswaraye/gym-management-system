@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import Link from "next/link";
 import {
@@ -35,9 +36,16 @@ import type {
   MemberSummary,
 } from "@/types/api";
 
-function dayLabel(days: number): string {
-  return days === 1 ? "1 day remaining" : `${days} days remaining`;
-}
+const PANEL = "rounded-2xl bg-white p-5 shadow-sm sm:p-6";
+const PANEL_TITLE = "text-base font-bold text-slate-900";
+
+const STATUS_TONE: Record<string, string> = {
+  ACTIVE: "bg-emerald-50 text-emerald-700",
+  EXPIRED: "bg-slate-100 text-slate-600",
+  SUSPENDED: "bg-amber-50 text-amber-800",
+  CANCELLED: "bg-rose-50 text-rose-700",
+  ARCHIVED: "bg-slate-100 text-slate-500",
+};
 
 function appendPayments(
   current: MemberPaymentHistoryItem[],
@@ -49,6 +57,7 @@ function appendPayments(
 }
 
 function PaymentHistory({ memberId }: { memberId: string }) {
+  const tx = useTx();
   const [payments, setPayments] = useState<MemberPaymentHistoryItem[]>([]);
   const [nextAfter, setNextAfter] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -137,32 +146,37 @@ function PaymentHistory({ memberId }: { memberId: string }) {
   }
 
   return (
-    <section aria-labelledby="payment-history-title" className="card p-5">
-      <h2 className="font-bold" id="payment-history-title">
-        Payment history
+    <section aria-labelledby="payment-history-title" className={PANEL}>
+      <h2 className={PANEL_TITLE} id="payment-history-title">
+        {tx("Payment history")}
       </h2>
       {loading ? (
         <p className="muted mt-3" role="status">
-          Loading payment history.
+          {" "}
+          {tx("Loading payment history.")}{" "}
         </p>
       ) : null}
       {error ? (
         <p className="error mt-3" role="alert">
-          {error}
+          {tx(error)}
         </p>
       ) : null}
       {!loading && payments.length === 0 && !error ? (
-        <p className="muted mt-3">No payments.</p>
+        <p className="muted mt-3">{tx("No payments.")}</p>
       ) : null}
       {payments.length > 0 ? (
-        <ul className="mt-3 grid gap-2">
+        <ul className="mt-4 divide-y divide-slate-100">
           {payments.map((payment) => (
-            <li key={payment.id}>
-              {payment.business_date} · {payment.entry_type} · {payment.purpose}{" "}
-              · {payment.description} · {payment.amount} {payment.currency} ·{" "}
-              {payment.method} · {payment.status}
+            <li
+              className="py-3 text-sm leading-6 text-slate-700 first:pt-1 last:pb-0"
+              key={payment.id}
+            >
+              {payment.business_date} · {tx(payment.entry_type)} ·{" "}
+              {tx(payment.purpose)} · {tx(payment.description)} ·{" "}
+              {payment.amount} {tx(payment.currency)} · {tx(payment.method)} ·{" "}
+              {tx(payment.status)}
               {payment.receipt_number
-                ? ` · Receipt ${payment.receipt_number}`
+                ? ` · ${tx("Receipt {number}", { number: payment.receipt_number })}`
                 : ""}
             </li>
           ))}
@@ -170,7 +184,8 @@ function PaymentHistory({ memberId }: { memberId: string }) {
       ) : null}
       {paging ? (
         <p className="muted mt-3" role="status">
-          Loading older payments.
+          {" "}
+          {tx("Loading older payments.")}{" "}
         </p>
       ) : null}
       {hasMore && nextAfter ? (
@@ -180,7 +195,8 @@ function PaymentHistory({ memberId }: { memberId: string }) {
           onClick={() => void loadOlder()}
           type="button"
         >
-          Load older payments
+          {" "}
+          {tx("Load older payments")}{" "}
         </button>
       ) : null}
     </section>
@@ -210,6 +226,7 @@ export function MemberDetail({
   canViewPhoto?: boolean;
   canDeletePhoto?: boolean;
 }) {
+  const tx = useTx();
   const [summary, setSummary] = useState<MemberSummary | null>(null);
   const [error, setError] = useState("");
   const [archiving, setArchiving] = useState(false);
@@ -305,7 +322,7 @@ export function MemberDetail({
     if (!canUpdate || !draft || saveLocked.current) return;
     const payload = memberUpdatePayload(draft);
     if (!payload.first_name || !payload.last_name || !payload.join_date) {
-      setError("Enter a first name, last name, and join date.");
+      setError(tx("Enter a first name, last name, and join date."));
       return;
     }
     saveLocked.current = true;
@@ -328,18 +345,20 @@ export function MemberDetail({
   if (!summary && error) {
     return (
       <p className="error" role="alert">
-        {error}
+        {tx(error)}
       </p>
     );
   }
   if (!summary || !draft) {
     return (
       <p className="muted" role="status">
-        Loading member summary.
+        {" "}
+        {tx("Loading member summary.")}{" "}
       </p>
     );
   }
   const member = summary.member;
+  const memberName = `${member.first_name} ${member.last_name}`.trim();
   const payments = summary.payment_summary;
   const noFinalizedPayments =
     payments.total_charged === "0.00" && payments.total_refunded === "0.00";
@@ -410,119 +429,307 @@ export function MemberDetail({
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[22rem_1fr]">
-      <div className="card grid gap-4 p-5">
-        <MemberPhoto
-          assetId={member.profile_photo_asset_id}
-          canDelete={canDeletePhoto}
-          canUpload={canUploadPhoto}
-          canView={canViewPhoto}
-          memberId={memberId}
-          memberName={`${member.first_name} ${member.last_name}`.trim()}
-          onAttach={async (fileId) => {
-            const targetMemberId = memberId;
-            await operationMutation<Member>(
-              `members/${targetMemberId}/`,
-              { profile_photo_asset_id: fileId },
-              "PATCH",
-            );
-            if (!mounted.current || viewedMemberId.current !== targetMemberId)
-              return;
-            applyPhoto(fileId);
-            await load();
-          }}
-          onRemove={async () => {
-            applyPhoto(null);
-            await load();
-          }}
-        />
-        {error && !editing ? (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <p className="muted">{member.member_number}</p>
-        <dl>
-          <dt className="muted">Status</dt>
-          <dd>{member.status}</dd>
-        </dl>
-        {canUpdate ? (
-          <button
-            className="button button-edit"
-            disabled={commandPending}
-            onClick={() => setEditing(true)}
-            type="button"
-          >
-            Edit profile
-          </button>
-        ) : (
-          <MemberProfileFields
-            disabled
-            includeMemberNumber={false}
-            onChange={() => undefined}
-            value={draft}
-          />
+    <>
+      <div className="grid gap-5">
+        <section className={PANEL}>
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+            <div className="sm:w-64 sm:shrink-0">
+              <MemberPhoto
+                assetId={member.profile_photo_asset_id}
+                canDelete={canDeletePhoto}
+                canUpload={canUploadPhoto}
+                canView={canViewPhoto}
+                memberId={memberId}
+                memberName={memberName}
+                onAttach={async (fileId) => {
+                  const targetMemberId = memberId;
+                  await operationMutation<Member>(
+                    `members/${targetMemberId}/`,
+                    { profile_photo_asset_id: fileId },
+                    "PATCH",
+                  );
+                  if (
+                    !mounted.current ||
+                    viewedMemberId.current !== targetMemberId
+                  )
+                    return;
+                  applyPhoto(fileId);
+                  await load();
+                }}
+                onRemove={async () => {
+                  applyPhoto(null);
+                  await load();
+                }}
+              />
+            </div>
+            <div className="grid min-w-0 flex-1 content-start gap-4">
+              <div>
+                <p className="text-xs font-bold tracking-[0.16em] text-sky-700 uppercase">
+                  {member.member_number}
+                </p>
+                <p className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+                  {memberName || member.member_number}
+                </p>
+              </div>
+              {error && !editing ? (
+                <p className="error" role="alert">
+                  {tx(error)}
+                </p>
+              ) : null}
+              <dl>
+                <div className="flex items-center gap-3">
+                  <dt className="text-sm text-slate-500">{tx("Status")}</dt>
+                  <dd
+                    className={`rounded-full px-3 py-1 text-xs font-bold ${STATUS_TONE[member.status] ?? "bg-slate-100 text-slate-600"}`}
+                  >
+                    {tx(member.status)}
+                  </dd>
+                </div>
+              </dl>
+              <div className="flex flex-wrap gap-3">
+                {canUpdate ? (
+                  <button
+                    className="button button-edit"
+                    disabled={commandPending}
+                    onClick={() => setEditing(true)}
+                    type="button"
+                  >
+                    {tx("Edit profile")}
+                  </button>
+                ) : null}
+                {showArchive ? (
+                  <button
+                    className="button button-archive"
+                    disabled={commandPending}
+                    onClick={() => {
+                      if (archiveLocked.current || commandPending) return;
+                      setArchiveOpen(true);
+                    }}
+                    type="button"
+                  >
+                    {tx("Archive member")}
+                  </button>
+                ) : null}
+                {showRestore ? (
+                  <button
+                    className="button button-success"
+                    disabled={commandPending}
+                    onClick={() => {
+                      if (restoreLocked.current || commandPending) return;
+                      setRestoreOpen(true);
+                    }}
+                    type="button"
+                  >
+                    {tx("Restore member")}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          {canUpdate && editing ? (
+            <FormDialog
+              onClose={() => {
+                if (!saving) setEditing(false);
+              }}
+              onSubmit={save}
+              pending={saving}
+              title={tx("Edit profile")}
+              wide
+            >
+              {error ? (
+                <p className="error" role="alert">
+                  {tx(error)}
+                </p>
+              ) : null}
+              <MemberProfileFields
+                disabled={commandPending}
+                includeMemberNumber={false}
+                onChange={(next) =>
+                  setDraftState({ snapshot: profileSnapshot, draft: next })
+                }
+                value={draft}
+              />
+              <div>
+                <button
+                  className="button button-edit"
+                  disabled={commandPending}
+                  type="submit"
+                >
+                  {saving ? tx("Saving…") : tx("Save changes")}
+                </button>
+              </div>
+            </FormDialog>
+          ) : null}
+        </section>
+        {canUpdate ? null : (
+          <section aria-labelledby="member-profile-fields" className={PANEL}>
+            <h2 className={PANEL_TITLE} id="member-profile-fields">
+              {tx("Profile")}
+            </h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 [&_fieldset]:sm:col-span-2 [&>label:last-child]:sm:col-span-2">
+              <MemberProfileFields
+                disabled
+                includeMemberNumber={false}
+                onChange={() => undefined}
+                value={draft}
+              />
+            </div>
+          </section>
         )}
-        {canUpdate && editing ? (
-          <FormDialog
-            onClose={() => {
-              if (!saving) setEditing(false);
-            }}
-            onSubmit={save}
-            pending={saving}
-            title="Edit profile"
-            wide
-          >
-            {error ? (
-              <p className="error" role="alert">
-                {error}
+        <div className="grid gap-5 xl:grid-cols-2">
+          <section aria-labelledby="current-membership-title" className={PANEL}>
+            <h2 className={PANEL_TITLE} id="current-membership-title">
+              {tx("Current membership")}
+            </h2>
+            {summary.current_membership ? (
+              <div className="mt-4 grid gap-3">
+                <p className="text-lg font-semibold text-slate-900">
+                  {summary.current_membership.plan_name}:{" "}
+                  {summary.current_membership.start_date} –{" "}
+                  {summary.current_membership.expiry_date} (
+                  {tx(summary.current_membership.payment_status)})
+                </p>
+                <p className="text-sm text-slate-500">
+                  {summary.days_remaining === null
+                    ? tx("Days remaining are unavailable.")
+                    : summary.days_remaining === 1
+                      ? tx("1 day remaining")
+                      : tx("{count} days remaining", {
+                          count: summary.days_remaining,
+                        })}
+                  {summary.is_pt_client ? tx("· PT client") : ""}
+                </p>
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">
+                {tx("No current membership.")}
+              </p>
+            )}
+          </section>
+          <section aria-labelledby="payment-summary-title" className={PANEL}>
+            <h2 className={PANEL_TITLE} id="payment-summary-title">
+              {tx("Payment summary")}
+            </h2>
+            {payments.available ? (
+              <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                {(
+                  [
+                    ["Total charged", payments.total_charged],
+                    ["Total refunded", payments.total_refunded],
+                    ["Net paid", payments.net_paid],
+                    [
+                      "Outstanding membership balance",
+                      payments.outstanding_membership_balance,
+                    ],
+                  ] as const
+                ).map(([label, amount]) => (
+                  <div className="rounded-xl bg-slate-50 px-4 py-3" key={label}>
+                    <dt className="text-xs font-semibold text-slate-500">
+                      {tx(label)}
+                    </dt>
+                    <dd className="mt-1 text-lg font-bold tracking-tight text-slate-900">
+                      {amount} {tx(payments.currency)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">
+                {tx("Payment summary is not available.")}
+              </p>
+            )}
+            {payments.available && noFinalizedPayments ? (
+              <p className="mt-4 text-sm text-slate-500">
+                {tx("No finalized payments.")}
               </p>
             ) : null}
-            <MemberProfileFields
-              disabled={commandPending}
-              includeMemberNumber={false}
-              onChange={(next) =>
-                setDraftState({ snapshot: profileSnapshot, draft: next })
-              }
-              value={draft}
-            />
-            <div>
-              <button
-                className="button button-edit"
-                disabled={commandPending}
-                type="submit"
-              >
-                {saving ? "Saving…" : "Save changes"}
-              </button>
-            </div>
-          </FormDialog>
-        ) : null}
-        {showArchive ? (
-          <button
-            className="button button-archive"
-            disabled={commandPending}
-            onClick={() => {
-              if (archiveLocked.current || commandPending) return;
-              setArchiveOpen(true);
-            }}
-            type="button"
-          >
-            Archive member
-          </button>
-        ) : null}
-        {showRestore ? (
-          <button
-            className="button button-success"
-            disabled={commandPending}
-            onClick={() => {
-              if (restoreLocked.current || commandPending) return;
-              setRestoreOpen(true);
-            }}
-            type="button"
-          >
-            Restore member
-          </button>
-        ) : null}
+          </section>
+        </div>
+        {canViewPayments ? <PaymentHistory memberId={memberId} /> : null}
+        <div className="grid gap-5 xl:grid-cols-2">
+          <section aria-labelledby="membership-history-title" className={PANEL}>
+            <h2 className={PANEL_TITLE} id="membership-history-title">
+              {tx("Membership history")}
+            </h2>
+            {summary.membership_history.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">
+                {tx("No membership history.")}
+              </p>
+            ) : (
+              <ul className="mt-4 divide-y divide-slate-100">
+                {summary.membership_history.map((membership) => (
+                  <li
+                    className="py-3 text-sm leading-6 text-slate-700 first:pt-1 last:pb-0"
+                    key={membership.id}
+                  >
+                    {membership.plan_name}: {membership.start_date} –{" "}
+                    {membership.expiry_date} ({tx(membership.status)})
+                  </li>
+                ))}
+              </ul>
+            )}
+            {summary.membership_history_has_more ? (
+              <p className="mt-4 text-sm text-slate-500">
+                {tx("Older memberships are not shown.")}
+              </p>
+            ) : null}
+          </section>
+          <section aria-labelledby="check-in-summary-title" className={PANEL}>
+            <h2 className={PANEL_TITLE} id="check-in-summary-title">
+              {tx("Check-ins")}
+            </h2>
+            {summary.check_in_summary.available ? (
+              <dl className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+                <div className="rounded-xl bg-slate-50 px-4 py-3">
+                  <dt className="text-xs font-semibold text-slate-500">
+                    {tx("Current visit")}
+                  </dt>
+                  <dd className="mt-1 text-sm font-bold text-slate-900">
+                    {summary.check_in_summary.currently_checked_in
+                      ? tx("Checked in")
+                      : tx("Not checked in")}
+                  </dd>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-4 py-3">
+                  <dt className="text-xs font-semibold text-slate-500">
+                    {tx("Last check-in")}
+                  </dt>
+                  <dd className="mt-1 text-sm font-bold text-slate-900">
+                    {formatInstant(
+                      summary.check_in_summary.last_check_in_at,
+                      timeZone,
+                    )}
+                  </dd>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-4 py-3">
+                  <dt className="text-xs font-semibold text-slate-500">
+                    {tx("Last check-out")}
+                  </dt>
+                  <dd className="mt-1 text-sm font-bold text-slate-900">
+                    {formatInstant(
+                      summary.check_in_summary.last_check_out_at,
+                      timeZone,
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">
+                {tx("Check-in summary is not available yet.")}
+              </p>
+            )}
+            {canViewCheckIns ? (
+              <p className="mt-4">
+                <Link
+                  className="text-sm font-semibold text-sky-700"
+                  href="/check-ins"
+                >
+                  {tx("Open front desk")}
+                </Link>
+              </p>
+            ) : null}
+          </section>
+        </div>
       </div>
       {archiveOpen ? (
         <ArchiveMemberDialog
@@ -538,138 +745,6 @@ export function MemberDetail({
           onConfirm={() => void restoreMember()}
         />
       ) : null}
-      <div className="grid gap-6">
-        <section
-          aria-labelledby="current-membership-title"
-          className="card p-5"
-        >
-          <h2 className="font-bold" id="current-membership-title">
-            Current membership
-          </h2>
-          {summary.current_membership ? (
-            <div className="mt-3 grid gap-1">
-              <p>
-                {summary.current_membership.plan_name}:{" "}
-                {summary.current_membership.start_date} –{" "}
-                {summary.current_membership.expiry_date} (
-                {summary.current_membership.payment_status})
-              </p>
-              <p className="muted">
-                {summary.days_remaining === null
-                  ? "Days remaining are unavailable."
-                  : dayLabel(summary.days_remaining)}
-                {summary.is_pt_client ? " · PT client" : ""}
-              </p>
-            </div>
-          ) : (
-            <p className="muted mt-3">No current membership.</p>
-          )}
-        </section>
-        <section aria-labelledby="payment-summary-title" className="card p-5">
-          <h2 className="font-bold" id="payment-summary-title">
-            Payment summary
-          </h2>
-          {payments.available ? (
-            <dl className="mt-3 grid gap-2">
-              <div className="flex justify-between gap-4">
-                <dt>Total charged</dt>
-                <dd>
-                  {payments.total_charged} {payments.currency}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt>Total refunded</dt>
-                <dd>
-                  {payments.total_refunded} {payments.currency}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt>Net paid</dt>
-                <dd>
-                  {payments.net_paid} {payments.currency}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt>Outstanding membership balance</dt>
-                <dd>
-                  {payments.outstanding_membership_balance} {payments.currency}
-                </dd>
-              </div>
-            </dl>
-          ) : (
-            <p className="muted mt-3">Payment summary is not available.</p>
-          )}
-          {payments.available && noFinalizedPayments ? (
-            <p className="muted mt-3">No finalized payments.</p>
-          ) : null}
-        </section>
-        {canViewPayments ? <PaymentHistory memberId={memberId} /> : null}
-        <section
-          aria-labelledby="membership-history-title"
-          className="card p-5"
-        >
-          <h2 className="font-bold" id="membership-history-title">
-            Membership history
-          </h2>
-          {summary.membership_history.length === 0 ? (
-            <p className="muted mt-3">No membership history.</p>
-          ) : (
-            <ul className="mt-3 grid gap-2">
-              {summary.membership_history.map((membership) => (
-                <li key={membership.id}>
-                  {membership.plan_name}: {membership.start_date} –{" "}
-                  {membership.expiry_date} ({membership.status})
-                </li>
-              ))}
-            </ul>
-          )}
-          {summary.membership_history_has_more ? (
-            <p className="muted mt-3">Older memberships are not shown.</p>
-          ) : null}
-        </section>
-        <section aria-labelledby="check-in-summary-title" className="card p-5">
-          <h2 className="font-bold" id="check-in-summary-title">
-            Check-ins
-          </h2>
-          {summary.check_in_summary.available ? (
-            <dl className="mt-3 grid gap-2">
-              <div>
-                <dt className="muted">Current visit</dt>
-                <dd>
-                  {summary.check_in_summary.currently_checked_in
-                    ? "Checked in"
-                    : "Not checked in"}
-                </dd>
-              </div>
-              <div>
-                <dt className="muted">Last check-in</dt>
-                <dd>
-                  {formatInstant(
-                    summary.check_in_summary.last_check_in_at,
-                    timeZone,
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt className="muted">Last check-out</dt>
-                <dd>
-                  {formatInstant(
-                    summary.check_in_summary.last_check_out_at,
-                    timeZone,
-                  )}
-                </dd>
-              </div>
-            </dl>
-          ) : (
-            <p className="muted mt-3">Check-in summary is not available yet.</p>
-          )}
-          {canViewCheckIns ? (
-            <p className="mt-3">
-              <Link href="/check-ins">Open front desk</Link>
-            </p>
-          ) : null}
-        </section>
-      </div>
-    </div>
+    </>
   );
 }

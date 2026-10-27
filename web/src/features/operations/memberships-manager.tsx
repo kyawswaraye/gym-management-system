@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 
@@ -107,29 +108,45 @@ const DURATION_UNIT_LABELS: Record<MembershipPlan["duration_unit"], string> = {
   YEAR: "Year",
 };
 
-function planDurationLabel(row: MembershipPlan): string {
-  const unit = DURATION_UNIT_LABELS[row.duration_unit];
-  const suffix = row.duration_value === 1 ? "" : "s";
-  return `${row.duration_value} ${unit}${suffix}`;
+function planDurationLabel(
+  row: MembershipPlan,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
+): string {
+  const singular = DURATION_UNIT_LABELS[row.duration_unit];
+  const unit = row.duration_value === 1 ? singular : `${singular}s`;
+  return tx("{count} {unit}", {
+    count: row.duration_value,
+    unit: tx(unit),
+  });
 }
 
 function planStatusLabel(row: MembershipPlan): string {
   return row.is_active ? "Active" : "Archived";
 }
 
-function planArchiveActionName(row: MembershipPlan): string {
-  return `Archive ${row.name} (${row.code}) plan`;
+function planArchiveActionName(
+  row: MembershipPlan,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
+): string {
+  return tx("Archive {name} ({code}) plan", { name: row.name, code: row.code });
 }
 
-function planEditActionName(row: MembershipPlan): string {
-  return `Edit ${row.name} (${row.code}) plan`;
+function planEditActionName(
+  row: MembershipPlan,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
+): string {
+  return tx("Edit {name} ({code}) plan", { name: row.name, code: row.code });
 }
 
 function membershipNoteActionName(
   row: Membership,
   memberLabel: string,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
 ): string {
-  return `Edit note for ${compactIdentifier(memberLabel)} · ${row.plan_name}`;
+  return tx("Edit note for {member} · {plan}", {
+    member: compactIdentifier(memberLabel),
+    plan: row.plan_name,
+  });
 }
 
 function rowActionClass(
@@ -318,6 +335,7 @@ export function MembershipsManager({
   currency: string;
   defaultDate: string;
 }) {
+  const tx = useTx();
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [planError, setPlanError] = useState("");
   const [planGeneration, setPlanGeneration] = useState(0);
@@ -434,7 +452,7 @@ export function MembershipsManager({
       setMemberships([]);
       setNextAfter(null);
       setHasMore(false);
-      setError(errorText(caught, "Unable to load memberships."));
+      setError(errorText(caught, tx("Unable to load memberships.")));
       setErrorScope("list");
     } finally {
       if (version === requestVersion.current) setLoading(false);
@@ -460,7 +478,7 @@ export function MembershipsManager({
       .catch((caught: unknown) => {
         if (version !== planRequest.current) return;
         setPlans([]);
-        setPlanError(errorText(caught, "Unable to load membership plans."));
+        setPlanError(errorText(caught, tx("Unable to load membership plans.")));
       })
       .finally(() => {
         if (version === planRequest.current) setPlansLoading(false);
@@ -468,7 +486,7 @@ export function MembershipsManager({
     return () => {
       planRequest.current += 1;
     };
-  }, [canManagePlans, planGeneration]);
+  }, [canManagePlans, planGeneration, tx]);
 
   useEffect(() => {
     const version = ++requestVersion.current;
@@ -491,7 +509,7 @@ export function MembershipsManager({
           setMemberships([]);
           setNextAfter(null);
           setHasMore(false);
-          setError(errorText(caught, "Unable to load memberships."));
+          setError(errorText(caught, tx("Unable to load memberships.")));
           setErrorScope("list");
         } finally {
           if (version === requestVersion.current) setLoading(false);
@@ -503,7 +521,7 @@ export function MembershipsManager({
       requestVersion.current += 1;
       listEpoch.current += 1;
     };
-  }, [listMode, paymentStatus, status]);
+  }, [listMode, paymentStatus, status, tx]);
 
   useEffect(() => {
     const trimmed = memberQuery.trim();
@@ -524,7 +542,9 @@ export function MembershipsManager({
         } catch (caught) {
           if (version !== memberSearchVersion.current) return;
           setMemberResults([]);
-          setMemberSearchError(errorText(caught, "Unable to search members."));
+          setMemberSearchError(
+            errorText(caught, tx("Unable to search members.")),
+          );
         } finally {
           if (version === memberSearchVersion.current) {
             setMemberSearchLoading(false);
@@ -536,7 +556,7 @@ export function MembershipsManager({
       window.clearTimeout(timer);
       memberSearchVersion.current += 1;
     };
-  }, [memberQuery]);
+  }, [memberQuery, tx]);
 
   useEffect(() => {
     if (showMembershipForm) {
@@ -576,7 +596,7 @@ export function MembershipsManager({
     } catch (caught) {
       appliedCursors.current.delete(cursor);
       if (version === requestVersion.current) {
-        setError(errorText(caught, "Unable to load memberships."));
+        setError(errorText(caught, tx("Unable to load memberships.")));
         setErrorScope("page");
       }
     } finally {
@@ -650,7 +670,7 @@ export function MembershipsManager({
     } catch (caught) {
       if (!mountedRef.current) return;
       if ((planVersions.current.get(target.id) ?? 0) !== version) return;
-      setPlanEditError(errorText(caught, "Unable to update plan."));
+      setPlanEditError(errorText(caught, tx("Unable to update plan.")));
     } finally {
       releasePlan(target.id);
     }
@@ -684,7 +704,7 @@ export function MembershipsManager({
     } catch (caught) {
       if (!mountedRef.current) return;
       if ((planVersions.current.get(target.id) ?? 0) !== version) return;
-      setError(errorText(caught, "Unable to archive plan."));
+      setError(errorText(caught, tx("Unable to archive plan.")));
       setErrorScope(null);
     } finally {
       releasePlan(target.id);
@@ -732,7 +752,7 @@ export function MembershipsManager({
       await refreshMemberships();
     } catch (caught) {
       if (!mountedRef.current) return;
-      setError(errorText(caught, "Unable to create plan."));
+      setError(errorText(caught, tx("Unable to create plan.")));
       setErrorScope(null);
     } finally {
       endSharedPending();
@@ -761,7 +781,9 @@ export function MembershipsManager({
       await refreshMemberships();
     } catch (caught) {
       if (!mountedRef.current) return;
-      setMembershipFormError(errorText(caught, "Unable to create membership."));
+      setMembershipFormError(
+        errorText(caught, tx("Unable to create membership.")),
+      );
     } finally {
       endSharedPending();
     }
@@ -829,7 +851,7 @@ export function MembershipsManager({
       );
     } catch (caught) {
       if (!noteResultIsCurrent(epoch, membersAtStart)) return;
-      setNoteError(errorText(caught, "Unable to update membership note."));
+      setNoteError(errorText(caught, tx("Unable to update membership note.")));
     } finally {
       endSharedPending();
     }
@@ -859,7 +881,7 @@ export function MembershipsManager({
       succeeded = true;
     } catch (caught) {
       if (!noteResultIsCurrent(epoch, membersAtStart)) return;
-      setError(errorText(caught, "Unable to update membership."));
+      setError(errorText(caught, tx("Unable to update membership.")));
       setErrorScope(null);
     } finally {
       endSharedPending();
@@ -876,11 +898,13 @@ export function MembershipsManager({
       {error ? (
         <div className="order-1 grid gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
           <p className="text-sm font-medium text-red-800" role="alert">
-            {error}
+            {tx(error)}
           </p>
           {errorScope ? (
             <button className="button w-fit" onClick={retry} type="button">
-              {errorScope === "page" ? "Retry loading memberships" : "Retry"}
+              {errorScope === "page"
+                ? tx("Retry loading memberships")
+                : tx("Retry")}
             </button>
           ) : null}
         </div>
@@ -890,13 +914,18 @@ export function MembershipsManager({
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-bold tracking-[0.16em] text-amber-600 uppercase">
-                Quick actions
+                {" "}
+                {tx("Quick actions")}{" "}
               </p>
               <h2 className="mt-1 text-lg font-bold text-slate-900">
-                What would you like to do?
+                {" "}
+                {tx("What would you like to do?")}{" "}
               </h2>
               <p className="mt-0.5 text-sm text-slate-500">
-                Start a membership or manage the plans available to members.
+                {" "}
+                {tx(
+                  "Start a membership or manage the plans available to members.",
+                )}{" "}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -909,7 +938,7 @@ export function MembershipsManager({
                   onClick={() => setShowPlanForm((current) => !current)}
                   type="button"
                 >
-                  {showPlanForm ? "Close plan form" : "New plan"}
+                  {showPlanForm ? tx("Close plan form") : tx("New plan")}
                 </button>
               ) : null}
               {canManagePlans ? (
@@ -921,7 +950,7 @@ export function MembershipsManager({
                   onClick={() => setShowPlans((current) => !current)}
                   type="button"
                 >
-                  {showPlans ? "Hide plans" : "View plans"}
+                  {showPlans ? tx("Hide plans") : tx("View plans")}
                 </button>
               ) : null}
               {canCreate ? (
@@ -929,8 +958,8 @@ export function MembershipsManager({
                   ref={startMembershipButtonRef}
                   aria-label={
                     showMembershipForm
-                      ? "Close start membership form"
-                      : "Open start membership form"
+                      ? tx("Close start membership form")
+                      : tx("Open start membership form")
                   }
                   aria-expanded={showMembershipForm}
                   className={
@@ -948,8 +977,8 @@ export function MembershipsManager({
                   type="button"
                 >
                   {showMembershipForm
-                    ? "Close membership form"
-                    : "Start membership"}
+                    ? tx("Close membership form")
+                    : tx("Start membership")}
                 </button>
               ) : null}
             </div>
@@ -971,15 +1000,18 @@ export function MembershipsManager({
               className="text-lg font-bold text-slate-900"
               id="membership-plans-title"
             >
-              Membership plans
+              {" "}
+              {tx("Membership plans")}{" "}
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              Available pricing and duration options.
+              {" "}
+              {tx("Available pricing and duration options.")}{" "}
             </p>
           </div>
           {plansLoading && !planError && plans.length === 0 ? (
             <p className="muted m-4" role="status">
-              Loading membership plans.
+              {" "}
+              {tx("Loading membership plans.")}{" "}
             </p>
           ) : null}
           {planError ? (
@@ -992,44 +1024,52 @@ export function MembershipsManager({
                 onClick={retryPlanCatalog}
                 type="button"
               >
-                Retry loading plans
+                {" "}
+                {tx("Retry loading plans")}{" "}
               </button>
             </div>
           ) : null}
           {!plansLoading && !planError && plans.length === 0 ? (
             <p className="muted m-4" role="status">
-              No membership plans.
+              {" "}
+              {tx("No membership plans.")}{" "}
             </p>
           ) : null}
           {showPlanTable ? (
             <div className="overflow-x-auto">
               <table
-                aria-label="Membership plans"
+                aria-label={tx("Membership plans")}
                 className="w-full text-left text-sm"
               >
                 <thead>
                   <tr>
                     <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                      Code
+                      {" "}
+                      {tx("Code")}{" "}
                     </th>
                     <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                      Name
+                      {" "}
+                      {tx("Name")}{" "}
                     </th>
                     <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                      Duration
+                      {" "}
+                      {tx("Duration")}{" "}
                     </th>
                     <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                      Price
+                      {" "}
+                      {tx("Price")}{" "}
                     </th>
                     <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                      Status
+                      {" "}
+                      {tx("Status")}{" "}
                     </th>
                     {canUpdate ? (
                       <th
                         className="px-5 py-3 text-xs font-semibold"
                         scope="col"
                       >
-                        Action
+                        {" "}
+                        {tx("Action")}{" "}
                       </th>
                     ) : null}
                   </tr>
@@ -1044,10 +1084,10 @@ export function MembershipsManager({
                         {plan.name}
                       </td>
                       <td className="px-5 py-4 text-slate-600">
-                        {planDurationLabel(plan)}
+                        {planDurationLabel(plan, tx)}
                       </td>
                       <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-900">
-                        {plan.price} {plan.currency}
+                        {plan.price} {tx(plan.currency)}
                       </td>
                       <td className="px-5 py-4">
                         <StatusBadge
@@ -1059,17 +1099,18 @@ export function MembershipsManager({
                         <td className="px-5 py-4">
                           <div className="flex flex-nowrap gap-2">
                             <button
-                              aria-label={planEditActionName(plan)}
+                              aria-label={planEditActionName(plan, tx)}
                               className={rowActionClass("edit")}
                               disabled={lockedPlanIds.includes(plan.id)}
                               onClick={() => openPlanEditor(plan)}
                               type="button"
                             >
-                              Edit
+                              {" "}
+                              {tx("Edit")}{" "}
                             </button>
                             {plan.is_active ? (
                               <button
-                                aria-label={planArchiveActionName(plan)}
+                                aria-label={planArchiveActionName(plan, tx)}
                                 className={rowActionClass("archive")}
                                 disabled={
                                   lockedPlanIds.includes(plan.id) ||
@@ -1078,7 +1119,8 @@ export function MembershipsManager({
                                 onClick={() => setArchiveTarget(plan)}
                                 type="button"
                               >
-                                Archive
+                                {" "}
+                                {tx("Archive")}{" "}
                               </button>
                             ) : null}
                           </div>
@@ -1121,33 +1163,38 @@ export function MembershipsManager({
                     className="grid min-h-9 shrink-0 place-items-center rounded-lg bg-slate-100 px-2 text-[0.65rem] font-black tracking-wide text-slate-700"
                     aria-hidden="true"
                   >
-                    PLAN
+                    {tx("PLAN")}
                   </span>
                   <div>
                     <h2
                       className="text-xl font-bold text-slate-900"
                       id={newPlanTitleId}
                     >
-                      New plan
+                      {" "}
+                      {tx("New plan")}{" "}
                     </h2>
                     <p className="mt-1 text-sm text-slate-500">
-                      Define the price and membership duration. A code is
-                      assigned from the name.
+                      {" "}
+                      {tx(
+                        "Define the price and membership duration. A code is assigned from the name.",
+                      )}{" "}
                     </p>
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 [&_.field]:text-sm [&_.field]:font-semibold [&_.field]:text-slate-700">
                   <label className="field sm:col-span-2">
-                    Name
+                    {" "}
+                    {tx("Name")}{" "}
                     <input
                       className="input"
                       name="name"
-                      placeholder="e.g. Monthly membership"
+                      placeholder={tx("e.g. Monthly membership")}
                       required
                     />
                   </label>
                   <label className="field">
-                    Duration
+                    {" "}
+                    {tx("Duration")}{" "}
                     <input
                       className="input"
                       min="1"
@@ -1157,16 +1204,18 @@ export function MembershipsManager({
                     />
                   </label>
                   <label className="field">
-                    Unit
+                    {" "}
+                    {tx("Unit")}{" "}
                     <select className="input" name="duration_unit">
-                      <option value="MONTH">Month</option>
-                      <option value="DAY">Day</option>
-                      <option value="WEEK">Week</option>
-                      <option value="YEAR">Year</option>
+                      <option value="MONTH">{tx("Month")}</option>
+                      <option value="DAY">{tx("Day")}</option>
+                      <option value="WEEK">{tx("Week")}</option>
+                      <option value="YEAR">{tx("Year")}</option>
                     </select>
                   </label>
                   <label className="field">
-                    Price
+                    {" "}
+                    {tx("Price")}{" "}
                     <input
                       className="input"
                       min="0"
@@ -1178,7 +1227,8 @@ export function MembershipsManager({
                     />
                   </label>
                   <label className="field">
-                    Currency
+                    {" "}
+                    {tx("Currency")}{" "}
                     <input
                       className="input bg-slate-50 text-slate-500"
                       defaultValue={currency}
@@ -1194,14 +1244,15 @@ export function MembershipsManager({
                     onClick={() => setShowPlanForm(false)}
                     type="button"
                   >
-                    Cancel
+                    {" "}
+                    {tx("Cancel")}{" "}
                   </button>
                   <button
                     className="button button-edit"
                     disabled={pending}
                     type="submit"
                   >
-                    {pending ? "Saving…" : "Save"}
+                    {pending ? tx("Saving…") : tx("Save")}
                   </button>
                 </div>
               </form>
@@ -1215,13 +1266,15 @@ export function MembershipsManager({
       >
         <div className="border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5">
           <h2 className="mb-3 text-sm font-bold tracking-wide text-slate-700 uppercase">
-            Membership directory
+            {" "}
+            {tx("Membership directory")}{" "}
           </h2>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="grid gap-1.5 text-xs font-semibold text-slate-600">
-              View
+              {" "}
+              {tx("View")}{" "}
               <select
-                aria-label="Membership list"
+                aria-label={tx("Membership list")}
                 className="input"
                 onChange={(event) => {
                   const value = event.target.value;
@@ -1230,7 +1283,7 @@ export function MembershipsManager({
                 }}
                 value={listMode}
               >
-                <option value="all">All memberships</option>
+                <option value="all">{tx("All memberships")}</option>
                 {EXPIRY_BUCKETS.map((bucket) => (
                   <option key={bucket} value={bucket}>
                     {EXPIRY_LABELS[bucket]}
@@ -1239,9 +1292,10 @@ export function MembershipsManager({
               </select>
             </label>
             <label className="grid gap-1.5 text-xs font-semibold text-slate-600">
-              Membership status
+              {" "}
+              {tx("Membership status")}{" "}
               <select
-                aria-label="Filter by status"
+                aria-label={tx("Filter by status")}
                 className="input"
                 disabled={listMode !== "all"}
                 onChange={(event) => {
@@ -1251,18 +1305,19 @@ export function MembershipsManager({
                 }}
                 value={status}
               >
-                <option value="">All statuses</option>
-                <option value="PENDING">Pending</option>
-                <option value="ACTIVE">Active</option>
-                <option value="EXPIRED">Expired</option>
-                <option value="SUSPENDED">Suspended</option>
-                <option value="CANCELLED">Cancelled</option>
+                <option value="">{tx("All statuses")}</option>
+                <option value="PENDING">{tx("Pending")}</option>
+                <option value="ACTIVE">{tx("Active")}</option>
+                <option value="EXPIRED">{tx("Expired")}</option>
+                <option value="SUSPENDED">{tx("Suspended")}</option>
+                <option value="CANCELLED">{tx("Cancelled")}</option>
               </select>
             </label>
             <label className="grid gap-1.5 text-xs font-semibold text-slate-600">
-              Payment status
+              {" "}
+              {tx("Payment status")}{" "}
               <select
-                aria-label="Filter by payment status"
+                aria-label={tx("Filter by payment status")}
                 className="input"
                 disabled={listMode !== "all"}
                 onChange={(event) => {
@@ -1272,19 +1327,21 @@ export function MembershipsManager({
                 }}
                 value={paymentStatus}
               >
-                <option value="">All payment statuses</option>
-                <option value="UNPAID">Unpaid</option>
-                <option value="PARTIAL">Partial</option>
-                <option value="PAID">Paid</option>
-                <option value="PARTIALLY_REFUNDED">Partially refunded</option>
-                <option value="REFUNDED">Refunded</option>
+                <option value="">{tx("All payment statuses")}</option>
+                <option value="UNPAID">{tx("Unpaid")}</option>
+                <option value="PARTIAL">{tx("Partial")}</option>
+                <option value="PAID">{tx("Paid")}</option>
+                <option value="PARTIALLY_REFUNDED">
+                  {tx("Partially refunded")}
+                </option>
+                <option value="REFUNDED">{tx("Refunded")}</option>
               </select>
             </label>
           </div>
         </div>
         {loading ? (
           <div className="grid gap-3 p-5" role="status">
-            <span className="sr-only">Loading memberships.</span>
+            <span className="sr-only">{tx("Loading memberships.")}</span>
             {[0, 1, 2].map((item) => (
               <div
                 className="h-16 animate-pulse rounded-xl bg-slate-100"
@@ -1294,29 +1351,39 @@ export function MembershipsManager({
           </div>
         ) : null}
         <div className="overflow-x-auto">
-          <table aria-label="Memberships" className="w-full text-left text-sm">
+          <table
+            aria-label={tx("Memberships")}
+            className="w-full text-left text-sm"
+          >
             <thead>
               <tr>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                  Member
+                  {" "}
+                  {tx("Member")}{" "}
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                  Plan
+                  {" "}
+                  {tx("Plan")}{" "}
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                  Dates
+                  {" "}
+                  {tx("Dates")}{" "}
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                  Total
+                  {" "}
+                  {tx("Total")}{" "}
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                  Status
+                  {" "}
+                  {tx("Status")}{" "}
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                  Note
+                  {" "}
+                  {tx("Note")}{" "}
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold" scope="col">
-                  Action
+                  {" "}
+                  {tx("Action")}{" "}
                 </th>
               </tr>
             </thead>
@@ -1338,11 +1405,11 @@ export function MembershipsManager({
                     {membership.start_date} – {membership.expiry_date}
                   </td>
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-900">
-                    {membership.final_amount} {membership.currency}
+                    {membership.final_amount} {tx(membership.currency)}
                   </td>
                   <td className="px-5 py-4">
                     <span className="sr-only">
-                      {membership.status} / {membership.payment_status}
+                      {tx(membership.status)} / {tx(membership.payment_status)}
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       <StatusBadge status={membership.status} />
@@ -1350,7 +1417,7 @@ export function MembershipsManager({
                     </div>
                   </td>
                   <td className="max-w-56 truncate px-5 py-4 text-slate-600">
-                    {membership.note ? membership.note : "No note"}
+                    {membership.note ? membership.note : tx("No note")}
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex flex-nowrap gap-2">
@@ -1362,13 +1429,15 @@ export function MembershipsManager({
                               knownMembers.get(membership.member_id),
                               membership.member_id,
                             ),
+                            tx,
                           )}
                           className={rowActionClass("edit")}
                           disabled={membershipActionsLocked}
                           onClick={() => openNoteEditor(membership)}
                           type="button"
                         >
-                          Edit note
+                          {" "}
+                          {tx("Edit note")}{" "}
                         </button>
                       ) : null}
                       {canUpdate && membership.status === "ACTIVE" && (
@@ -1380,7 +1449,8 @@ export function MembershipsManager({
                           }
                           type="button"
                         >
-                          Suspend
+                          {" "}
+                          {tx("Suspend")}{" "}
                         </button>
                       )}
                       {canUpdate && membership.status === "SUSPENDED" && (
@@ -1392,7 +1462,8 @@ export function MembershipsManager({
                           }
                           type="button"
                         >
-                          Resume
+                          {" "}
+                          {tx("Resume")}{" "}
                         </button>
                       )}
                       {canCancel &&
@@ -1405,7 +1476,8 @@ export function MembershipsManager({
                             onClick={() => setCancelTarget(membership)}
                             type="button"
                           >
-                            Cancel
+                            {" "}
+                            {tx("Cancel")}{" "}
                           </button>
                         )}
                     </div>
@@ -1416,10 +1488,14 @@ export function MembershipsManager({
                 <tr>
                   <td className="px-6 py-14 text-center" colSpan={7}>
                     <p className="font-semibold text-slate-700">
-                      No memberships found.
+                      {" "}
+                      {tx("No memberships found.")}{" "}
                     </p>
                     <p className="mt-1 text-sm text-slate-500">
-                      Try selecting a different status or expiry range.
+                      {" "}
+                      {tx(
+                        "Try selecting a different status or expiry range.",
+                      )}{" "}
                     </p>
                   </td>
                 </tr>
@@ -1429,7 +1505,8 @@ export function MembershipsManager({
         </div>
         {paging ? (
           <p className="m-4 text-center text-sm text-slate-500" role="status">
-            Loading more memberships.
+            {" "}
+            {tx("Loading more memberships.")}{" "}
           </p>
         ) : null}
         {hasMore && nextAfter ? (
@@ -1440,7 +1517,8 @@ export function MembershipsManager({
               onClick={() => void loadMore()}
               type="button"
             >
-              Load more memberships
+              {" "}
+              {tx("Load more memberships")}{" "}
             </button>
           </div>
         ) : null}
@@ -1524,17 +1602,21 @@ export function MembershipsManager({
                 aria-hidden="true"
                 className="grid min-h-9 shrink-0 place-items-center rounded-lg bg-amber-100 px-2 text-[0.65rem] font-black tracking-wide text-amber-800"
               >
-                MEMBER
+                {tx("MEMBER")}
               </span>
               <div className="min-w-0 flex-1">
                 <h2
                   className="text-xl font-bold text-slate-900"
                   id={startMembershipTitleId}
                 >
-                  Start membership
+                  {" "}
+                  {tx("Start membership")}{" "}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Find a member, choose a plan, and confirm the start date.
+                  {" "}
+                  {tx(
+                    "Find a member, choose a plan, and confirm the start date.",
+                  )}{" "}
                 </p>
               </div>
               <button
@@ -1543,18 +1625,21 @@ export function MembershipsManager({
                 onClick={closeStartMembershipForm}
                 type="button"
               >
-                Close
+                {" "}
+                {tx("Close")}{" "}
               </button>
             </div>
             <div className="grid gap-5 px-5 py-4 sm:px-6">
               <fieldset className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <legend className="px-2 text-sm font-bold text-slate-700">
-                  Member selection
+                  {" "}
+                  {tx("Member selection")}{" "}
                 </legend>
                 <label className="field">
-                  Search members
+                  {" "}
+                  {tx("Search members")}{" "}
                   <input
-                    aria-label="Search members"
+                    aria-label={tx("Search members")}
                     className="input"
                     maxLength={100}
                     onChange={(event) => {
@@ -1570,14 +1655,15 @@ export function MembershipsManager({
                       setMemberSearchLoading(true);
                       setMemberSearchError("");
                     }}
-                    placeholder="Name, number, phone, or email"
+                    placeholder={tx("Name, number, phone, or email")}
                     ref={memberSearchRef}
                     value={memberQuery}
                   />
                 </label>
                 {memberSearchLoading ? (
                   <p className="text-sm text-slate-500" role="status">
-                    Searching members.
+                    {" "}
+                    {tx("Searching members.")}{" "}
                   </p>
                 ) : null}
                 {memberSearchError ? (
@@ -1589,11 +1675,11 @@ export function MembershipsManager({
                 trimmedMemberQuery &&
                 memberResults.length === 0 &&
                 !memberSearchError ? (
-                  <p className="muted">No matching members.</p>
+                  <p className="muted">{tx("No matching members.")}</p>
                 ) : null}
                 {memberResults.length > 0 ? (
                   <ul
-                    aria-label="Matching members"
+                    aria-label={tx("Matching members")}
                     className="grid max-h-48 gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2"
                   >
                     {memberResults.map((member) => (
@@ -1618,13 +1704,16 @@ export function MembershipsManager({
                   }
                 >
                   {selectedMember
-                    ? `Selected member: ${memberOptionLabel(selectedMember)}`
-                    : "No member selected."}
+                    ? tx("Selected member: {name}", {
+                        name: memberOptionLabel(selectedMember),
+                      })
+                    : tx("No member selected.")}
                 </p>
               </fieldset>
               <div className="grid gap-4 sm:grid-cols-2 [&_.field]:text-sm [&_.field]:font-semibold [&_.field]:text-slate-700">
                 <label className="field sm:col-span-2">
-                  Plan
+                  {" "}
+                  {tx("Plan")}{" "}
                   <select
                     className="input"
                     disabled={Boolean(planError)}
@@ -1633,16 +1722,17 @@ export function MembershipsManager({
                     required
                     value={draftPlanId}
                   >
-                    <option value="">Select plan</option>
+                    <option value="">{tx("Select plan")}</option>
                     {activePlans.map((plan) => (
                       <option key={plan.id} value={plan.id}>
-                        {plan.name} — {plan.price} {plan.currency}
+                        {plan.name} — {plan.price} {tx(plan.currency)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="field">
-                  Start date
+                  {" "}
+                  {tx("Start date")}{" "}
                   <input
                     className="input"
                     name="start_date"
@@ -1653,7 +1743,8 @@ export function MembershipsManager({
                   />
                 </label>
                 <label className="field">
-                  Discount
+                  {" "}
+                  {tx("Discount")}{" "}
                   <input
                     className="input"
                     min="0"
@@ -1666,7 +1757,8 @@ export function MembershipsManager({
                 </label>
               </div>
               <label className="field text-sm font-semibold text-slate-700">
-                Note
+                {" "}
+                {tx("Note")}{" "}
                 <textarea
                   className="input min-h-24"
                   maxLength={4000}
@@ -1689,14 +1781,16 @@ export function MembershipsManager({
                   onClick={closeStartMembershipForm}
                   type="button"
                 >
-                  Cancel
+                  {" "}
+                  {tx("Cancel")}{" "}
                 </button>
                 <button
                   className="button button-success w-full sm:w-auto"
                   disabled={pending}
                   type="submit"
                 >
-                  Start membership
+                  {" "}
+                  {tx("Start membership")}{" "}
                 </button>
               </div>
             </div>
@@ -1716,6 +1810,7 @@ function ArchivePlanDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const tx = useTx();
   const titleId = useId();
   return (
     <div
@@ -1736,19 +1831,23 @@ function ArchivePlanDialog({
       >
         <div className="border-b border-slate-200 px-5 py-4">
           <p className="text-xs font-bold tracking-[0.16em] text-red-600 uppercase">
-            Archive plan
+            {" "}
+            {tx("Archive plan")}{" "}
           </p>
           <h2
             className="mt-1 text-xl font-black tracking-tight text-slate-900"
             id={titleId}
           >
-            Archive {plan.name}?
+            {" "}
+            {tx("Archive")} {plan.name}?
           </h2>
         </div>
         <div className="p-5">
           <p className="text-sm leading-6 text-slate-600">
-            This plan will no longer be available for new memberships. Existing
-            memberships and historical records will remain unchanged.
+            {" "}
+            {tx(
+              "This plan will no longer be available for new memberships. Existing memberships and historical records will remain unchanged.",
+            )}{" "}
           </p>
           <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
             {plan.name} ({plan.code})
@@ -1759,14 +1858,16 @@ function ArchivePlanDialog({
               onClick={onCancel}
               type="button"
             >
-              Cancel
+              {" "}
+              {tx("Cancel")}{" "}
             </button>
             <button
               className="button button-archive"
               onClick={onConfirm}
               type="button"
             >
-              Archive
+              {" "}
+              {tx("Archive")}{" "}
             </button>
           </div>
         </div>
@@ -1786,6 +1887,7 @@ function CancelMembershipDialog({
   onCancel: () => void;
   onConfirm: (reason: string) => void;
 }) {
+  const tx = useTx();
   const titleId = useId();
   const reasonId = useId();
   const [reason, setReason] = useState("");
@@ -1795,7 +1897,7 @@ function CancelMembershipDialog({
     event.preventDefault();
     const trimmed = reason.trim();
     if (!trimmed) {
-      setError("Enter a cancellation reason.");
+      setError(tx("Enter a cancellation reason."));
       return;
     }
     onConfirm(trimmed);
@@ -1821,22 +1923,25 @@ function CancelMembershipDialog({
       >
         <div className="border-b border-slate-200 px-5 py-4">
           <p className="text-xs font-bold tracking-[0.16em] text-red-600 uppercase">
-            Cancel membership
+            {" "}
+            {tx("Cancel membership")}{" "}
           </p>
           <h2
             className="mt-1 text-xl font-black tracking-tight text-slate-900"
             id={titleId}
           >
-            Cancel this membership?
+            {" "}
+            {tx("Cancel this membership?")}{" "}
           </h2>
         </div>
         <div className="grid gap-4 p-5">
           <p className="text-sm leading-6 text-slate-600">
-            {memberLabel} will lose the {planName} membership. This does not
-            delete payment history.
+            {memberLabel} {tx("will lose the")} {planName}{" "}
+            {tx("membership. This does not delete payment history.")}{" "}
           </p>
           <label className="field" htmlFor={reasonId}>
-            Cancellation reason
+            {" "}
+            {tx("Cancellation reason")}{" "}
             <textarea
               className="input min-h-24"
               id={reasonId}
@@ -1847,7 +1952,7 @@ function CancelMembershipDialog({
           </label>
           {error ? (
             <p className="error" role="alert">
-              {error}
+              {tx(error)}
             </p>
           ) : null}
           <div className="flex justify-end">
@@ -1856,10 +1961,12 @@ function CancelMembershipDialog({
               onClick={onCancel}
               type="button"
             >
-              Back
+              {" "}
+              {tx("Back")}{" "}
             </button>
             <button className="button button-delete" type="submit">
-              Cancel membership
+              {" "}
+              {tx("Cancel membership")}{" "}
             </button>
           </div>
         </div>
@@ -1869,6 +1976,7 @@ function CancelMembershipDialog({
 }
 
 function StatusBadge({ status, label }: { status: string; label?: string }) {
+  const tx = useTx();
   const tones: Record<string, string> = {
     ACTIVE: "bg-emerald-100 text-emerald-700",
     PAID: "bg-emerald-100 text-emerald-700",
@@ -1886,7 +1994,7 @@ function StatusBadge({ status, label }: { status: string; label?: string }) {
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${tones[status] ?? "bg-slate-100 text-slate-600"}`}
     >
-      {label ?? statusLabel(status)}
+      {tx(label ?? statusLabel(status))}
     </span>
   );
 }
@@ -1914,9 +2022,13 @@ function PlanEditorDialog({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
 }) {
+  const tx = useTx();
   const titleId = useId();
   const { source, draft } = state;
-  const title = `Edit ${source.name} (${source.code})`;
+  const title = tx("Edit {name} ({code})", {
+    name: source.name,
+    code: source.code,
+  });
   return (
     <div
       className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-4 py-8"
@@ -1937,26 +2049,30 @@ function PlanEditorDialog({
       >
         <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
           <p className="text-xs font-bold tracking-[0.16em] text-amber-600 uppercase">
-            Membership plan
+            {" "}
+            {tx("Membership plan")}{" "}
           </p>
           <h2
             className="mt-1 text-xl font-black tracking-tight text-slate-900"
             id={titleId}
           >
-            {title}
+            {tx(title)}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Update the plan details below, then save your changes.
+            {" "}
+            {tx("Update the plan details below, then save your changes.")}{" "}
           </p>
         </div>
         <form className="grid gap-5 p-5 sm:p-6" onSubmit={onSubmit}>
           <div className="grid gap-4 sm:grid-cols-2 [&_.field]:text-sm [&_.field]:font-semibold [&_.field]:text-slate-700">
             <label className="field">
-              Code
+              {" "}
+              {tx("Code")}{" "}
               <input className="input" readOnly value={draft.code} />
             </label>
             <label className="field">
-              Name
+              {" "}
+              {tx("Name")}{" "}
               <input
                 className="input"
                 maxLength={PLAN_NAME_MAX}
@@ -1968,7 +2084,8 @@ function PlanEditorDialog({
               />
             </label>
             <label className="field col-span-2">
-              Description
+              {" "}
+              {tx("Description")}{" "}
               <textarea
                 className="input min-h-24"
                 maxLength={PLAN_TEXT_MAX}
@@ -1979,7 +2096,8 @@ function PlanEditorDialog({
               />
             </label>
             <label className="field">
-              Duration
+              {" "}
+              {tx("Duration")}{" "}
               <input
                 className="input"
                 inputMode="numeric"
@@ -1992,7 +2110,8 @@ function PlanEditorDialog({
               />
             </label>
             <label className="field">
-              Unit
+              {" "}
+              {tx("Unit")}{" "}
               <select
                 className="input"
                 onChange={(event) => {
@@ -2004,13 +2123,14 @@ function PlanEditorDialog({
               >
                 {DURATION_UNITS.map((unit) => (
                   <option key={unit} value={unit}>
-                    {DURATION_UNIT_LABELS[unit]}
+                    {tx(DURATION_UNIT_LABELS[unit])}
                   </option>
                 ))}
               </select>
             </label>
             <label className="field">
-              Price
+              {" "}
+              {tx("Price")}{" "}
               <input
                 className="input"
                 inputMode="decimal"
@@ -2022,7 +2142,8 @@ function PlanEditorDialog({
               />
             </label>
             <label className="field">
-              Currency
+              {" "}
+              {tx("Currency")}{" "}
               <input
                 className="input bg-slate-50 text-slate-500"
                 readOnly
@@ -2031,7 +2152,8 @@ function PlanEditorDialog({
             </label>
           </div>
           <p className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
-            Status
+            {" "}
+            {tx("Status")}{" "}
             <StatusBadge
               label={planStatusLabel(source)}
               status={planStatusLabel(source).toUpperCase()}
@@ -2039,7 +2161,7 @@ function PlanEditorDialog({
           </p>
           {error ? (
             <p className="error" role="alert">
-              {error}
+              {tx(error)}
             </p>
           ) : null}
           <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
@@ -2049,14 +2171,15 @@ function PlanEditorDialog({
               onClick={onCancel}
               type="button"
             >
-              Cancel
+              {" "}
+              {tx("Cancel")}{" "}
             </button>
             <button
               className="button button-edit"
               disabled={pending}
               type="submit"
             >
-              {pending ? "Saving…" : "Save"}
+              {pending ? tx("Saving…") : tx("Save")}
             </button>
           </div>
         </form>
@@ -2080,6 +2203,7 @@ function NoteEditorDialog({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
 }) {
+  const tx = useTx();
   const titleId = useId();
   const shortMember = compactIdentifier(state.memberLabel);
   return (
@@ -2096,16 +2220,18 @@ function NoteEditorDialog({
       >
         <div>
           <h2 className="text-lg font-bold" id={titleId}>
-            Edit membership note
+            {" "}
+            {tx("Edit membership note")}{" "}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            {shortMember} · {state.planName} · Membership{" "}
+            {shortMember} · {state.planName} {tx("· Membership")}{" "}
             <IdentifierValue value={state.membershipId} />
           </p>
         </div>
         <form className="grid gap-4" onSubmit={onSubmit}>
           <label className="field">
-            Membership note
+            {" "}
+            {tx("Membership note")}{" "}
             <textarea
               className="input min-h-28"
               maxLength={PLAN_TEXT_MAX}
@@ -2115,26 +2241,31 @@ function NoteEditorDialog({
           </label>
           {error ? (
             <p className="error" role="alert">
-              {error}
+              {tx(error)}
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
             <button
-              aria-label={`Save note for ${shortMember} · ${state.planName}`}
+              aria-label={tx("Save note for {member} · {plan}", {
+                member: shortMember,
+                plan: state.planName,
+              })}
               className="button button-edit"
               disabled={pending}
               type="submit"
             >
-              Save
+              {" "}
+              {tx("Save")}{" "}
             </button>
             <button
-              aria-label="Discard note changes"
+              aria-label={tx("Discard note changes")}
               className="button button-cancel"
               disabled={pending}
               onClick={onCancel}
               type="button"
             >
-              Cancel
+              {" "}
+              {tx("Cancel")}{" "}
             </button>
           </div>
         </form>

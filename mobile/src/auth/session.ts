@@ -7,7 +7,7 @@ export type SessionStatus = "loading" | "anonymous" | "signed-in" | "offline";
 
 export type Session = {
   bootstrap(): Promise<SessionStatus>;
-  login(email: string, password: string): Promise<void>;
+  login(idToken: string): Promise<void>;
   logout(): Promise<{ serverConfirmed: boolean }>;
   wipe(): Promise<void>;
 };
@@ -100,8 +100,8 @@ export function createSession(deps: {
         return "offline";
       }
     },
-    async login(email, password) {
-      const tokens = await deps.api.login({ email, password });
+    async login(idToken) {
+      const tokens = await deps.api.login({ idToken });
       try {
         await deps.store.setRefreshToken(tokens.refresh_token);
       } catch (error) {

@@ -56,6 +56,7 @@ PUBLISHED_PATHS = {
     "/api/v1/gym/",
     "/api/v1/gym/logo/",
     "/api/v1/gym-memberships/{id}/roles/",
+    "/api/v1/member-auth/google/",
     "/api/v1/member-auth/login/",
     "/api/v1/member-auth/logout/",
     "/api/v1/member-auth/refresh/",
@@ -1243,6 +1244,7 @@ def test_openapi_documents_bff_staff_and_platform_authentication_boundaries() ->
 def test_openapi_documents_member_auth_without_a_selector_or_bff_gate() -> None:
     document = generated_schema()
     login = document["paths"]["/api/v1/member-auth/login/"]["post"]
+    google = document["paths"]["/api/v1/member-auth/google/"]["post"]
     refresh = document["paths"]["/api/v1/member-auth/refresh/"]["post"]
     logout = document["paths"]["/api/v1/member-auth/logout/"]["post"]
     parameters = login.get("parameters", [])
@@ -1256,6 +1258,19 @@ def test_openapi_documents_member_auth_without_a_selector_or_bff_gate() -> None:
     assert set(body["properties"]) == {"email", "password", "device_name"}
     assert "member_id" not in body["properties"]
     assert "gym_id" not in body["properties"]
+    google_parameters = google.get("parameters", [])
+    assert not any(parameter["name"] == "X-Gym-BFF-Secret" for parameter in google_parameters)
+    assert google.get("security", []) == []
+    google_body = google["requestBody"]["content"]["application/json"]["schema"]
+    if "$ref" in google_body:
+        google_body = document["components"]["schemas"][google_body["$ref"].rsplit("/", 1)[-1]]
+    assert set(google_body["properties"]) == {"id_token", "device_name"}
+    assert "email" not in google_body["properties"]
+    assert "password" not in google_body["properties"]
+    assert "member_id" not in google_body["properties"]
+    assert "gym_id" not in google_body["properties"]
+    assert "200" in google["responses"]
+    assert "403" in google["responses"]
     assert "200" in login["responses"]
     assert "200" in refresh["responses"]
     assert "204" in logout["responses"]

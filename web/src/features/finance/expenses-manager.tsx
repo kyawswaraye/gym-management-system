@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import {
   useEffect,
@@ -113,11 +114,12 @@ function statusTone(status: string): string {
 }
 
 function StatusPill({ status }: { status: string }) {
+  const tx = useTx();
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ${statusTone(status)}`}
     >
-      {pretty(status)}
+      {tx(pretty(status))}
     </span>
   );
 }
@@ -144,11 +146,12 @@ function categoryStatus(category: ExpenseCategory): string {
 }
 
 function FactGrid({ rows }: { rows: Array<{ label: string; value: string }> }) {
+  const tx = useTx();
   return (
     <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
       {rows.map((row) => (
         <div key={row.label}>
-          <dt className="text-xs text-slate-500">{row.label}</dt>
+          <dt className="text-xs text-slate-500">{tx(row.label)}</dt>
           <dd className="mt-0.5 text-sm font-semibold break-words text-slate-900">
             <IdentifierValue value={row.value} />
           </dd>
@@ -177,6 +180,7 @@ function ActionPanel({
   onCancel: () => void;
   children?: ReactNode;
 }) {
+  const tx = useTx();
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit(new FormData(event.currentTarget));
@@ -199,14 +203,15 @@ function ActionPanel({
           onClick={onCancel}
           type="button"
         >
-          Back
+          {" "}
+          {tx("Back")}{" "}
         </button>
         <button
           className={actionButtonClass(confirmLabel)}
           disabled={pending}
           type="submit"
         >
-          {confirmLabel}
+          {tx(confirmLabel)}
         </button>
       </div>
     </FormDialog>
@@ -220,6 +225,7 @@ function StatusFilter({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const tx = useTx();
   const groupRef = useRef<HTMLDivElement>(null);
 
   function move(event: KeyboardEvent<HTMLDivElement>, delta: number) {
@@ -237,7 +243,7 @@ function StatusFilter({
 
   return (
     <div
-      aria-label="Status"
+      aria-label={tx("Status")}
       className="flex flex-wrap gap-1.5"
       onKeyDown={(event) => {
         if (event.key === "ArrowRight" || event.key === "ArrowDown") {
@@ -266,7 +272,7 @@ function StatusFilter({
             tabIndex={selected ? 0 : -1}
             type="button"
           >
-            {label}
+            {tx(label)}
           </button>
         );
       })}
@@ -291,6 +297,7 @@ function ExpenseFields({
   fields: Record<string, string>;
   wide?: boolean;
 }) {
+  const tx = useTx();
   const span = wide ? "sm:col-span-2" : undefined;
   return (
     <div className={wide ? "grid gap-4 sm:grid-cols-2" : "grid gap-4"}>
@@ -309,7 +316,7 @@ function ExpenseFields({
           name="category_id"
           required
         >
-          <option value="">Select a category</option>
+          <option value="">{tx("Select a category")}</option>
           {categories.map((category) => (
             <option
               disabled={salaryCategory(category)}
@@ -331,7 +338,7 @@ function ExpenseFields({
           type="date"
         />
       </Field>
-      <Field error={fields.amount} label={`Amount (${currency})`}>
+      <Field error={fields.amount} label={tx("Amount ({currency})", { currency: tx(currency) })}>
         <TextInput
           defaultValue={expense?.amount}
           inputMode="decimal"
@@ -347,7 +354,7 @@ function ExpenseFields({
         >
           {METHODS.map((item) => (
             <option key={item} value={item}>
-              {pretty(item)}
+              {tx(pretty(item))}
             </option>
           ))}
         </SelectInput>
@@ -374,9 +381,10 @@ function ExpenseFields({
 }
 
 function LoadingRows({ label }: { label: string }) {
+  const tx = useTx();
   return (
     <div className="grid gap-3 p-4 sm:p-5" role="status">
-      <p className="text-sm font-medium text-slate-600">{label}</p>
+      <p className="text-sm font-medium text-slate-600">{tx(label)}</p>
       <div className="grid gap-2">
         {[0, 1, 2].map((item) => (
           <div
@@ -412,6 +420,7 @@ export function ExpensesManager({
   currency: string;
   defaultDate: string;
 }) {
+  const tx = useTx();
   const [view, setView] = useState<ExpenseSection>("expenses");
   const [applied, setApplied] = useState("");
   const [selectedId, setSelectedId] = useState("");
@@ -461,7 +470,7 @@ export function ExpensesManager({
           if (!active) return;
           setExpense(null);
           setFormError(
-            financeError(caught, "The expense could not be loaded."),
+            financeError(caught, tx("The expense could not be loaded.")),
           );
           setErrorScope("detail");
         });
@@ -470,7 +479,7 @@ export function ExpensesManager({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [selectedId, expenses.rows]);
+  }, [selectedId, expenses.rows, tx]);
 
   useEffect(() => {
     if (!editingCategory) return undefined;
@@ -555,7 +564,7 @@ export function ExpensesManager({
   return (
     <div className="grid gap-6">
       <div
-        aria-label="Expense sections"
+        aria-label={tx("Expense sections")}
         className="flex flex-wrap gap-2"
         role="tablist"
       >
@@ -570,7 +579,7 @@ export function ExpensesManager({
             role="tab"
             type="button"
           >
-            {label}
+            {tx(label)}
           </button>
         ))}
       </div>
@@ -615,7 +624,7 @@ export function ExpensesManager({
                   .finally(() => setPending(false));
               }}
               pending={pending}
-              title="Record an expense"
+              title={tx("Record an expense")}
               wide
             >
               <div className={fieldTone}>
@@ -635,7 +644,8 @@ export function ExpensesManager({
                   disabled={pending}
                   type="submit"
                 >
-                  Save draft
+                  {" "}
+                  {tx("Save draft")}{" "}
                 </button>
               </div>
             </FormDialog>
@@ -660,10 +670,14 @@ export function ExpensesManager({
                       className="text-lg font-bold text-slate-900"
                       id="expense-list-title"
                     >
-                      Expense ledger
+                      {" "}
+                      {tx("Expense ledger")}{" "}
                     </h2>
                     <p className="mt-1 text-sm leading-6 text-slate-500">
-                      Select a row to review, submit, or approve it.
+                      {" "}
+                      {tx(
+                        "Select a row to review, submit, or approve it.",
+                      )}{" "}
                     </p>
                   </div>
                   {canCreate ? (
@@ -676,7 +690,8 @@ export function ExpensesManager({
                       }}
                       type="button"
                     >
-                      Record an expense
+                      {" "}
+                      {tx("Record an expense")}{" "}
                     </button>
                   ) : null}
                 </div>
@@ -693,7 +708,8 @@ export function ExpensesManager({
                   className="px-5 pt-4 text-sm font-medium text-slate-600"
                   role="status"
                 >
-                  Loading expenses.
+                  {" "}
+                  {tx("Loading expenses.")}{" "}
                 </p>
               ) : null}
               {!expenses.pending && expenses.error ? (
@@ -707,13 +723,13 @@ export function ExpensesManager({
                 <div className="px-4 py-14 text-center sm:px-5">
                   <p className="font-semibold text-slate-800">
                     {applied
-                      ? "No expenses match this status."
-                      : "No expenses yet."}
+                      ? tx("No expenses match this status.")
+                      : tx("No expenses yet.")}
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
                     {applied
-                      ? "Try another status."
-                      : "Drafts you save will show up here."}
+                      ? tx("Try another status.")
+                      : tx("Drafts you save will show up here.")}
                   </p>
                 </div>
               ) : null}
@@ -722,44 +738,50 @@ export function ExpensesManager({
                   className={`overflow-x-auto ${expenses.pending ? "opacity-60" : ""}`}
                 >
                   <table className="w-full text-left text-sm">
-                    <caption className="sr-only">Expenses</caption>
+                    <caption className="sr-only">{tx("Expenses")}</caption>
                     <thead className="border-b border-slate-200 text-slate-500">
                       <tr>
                         <th
                           className="px-5 py-2.5 text-xs font-semibold"
                           scope="col"
                         >
-                          Description
+                          {" "}
+                          {tx("Description")}{" "}
                         </th>
                         <th
                           className="hidden px-5 py-2.5 text-xs font-semibold sm:table-cell"
                           scope="col"
                         >
-                          Category
+                          {" "}
+                          {tx("Category")}{" "}
                         </th>
                         <th
                           className="px-5 py-2.5 text-right text-xs font-semibold"
                           scope="col"
                         >
-                          Amount
+                          {" "}
+                          {tx("Amount")}{" "}
                         </th>
                         <th
                           className="hidden px-5 py-2.5 text-xs font-semibold lg:table-cell"
                           scope="col"
                         >
-                          Method
+                          {" "}
+                          {tx("Method")}{" "}
                         </th>
                         <th
                           className="hidden px-5 py-2.5 text-xs font-semibold lg:table-cell"
                           scope="col"
                         >
-                          Date
+                          {" "}
+                          {tx("Date")}{" "}
                         </th>
                         <th
                           className="px-5 py-2.5 text-xs font-semibold"
                           scope="col"
                         >
-                          Status
+                          {" "}
+                          {tx("Status")}{" "}
                         </th>
                       </tr>
                     </thead>
@@ -782,7 +804,7 @@ export function ExpensesManager({
                                 onClick={() => selectExpense(row.id)}
                                 type="button"
                               >
-                                {row.description}
+                                {tx(row.description)}
                               </button>
                             </td>
                             <td className="hidden px-5 py-3 text-slate-600 sm:table-cell">
@@ -791,11 +813,11 @@ export function ExpensesManager({
                             <td className="px-5 py-3 text-right font-semibold whitespace-nowrap text-slate-900 tabular-nums">
                               {row.amount}{" "}
                               <span className="font-medium text-slate-400">
-                                {row.currency}
+                                {tx(row.currency)}
                               </span>
                             </td>
                             <td className="hidden px-5 py-3 whitespace-nowrap text-slate-600 lg:table-cell">
-                              {pretty(row.payment_method)}
+                              {tx(pretty(row.payment_method))}
                             </td>
                             <td className="hidden px-5 py-3 whitespace-nowrap text-slate-600 lg:table-cell">
                               {row.business_date}
@@ -832,13 +854,15 @@ export function ExpensesManager({
               >
                 {!detail ? (
                   <h2 className="sr-only" id="expense-detail-title">
-                    Expense
+                    {" "}
+                    {tx("Expense")}{" "}
                   </h2>
                 ) : null}
                 {!detail && !detailError ? (
                   <div className="grid gap-3 p-5" role="status">
                     <p className="text-sm font-medium text-slate-600">
-                      Loading the expense.
+                      {" "}
+                      {tx("Loading the expense.")}{" "}
                     </p>
                     <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
                     <div className="grid grid-cols-2 gap-2">
@@ -861,10 +885,11 @@ export function ExpensesManager({
                             className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase"
                             id="expense-detail-title"
                           >
-                            Expense
+                            {" "}
+                            {tx("Expense")}{" "}
                           </h2>
                           <p className="mt-1 text-xl font-black tracking-tight break-words text-slate-900">
-                            {detail.description}
+                            {tx(detail.description)}
                           </p>
                           <p className="mt-0.5 text-sm text-slate-500">
                             {selectedCategory?.name ?? "Category unavailable"}
@@ -875,14 +900,15 @@ export function ExpensesManager({
                       <div className="mt-4 flex items-end justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/80">
                         <div>
                           <p className="text-xs font-medium text-slate-500">
-                            Amount
+                            {" "}
+                            {tx("Amount")}{" "}
                           </p>
                           <p className="mt-1 text-2xl font-black tracking-tight text-slate-900 tabular-nums">
                             {detail.amount}
                           </p>
                         </div>
                         <p className="pb-1 text-sm font-semibold text-slate-500">
-                          {detail.currency}
+                          {tx(detail.currency)}
                         </p>
                       </div>
                     </div>
@@ -890,21 +916,21 @@ export function ExpensesManager({
                       <FactGrid
                         rows={[
                           {
-                            label: "Method",
-                            value: pretty(detail.payment_method),
+                            label: tx("Method"),
+                            value: tx(pretty(detail.payment_method)),
                           },
                           {
-                            label: "Business date",
+                            label: tx("Business date"),
                             value: detail.business_date,
                           },
                           {
-                            label: "Receipt",
+                            label: tx("Receipt"),
                             value: detail.receipt_file_asset_id
-                              ? "Attached"
-                              : "None",
+                              ? tx("Attached")
+                              : tx("None"),
                           },
                           {
-                            label: "Cash session",
+                            label: tx("Cash session"),
                             value: detail.cash_session_id ?? "None",
                           },
                         ]}
@@ -914,7 +940,8 @@ export function ExpensesManager({
                       <div className="px-5 pb-4">
                         <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-200/80">
                           <span className="mb-1 block text-xs font-medium text-slate-500">
-                            Policy note
+                            {" "}
+                            {tx("Policy note")}{" "}
                           </span>
                           {detail.policy_note}
                         </p>
@@ -924,7 +951,8 @@ export function ExpensesManager({
                       <div className="px-5 pb-4">
                         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-900">
                           <span className="mb-1 block text-xs font-semibold text-red-700">
-                            Rejection reason
+                            {" "}
+                            {tx("Rejection reason")}{" "}
                           </span>
                           {detail.rejection_reason}
                         </p>
@@ -936,7 +964,8 @@ export function ExpensesManager({
                       <div className="px-5 pb-4">
                         <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
                           <span className="mb-1 block text-xs font-medium text-slate-500">
-                            Reason
+                            {" "}
+                            {tx("Reason")}{" "}
                           </span>
                           {detail.reason}
                         </p>
@@ -948,9 +977,10 @@ export function ExpensesManager({
                           className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950"
                           role="note"
                         >
-                          This expense uses a protected salary or commission
-                          category. Void the salary period instead of voiding it
-                          here.
+                          {" "}
+                          {tx(
+                            "This expense uses a protected salary or commission category. Void the salary period instead of voiding it here.",
+                          )}{" "}
                         </p>
                       </div>
                     ) : null}
@@ -964,7 +994,8 @@ export function ExpensesManager({
                                 onClick={() => openAction("edit")}
                                 type="button"
                               >
-                                Edit draft
+                                {" "}
+                                {tx("Edit draft")}{" "}
                               </button>
                             ) : null}
                             {canSubmitDraft ? (
@@ -973,7 +1004,8 @@ export function ExpensesManager({
                                 onClick={() => openAction("submit")}
                                 type="button"
                               >
-                                Submit
+                                {" "}
+                                {tx("Submit")}{" "}
                               </button>
                             ) : null}
                             {canDecide ? (
@@ -982,7 +1014,8 @@ export function ExpensesManager({
                                 onClick={() => openAction("approve")}
                                 type="button"
                               >
-                                Approve
+                                {" "}
+                                {tx("Approve")}{" "}
                               </button>
                             ) : null}
                             {canDecide ? (
@@ -991,7 +1024,8 @@ export function ExpensesManager({
                                 onClick={() => openAction("reject")}
                                 type="button"
                               >
-                                Reject
+                                {" "}
+                                {tx("Reject")}{" "}
                               </button>
                             ) : null}
                             {canCancelDraft ? (
@@ -1000,7 +1034,8 @@ export function ExpensesManager({
                                 onClick={() => openAction("cancel")}
                                 type="button"
                               >
-                                Cancel draft
+                                {" "}
+                                {tx("Cancel draft")}{" "}
                               </button>
                             ) : null}
                             {canVoidPosted ? (
@@ -1009,7 +1044,8 @@ export function ExpensesManager({
                                 onClick={() => openAction("void")}
                                 type="button"
                               >
-                                Void
+                                {" "}
+                                {tx("Void")}{" "}
                               </button>
                             ) : null}
                           </div>
@@ -1049,7 +1085,7 @@ export function ExpensesManager({
                                 .finally(() => setPending(false));
                             }}
                             pending={pending}
-                            title="Edit draft"
+                            title={tx("Edit draft")}
                             wide
                           >
                             <Alert message={expenseError} />
@@ -1070,14 +1106,16 @@ export function ExpensesManager({
                                 onClick={() => setAction(null)}
                                 type="button"
                               >
-                                Back
+                                {" "}
+                                {tx("Back")}{" "}
                               </button>
                               <button
                                 className="button button-edit"
                                 disabled={pending}
                                 type="submit"
                               >
-                                Save changes
+                                {" "}
+                                {tx("Save changes")}{" "}
                               </button>
                             </div>
                           </FormDialog>
@@ -1107,7 +1145,7 @@ export function ExpensesManager({
                                 .finally(() => setPending(false));
                             }}
                             pending={pending}
-                            title="Submit this expense?"
+                            title={tx("Submit this expense?")}
                           />
                         ) : null}
                         {action === "approve" ? (
@@ -1155,7 +1193,7 @@ export function ExpensesManager({
                                 .finally(() => setPending(false));
                             }}
                             pending={pending}
-                            title="Approve expense"
+                            title={tx("Approve expense")}
                           >
                             {detail.payment_method === "CASH" ? (
                               <CashSessionSelect
@@ -1168,7 +1206,10 @@ export function ExpensesManager({
                               />
                             ) : (
                               <p className="text-sm text-slate-600">
-                                No cash session is sent for this method.
+                                {" "}
+                                {tx(
+                                  "No cash session is sent for this method.",
+                                )}{" "}
                               </p>
                             )}
                           </ActionPanel>
@@ -1203,7 +1244,7 @@ export function ExpensesManager({
                                 .finally(() => setPending(false));
                             }}
                             pending={pending}
-                            title="Reject expense"
+                            title={tx("Reject expense")}
                           >
                             <ReasonField
                               label="Rejection reason"
@@ -1238,7 +1279,7 @@ export function ExpensesManager({
                                 .finally(() => setPending(false));
                             }}
                             pending={pending}
-                            title="Cancel draft"
+                            title={tx("Cancel draft")}
                           >
                             <ReasonField label="Cancellation reason" />
                           </ActionPanel>
@@ -1285,7 +1326,7 @@ export function ExpensesManager({
                                 .finally(() => setPending(false));
                             }}
                             pending={pending}
-                            title="Void expense"
+                            title={tx("Void expense")}
                           >
                             <ReasonField label="Void reason" />
                             <Field label="Correction date">
@@ -1333,7 +1374,8 @@ export function ExpensesManager({
                 className="text-lg font-bold text-slate-900"
                 id="categories-title"
               >
-                Categories
+                {" "}
+                {tx("Categories")}{" "}
               </h2>
               {categories.rows.length > 0 ? (
                 <p className="text-xs font-semibold text-slate-400 tabular-nums">
@@ -1342,8 +1384,10 @@ export function ExpensesManager({
               ) : null}
             </div>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-              Protected salary and commission categories stay fixed. Custom
-              categories can be renamed or archived here.
+              {" "}
+              {tx(
+                "Protected salary and commission categories stay fixed. Custom categories can be renamed or archived here.",
+              )}{" "}
             </p>
           </div>
           {categories.error ? (
@@ -1359,7 +1403,8 @@ export function ExpensesManager({
           categories.rows.length === 0 ? (
             <div className="px-5 py-10 text-center">
               <p className="font-semibold text-slate-800">
-                No categories were returned.
+                {" "}
+                {tx("No categories were returned.")}{" "}
               </p>
             </div>
           ) : null}
@@ -1401,7 +1446,7 @@ export function ExpensesManager({
                   .finally(() => setPending(false));
               }}
               pending={pending}
-              title={`Update ${editingCategory.name}`}
+              title={tx("Update {name}", { name: editingCategory.name })}
             >
               <div className={fieldTone}>
                 <Alert message={categoryError} />
@@ -1427,8 +1472,8 @@ export function ExpensesManager({
                     defaultChecked={editingCategory.is_active}
                     name="is_active"
                     type="checkbox"
-                  />
-                  Active
+                  />{" "}
+                  {tx("Active")}{" "}
                 </label>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <button
@@ -1440,14 +1485,16 @@ export function ExpensesManager({
                     }}
                     type="button"
                   >
-                    Back
+                    {" "}
+                    {tx("Back")}{" "}
                   </button>
                   <button
                     className="button button-edit"
                     disabled={pending}
                     type="submit"
                   >
-                    Save category
+                    {" "}
+                    {tx("Save category")}{" "}
                   </button>
                 </div>
               </div>
@@ -1478,7 +1525,8 @@ export function ExpensesManager({
                       }}
                       type="button"
                     >
-                      Edit {category.name}
+                      {" "}
+                      {tx("Edit")} {category.name}
                     </button>
                   ) : null}
                 </li>
@@ -1508,7 +1556,8 @@ export function ExpensesManager({
                 }}
                 type="button"
               >
-                New custom category
+                {" "}
+                {tx("New custom category")}{" "}
               </button>
             </div>
           ) : null}
@@ -1552,7 +1601,7 @@ export function ExpensesManager({
                   .finally(() => setPending(false));
               }}
               pending={pending}
-              title="New custom category"
+              title={tx("New custom category")}
             >
               <div className={`grid gap-4 ${fieldTone}`}>
                 <Alert message={categoryError} />
@@ -1578,7 +1627,8 @@ export function ExpensesManager({
                   disabled={pending}
                   type="submit"
                 >
-                  Create category
+                  {" "}
+                  {tx("Create category")}{" "}
                 </button>
               </div>
             </FormDialog>

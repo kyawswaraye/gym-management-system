@@ -1,3 +1,4 @@
+import { tx } from "../i18n/translate";
 import type { components } from "../types/api.generated";
 import {
   ApiError,
@@ -35,9 +36,7 @@ export type ApiClient = {
       idempotencyKey?: string;
     },
   ): Promise<SuccessEnvelope<T> | undefined>;
-  login(
-    body: components["schemas"]["MemberLoginInputRequest"],
-  ): Promise<TokenData>;
+  login(body: { idToken: string }): Promise<TokenData>;
   refresh(): Promise<TokenData>;
   logout(refreshToken: string): Promise<void>;
 };
@@ -50,6 +49,7 @@ export type ApiClientOptions = {
   getRefreshToken: () => Promise<string | null>;
   setRefreshToken: (token: string) => Promise<void>;
   onSessionRevoked: () => Promise<void>;
+  getAcceptLanguage?: () => "en" | "my";
 };
 
 type RawResponse = {
@@ -88,7 +88,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       idempotencyKey?: string;
     },
   ): Promise<RawResponse> {
-    const headers: Record<string, string> = { Accept: "application/json" };
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      "Accept-Language": options.getAcceptLanguage?.() ?? "en",
+    };
     if (init.body !== undefined) {
       headers["Content-Type"] = "application/json";
     }
@@ -132,7 +135,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       throw new ApiError(
         401,
         "AUTHENTICATION_FAILED",
-        "Sign in again to continue.",
+        tx("Sign in again to continue."),
       );
     }
     const response = await send("/api/v1/member-auth/refresh/", {
@@ -207,10 +210,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   return {
     request,
     async login(body) {
-      const envelope = await request<TokenData>("/api/v1/member-auth/login/", {
+      const envelope = await request<TokenData>("/api/v1/member-auth/google/", {
         method: "POST",
         auth: false,
-        body: { email: body.email, password: body.password },
+        body: { id_token: body.idToken },
       });
       if (!envelope) {
         throw new ApiError(

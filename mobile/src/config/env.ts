@@ -7,16 +7,22 @@ const LOCAL_HTTP_HOSTS = new Set(["10.0.2.2", "localhost", "127.0.0.1"]);
 const rawEnvSchema = z.object({
   API_BASE_URL: z.string().min(1),
   APP_ENV: z.enum(["debug", "release"]),
+  GOOGLE_WEB_CLIENT_ID: z.string().optional().default(""),
+  GOOGLE_IOS_CLIENT_ID: z.string().optional().default(""),
 });
 
 export type AppEnv = {
   apiBaseUrl: string;
   appEnv: "debug" | "release";
+  googleWebClientId: string;
+  googleIosClientId: string;
 };
 
 export function parseEnv(input: {
   API_BASE_URL: string;
   APP_ENV: string;
+  GOOGLE_WEB_CLIENT_ID?: string;
+  GOOGLE_IOS_CLIENT_ID?: string;
 }): AppEnv {
   const raw = rawEnvSchema.parse(input);
   let url: URL;
@@ -42,7 +48,25 @@ export function parseEnv(input: {
   } else if (url.protocol !== "https:") {
     throw new Error("API_BASE_URL must use HTTP or HTTPS.");
   }
-  return { apiBaseUrl: url.origin, appEnv: raw.APP_ENV };
+  return {
+    apiBaseUrl: url.origin,
+    appEnv: raw.APP_ENV,
+    googleWebClientId: googleClientId(raw.GOOGLE_WEB_CLIENT_ID),
+    googleIosClientId: googleClientId(raw.GOOGLE_IOS_CLIENT_ID),
+  };
+}
+
+function googleClientId(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (!trimmed.endsWith(".apps.googleusercontent.com") || /\s/.test(trimmed)) {
+    throw new Error(
+      "Google client IDs must be public OAuth client IDs ending in .apps.googleusercontent.com.",
+    );
+  }
+  return trimmed;
 }
 
 export function assertRuntimeEnv(env: AppEnv, isDev: boolean): void {

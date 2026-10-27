@@ -1,10 +1,12 @@
+import { useTx } from "../i18n/useTx";
 import type { ReactNode } from "react";
-import { RefreshControl, View } from "react-native";
+import { RefreshControl } from "react-native";
 
 import type { Page } from "../api/memberApi";
 import { useOnline } from "../app/providers";
 import { useCursorList } from "../pagination/useCursorList";
 import { Button } from "./Button";
+import { Card } from "./Card";
 import { Screen } from "./Screen";
 import {
   EmptyState,
@@ -19,18 +21,22 @@ export function PagedScreen<T extends { id: string }>({
   load,
   empty,
   renderItem,
+  onBack,
 }: {
   title: string;
   queryKey: readonly unknown[];
   load: (after?: string) => Promise<Page<T>>;
   empty: string;
   renderItem: (item: T) => ReactNode;
+  onBack?: () => void;
 }) {
+  const tx = useTx();
   const online = useOnline();
   const query = useCursorList(queryKey, load);
   return (
     <Screen
       title={title}
+      onBack={onBack}
       refreshControl={
         <RefreshControl
           refreshing={query.isRefetching}
@@ -41,9 +47,7 @@ export function PagedScreen<T extends { id: string }>({
       }
     >
       <OfflineBanner visible={!online} />
-      {query.isLoading ? (
-        <LoadingState label={`Loading ${title.toLowerCase()}`} />
-      ) : null}
+      {query.isLoading ? <LoadingState label={tx("Loading…")} /> : null}
       {query.isError ? (
         <ErrorState
           error={query.error}
@@ -55,12 +59,14 @@ export function PagedScreen<T extends { id: string }>({
         <EmptyState message={empty} />
       ) : null}
       {query.items.map((item) => (
-        <View key={item.id}>{renderItem(item)}</View>
+        <Card key={item.id}>{renderItem(item)}</Card>
       ))}
       {query.hasNextPage ? (
         <Button
-          label={query.isFetchingNextPage ? "Loading more" : "Load more"}
-          hint="Loads the next page"
+          label={
+            query.isFetchingNextPage ? tx("Loading more") : tx("Load more")
+          }
+          hint={tx("Loads the next page")}
           disabled={query.isFetchingNextPage}
           onPress={() => query.fetchNextPage()}
         />

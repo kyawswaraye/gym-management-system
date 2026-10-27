@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useState, type FormEvent } from "react";
 
@@ -52,6 +53,7 @@ async function resolveProfile(membershipId: string): Promise<string> {
 }
 
 export function TrainerScan({ membershipId }: { membershipId: string }) {
+  const tx = useTx();
   const [profileId, setProfileId] = useState("");
   const [members, setMembers] = useState<AssignedMember[]>([]);
   const [query, setQuery] = useState("");
@@ -84,7 +86,7 @@ export function TrainerScan({ membershipId }: { membershipId: string }) {
       .catch((caught: unknown) => {
         if (active)
           setError(
-            phase5Error(caught, "Assigned members could not be loaded."),
+            phase5Error(caught, tx("Assigned members could not be loaded.")),
           );
       })
       .finally(() => {
@@ -93,7 +95,7 @@ export function TrainerScan({ membershipId }: { membershipId: string }) {
     return () => {
       active = false;
     };
-  }, [membershipId]);
+  }, [membershipId, tx]);
 
   const visible = members.filter((member) => {
     const haystack = `${label(member)} ${member.member_number}`.toLowerCase();
@@ -109,10 +111,10 @@ export function TrainerScan({ membershipId }: { membershipId: string }) {
     try {
       await scanTrainerCheckIn({ memberId, payload });
       setPayload("");
-      setNotice("Checked in from the trainer code.");
+      setNotice(tx("Checked in from the trainer code."));
       setScanning(false);
     } catch (caught) {
-      setError(phase5Error(caught, "The check-in code is not valid."));
+      setError(phase5Error(caught, tx("The check-in code is not valid.")));
     } finally {
       setPending(false);
     }
@@ -125,24 +127,28 @@ export function TrainerScan({ membershipId }: { membershipId: string }) {
     >
       <div className="border-b border-slate-100 px-5 py-4">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
-          Trainer
+          {" "}
+          {tx("Trainer")}{" "}
         </p>
         <h2
           className="mt-1 text-xl font-bold text-slate-900"
           id="trainer-scan-title"
         >
-          Trainer QR scan
+          {" "}
+          {tx("Trainer QR scan")}{" "}
         </h2>
         <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-          Choose an assigned member and accept the scanner text or paste the
-          code. The code is sent once and is not kept in this browser.
+          {" "}
+          {tx(
+            "Choose an assigned member and accept the scanner text or paste the code. The code is sent once and is not kept in this browser.",
+          )}{" "}
         </p>
       </div>
       <div className="grid gap-3 p-5">
         {loading ? <Loading label="Loading assigned members." /> : null}
         {error ? (
           <p className="error" role="alert">
-            {error}
+            {tx(error)}
           </p>
         ) : null}
         {notice ? (
@@ -151,7 +157,7 @@ export function TrainerScan({ membershipId }: { membershipId: string }) {
             className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
             role="status"
           >
-            {notice}
+            {tx(notice)}
           </p>
         ) : null}
         <button
@@ -163,7 +169,8 @@ export function TrainerScan({ membershipId }: { membershipId: string }) {
           }}
           type="button"
         >
-          Scan check-in code
+          {" "}
+          {tx("Scan check-in code")}{" "}
         </button>
         {scanning ? (
           <FormDialog
@@ -173,7 +180,7 @@ export function TrainerScan({ membershipId }: { membershipId: string }) {
             }}
             onSubmit={(event) => void submit(event)}
             pending={pending}
-            title="Trainer QR scan"
+            title={tx("Trainer QR scan")}
           >
             <Field label="Search assigned members">
               <TextInput
@@ -188,7 +195,7 @@ export function TrainerScan({ membershipId }: { membershipId: string }) {
                 required
                 value={memberId}
               >
-                <option value="">Select a member</option>
+                <option value="">{tx("Select a member")}</option>
                 {visible.map((member) => (
                   <option key={member.id} value={member.id}>
                     {label(member)} ({member.member_number})
@@ -212,7 +219,8 @@ export function TrainerScan({ membershipId }: { membershipId: string }) {
               disabled={pending || !profileId}
               type="submit"
             >
-              Scan check-in code
+              {" "}
+              {tx("Scan check-in code")}{" "}
             </button>
           </FormDialog>
         ) : null}

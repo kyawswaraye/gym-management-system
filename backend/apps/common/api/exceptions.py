@@ -7,6 +7,12 @@ from rest_framework import status
 from rest_framework.exceptions import APIException, ErrorDetail
 from rest_framework.response import Response
 
+from apps.common.api.error_catalog import (
+    translate_error_fields,
+    translate_error_text,
+    wants_myanmar,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,6 +31,47 @@ class AuthenticationFailed(CodedAPIException):
 class AccessTokenExpired(AuthenticationFailed):
     default_code = "ACCESS_TOKEN_EXPIRED"
     default_detail = "The access token has expired."
+
+
+class MemberGoogleLoginRejected(CodedAPIException):
+    status_code = status.HTTP_403_FORBIDDEN
+    default_code = "MEMBER_SIGN_IN_REJECTED"
+    default_detail = "This Google account cannot sign in to the member app."
+
+
+class GoogleSignInNotConfigured(MemberGoogleLoginRejected):
+    default_code = "GOOGLE_SIGN_IN_NOT_CONFIGURED"
+    default_detail = "Google sign-in is not configured."
+
+
+class MemberAccountMissing(MemberGoogleLoginRejected):
+    default_code = "MEMBER_NOT_FOUND"
+    default_detail = "No member account uses this Google email."
+
+
+class MemberAccountInactive(MemberGoogleLoginRejected):
+    default_code = "MEMBER_NOT_ACTIVE"
+    default_detail = "This member account is not active."
+
+
+class MemberAccountAmbiguous(MemberGoogleLoginRejected):
+    default_code = "MEMBER_SIGN_IN_AMBIGUOUS"
+    default_detail = "This Google email matches more than one active member."
+
+
+class MemberAccountLinkedElsewhere(MemberGoogleLoginRejected):
+    default_code = "MEMBER_ALREADY_LINKED"
+    default_detail = "This member account is already linked to a different login."
+
+
+class GoogleAccountAlreadyLinked(MemberGoogleLoginRejected):
+    default_code = "GOOGLE_ACCOUNT_ALREADY_LINKED"
+    default_detail = "This Google account is already linked to another member."
+
+
+class MemberSignInUnavailable(MemberGoogleLoginRejected):
+    default_code = "MEMBER_SIGN_IN_UNAVAILABLE"
+    default_detail = "This Google account cannot sign in to the member app."
 
 
 class RequestRejected(CodedAPIException):
@@ -51,6 +98,7 @@ def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
     response = exception_handler(exc, context)
     request = context.get("request")
     request_id = getattr(request, "request_id", "req_unknown")
+    myanmar = wants_myanmar(request)
     if response is None:
         logger.exception("Unhandled API exception", extra={"request_id": request_id}, exc_info=exc)
         return Response(
@@ -58,7 +106,7 @@ def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
                 "success": False,
                 "error": {
                     "code": "INTERNAL_ERROR",
-                    "message": "An internal error occurred.",
+                    "message": translate_error_text("An internal error occurred.", myanmar=myanmar),
                     "fields": {},
                 },
                 "request_id": request_id,
@@ -78,6 +126,9 @@ def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
                 fields = extra_fields
         else:
             fields = _flatten_fields(response.data)
+    if myanmar:
+        message = translate_error_text(message, myanmar=True)
+        fields = translate_error_fields(fields, myanmar=True)
     return Response(
         {
             "success": False,

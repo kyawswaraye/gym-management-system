@@ -71,6 +71,12 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
 ]
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.PBKDF2PasswordHasher"]
+# Audiences accepted on member-app Google ID tokens. Empty disables that sign-in.
+GOOGLE_OAUTH_CLIENT_IDS = tuple(
+    item.strip()
+    for item in os.environ.get("GOOGLE_OAUTH_CLIENT_IDS", "").split(",")
+    if item.strip()
+)
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True

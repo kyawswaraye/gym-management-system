@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect } from "react";
 
@@ -11,6 +12,7 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const tx = useTx();
   useEffect(() => {
     console.error("A page failed to render.", error.digest);
   }, [error]);
@@ -19,12 +21,16 @@ export default function GlobalError({
     <main className="grid min-h-screen place-items-center p-6">
       <section className="card text-center">
         <BrandLogo />
-        <h1 className="mt-6 text-2xl font-bold">Something went wrong</h1>
+        <h1 className="mt-6 text-2xl font-bold">
+          {tx("Something went wrong")}
+        </h1>
         <p className="muted mt-2">
-          No sensitive details were displayed. Please try again.
+          {" "}
+          {tx("No sensitive details were displayed. Please try again.")}{" "}
         </p>
         <button className="button mt-5" type="button" onClick={reset}>
-          Try again
+          {" "}
+          {tx("Try again")}{" "}
         </button>
       </section>
     </main>

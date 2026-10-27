@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import {
   useEffect,
@@ -163,19 +164,21 @@ function blankLine(): LineDraft {
 }
 
 function StatusPill({ status }: { status: string }) {
+  const tx = useTx();
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ${statusTone(status)}`}
     >
-      {pretty(status)}
+      {tx(pretty(status))}
     </span>
   );
 }
 
 function LoadingRows({ label }: { label: string }) {
+  const tx = useTx();
   return (
     <div className="grid gap-3 p-4 sm:p-5" role="status">
-      <p className="text-sm font-medium text-slate-600">{label}</p>
+      <p className="text-sm font-medium text-slate-600">{tx(label)}</p>
       <div className="grid gap-2">
         {[0, 1, 2].map((item) => (
           <div
@@ -207,6 +210,7 @@ function ActionPanel({
   onCancel: () => void;
   children?: ReactNode;
 }) {
+  const tx = useTx();
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit(new FormData(event.currentTarget));
@@ -229,14 +233,15 @@ function ActionPanel({
           onClick={onCancel}
           type="button"
         >
-          Back
+          {" "}
+          {tx("Back")}{" "}
         </button>
         <button
           className={actionButtonClass(confirmLabel)}
           disabled={pending}
           type="submit"
         >
-          {confirmLabel}
+          {tx(confirmLabel)}
         </button>
       </div>
     </FormDialog>
@@ -250,6 +255,7 @@ function StatusFilter({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const tx = useTx();
   const groupRef = useRef<HTMLDivElement>(null);
 
   function move(event: KeyboardEvent<HTMLDivElement>, delta: number) {
@@ -267,7 +273,7 @@ function StatusFilter({
 
   return (
     <div
-      aria-label="Status"
+      aria-label={tx("Status")}
       className="flex flex-wrap gap-1.5"
       onKeyDown={(event) => {
         if (event.key === "ArrowRight" || event.key === "ArrowDown") {
@@ -296,7 +302,7 @@ function StatusFilter({
             tabIndex={selected ? 0 : -1}
             type="button"
           >
-            {label}
+            {tx(label)}
           </button>
         );
       })}
@@ -305,10 +311,12 @@ function StatusFilter({
 }
 
 function StaffLineList({ lines }: { lines: StaffSalaryLine[] }) {
+  const tx = useTx();
   if (lines.length === 0) {
     return (
       <p className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 ring-1 ring-slate-200/80">
-        No staff lines on this period.
+        {" "}
+        {tx("No staff lines on this period.")}{" "}
       </p>
     );
   }
@@ -325,7 +333,7 @@ function StaffLineList({ lines }: { lines: StaffSalaryLine[] }) {
               {line.staff.display_name}
             </p>
             <p className="mt-0.5 text-xs leading-5 text-slate-500">
-              {line.staff.staff_code} · {pretty(line.payment_method)}
+              {line.staff.staff_code} · {tx(pretty(line.payment_method))}
               {line.description ? ` · ${line.description}` : ""}
             </p>
             {line.external_reference ? (
@@ -336,7 +344,7 @@ function StaffLineList({ lines }: { lines: StaffSalaryLine[] }) {
           </div>
           <p className="shrink-0 text-sm font-bold text-slate-900 tabular-nums">
             {line.amount}{" "}
-            <span className="font-medium text-slate-400">{line.currency}</span>
+            <span className="font-medium text-slate-400">{tx(line.currency)}</span>
           </p>
         </li>
       ))}
@@ -369,17 +377,24 @@ function LineEditor({
   onAdd: () => void;
   onSave: () => void;
 }) {
+  const tx = useTx();
   return (
     <div className={`grid gap-3 ${fieldTone}`}>
       <div>
-        <h3 className="text-sm font-bold text-slate-900">Staff lines</h3>
+        <h3 className="text-sm font-bold text-slate-900">
+          {tx("Staff lines")}
+        </h3>
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          Each person appears once. Saving replaces every line on this draft.
+          {" "}
+          {tx(
+            "Each person appears once. Saving replaces every line on this draft.",
+          )}{" "}
         </p>
       </div>
       {staff.length === 0 ? (
         <p className="text-sm text-slate-500">
-          No staff records were returned.
+          {" "}
+          {tx("No staff records were returned.")}{" "}
         </p>
       ) : null}
       <Alert message={error} />
@@ -393,20 +408,22 @@ function LineEditor({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase">
-                  Line {index + 1}
+                  {" "}
+                  {tx("Line")} {index + 1}
                 </p>
                 <p className="mt-0.5 truncate text-sm font-bold text-slate-900">
-                  {line.staffLabel || "Choose a staff member"}
+                  {line.staffLabel || tx("Choose a staff member")}
                 </p>
               </div>
               <button
-                aria-label={`Remove line ${index + 1}`}
+                aria-label={tx("Remove line {number}", { number: index + 1 })}
                 className="text-sm font-bold text-red-700 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={lines.length < 2}
                 onClick={() => onRemove(line.key)}
                 type="button"
               >
-                Remove
+                {" "}
+                {tx("Remove")}{" "}
               </button>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -422,7 +439,7 @@ function LineEditor({
                   }}
                   value={line.staffId}
                 >
-                  <option value="">Select staff</option>
+                  <option value="">{tx("Select staff")}</option>
                   {line.staffId && !known ? (
                     <option value={line.staffId}>
                       {line.staffLabel || "Selected staff"}
@@ -437,7 +454,7 @@ function LineEditor({
               </Field>
               <Field
                 error={line.key === invalidAmountKey ? amountError : undefined}
-                label={`Amount (${currency})`}
+                label={tx("Amount ({currency})", { currency: tx(currency) })}
               >
                 <TextInput
                   inputMode="decimal"
@@ -458,7 +475,7 @@ function LineEditor({
                 >
                   {METHODS.map((item) => (
                     <option key={item} value={item}>
-                      {pretty(item)}
+                      {tx(pretty(item))}
                     </option>
                   ))}
                 </SelectInput>
@@ -492,7 +509,8 @@ function LineEditor({
           onClick={onAdd}
           type="button"
         >
-          Add staff line
+          {" "}
+          {tx("Add staff line")}{" "}
         </button>
         <button
           className="button button-edit"
@@ -500,7 +518,8 @@ function LineEditor({
           onClick={onSave}
           type="button"
         >
-          Replace staff lines
+          {" "}
+          {tx("Replace staff lines")}{" "}
         </button>
       </div>
     </div>
@@ -524,6 +543,7 @@ export function SalariesManager({
   currency: string;
   defaultDate: string;
 }) {
+  const tx = useTx();
   const [applied, setApplied] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [period, setPeriod] = useState<SalaryPeriod | null>(null);
@@ -597,7 +617,7 @@ export function SalariesManager({
           if (!active) return;
           setPeriod(null);
           setFormError(
-            financeError(caught, "The salary period could not be loaded."),
+            financeError(caught, tx("The salary period could not be loaded.")),
           );
           setErrorScope("detail");
         });
@@ -606,7 +626,7 @@ export function SalariesManager({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [selectedId, periods.rows]);
+  }, [selectedId, periods.rows, tx]);
 
   const detailId = detail?.id ?? "";
   useEffect(() => {
@@ -775,7 +795,7 @@ export function SalariesManager({
               .finally(() => setPending(false));
           }}
           pending={pending}
-          title="New salary period"
+          title={tx("New salary period")}
           wide
         >
           <div className={fieldTone}>
@@ -816,7 +836,8 @@ export function SalariesManager({
               disabled={pending}
               type="submit"
             >
-              Save period
+              {" "}
+              {tx("Save period")}{" "}
             </button>
           </div>
         </FormDialog>
@@ -840,7 +861,8 @@ export function SalariesManager({
                 className="text-lg font-bold text-slate-900"
                 id="salary-list-title"
               >
-                Salary periods
+                {" "}
+                {tx("Salary periods")}{" "}
               </h2>
               {canCreate ? (
                 <button
@@ -852,14 +874,16 @@ export function SalariesManager({
                   }}
                   type="button"
                 >
-                  New salary period
+                  {" "}
+                  {tx("New salary period")}{" "}
                 </button>
               ) : null}
             </div>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-              Periods shown are only those the server returns for your access.
-              Reception staff see their own drafts and submissions. Amounts are
-              the server&apos;s line amounts.
+              {" "}
+              {tx(
+                "Periods shown are only those the server returns for your access. Reception staff see their own drafts and submissions. Amounts are the server's line amounts.",
+              )}{" "}
             </p>
             <div className="mt-4">
               <StatusFilter onChange={setApplied} value={applied} />
@@ -874,7 +898,8 @@ export function SalariesManager({
               className="px-5 pt-4 text-sm font-medium text-slate-600"
               role="status"
             >
-              Loading salary periods.
+              {" "}
+              {tx("Loading salary periods.")}{" "}
             </p>
           ) : null}
           {!periods.pending && periods.error ? (
@@ -886,13 +911,13 @@ export function SalariesManager({
             <div className="px-4 py-14 text-center sm:px-5">
               <p className="font-semibold text-slate-800">
                 {applied
-                  ? "No salary periods match this status."
-                  : "No salary periods yet."}
+                  ? tx("No salary periods match this status.")
+                  : tx("No salary periods yet.")}
               </p>
               <p className="mt-1 text-sm text-slate-500">
                 {applied
-                  ? "Try another status."
-                  : "Drafts you save will show up here."}
+                  ? tx("Try another status.")
+                  : tx("Drafts you save will show up here.")}
               </p>
             </div>
           ) : null}
@@ -901,32 +926,36 @@ export function SalariesManager({
               className={`overflow-x-auto ${periods.pending ? "opacity-60" : ""}`}
             >
               <table className="w-full text-left text-sm">
-                <caption className="sr-only">Salary periods</caption>
+                <caption className="sr-only">{tx("Salary periods")}</caption>
                 <thead className="border-b border-slate-200 text-slate-500">
                   <tr>
                     <th
                       className="px-5 py-2.5 text-xs font-semibold"
                       scope="col"
                     >
-                      Period
+                      {" "}
+                      {tx("Period")}{" "}
                     </th>
                     <th
                       className="hidden px-5 py-2.5 text-xs font-semibold md:table-cell"
                       scope="col"
                     >
-                      Business date
+                      {" "}
+                      {tx("Business date")}{" "}
                     </th>
                     <th
                       className="hidden px-5 py-2.5 text-xs font-semibold sm:table-cell"
                       scope="col"
                     >
-                      Staff
+                      {" "}
+                      {tx("Staff")}{" "}
                     </th>
                     <th
                       className="px-5 py-2.5 text-xs font-semibold"
                       scope="col"
                     >
-                      Status
+                      {" "}
+                      {tx("Status")}{" "}
                     </th>
                   </tr>
                 </thead>
@@ -953,7 +982,7 @@ export function SalariesManager({
                           </button>
                           {row.description ? (
                             <p className="mt-1 line-clamp-1 max-w-md text-xs text-slate-500">
-                              {row.description}
+                              {tx(row.description)}
                             </p>
                           ) : null}
                         </td>
@@ -1001,11 +1030,13 @@ export function SalariesManager({
                     onClick={closePeriod}
                     type="button"
                   >
-                    Close
+                    {" "}
+                    {tx("Close")}{" "}
                   </button>
                 </div>
                 <h2 className="sr-only" id="salary-detail-title">
-                  Salary period
+                  {" "}
+                  {tx("Salary period")}{" "}
                 </h2>
                 <Alert message={detailError} />
               </div>
@@ -1013,10 +1044,12 @@ export function SalariesManager({
             {!detail && !detailError ? (
               <div className="grid gap-3 p-5" role="status">
                 <h2 className="sr-only" id="salary-detail-title">
-                  Salary period
+                  {" "}
+                  {tx("Salary period")}{" "}
                 </h2>
                 <p className="text-sm font-medium text-slate-600">
-                  Loading the salary period.
+                  {" "}
+                  {tx("Loading the salary period.")}{" "}
                 </p>
                 <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
                 <div className="grid grid-cols-2 gap-2">
@@ -1035,13 +1068,14 @@ export function SalariesManager({
                         id="salary-detail-title"
                         tabIndex={-1}
                       >
-                        Salary period
+                        {" "}
+                        {tx("Salary period")}{" "}
                       </h2>
                       <p className="mt-1 text-xl font-black tracking-tight text-slate-900 tabular-nums">
                         {detail.period_start} – {detail.period_end}
                       </p>
                       <p className="mt-1 text-sm leading-6 break-words text-slate-500">
-                        {detail.description}
+                        {tx(detail.description)}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -1051,14 +1085,16 @@ export function SalariesManager({
                         onClick={closePeriod}
                         type="button"
                       >
-                        Close
+                        {" "}
+                        {tx("Close")}{" "}
                       </button>
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/80">
                       <p className="text-xs font-medium text-slate-500">
-                        Business date
+                        {" "}
+                        {tx("Business date")}{" "}
                       </p>
                       <p className="mt-1 text-sm font-bold text-slate-900 tabular-nums">
                         {detail.business_date}
@@ -1066,7 +1102,8 @@ export function SalariesManager({
                     </div>
                     <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/80">
                       <p className="text-xs font-medium text-slate-500">
-                        Staff
+                        {" "}
+                        {tx("Staff")}{" "}
                       </p>
                       <p className="mt-1 text-sm font-bold text-slate-900 tabular-nums">
                         {detail.lines.length}
@@ -1092,7 +1129,8 @@ export function SalariesManager({
                   {detail.rejection_reason ? (
                     <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-900">
                       <span className="mb-1 block text-xs font-semibold text-red-700">
-                        Rejection reason
+                        {" "}
+                        {tx("Rejection reason")}{" "}
                       </span>
                       {detail.rejection_reason}
                     </p>
@@ -1102,12 +1140,14 @@ export function SalariesManager({
                     detail.status === "CANCELLED") ? (
                     <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
                       <span className="mb-1 block text-xs font-medium text-slate-500">
-                        Reason
+                        {" "}
+                        {tx("Reason")}{" "}
                       </span>
                       {detail.reason}
                       {detail.void_business_date ? (
                         <span className="mt-2 block text-xs text-slate-500">
-                          Correction date {detail.void_business_date}
+                          {" "}
+                          {tx("Correction date")} {detail.void_business_date}
                         </span>
                       ) : null}
                     </p>
@@ -1150,7 +1190,7 @@ export function SalariesManager({
                           .finally(() => setPending(false));
                       }}
                       pending={pending}
-                      title="Edit period"
+                      title={tx("Edit period")}
                     >
                       <div className={fieldTone}>
                         <Alert message={editError} />
@@ -1192,14 +1232,16 @@ export function SalariesManager({
                             onClick={() => setAction(null)}
                             type="button"
                           >
-                            Back
+                            {" "}
+                            {tx("Back")}{" "}
                           </button>
                           <button
                             className="button button-edit"
                             disabled={pending}
                             type="submit"
                           >
-                            Save period changes
+                            {" "}
+                            {tx("Save period changes")}{" "}
                           </button>
                         </div>
                       </div>
@@ -1212,7 +1254,8 @@ export function SalariesManager({
                       onClick={() => setLinesOpen(true)}
                       type="button"
                     >
-                      Edit staff lines
+                      {" "}
+                      {tx("Edit staff lines")}{" "}
                     </button>
                   ) : null}
                   {editingLines && linesOpen ? (
@@ -1222,7 +1265,7 @@ export function SalariesManager({
                         if (!pending) setLinesOpen(false);
                       }}
                       pending={pending}
-                      title="Staff lines"
+                      title={tx("Staff lines")}
                       wide
                     >
                       <LineEditor
@@ -1268,7 +1311,8 @@ export function SalariesManager({
                   {detail.lines ? (
                     <div className="grid gap-2">
                       <h3 className="text-sm font-bold text-slate-900">
-                        Staff lines
+                        {" "}
+                        {tx("Staff lines")}{" "}
                       </h3>
                       <StaffLineList lines={detail.lines} />
                     </div>
@@ -1285,7 +1329,8 @@ export function SalariesManager({
                             onClick={() => openAction("edit")}
                             type="button"
                           >
-                            Edit period
+                            {" "}
+                            {tx("Edit period")}{" "}
                           </button>
                         ) : null}
                         {canSubmitDraft ? (
@@ -1294,7 +1339,8 @@ export function SalariesManager({
                             onClick={() => openAction("submit")}
                             type="button"
                           >
-                            Submit
+                            {" "}
+                            {tx("Submit")}{" "}
                           </button>
                         ) : null}
                         {canDecide ? (
@@ -1303,7 +1349,8 @@ export function SalariesManager({
                             onClick={() => openAction("approve")}
                             type="button"
                           >
-                            Approve
+                            {" "}
+                            {tx("Approve")}{" "}
                           </button>
                         ) : null}
                         {canDecide ? (
@@ -1312,7 +1359,8 @@ export function SalariesManager({
                             onClick={() => openAction("reject")}
                             type="button"
                           >
-                            Reject
+                            {" "}
+                            {tx("Reject")}{" "}
                           </button>
                         ) : null}
                         {canCancelDraft ? (
@@ -1321,7 +1369,8 @@ export function SalariesManager({
                             onClick={() => openAction("cancel")}
                             type="button"
                           >
-                            Cancel draft
+                            {" "}
+                            {tx("Cancel draft")}{" "}
                           </button>
                         ) : null}
                         {canVoidPosted ? (
@@ -1330,7 +1379,8 @@ export function SalariesManager({
                             onClick={() => openAction("void")}
                             type="button"
                           >
-                            Void period
+                            {" "}
+                            {tx("Void period")}{" "}
                           </button>
                         ) : null}
                       </div>
@@ -1360,7 +1410,7 @@ export function SalariesManager({
                             .finally(() => setPending(false));
                         }}
                         pending={pending}
-                        title="Submit this salary period?"
+                        title={tx("Submit this salary period?")}
                       />
                     ) : null}
                     {action === "approve" ? (
@@ -1407,11 +1457,12 @@ export function SalariesManager({
                             .finally(() => setPending(false));
                         }}
                         pending={pending}
-                        title="Approve salary period"
+                        title={tx("Approve salary period")}
                       >
                         {cashLines.length === 0 ? (
                           <p className="text-sm text-slate-600">
-                            No cash line is mapped.
+                            {" "}
+                            {tx("No cash line is mapped.")}{" "}
                           </p>
                         ) : null}
                         {cashLines.map((line) => (
@@ -1420,7 +1471,9 @@ export function SalariesManager({
                             currency={line.currency}
                             error={fields.cash_session_id}
                             key={line.id}
-                            label={`Session for ${line.staff.display_name}`}
+                            label={tx("Session for {name}", {
+                              name: line.staff.display_name,
+                            })}
                             name={`session-${line.id}`}
                             pending={sessions.pending}
                             sessions={sessions.sessions}
@@ -1433,8 +1486,13 @@ export function SalariesManager({
                               className="rounded-lg bg-white px-3 py-2 text-sm leading-6 text-slate-600 ring-1 ring-slate-200"
                               key={line.id}
                             >
-                              {line.staff.display_name} is {line.payment_method}{" "}
-                              and is not mapped to a session.
+                              {tx(
+                                "{name} pays by {method} and is not mapped to a session.",
+                                {
+                                  name: line.staff.display_name,
+                                  method: tx(line.payment_method),
+                                },
+                              )}{" "}
                             </p>
                           ))}
                       </ActionPanel>
@@ -1466,7 +1524,7 @@ export function SalariesManager({
                             .finally(() => setPending(false));
                         }}
                         pending={pending}
-                        title="Reject salary period"
+                        title={tx("Reject salary period")}
                       >
                         <ReasonField
                           label="Rejection reason"
@@ -1501,7 +1559,7 @@ export function SalariesManager({
                             .finally(() => setPending(false));
                         }}
                         pending={pending}
-                        title="Cancel salary draft"
+                        title={tx("Cancel salary draft")}
                       >
                         <ReasonField label="Cancellation reason" />
                       </ActionPanel>
@@ -1552,7 +1610,7 @@ export function SalariesManager({
                             .finally(() => setPending(false));
                         }}
                         pending={pending}
-                        title="Void salary period"
+                        title={tx("Void salary period")}
                       >
                         <ReasonField label="Void reason" />
                         <Field label="Correction date">
@@ -1571,7 +1629,9 @@ export function SalariesManager({
                             currency={line.currency}
                             error={fields.cash_session_id}
                             key={line.id}
-                            label={`Destination session for ${line.staff.display_name}`}
+                            label={tx("Destination session for {name}", {
+                              name: line.staff.display_name,
+                            })}
                             name={`void-${line.id}`}
                             pending={sessions.pending}
                             sessions={sessions.sessions}

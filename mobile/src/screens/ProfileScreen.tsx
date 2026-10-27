@@ -1,7 +1,8 @@
+import { useTx } from "../i18n/useTx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { useState } from "react";
-import { Image, RefreshControl } from "react-native";
+import { Image, RefreshControl, View } from "react-native";
 import { launchCamera, launchImageLibrary } from "react-native-image-picker";
 
 import { ApiError, fieldMessage } from "../api/errors";
@@ -20,14 +21,17 @@ import {
 } from "../files/profilePhoto";
 import { queryKeys } from "../query/keys";
 import { Button } from "../ui/Button";
-import { Screen } from "../ui/Screen";
+import { Card } from "../ui/Card";
+import { NestedScreen } from "../ui/NestedScreen";
 import { ErrorState, LoadingState, OfflineBanner } from "../ui/StateView";
 import { Text } from "../ui/Text";
 import { TextField } from "../ui/TextField";
+import { colors } from "../ui/theme";
 
 const genders = ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"] as const;
 
 export function ProfileScreen() {
+  const tx = useTx();
   const api = useMemberApi();
   const online = useOnline();
   const queryClient = useQueryClient();
@@ -51,14 +55,14 @@ export function ProfileScreen() {
     }
     const patch = profilePatch(profileToForm(profile.data), values);
     if (!patch) {
-      setMessage("Change at least one field.");
+      setMessage(tx("Change at least one field."));
       return;
     }
     setMessage(null);
     try {
       await api.updateMe(patch);
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
-      setMessage("Profile saved.");
+      setMessage(tx("Profile saved."));
     } catch (error) {
       if (error instanceof ApiError) {
         for (const [field, messages] of Object.entries(error.fields)) {
@@ -90,7 +94,7 @@ export function ProfileScreen() {
     const asset = selected.assets?.[0];
     if (!asset?.uri || !asset.base64 || !asset.type) {
       if (selected.errorCode) {
-        setMessage("The photo could not be opened.");
+        setMessage(tx("The photo could not be opened."));
       }
       return;
     }
@@ -123,8 +127,8 @@ export function ProfileScreen() {
   }
 
   return (
-    <Screen
-      title="Profile"
+    <NestedScreen
+      title={tx("Profile")}
       refreshControl={
         <RefreshControl
           refreshing={profile.isRefetching}
@@ -135,7 +139,9 @@ export function ProfileScreen() {
       }
     >
       <OfflineBanner visible={!online} />
-      {profile.isLoading ? <LoadingState label="Loading profile" /> : null}
+      {profile.isLoading ? (
+        <LoadingState label={tx("Loading profile")} />
+      ) : null}
       {profile.isError ? (
         <ErrorState
           error={profile.error}
@@ -145,105 +151,128 @@ export function ProfileScreen() {
       ) : null}
       {profile.data ? (
         <>
-          <Text>
-            {profile.data.first_name} {profile.data.last_name} ·{" "}
-            {profile.data.member_number}
-          </Text>
-          {photo.data?.url ? (
-            <Image
-              accessibilityLabel="Profile photo"
-              source={{ uri: photo.data.url }}
-              style={{ width: 96, height: 96, borderRadius: 48 }}
-            />
-          ) : (
-            <Text>No profile photo yet.</Text>
-          )}
-          <Button
-            label="Choose photo"
-            hint="Opens the system photo picker"
-            variant="secondary"
-            onPress={() => choosePhoto("library")}
-          />
-          <Button
-            label="Take photo"
-            hint="Uses the camera for a profile photo"
-            variant="secondary"
-            onPress={() => choosePhoto("camera")}
-          />
-          {photoId ? (
+          <Card>
+            <View style={{ alignItems: "center", gap: 8 }}>
+              {photo.data?.url ? (
+                <Image
+                  accessibilityLabel={tx("Profile photo")}
+                  source={{ uri: photo.data.url }}
+                  style={{
+                    borderColor: colors.border,
+                    borderRadius: 48,
+                    borderWidth: 1,
+                    height: 96,
+                    width: 96,
+                  }}
+                />
+              ) : (
+                <Text style={{ color: colors.muted }}>
+                  {tx("No profile photo yet.")}
+                </Text>
+              )}
+              <Text style={{ fontSize: 20, fontWeight: "700" }}>
+                {profile.data.first_name} {profile.data.last_name}
+              </Text>
+              <Text style={{ color: colors.muted }}>
+                {profile.data.member_number}
+              </Text>
+            </View>
             <Button
-              label="Remove photo"
-              variant="danger"
-              hint="Deletes your profile photo"
-              onPress={async () => {
-                await api.deletePhoto(photoId);
-                await queryClient.invalidateQueries({ queryKey: queryKeys.me });
-                setMessage("Profile photo removed.");
-              }}
+              hint="Opens the system photo picker"
+              label="Choose photo"
+              variant="secondary"
+              onPress={() => choosePhoto("library")}
             />
-          ) : null}
-          <Field control={form.control} name="phone" label="Phone" />
-          <Field
-            control={form.control}
-            name="email"
-            label="Contact email"
-            keyboardType="email-address"
-          />
-          <Text style={{ fontWeight: "700" }}>Gender</Text>
-          {genders.map((gender) => (
             <Button
-              key={gender}
-              label={gender}
-              variant={
-                form.watch("gender") === gender ? "primary" : "secondary"
-              }
-              onPress={() =>
-                form.setValue("gender", gender, { shouldDirty: true })
-              }
+              hint="Uses the camera for a profile photo"
+              label="Take photo"
+              variant="secondary"
+              onPress={() => choosePhoto("camera")}
             />
-          ))}
-          <Field
-            control={form.control}
-            name="date_of_birth"
-            label="Date of birth"
-            hint="YYYY-MM-DD"
-          />
-          <Field
-            control={form.control}
-            name="address_line1"
-            label="Address line 1"
-          />
-          <Field
-            control={form.control}
-            name="address_line2"
-            label="Address line 2"
-          />
-          <Field control={form.control} name="city" label="City" />
-          <Field control={form.control} name="region" label="Region" />
-          <Field
-            control={form.control}
-            name="postal_code"
-            label="Postal code"
-          />
-          <Field
-            control={form.control}
-            name="country_code"
-            label="Country code"
-          />
-          <Field
-            control={form.control}
-            name="emergency_contact_name"
-            label="Emergency contact name"
-          />
-          <Field
-            control={form.control}
-            name="emergency_contact_phone"
-            label="Emergency contact phone"
-          />
+            {photoId ? (
+              <Button
+                hint="Deletes your profile photo"
+                label="Remove photo"
+                variant="danger"
+                onPress={async () => {
+                  await api.deletePhoto(photoId);
+                  await queryClient.invalidateQueries({
+                    queryKey: queryKeys.me,
+                  });
+                  setMessage(tx("Profile photo removed."));
+                }}
+              />
+            ) : null}
+          </Card>
+          <Card>
+            <Text style={{ fontWeight: "700" }}>{tx("Gender")}</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {genders.map((gender) => (
+                <Button
+                  key={gender}
+                  label={gender}
+                  style={{ flexGrow: 1 }}
+                  variant={
+                    form.watch("gender") === gender ? "primary" : "secondary"
+                  }
+                  onPress={() =>
+                    form.setValue("gender", gender, { shouldDirty: true })
+                  }
+                />
+              ))}
+            </View>
+          </Card>
+          <Card>
+            <Field control={form.control} name="phone" label={tx("Phone")} />
+            <Field
+              control={form.control}
+              name="email"
+              label={tx("Contact email")}
+              keyboardType="email-address"
+            />
+            <Field
+              control={form.control}
+              name="date_of_birth"
+              label={tx("Date of birth")}
+              hint={tx("YYYY-MM-DD")}
+            />
+            <Field
+              control={form.control}
+              name="address_line1"
+              label={tx("Address line 1")}
+            />
+            <Field
+              control={form.control}
+              name="address_line2"
+              label={tx("Address line 2")}
+            />
+            <Field control={form.control} name="city" label={tx("City")} />
+            <Field control={form.control} name="region" label={tx("Region")} />
+            <Field
+              control={form.control}
+              name="postal_code"
+              label={tx("Postal code")}
+            />
+            <Field
+              control={form.control}
+              name="country_code"
+              label={tx("Country code")}
+            />
+            <Field
+              control={form.control}
+              name="emergency_contact_name"
+              label={tx("Emergency contact name")}
+            />
+            <Field
+              control={form.control}
+              name="emergency_contact_phone"
+              label={tx("Emergency contact phone")}
+            />
+          </Card>
           {message ? <Text accessibilityRole="alert">{message}</Text> : null}
           <Button
-            label="Save profile"
-            hint="Saves the contact fields you changed"
+            label={tx("Save profile")}
+            hint={tx("Saves the contact fields you changed")}
             disabled={form.formState.isSubmitting || !online}
             onPress={() => {
               void form.handleSubmit(save)();
@@ -251,7 +280,7 @@ export function ProfileScreen() {
           />
         </>
       ) : null}
-    </Screen>
+    </NestedScreen>
   );
 }
 

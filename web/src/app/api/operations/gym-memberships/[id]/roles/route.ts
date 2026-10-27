@@ -15,12 +15,12 @@ async function membershipId(context: Context) {
 
 export async function GET(request: NextRequest, context: Context) {
   const id = await membershipId(context);
-  if (!id) return unknownMembershipResponse();
+  if (!id) return unknownMembershipResponse(request);
   return getMembershipRoles(request, id);
 }
 
 export async function PUT(request: NextRequest, context: Context) {
   const id = await membershipId(context);
-  if (!id) return unknownMembershipResponse();
+  if (!id) return unknownMembershipResponse(request);
   return replaceMembershipRoles(request, id);
 }

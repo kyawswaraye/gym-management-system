@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { safeErrorResponse } from "@/lib/api/errors";
+import { requestLocale, safeErrorResponse } from "@/lib/api/errors";
 import { authMutation, parseRequestBody } from "@/lib/api/server";
 import { AUTH_COOKIES } from "@/lib/auth/cookies";
 import { resolveRequestId } from "@/lib/log/structured";
@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
       "INVALID_GYM_SELECTION",
       "Choose a valid gym membership.",
       resolveRequestId(request.headers.get("x-request-id")),
+      requestLocale(request),
     );
   }
   const ticket = request.cookies.get(AUTH_COOKIES.selectionTicket)?.value;

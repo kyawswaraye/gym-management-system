@@ -1,4 +1,8 @@
+"use client";
+
 import type { ReactNode } from "react";
+
+import { useTx } from "@/i18n/use-tx";
 
 const TITLE_CLASS =
   "text-3xl font-black tracking-tight text-slate-900 sm:text-4xl";
@@ -20,22 +24,23 @@ export function PageHeader({
   actions,
   children,
 }: PageHeaderProps) {
+  const tx = useTx();
   const copy = (
     <>
       {eyebrow ? (
         <p className="text-xs font-bold tracking-[0.18em] text-[#0866ff] uppercase">
-          {eyebrow}
+          {tx(eyebrow)}
         </p>
       ) : null}
       <h1
         className={eyebrow ? `mt-2 ${TITLE_CLASS}` : TITLE_CLASS}
         id={titleId}
       >
-        {title}
+        {tx(title)}
       </h1>
       {description ? (
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-          {description}
+          {typeof description === "string" ? tx(description) : description}
         </p>
       ) : null}
     </>

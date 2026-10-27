@@ -201,6 +201,17 @@ class MemberLoginThrottle(_ConfiguredRateThrottle):
         return self._cache_key(fingerprint=fingerprint, request=request)
 
 
+class MemberGoogleLoginThrottle(_ConfiguredRateThrottle):
+    """Limit Google member sign-in by address and a hash of the presented token."""
+
+    scope = "member_login"
+
+    def get_cache_key(self, request: Request, view: Any) -> str:
+        token = request.data.get("id_token") if isinstance(request.data, dict) else ""
+        fingerprint = hash_refresh_token(f"member-google:{token if isinstance(token, str) else ''}")
+        return self._cache_key(fingerprint=fingerprint, request=request)
+
+
 class MemberRefreshIPThrottle(_AddressBoundaryThrottle):
     """Bound member refresh attempts from one address, including malformed ones."""
 

@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -20,6 +21,7 @@ function gymName(gym: GymSummary): string {
 }
 
 export function GymSelectionForm({ gyms }: { gyms: GymSummary[] }) {
+  const tx = useTx();
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export function GymSelectionForm({ gyms }: { gyms: GymSummary[] }) {
     const form = new FormData(event.currentTarget);
     const gymMembershipId = String(form.get("gym_membership_id") ?? "");
     if (!gymMembershipId) {
-      setError("Choose a gym.");
+      setError(tx("Choose a gym."));
       return;
     }
     setPending(true);
@@ -47,13 +49,15 @@ export function GymSelectionForm({ gyms }: { gyms: GymSummary[] }) {
           router.replace("/login?reason=expired");
           return;
         }
-        setError(await errorMessage(response, "Unable to select this gym."));
+        setError(
+          await errorMessage(response, tx("Unable to select this gym.")),
+        );
         return;
       }
       router.replace(await authenticatedHomePath());
       router.refresh();
     } catch {
-      setError("The network is unavailable. Please try again.");
+      setError(tx("The network is unavailable. Please try again."));
     } finally {
       setPending(false);
     }
@@ -63,13 +67,13 @@ export function GymSelectionForm({ gyms }: { gyms: GymSummary[] }) {
     <form className="mt-6 grid gap-4" onSubmit={submit} noValidate>
       {error && (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       )}
       {gyms.length ? (
         <>
           <fieldset className="grid gap-3">
-            <legend className="mb-2 font-bold">Available gyms</legend>
+            <legend className="mb-2 font-bold">{tx("Available gyms")}</legend>
             {gyms.map((gym) => {
               const id = membershipId(gym);
               return (
@@ -84,18 +88,20 @@ export function GymSelectionForm({ gyms }: { gyms: GymSummary[] }) {
                     required
                     disabled={pending}
                   />
+
                   <span>{gymName(gym)}</span>
                 </label>
               );
             })}
           </fieldset>
           <button className="button" type="submit" disabled={pending}>
-            {pending ? "Opening gym…" : "Continue"}
+            {pending ? tx("Opening gym…") : tx("Continue")}
           </button>
         </>
       ) : (
         <p className="muted">
-          No active gym memberships are available for this account.
+          {" "}
+          {tx("No active gym memberships are available for this account.")}{" "}
         </p>
       )}
     </form>

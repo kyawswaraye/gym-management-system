@@ -4,6 +4,7 @@ export const REFRESH_SERVICE = "com.gymplatform.member.refresh";
 export const INSTALLATION_SERVICE = "com.gymplatform.member.installation";
 export const DEVICE_SERVICE = "com.gymplatform.member.device";
 export const PREFERENCE_SERVICE = "com.gymplatform.member.preferences";
+export const LOCALE_SERVICE = "com.gymplatform.member.locale";
 
 export type SecureWriteOptions = {
   service: string;
@@ -37,6 +38,8 @@ export type SecureStore = {
   setDeviceId(id: string): Promise<void>;
   getBiometricGate(): Promise<boolean>;
   setBiometricGate(enabled: boolean): Promise<void>;
+  getLocale(): Promise<"en" | "mm">;
+  setLocale(locale: "en" | "mm"): Promise<void>;
   resetAll(): Promise<void>;
 };
 
@@ -117,6 +120,13 @@ export function createSecureStore(
       if (refresh) {
         await write(REFRESH_SERVICE, refresh, enabled);
       }
+    },
+    async getLocale() {
+      const value = await read(LOCALE_SERVICE);
+      return value === "mm" ? "mm" : "en";
+    },
+    setLocale(locale) {
+      return write(LOCALE_SERVICE, locale);
     },
     async resetAll() {
       await port.resetGenericPassword({ service: REFRESH_SERVICE });

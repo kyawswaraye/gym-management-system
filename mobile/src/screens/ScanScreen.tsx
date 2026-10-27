@@ -1,3 +1,4 @@
+import { useTx } from "../i18n/useTx";
 import { useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import {
@@ -13,11 +14,13 @@ import { useMemberApi, useOnline } from "../app/providers";
 import { readCheckInPayload } from "../scan/payload";
 import { scanErrorMessage } from "../scan/errors";
 import { Button } from "../ui/Button";
+import { Card } from "../ui/Card";
 import { Screen } from "../ui/Screen";
 import { Text } from "../ui/Text";
-import { colors } from "../ui/theme";
+import { colors, radius } from "../ui/theme";
 
 export function ScanScreen() {
+  const tx = useTx();
   const api = useMemberApi();
   const online = useOnline();
   const { hasPermission, requestPermission, canRequestPermission } =
@@ -35,8 +38,8 @@ export function ScanScreen() {
     if (!parsed.ok) {
       setResult(
         parsed.reason === "empty"
-          ? "Point the camera at the gym check-in code."
-          : "That code is not a gym check-in code.",
+          ? tx("Point the camera at the gym check-in code.")
+          : tx("That code is not a gym check-in code."),
       );
       return;
     }
@@ -44,12 +47,14 @@ export function ScanScreen() {
     setScanning(true);
     try {
       const visit = await api.scan(parsed.payload);
-      setResult(`Checked in at ${visit.check_in_at}.`);
+      setResult(tx("Checked in at {time}.", { time: visit.check_in_at }));
     } catch (error) {
       if (error instanceof ApiError) {
-        setResult(scanErrorMessage(error.code, error.message));
+        setResult(tx(scanErrorMessage(error.code, error.message)));
       } else {
-        setResult(error instanceof Error ? error.message : "Check-in failed.");
+        setResult(
+          error instanceof Error ? tx(error.message) : tx("Check-in failed."),
+        );
       }
     } finally {
       inFlight.current = false;
@@ -70,37 +75,41 @@ export function ScanScreen() {
   });
 
   return (
-    <Screen title="Check in">
-      <Text>
-        Scan the code on the gym screen. If the camera is unavailable, the front
-        desk can check you in.
+    <Screen title={tx("Check in")}>
+      <Text style={{ color: colors.muted }}>
+        {tx(
+          "Scan the code on the gym screen. If the camera is unavailable, the front desk can check you in.",
+        )}
       </Text>
       {!online ? (
-        <Text accessibilityRole="alert">
-          You are offline, so a scan cannot be sent.
+        <Text accessibilityRole="alert" style={{ color: colors.muted }}>
+          {tx("You are offline, so a scan cannot be sent.")}
         </Text>
       ) : null}
       {!hasPermission ? (
         <>
-          <Text>
-            Camera access is off. You can still check in with a staff member at
-            the front desk.
+          <Text style={{ color: colors.muted }}>
+            {tx(
+              "Camera access is off. You can still check in with a staff member at the front desk.",
+            )}
           </Text>
           {canRequestPermission ? (
             <Button
-              label="Allow camera"
-              hint="Asks the phone for camera access"
+              label={tx("Allow camera")}
+              hint={tx("Asks the phone for camera access")}
               onPress={() => requestPermission()}
             />
           ) : (
-            <Text>
-              Turn camera access on in system settings, then return here.
+            <Text style={{ color: colors.muted }}>
+              {tx(
+                "Turn camera access on in system settings, then return here.",
+              )}
             </Text>
           )}
         </>
       ) : null}
       {hasPermission && device ? (
-        <View accessibilityLabel="Check-in camera" style={styles.preview}>
+        <View accessibilityLabel={tx("Check-in camera")} style={styles.preview}>
           <Camera
             style={StyleSheet.absoluteFill}
             device={device}
@@ -110,12 +119,14 @@ export function ScanScreen() {
         </View>
       ) : null}
       {hasPermission && !device ? (
-        <Text>No back camera is available on this phone.</Text>
+        <Text>{tx("No back camera is available on this phone.")}</Text>
       ) : null}
       {result ? (
-        <Text accessibilityRole="alert" accessibilityLiveRegion="polite">
-          {result}
-        </Text>
+        <Card>
+          <Text accessibilityLiveRegion="polite" accessibilityRole="alert">
+            {result}
+          </Text>
+        </Card>
       ) : null}
     </Screen>
   );
@@ -123,8 +134,8 @@ export function ScanScreen() {
 
 const styles = StyleSheet.create({
   preview: {
-    height: 280,
-    borderRadius: 8,
+    height: 320,
+    borderRadius: radius.md,
     overflow: "hidden",
     backgroundColor: colors.text,
   },

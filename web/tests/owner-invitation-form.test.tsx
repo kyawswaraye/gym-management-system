@@ -98,4 +98,45 @@ describe("owner invitation acceptance", () => {
     });
     expect(document.body.innerHTML).not.toContain(token);
   });
+
+  it("shows the password policy error instead of the generic request message", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        Response.json({ data: { csrf_token: "csrf-token" } }),
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            success: false,
+            error: {
+              message: "The request could not be processed.",
+              fields: {
+                non_field_errors: ["This password is too common."],
+              },
+            },
+          },
+          { status: 400 },
+        ),
+      );
+    render(<OwnerInvitationForm token={token} />);
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "Password1234xx" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm password"), {
+      target: { value: "Password1234xx" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Accept Owner invitation" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This password is too common.",
+    );
+    expect(screen.getByLabelText("Password")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(replace).not.toHaveBeenCalled();
+    expect(document.body.innerHTML).not.toContain(token);
+  });
 });

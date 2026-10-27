@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import {
   useEffect,
@@ -95,22 +96,26 @@ function saleStatusClass(status: string): string {
   }
 }
 
-function saleLabel(row: PTSale): string {
+function saleLabel(
+  row: PTSale,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
+): string {
   const packagePart = row.service_package_id
-    ? ` package ${row.service_package_id}`
+    ? ` ${tx("package")} ${row.service_package_id}`
     : "";
   const paymentPart = row.payment?.method
-    ? ` payment ${row.payment.method}`
+    ? ` ${tx("payment")} ${tx(row.payment.method)}`
     : "";
-  return `${row.service_date} ${row.description} ${row.gross_fee} ${row.currency} member ${row.member_id} trainer ${row.trainer_staff_profile_id}${packagePart}${paymentPart} ${row.status}`;
+  return `${row.service_date} ${row.description} ${row.gross_fee} ${tx(row.currency)} ${tx("member")} ${row.member_id} ${tx("trainer")} ${row.trainer_staff_profile_id}${packagePart}${paymentPart} ${tx(row.status)}`;
 }
 
 function SaleStatusBadge({ status }: { status: string }) {
+  const tx = useTx();
   return (
     <span
       className={`rounded-full px-2.5 py-1 text-xs font-bold ${saleStatusClass(status)}`}
     >
-      {status}
+      {tx(status)}
     </span>
   );
 }
@@ -124,9 +129,10 @@ function Fact({
   value: string;
   emphasis?: boolean;
 }) {
+  const tx = useTx();
   return (
     <div>
-      <dt className="text-xs font-medium text-slate-500">{label}</dt>
+      <dt className="text-xs font-medium text-slate-500">{tx(label)}</dt>
       <dd
         className={`mt-0.5 break-words text-slate-900 ${
           emphasis ? "text-lg font-black tabular-nums" : "font-semibold"
@@ -139,13 +145,14 @@ function Fact({
 }
 
 function NoticeBanner({ message }: { message: string }) {
+  const tx = useTx();
   return (
     <p
       aria-live="polite"
       className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
       role="status"
     >
-      {message}
+      {tx(message)}
     </p>
   );
 }
@@ -169,6 +176,7 @@ export function SalesManager({
   today: string;
   membershipId: string;
 }) {
+  const tx = useTx();
   const [status, setStatus] = useState("");
   const [memberFilter, setMemberFilter] = useState<PickedMember | null>(null);
   const [selected, setSelected] = useState<PTSale | null>(null);
@@ -334,7 +342,7 @@ export function SalesManager({
       }
     } catch (caught) {
       if (detailToken.current !== token) return;
-      setLoadError(phase5Error(caught, "The sale could not be loaded."));
+      setLoadError(phase5Error(caught, tx("The sale could not be loaded.")));
     } finally {
       if (detailToken.current === token) setDetailPending(false);
     }
@@ -414,7 +422,9 @@ export function SalesManager({
         sales.reload();
       })
       .catch((caught: unknown) => {
-        setDialogError(phase5Error(caught, "The draft could not be saved."));
+        setDialogError(
+          phase5Error(caught, tx("The draft could not be saved.")),
+        );
       })
       .finally(() => endCommand(token));
   }
@@ -428,12 +438,14 @@ export function SalesManager({
     void submitPtSale(selected.id, commandKey(fingerprint))
       .then(async () => {
         key.current = null;
-        setNotice("Sale submitted.");
+        setNotice(tx("Sale submitted."));
         await openSale(selected.id);
         sales.reload();
       })
       .catch((caught: unknown) => {
-        setActionError(phase5Error(caught, "The sale could not be submitted."));
+        setActionError(
+          phase5Error(caught, tx("The sale could not be submitted.")),
+        );
       })
       .finally(() => endCommand(token));
   }
@@ -456,14 +468,16 @@ export function SalesManager({
     )
       .then(async () => {
         key.current = null;
-        setNotice("Sale approved.");
+        setNotice(tx("Sale approved."));
         setDialogError("");
         setMode(null);
         await openSale(selected.id);
         sales.reload();
       })
       .catch((caught: unknown) => {
-        setDialogError(phase5Error(caught, "The sale could not be approved."));
+        setDialogError(
+          phase5Error(caught, tx("The sale could not be approved.")),
+        );
       })
       .finally(() => endCommand(token));
   }
@@ -484,14 +498,16 @@ export function SalesManager({
     )
       .then(async () => {
         key.current = null;
-        setNotice("Sale rejected.");
+        setNotice(tx("Sale rejected."));
         setDialogError("");
         setMode(null);
         await openSale(selected.id);
         sales.reload();
       })
       .catch((caught: unknown) => {
-        setDialogError(phase5Error(caught, "The sale could not be rejected."));
+        setDialogError(
+          phase5Error(caught, tx("The sale could not be rejected.")),
+        );
       })
       .finally(() => endCommand(token));
   }
@@ -512,7 +528,7 @@ export function SalesManager({
     )
       .then(async () => {
         key.current = null;
-        setNotice("Draft cancelled.");
+        setNotice(tx("Draft cancelled."));
         setDialogError("");
         setMode(null);
         await openSale(selected.id);
@@ -520,7 +536,7 @@ export function SalesManager({
       })
       .catch((caught: unknown) => {
         setDialogError(
-          phase5Error(caught, "The draft could not be cancelled."),
+          phase5Error(caught, tx("The draft could not be cancelled.")),
         );
       })
       .finally(() => endCommand(token));
@@ -583,14 +599,16 @@ export function SalesManager({
     void voidPtSale(selected.id, body, commandKey(JSON.stringify(body)))
       .then(async () => {
         key.current = null;
-        setNotice("Sale voided.");
+        setNotice(tx("Sale voided."));
         setDialogError("");
         setMode(null);
         await openSale(selected.id);
         sales.reload();
       })
       .catch((caught: unknown) => {
-        setDialogError(phase5Error(caught, "The sale could not be voided."));
+        setDialogError(
+          phase5Error(caught, tx("The sale could not be voided.")),
+        );
       })
       .finally(() => endCommand(token));
   }
@@ -618,10 +636,12 @@ export function SalesManager({
                 className="text-sm font-bold tracking-wide text-slate-700 uppercase"
                 id="pt-sales-list-title"
               >
-                Sales
+                {" "}
+                {tx("Sales")}{" "}
               </h2>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                Service date, fee, member, trainer, and status.
+                {" "}
+                {tx("Service date, fee, member, trainer, and status.")}{" "}
               </p>
             </div>
             {canCreate ? (
@@ -637,8 +657,7 @@ export function SalesManager({
                 ref={createButtonRef}
                 type="button"
               >
-                <span aria-hidden="true">+</span>
-                Create draft
+                <span aria-hidden="true">+</span> {tx("Create draft")}{" "}
               </button>
             ) : null}
           </div>
@@ -654,12 +673,13 @@ export function SalesManager({
                 />
               </div>
               <label className="grid gap-1 text-xs font-semibold tracking-wide text-slate-500 uppercase sm:w-48 lg:mb-0">
-                Sale status
+                {" "}
+                {tx("Sale status")}{" "}
                 <SelectInput
                   onChange={(event) => setStatus(event.target.value)}
                   value={status}
                 >
-                  <option value="">All</option>
+                  <option value="">{tx("All")}</option>
                   {SALE_STATUSES.map((value) => (
                     <option key={value} value={value}>
                       {value}
@@ -676,7 +696,8 @@ export function SalesManager({
                   }}
                   type="button"
                 >
-                  Clear filters
+                  {" "}
+                  {tx("Clear filters")}{" "}
                 </button>
               ) : null}
             </div>
@@ -686,7 +707,8 @@ export function SalesManager({
             {sales.pending && sales.rows.length === 0 ? (
               <div className="grid gap-3" role="status">
                 <p className="text-sm font-medium text-slate-600">
-                  Loading sales.
+                  {" "}
+                  {tx("Loading sales.")}{" "}
                 </p>
                 <div className="grid gap-3">
                   {[0, 1, 2].map((item) => (
@@ -700,7 +722,8 @@ export function SalesManager({
             ) : null}
             {sales.pending && sales.rows.length > 0 ? (
               <p className="text-sm font-medium text-slate-600" role="status">
-                Loading sales.
+                {" "}
+                {tx("Loading sales.")}{" "}
               </p>
             ) : null}
             {!sales.pending && sales.error ? (
@@ -713,32 +736,34 @@ export function SalesManager({
                   onClick={() => sales.reload()}
                   type="button"
                 >
-                  Retry loading sales
+                  {" "}
+                  {tx("Retry loading sales")}{" "}
                 </button>
               </div>
             ) : null}
             {!sales.pending && !sales.error && sales.rows.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
                 <p className="font-semibold text-slate-700">
-                  No PT sales match.
+                  {" "}
+                  {tx("No PT sales match.")}{" "}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
                   {filtered
-                    ? "Try changing or clearing the current filters."
+                    ? tx("Try changing or clearing the current filters.")
                     : canCreate
-                      ? "Create a draft to add a sale."
-                      : "Sales will appear here when they are recorded."}
+                      ? tx("Create a draft to add a sale.")
+                      : tx("Sales will appear here when they are recorded.")}
                 </p>
               </div>
             ) : null}
             {sales.rows.length > 0 ? (
-              <ul aria-label="Sale list" className="grid gap-3">
+              <ul aria-label={tx("Sale list")} className="grid gap-3">
                 {sales.rows.map((row) => {
                   const active = selected?.id === row.id;
                   return (
                     <li key={row.id}>
                       <button
-                        aria-label={saleLabel(row)}
+                        aria-label={saleLabel(row, tx)}
                         aria-pressed={active}
                         className={`w-full rounded-xl border border-l-4 p-4 text-left ${
                           active
@@ -756,19 +781,20 @@ export function SalesManager({
                               </time>
                             </p>
                             <h3 className="text-base font-bold break-words text-slate-900">
-                              {row.description}
+                              {tx(row.description)}
                             </h3>
                           </div>
                           <div className="shrink-0 text-right">
                             <p className="text-lg font-black text-slate-900 tabular-nums">
                               {row.gross_fee}{" "}
                               <span className="text-xs font-semibold text-slate-500">
-                                {row.currency}
+                                {tx(row.currency)}
                               </span>
                             </p>
                             {active ? (
                               <span className="mt-1 inline-flex rounded-full bg-teal-700 px-2.5 py-1 text-xs font-bold text-white">
-                                Selected
+                                {" "}
+                                {tx("Selected")}{" "}
                               </span>
                             ) : null}
                           </div>
@@ -778,13 +804,17 @@ export function SalesManager({
                         </div>
                         <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
                           <div>
-                            <dt className="text-xs text-slate-500">Member</dt>
+                            <dt className="text-xs text-slate-500">
+                              {tx("Member")}
+                            </dt>
                             <dd className="mt-0.5 font-semibold text-slate-900">
                               <IdentifierValue value={row.member_id} />
                             </dd>
                           </div>
                           <div>
-                            <dt className="text-xs text-slate-500">Trainer</dt>
+                            <dt className="text-xs text-slate-500">
+                              {tx("Trainer")}
+                            </dt>
                             <dd className="mt-0.5 font-semibold text-slate-900">
                               <IdentifierValue
                                 value={row.trainer_staff_profile_id}
@@ -794,7 +824,8 @@ export function SalesManager({
                           {row.service_package_id ? (
                             <div>
                               <dt className="text-xs text-slate-500">
-                                Package
+                                {" "}
+                                {tx("Package")}{" "}
                               </dt>
                               <dd className="mt-0.5 font-semibold text-slate-900">
                                 <IdentifierValue
@@ -806,7 +837,8 @@ export function SalesManager({
                           {row.payment?.method ? (
                             <div>
                               <dt className="text-xs text-slate-500">
-                                Payment
+                                {" "}
+                                {tx("Payment")}{" "}
                               </dt>
                               <dd className="mt-0.5 font-semibold text-slate-900">
                                 {row.payment.method}
@@ -854,10 +886,11 @@ export function SalesManager({
                       className="text-xl font-bold text-slate-900"
                       id="sale-detail-title"
                     >
-                      Sale detail
+                      {" "}
+                      {tx("Sale detail")}{" "}
                     </h2>
                     <p className="mt-1 text-sm break-words text-slate-600">
-                      {selected.description}
+                      {tx(selected.description)}
                     </p>
                   </div>
                   <SaleStatusBadge status={selected.status} />
@@ -868,7 +901,8 @@ export function SalesManager({
                     className="text-sm font-medium text-slate-600"
                     role="status"
                   >
-                    Loading sale detail.
+                    {" "}
+                    {tx("Loading sale detail.")}{" "}
                   </p>
                 ) : null}
                 {loadError ? (
@@ -880,7 +914,8 @@ export function SalesManager({
                         onClick={() => void openSale(requestedSaleId)}
                         type="button"
                       >
-                        Retry loading sale
+                        {" "}
+                        {tx("Retry loading sale")}{" "}
                       </button>
                     ) : null}
                   </div>
@@ -888,13 +923,14 @@ export function SalesManager({
                 {actionError ? <Alert message={actionError} /> : null}
                 <div>
                   <h3 className="text-sm font-bold text-slate-800">
-                    Financial summary
+                    {" "}
+                    {tx("Financial summary")}{" "}
                   </h3>
                   <dl className="mt-3 grid grid-cols-2 gap-3">
                     <Fact
                       emphasis
                       label="Gross fee"
-                      value={`${selected.gross_fee} ${selected.currency}`}
+                      value={`${selected.gross_fee} ${tx(selected.currency)}`}
                     />
                     <Fact
                       emphasis
@@ -910,7 +946,8 @@ export function SalesManager({
                 </div>
                 <div className="border-t border-slate-100 pt-4">
                   <h3 className="text-sm font-bold text-slate-800">
-                    Package and payment
+                    {" "}
+                    {tx("Package and payment")}{" "}
                   </h3>
                   <dl className="mt-3 grid grid-cols-2 gap-3">
                     <Fact label="Member" value={selected.member_id} />
@@ -943,7 +980,7 @@ export function SalesManager({
                         label="Payment amount"
                         value={`${selected.payment.amount}${
                           selected.payment.currency
-                            ? ` ${selected.payment.currency}`
+                            ? ` ${tx(selected.payment.currency)}`
                             : ""
                         }`}
                       />
@@ -963,27 +1000,30 @@ export function SalesManager({
                     {selected.payment?.status ? (
                       <Fact
                         label="Payment status"
-                        value={selected.payment.status}
+                        value={tx(selected.payment.status)}
                       />
                     ) : null}
                   </dl>
                 </div>
                 {selected.rejection_reason ? (
                   <p className="text-sm text-slate-700">
-                    <span className="font-semibold">Rejection reason. </span>
+                    <span className="font-semibold">
+                      {tx("Rejection reason.")}{" "}
+                    </span>
                     {selected.rejection_reason}
                   </p>
                 ) : null}
                 {selected.reason ? (
                   <p className="text-sm text-slate-700">
-                    <span className="font-semibold">Reason. </span>
+                    <span className="font-semibold">{tx("Reason.")} </span>
                     {selected.reason}
                   </p>
                 ) : null}
                 {selected.status === "POSTED" || selected.status === "VOID" ? (
                   <div className="border-t border-slate-100 pt-4">
                     <h3 className="text-sm font-bold text-slate-800">
-                      Commission
+                      {" "}
+                      {tx("Commission")}{" "}
                     </h3>
                     {commission ? (
                       <div className="mt-3 grid gap-3">
@@ -993,9 +1033,9 @@ export function SalesManager({
                           ) : null}
                           {commission.commission_percent_snapshot ? (
                             <span className="text-sm text-slate-600">
-                              {commission.commission_percent_snapshot}% of{" "}
-                              {commission.gross_fee_snapshot}{" "}
-                              {commission.currency}
+                              {commission.commission_percent_snapshot}
+                              {tx("% of")} {commission.gross_fee_snapshot}{" "}
+                              {tx(commission.currency)}
                             </span>
                           ) : null}
                         </div>
@@ -1015,7 +1055,7 @@ export function SalesManager({
                         </dl>
                         {(commission.payments ?? []).length > 0 ? (
                           <ul
-                            aria-label="Commission payouts"
+                            aria-label={tx("Commission payouts")}
                             className="grid gap-2"
                           >
                             {commission.payments.map((row) => (
@@ -1030,7 +1070,7 @@ export function SalesManager({
                                   <SaleStatusBadge status={row.status} />
                                 </div>
                                 <p className="mt-1 text-sm text-slate-600">
-                                  {row.payment_method}
+                                  {tx(row.payment_method)}
                                   {row.business_date
                                     ? ` · ${row.business_date}`
                                     : ""}
@@ -1040,20 +1080,22 @@ export function SalesManager({
                           </ul>
                         ) : (
                           <p className="text-sm text-slate-500">
-                            No payouts are recorded.
+                            {" "}
+                            {tx("No payouts are recorded.")}{" "}
                           </p>
                         )}
                       </div>
                     ) : !detailPending && !commissionUnresolved ? (
                       <p className="mt-3 text-sm text-slate-500">
-                        No commission matched this sale.
+                        {" "}
+                        {tx("No commission matched this sale.")}{" "}
                       </p>
                     ) : null}
                   </div>
                 ) : null}
                 {selected.status === "DRAFT" && (canUpdate || canSubmit) ? (
                   <div
-                    aria-label="Sale actions"
+                    aria-label={tx("Sale actions")}
                     className="flex flex-wrap gap-2 border-t border-slate-100 pt-4"
                     role="group"
                   >
@@ -1068,7 +1110,8 @@ export function SalesManager({
                         ref={editButtonRef}
                         type="button"
                       >
-                        Edit draft
+                        {" "}
+                        {tx("Edit draft")}{" "}
                       </button>
                     ) : null}
                     {canUpdate ? (
@@ -1082,7 +1125,8 @@ export function SalesManager({
                         ref={cancelButtonRef}
                         type="button"
                       >
-                        Cancel draft
+                        {" "}
+                        {tx("Cancel draft")}{" "}
                       </button>
                     ) : null}
                     {canSubmit ? (
@@ -1092,14 +1136,15 @@ export function SalesManager({
                         onClick={submitSale}
                         type="button"
                       >
-                        Submit sale
+                        {" "}
+                        {tx("Submit sale")}{" "}
                       </button>
                     ) : null}
                   </div>
                 ) : null}
                 {selected.status === "PENDING_APPROVAL" && canApprove ? (
                   <div
-                    aria-label="Sale actions"
+                    aria-label={tx("Sale actions")}
                     className="flex flex-wrap gap-2 border-t border-slate-100 pt-4"
                     role="group"
                   >
@@ -1117,7 +1162,8 @@ export function SalesManager({
                           ref={approveButtonRef}
                           type="button"
                         >
-                          Approve sale
+                          {" "}
+                          {tx("Approve sale")}{" "}
                         </button>
                         <button
                           aria-controls={
@@ -1129,19 +1175,23 @@ export function SalesManager({
                           ref={rejectButtonRef}
                           type="button"
                         >
-                          Reject sale
+                          {" "}
+                          {tx("Reject sale")}{" "}
                         </button>
                       </>
                     ) : (
                       <p className="text-sm text-slate-600">
-                        A different person must approve or reject this sale.
+                        {" "}
+                        {tx(
+                          "A different person must approve or reject this sale.",
+                        )}{" "}
                       </p>
                     )}
                   </div>
                 ) : null}
                 {selected.status === "POSTED" && canVoid ? (
                   <div
-                    aria-label="Sale actions"
+                    aria-label={tx("Sale actions")}
                     className="flex flex-wrap gap-2 border-t border-slate-100 pt-4"
                     role="group"
                   >
@@ -1155,7 +1205,8 @@ export function SalesManager({
                       ref={voidButtonRef}
                       type="button"
                     >
-                      Void sale
+                      {" "}
+                      {tx("Void sale")}{" "}
                     </button>
                   </div>
                 ) : null}
@@ -1166,7 +1217,8 @@ export function SalesManager({
                   className="text-sm font-bold tracking-wide text-slate-700 uppercase"
                   id="sale-detail-title"
                 >
-                  Sale detail
+                  {" "}
+                  {tx("Sale detail")}{" "}
                 </h2>
                 {loadError ? (
                   <div className="grid gap-3">
@@ -1177,14 +1229,17 @@ export function SalesManager({
                         onClick={() => void openSale(requestedSaleId)}
                         type="button"
                       >
-                        Retry loading sale
+                        {" "}
+                        {tx("Retry loading sale")}{" "}
                       </button>
                     ) : null}
                   </div>
                 ) : (
                   <p className="text-sm text-slate-500">
-                    Select a sale to see its fee, package, payment, and
-                    commission.
+                    {" "}
+                    {tx(
+                      "Select a sale to see its fee, package, payment, and commission.",
+                    )}{" "}
                   </p>
                 )}
               </>
@@ -1197,8 +1252,12 @@ export function SalesManager({
         <SaleCommandDialog
           description={
             mode === "edit"
-              ? "Update the draft. Leave the payment draft unchanged, replace it, or remove it."
-              : "Choose the member, trainer, fee, and any package or payment draft."
+              ? tx(
+                  "Update the draft. Leave the payment draft unchanged, replace it, or remove it.",
+                )
+              : tx(
+                  "Choose the member, trainer, fee, and any package or payment draft.",
+                )
           }
           descriptionId="sale-form-description"
           dialogId="sale-draft-dialog"
@@ -1210,7 +1269,7 @@ export function SalesManager({
           submitClass="button-edit"
           submitDisabled={detailPending}
           submitLabel="Save draft"
-          title={mode === "edit" ? "Edit draft" : "Create draft"}
+          title={mode === "edit" ? tx("Edit draft") : tx("Create draft")}
           titleId="sale-form-title"
         >
           <MemberSearch
@@ -1221,7 +1280,8 @@ export function SalesManager({
           <Alert message={trainers.error || packages.error} />
           {trainers.pending || packages.pending ? (
             <p className="text-sm text-slate-600" role="status">
-              Loading sale choices.
+              {" "}
+              {tx("Loading sale choices.")}{" "}
             </p>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1231,13 +1291,14 @@ export function SalesManager({
                 name="trainer_staff_profile_id"
                 required
               >
-                <option value="">Select a trainer</option>
+                <option value="">{tx("Select a trainer")}</option>
                 {selected?.trainer_staff_profile_id &&
                 !trainers.items.some(
                   (trainer) => trainer.id === selected.trainer_staff_profile_id,
                 ) ? (
                   <option value={selected.trainer_staff_profile_id}>
-                    Current trainer
+                    {" "}
+                    {tx("Current trainer")}{" "}
                   </option>
                 ) : null}
                 {trainers.items.map((trainer) => (
@@ -1276,7 +1337,7 @@ export function SalesManager({
                 defaultValue={selected?.service_package_id ?? ""}
                 name="service_package_id"
               >
-                <option value="">None</option>
+                <option value="">{tx("None")}</option>
                 {packages.items.map((row) => (
                   <option key={row.id} value={row.id}>
                     {row.code} · {row.name} · {row.price}
@@ -1286,12 +1347,14 @@ export function SalesManager({
             </Field>
           </div>
           <div className="grid gap-4 border-t border-slate-100 pt-4">
-            <h3 className="text-sm font-bold text-slate-800">Payment draft</h3>
+            <h3 className="text-sm font-bold text-slate-800">
+              {tx("Payment draft")}
+            </h3>
             <Field label="Payment draft">
               <SelectInput defaultValue="omit" name="payment_choice">
-                <option value="omit">Leave unchanged or omit</option>
-                <option value="set">Set payment draft</option>
-                <option value="clear">Remove payment draft</option>
+                <option value="omit">{tx("Leave unchanged or omit")}</option>
+                <option value="set">{tx("Set payment draft")}</option>
+                <option value="clear">{tx("Remove payment draft")}</option>
               </SelectInput>
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1338,15 +1401,20 @@ export function SalesManager({
           submitClass="button-success"
           submitDisabled={detailPending || (cashPayment && sessionsBlocked)}
           submitLabel="Confirm approval"
-          title="Approve sale"
+          title={tx("Approve sale")}
           titleId="approve-title"
         >
           {cashPayment ? (
             <>
               <p className="text-sm text-slate-600">
                 {selected.payment?.business_date
-                  ? `Open sessions are listed for the payment business date ${selected.payment.business_date}.`
-                  : "This cash payment has no business date, so a session cannot be chosen."}
+                  ? tx(
+                      "Open sessions are listed for the payment business date {date}.",
+                      { date: selected.payment.business_date },
+                    )
+                  : tx(
+                      "This cash payment has no business date, so a session cannot be chosen.",
+                    )}
               </p>
               <CashSessionSelect
                 collectionError={sessions.error}
@@ -1359,7 +1427,10 @@ export function SalesManager({
             </>
           ) : (
             <p className="text-sm text-slate-600">
-              This sale has no cash payment, so no cash session is sent.
+              {" "}
+              {tx(
+                "This sale has no cash payment, so no cash session is sent.",
+              )}{" "}
             </p>
           )}
         </SaleCommandDialog>
@@ -1378,7 +1449,7 @@ export function SalesManager({
           submitClass="button-warn"
           submitDisabled={detailPending}
           submitLabel="Confirm rejection"
-          title="Reject sale"
+          title={tx("Reject sale")}
           titleId="reject-title"
         >
           <ReasonField label="Rejection reason" name="rejection_reason" />
@@ -1398,7 +1469,7 @@ export function SalesManager({
           submitClass="button-cancel"
           submitDisabled={detailPending}
           submitLabel="Confirm cancellation"
-          title="Cancel draft"
+          title={tx("Cancel draft")}
           titleId="cancel-sale-title"
         >
           <ReasonField label="Cancellation reason" />
@@ -1422,13 +1493,15 @@ export function SalesManager({
             (voidNeedsSession && sessionsBlocked)
           }
           submitLabel="Confirm void"
-          title="Void sale"
+          title={tx("Void sale")}
           titleId="void-sale-title"
         >
           {commissionUnresolved ? (
             <p className="error" role="alert">
-              The sale commission could not be loaded completely. Payout
-              destinations are not listed, so this void was not sent.
+              {" "}
+              {tx(
+                "The sale commission could not be loaded completely. Payout destinations are not listed, so this void was not sent.",
+              )}{" "}
             </p>
           ) : null}
           <ReasonField label="Void reason" />
@@ -1456,7 +1529,7 @@ export function SalesManager({
               collectionError={sessions.error}
               currency={currency}
               key={row.id}
-              label={`Payout destination for ${row.amount}`}
+              label={tx("Payout destination for {amount}", { amount: row.amount })}
               name={`payout_${row.id}`}
               pending={sessions.pending}
               resetKey={voidDate}
@@ -1464,8 +1537,10 @@ export function SalesManager({
             />
           ))}
           <p className="text-sm text-slate-600">
-            Every posted payout is reversed. A consumed package returns
-            PACKAGE_CONSUMED and changes nothing.
+            {" "}
+            {tx(
+              "Every posted payout is reversed. A consumed package returns PACKAGE_CONSUMED and changes nothing.",
+            )}{" "}
           </p>
         </SaleCommandDialog>
       ) : null}

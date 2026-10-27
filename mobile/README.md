@@ -1,4 +1,4 @@
-# Gym Member
+# GymPilot MM
 
 Bare React Native 0.88 CLI app for Android and iOS. It calls the Django member API with a bearer member access token. It does not use Expo and it does not send `X-Gym-BFF-Secret`.
 

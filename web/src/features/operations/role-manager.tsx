@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
@@ -216,12 +217,13 @@ function Field({
   required?: boolean;
   placeholder?: string;
 }) {
+  const tx = useTx();
   const id = useId();
   const errorId = `${id}-error`;
   return (
     <div className="field">
       <label className="text-sm font-semibold text-slate-700" htmlFor={id}>
-        {label}
+        {tx(label)}
       </label>
       <input
         aria-describedby={error ? errorId : undefined}
@@ -237,7 +239,7 @@ function Field({
       />
       {error ? (
         <span className="error" id={errorId}>
-          {error}
+          {tx(error)}
         </span>
       ) : null}
     </div>
@@ -279,10 +281,11 @@ function ArchiveDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const tx = useTx();
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const title = `Archive ${roleName}`;
+  const title = tx("Archive {name}", { name: roleName });
 
   useEffect(() => {
     panelRef.current?.focus({ preventScroll: true });
@@ -314,14 +317,16 @@ function ArchiveDialog({
         <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold text-slate-900" id={titleId}>
-              {title}
+              {tx(title)}
             </h2>
             <p
               className="mt-1 text-sm leading-6 text-slate-500"
               id={descriptionId}
             >
-              {roleName} becomes inactive. Assignments stay on record, and the
-              role can be restored later.
+              {roleName}{" "}
+              {tx(
+                "becomes inactive. Assignments stay on record, and the role can be restored later.",
+              )}{" "}
             </p>
           </div>
           <button
@@ -330,13 +335,14 @@ function ArchiveDialog({
             onClick={onCancel}
             type="button"
           >
-            Close
+            {" "}
+            {tx("Close")}{" "}
           </button>
         </div>
         <div className="grid gap-4 px-5 py-4 sm:px-6">
           {error ? (
             <p className="error" role="alert">
-              {error}
+              {tx(error)}
             </p>
           ) : null}
           <div>
@@ -346,7 +352,8 @@ function ArchiveDialog({
               onClick={onCancel}
               type="button"
             >
-              Cancel
+              {" "}
+              {tx("Cancel")}{" "}
             </button>
             <button
               className="button button-archive"
@@ -354,7 +361,7 @@ function ArchiveDialog({
               onClick={onConfirm}
               type="button"
             >
-              {pending ? "Archiving…" : "Confirm archive"}
+              {pending ? tx("Archiving…") : tx("Confirm archive")}
             </button>
           </div>
         </div>
@@ -370,6 +377,7 @@ function PermissionChoice({
   option: PermissionOption;
   checked: boolean;
 }) {
+  const tx = useTx();
   const reasonId = useId();
   if (option.mode === "unavailable") {
     return (
@@ -379,7 +387,7 @@ function PermissionChoice({
         </p>
         {option.description ? (
           <p className="mt-1 text-sm leading-5 text-slate-500">
-            {option.description}
+            {tx(option.description)}
           </p>
         ) : null}
         {option.reason ? (
@@ -411,7 +419,8 @@ function PermissionChoice({
         </label>
         {option.mode === "required" ? (
           <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[0.68rem] font-bold tracking-wide text-slate-500 uppercase ring-1 ring-slate-200 ring-inset">
-            Required
+            {" "}
+            {tx("Required")}{" "}
           </span>
         ) : null}
       </div>
@@ -419,7 +428,7 @@ function PermissionChoice({
         <p
           className={`px-3 text-sm leading-5 text-slate-500 ${option.reason ? "" : "pb-3"}`}
         >
-          {option.description}
+          {tx(option.description)}
         </p>
       ) : null}
       {option.reason ? (
@@ -458,6 +467,7 @@ function PermissionEditor({
   onSubmit: (event: FormEvent<HTMLFormElement>, role: Role) => void;
   onClose: () => void;
 }) {
+  const tx = useTx();
   const [query, setQuery] = useState("");
   const normalized = query.trim().toLowerCase();
   const kept = new Set(
@@ -480,42 +490,51 @@ function PermissionEditor({
       onClose={onClose}
       onSubmit={(event) => onSubmit(event, role)}
       pending={pending}
-      title={`Permissions for ${role.name}`}
+      title={tx("Permissions for {name}", { name: role.name })}
       wide
     >
       <label className="field">
         <span className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-          Filter
+          {" "}
+          {tx("Filter")}{" "}
         </span>
         <input
           className="input"
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Code or area"
+          placeholder={tx("Code or area")}
           type="search"
           value={query}
         />
       </label>
       {error ? (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       ) : null}
       <fieldset className="m-0 grid min-w-0 gap-5 border-0 p-0">
-        <legend className="sr-only">Permissions for {role.name}</legend>
+        <legend className="sr-only">
+          {tx("Permissions for")} {role.name}
+        </legend>
         {dropped.length > 0 ? (
           <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-950">
-            Saving replaces the full permission set. Permissions outside the
-            delegation policy are removed.
+            {" "}
+            {tx(
+              "Saving replaces the full permission set. Permissions outside the delegation policy are removed.",
+            )}{" "}
           </p>
         ) : null}
         {editable.length === 0 && required.length === 0 ? (
           <p className="text-sm text-slate-500">
-            No permissions in the current delegation policy can be selected.
+            {" "}
+            {tx(
+              "No permissions in the current delegation policy can be selected.",
+            )}{" "}
           </p>
         ) : null}
         {normalized && !anyMatch ? (
           <p className="text-sm text-slate-500">
-            No permissions match this filter.
+            {" "}
+            {tx("No permissions match this filter.")}{" "}
           </p>
         ) : null}
         {required.length > 0 ? (
@@ -527,7 +546,8 @@ function PermissionEditor({
             }
           >
             <h3 className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-              Locked on this role
+              {" "}
+              {tx("Locked on this role")}{" "}
             </h3>
             <ul className="grid gap-2">
               {required.map((option) => (
@@ -553,7 +573,8 @@ function PermissionEditor({
             }
           >
             <h3 className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-              You can change
+              {" "}
+              {tx("You can change")}{" "}
             </h3>
             {groupOptions(editable).map(([module, items]) => (
               <div
@@ -565,7 +586,7 @@ function PermissionEditor({
                 key={module}
               >
                 <h4 className="text-sm font-semibold text-slate-800">
-                  {moduleLabel(module)}
+                  {tx(moduleLabel(module))}
                 </h4>
                 <ul className="grid gap-2 sm:grid-cols-2">
                   {items.map((option) => (
@@ -596,7 +617,8 @@ function PermissionEditor({
             }
           >
             <h3 className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-              Not available
+              {" "}
+              {tx("Not available")}{" "}
             </h3>
             <ul className="grid gap-2">
               {unavailable.map((option) => (
@@ -617,14 +639,14 @@ function PermissionEditor({
           <button
             aria-label={
               pending
-                ? "Saving permissions"
-                : `Save permissions for ${role.name}`
+                ? tx("Saving permissions")
+                : tx("Save permissions for {name}", { name: role.name })
             }
             className="button button-edit"
             disabled={pending}
             type="submit"
           >
-            {pending ? "Saving…" : "Save permissions"}
+            {pending ? tx("Saving…") : tx("Save permissions")}
           </button>
         </div>
       </fieldset>
@@ -694,6 +716,7 @@ function RoleCard({
   onClosePermissions: () => void;
   onSubmitPermissions: (event: FormEvent<HTMLFormElement>, role: Role) => void;
 }) {
+  const tx = useTx();
   const [expanded, setExpanded] = useState(false);
   const codes = [...role.permission_codes].sort();
   const compact = codes.length > PERMISSION_PREVIEW;
@@ -720,46 +743,52 @@ function RoleCard({
           <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
             {options ? (
               <button
-                aria-label={`Edit permissions for ${role.name}`}
+                aria-label={tx("Edit permissions for {name}", {
+                  name: role.name,
+                })}
                 className="button button-sm"
                 disabled={pending}
                 onClick={onOpenPermissions}
                 type="button"
               >
-                Permissions
+                {" "}
+                {tx("Permissions")}{" "}
               </button>
             ) : null}
             {customMutable ? (
               <button
-                aria-label={`Edit ${role.name}`}
+                aria-label={tx("Edit {name}", { name: role.name })}
                 className="button button-edit button-sm"
                 disabled={pending}
                 onClick={onEdit}
                 type="button"
               >
-                Edit
+                {" "}
+                {tx("Edit")}{" "}
               </button>
             ) : null}
             {customMutable && role.is_active ? (
               <button
-                aria-label={`Archive ${role.name}`}
+                aria-label={tx("Archive {name}", { name: role.name })}
                 className="button button-archive button-sm"
                 disabled={pending}
                 onClick={onArchive}
                 type="button"
               >
-                Archive
+                {" "}
+                {tx("Archive")}{" "}
               </button>
             ) : null}
             {customMutable && !role.is_active ? (
               <button
-                aria-label={`Restore ${role.name}`}
+                aria-label={tx("Restore {name}", { name: role.name })}
                 className="button button-success button-sm"
                 disabled={pending}
                 onClick={onRestore}
                 type="button"
               >
-                Restore
+                {" "}
+                {tx("Restore")}{" "}
               </button>
             ) : null}
           </div>
@@ -767,19 +796,19 @@ function RoleCard({
       </div>
       <dl className="mt-4 grid gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-3">
         <div>
-          <dt className="text-slate-500">Status</dt>
+          <dt className="text-slate-500">{tx("Status")}</dt>
           <dd className="mt-1 font-semibold text-slate-900">
-            {role.is_protected ? "Protected" : "Custom"}
+            {role.is_protected ? tx("Protected") : tx("Custom")}
           </dd>
         </div>
         <div>
-          <dt className="text-slate-500">Activity</dt>
+          <dt className="text-slate-500">{tx("Activity")}</dt>
           <dd className="mt-1 font-semibold text-slate-900">
-            {role.is_active ? "Active" : "Inactive"}
+            {role.is_active ? tx("Active") : tx("Inactive")}
           </dd>
         </div>
         <div>
-          <dt className="text-slate-500">Assigned</dt>
+          <dt className="text-slate-500">{tx("Assigned")}</dt>
           <dd className="mt-1 font-semibold text-slate-900">
             {role.assignment_count}
           </dd>
@@ -788,14 +817,19 @@ function RoleCard({
 
       {outsideBoundary ? (
         <p className="mt-3 text-sm text-slate-600">
-          This role is outside your delegation boundary.
+          {" "}
+          {tx("This role is outside your delegation boundary.")}{" "}
         </p>
       ) : null}
 
-      <div aria-label={`Permissions on ${role.name}`} className="mt-4">
+      <div
+        aria-label={tx("Permissions on {name}", { name: role.name })}
+        className="mt-4"
+      >
         {codes.length === 0 ? (
           <p className="mt-2 text-sm text-slate-500">
-            No permissions assigned.
+            {" "}
+            {tx("No permissions assigned.")}{" "}
           </p>
         ) : null}
         {codes.length > 0 && !compact ? (
@@ -817,7 +851,7 @@ function RoleCard({
             onClick={() => setExpanded((current) => !current)}
             type="button"
           >
-            {expanded ? "Hide permissions" : "Show permissions"}
+            {expanded ? tx("Hide permissions") : tx("Show permissions")}
           </button>
         ) : null}
         {compact && expanded ? (
@@ -825,7 +859,7 @@ function RoleCard({
             {groupCodes(codes).map(([module, moduleCodes]) => (
               <div key={module}>
                 <p className="text-[0.68rem] font-bold tracking-wide text-slate-400 uppercase">
-                  {moduleLabel(module)}
+                  {tx(moduleLabel(module))}
                 </p>
                 <ul className="mt-1.5 flex flex-wrap gap-1.5">
                   {moduleCodes.map((code) => (
@@ -845,13 +879,13 @@ function RoleCard({
 
       {customMutable && editing ? (
         <FormDialog
-          description={`Key ${role.key} stays the same.`}
+          description={tx("Key {key} stays the same.", { key: role.key })}
           key={`${role.id}:${role.updated_at}:identity`}
           noValidate
           onClose={onCloseEdit}
           onSubmit={onSubmitIdentity}
           pending={pending}
-          title={`Edit ${role.name}`}
+          title={tx("Edit {name}", { name: role.name })}
         >
           <div className="grid gap-4">
             {formError ? (
@@ -876,12 +910,12 @@ function RoleCard({
             />
             <div>
               <button
-                aria-label={`Save ${role.name}`}
+                aria-label={tx("Save {name}", { name: role.name })}
                 className="button button-edit"
                 disabled={pending}
                 type="submit"
               >
-                {pending ? "Saving…" : "Save changes"}
+                {pending ? tx("Saving…") : tx("Save changes")}
               </button>
             </div>
           </div>
@@ -911,6 +945,7 @@ export function RoleManager({
   isOwner: boolean;
   permissions: readonly string[];
 }) {
+  const tx = useTx();
   const [roles, setRoles] = useState<Role[] | null>(null);
   const [section, setSection] = useState<"roles" | "catalog">("roles");
   const [catalog, setCatalog] = useState<Permission[] | null>(null);
@@ -1050,7 +1085,7 @@ export function RoleManager({
       await updateRole(role.id, body);
       setEditingRoleId(null);
       await reloadRoles();
-      setSuccess(`${role.name} updated.`);
+      setSuccess(tx("{name} updated.", { name: role.name }));
     } catch (failure) {
       setFormError(failureMessage(failure, "Unable to update the role."));
     } finally {
@@ -1075,7 +1110,7 @@ export function RoleManager({
       await replaceRolePermissions(role.id, codes);
       setPermissionsRoleId(null);
       await reloadRoles();
-      setSuccess(`${role.name} permissions replaced.`);
+      setSuccess(tx("{name} permissions replaced.", { name: role.name }));
     } catch (failure) {
       setFormError(
         failureMessage(failure, "Unable to replace role permissions."),
@@ -1092,7 +1127,7 @@ export function RoleManager({
     setFormError(null);
     try {
       await archiveRole(archiveTarget.id);
-      setSuccess(`${archiveTarget.name} archived.`);
+      setSuccess(tx("{name} archived.", { name: archiveTarget.name }));
       setArchiveTarget(null);
       await reloadRoles();
     } catch (failure) {
@@ -1109,7 +1144,7 @@ export function RoleManager({
     try {
       await updateRole(role.id, { is_active: true });
       await reloadRoles();
-      setSuccess(`${role.name} restored.`);
+      setSuccess(tx("{name} restored.", { name: role.name }));
     } catch (failure) {
       setFormError(failureMessage(failure, "Unable to restore the role."));
     } finally {
@@ -1160,18 +1195,18 @@ export function RoleManager({
       "Protected role identity, archive, and permissions stay with an active owner. Custom role changes must stay inside your live permissions and the manager delegation policy.";
   }
   const filters: { id: RoleKind; label: string; count: number }[] = [
-    { id: "all", label: "All", count: loadedRoles.length },
-    { id: "protected", label: "Protected", count: protectedCount },
-    { id: "custom", label: "Custom", count: customCount },
-    { id: "inactive", label: "Inactive", count: inactiveCount },
+    { id: "all", label: tx("All"), count: loadedRoles.length },
+    { id: "protected", label: tx("Protected"), count: protectedCount },
+    { id: "custom", label: tx("Custom"), count: customCount },
+    { id: "inactive", label: tx("Inactive"), count: inactiveCount },
   ];
   const roleGroups = [
     {
-      title: "Protected roles",
+      title: tx("Protected roles"),
       roles: visibleRoles.filter((role) => role.is_protected),
     },
     {
-      title: "Custom roles",
+      title: tx("Custom roles"),
       roles: visibleRoles.filter((role) => !role.is_protected),
     },
   ].filter((group) => group.roles.length > 0);
@@ -1180,7 +1215,7 @@ export function RoleManager({
     <div className="grid gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div
-          aria-label="Role sections"
+          aria-label={tx("Role sections")}
           className="inline-flex w-fit rounded-xl bg-slate-200/70 p-1"
           role="tablist"
         >
@@ -1200,7 +1235,7 @@ export function RoleManager({
               role="tab"
               type="button"
             >
-              {label}
+              {tx(label)}
             </button>
           ))}
         </div>
@@ -1210,7 +1245,8 @@ export function RoleManager({
             onClick={openCreate}
             type="button"
           >
-            Create role
+            {" "}
+            {tx("Create role")}{" "}
           </button>
         ) : null}
       </div>
@@ -1232,7 +1268,7 @@ export function RoleManager({
               className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900"
               role="status"
             >
-              {success}
+              {tx(success)}
             </p>
           ) : null}
           {rolesError ? (
@@ -1248,7 +1284,8 @@ export function RoleManager({
           {roles === null ? (
             <div className={`${panelClass} grid gap-3 p-5`}>
               <p className="text-sm font-medium text-slate-500" role="status">
-                Loading roles.
+                {" "}
+                {tx("Loading roles.")}{" "}
               </p>
               {[0, 1, 2].map((item) => (
                 <div
@@ -1261,12 +1298,15 @@ export function RoleManager({
           {roles !== null && loadedRoles.length === 0 && !rolesError ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-sm">
               <p className="font-semibold text-slate-800" role="status">
-                No roles are defined for this gym.
+                {" "}
+                {tx("No roles are defined for this gym.")}{" "}
               </p>
               <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500">
                 {canManage
-                  ? "Create a custom role, then choose the permissions it should grant."
-                  : "Roles appear here after an owner adds them."}
+                  ? tx(
+                      "Create a custom role, then choose the permissions it should grant.",
+                    )
+                  : tx("Roles appear here after an owner adds them.")}
               </p>
             </div>
           ) : null}
@@ -1280,7 +1320,7 @@ export function RoleManager({
               }}
               onSubmit={(event) => void submitCreate(event)}
               pending={pending}
-              title="Create role"
+              title={tx("Create role")}
             >
               <div className="grid gap-4">
                 {formError ? (
@@ -1293,7 +1333,7 @@ export function RoleManager({
                   label="Name"
                   maxLength={100}
                   name="name"
-                  placeholder="Front desk"
+                  placeholder={tx("Front desk")}
                   required
                 />
                 <Field
@@ -1305,7 +1345,7 @@ export function RoleManager({
                   label="Description"
                   maxLength={255}
                   name="description"
-                  placeholder="What this role is for"
+                  placeholder={tx("What this role is for")}
                 />
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <label className="flex items-center gap-3 text-sm font-semibold text-slate-800">
@@ -1314,11 +1354,12 @@ export function RoleManager({
                       defaultChecked
                       name="is_active"
                       type="checkbox"
-                    />
-                    Active
+                    />{" "}
+                    {tx("Active")}{" "}
                   </label>
                   <p className="mt-1 pl-7 text-xs leading-5 text-slate-500">
-                    People can be assigned to an active role.
+                    {" "}
+                    {tx("People can be assigned to an active role.")}{" "}
                   </p>
                 </div>
                 <div>
@@ -1327,7 +1368,7 @@ export function RoleManager({
                     disabled={pending}
                     type="submit"
                   >
-                    {pending ? "Saving…" : "Create role"}
+                    {pending ? tx("Saving…") : tx("Create role")}
                   </button>
                 </div>
               </div>
@@ -1335,24 +1376,40 @@ export function RoleManager({
           ) : null}
 
           {roles !== null && loadedRoles.length > 0 ? (
-            <section aria-label="Role list" className={panelClass}>
+            <section aria-label={tx("Role list")} className={panelClass}>
               <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
-                <h2 className="text-lg font-bold text-slate-900">Role list</h2>
+                <h2 className="text-lg font-bold text-slate-900">
+                  {tx("Role list")}
+                </h2>
                 <p className="mt-0.5 text-sm text-slate-500">
                   {visibleRoles.length === loadedRoles.length
-                    ? `${loadedRoles.length} ${loadedRoles.length === 1 ? "role" : "roles"} · ${protectedCount} protected · ${customCount} custom · ${assignedTotal} assigned`
-                    : `${visibleRoles.length} of ${loadedRoles.length} roles`}
+                    ? tx(
+                        loadedRoles.length === 1
+                          ? "{count} role · {protected} protected · {custom} custom · {assigned} assigned"
+                          : "{count} roles · {protected} protected · {custom} custom · {assigned} assigned",
+                        {
+                          count: loadedRoles.length,
+                          protected: protectedCount,
+                          custom: customCount,
+                          assigned: assignedTotal,
+                        },
+                      )
+                    : tx("{shown} of {total} roles", {
+                        shown: visibleRoles.length,
+                        total: loadedRoles.length,
+                      })}
                 </p>
               </div>
               <div className="border-b border-slate-100 bg-slate-50/80 p-4 sm:p-5">
                 <label className="field">
                   <span className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-                    Search roles
+                    {" "}
+                    {tx("Search roles")}{" "}
                   </span>
                   <input
                     className="input"
                     onChange={(event) => setRoleQuery(event.target.value)}
-                    placeholder="Name, key, or permission"
+                    placeholder={tx("Name, key, or permission")}
                     type="search"
                     value={roleQuery}
                   />
@@ -1373,7 +1430,7 @@ export function RoleManager({
                         onClick={() => setRoleKind(filter.id)}
                         type="button"
                       >
-                        {filter.label}
+                        {tx(filter.label)}
                         <span
                           aria-hidden="true"
                           className="ml-1.5 text-xs opacity-70"
@@ -1388,7 +1445,8 @@ export function RoleManager({
                       onClick={() => setRoleQuery("")}
                       type="button"
                     >
-                      Clear
+                      {" "}
+                      {tx("Clear")}{" "}
                     </button>
                   ) : null}
                 </div>
@@ -1396,10 +1454,12 @@ export function RoleManager({
               {visibleRoles.length === 0 ? (
                 <div className="px-6 py-14 text-center">
                   <p className="font-semibold text-slate-800">
-                    No roles match this search.
+                    {" "}
+                    {tx("No roles match this search.")}{" "}
                   </p>
                   <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500">
-                    Try another name, key, or permission.
+                    {" "}
+                    {tx("Try another name, key, or permission.")}{" "}
                   </p>
                 </div>
               ) : (
@@ -1407,7 +1467,7 @@ export function RoleManager({
                   {roleGroups.map((group) => (
                     <div key={group.title}>
                       <p className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-                        {group.title}
+                        {tx(group.title)}
                       </p>
                       <div className="mt-3 grid gap-3">
                         {group.roles.map((role) => {
@@ -1499,18 +1559,23 @@ export function RoleManager({
         >
           <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
             <h2 className="text-lg font-bold text-slate-900">
-              Permission catalog
+              {" "}
+              {tx("Permission catalog")}{" "}
             </h2>
             <p className="mt-0.5 max-w-2xl text-sm leading-6 text-slate-500">
               {catalog && catalog.length > 0
-                ? `${catalog.length} permissions, grouped by area. A role only receives the ones saved onto it.`
-                : "Every permission this gym can grant."}
+                ? tx(
+                    "{count} permissions, grouped by area. A role only receives the ones saved onto it.",
+                    { count: catalog.length },
+                  )
+                : tx("Every permission this gym can grant.")}
             </p>
           </div>
           {catalog === null ? (
             <div className="grid gap-3 p-5">
               <p className="text-sm font-medium text-slate-500" role="status">
-                Loading permissions.
+                {" "}
+                {tx("Loading permissions.")}{" "}
               </p>
               {[0, 1, 2].map((item) => (
                 <div
@@ -1528,7 +1593,8 @@ export function RoleManager({
           {catalog !== null && catalog.length === 0 && !catalogError ? (
             <div className="px-6 py-16 text-center">
               <p className="font-semibold text-slate-800" role="status">
-                No permissions are in the catalog.
+                {" "}
+                {tx("No permissions are in the catalog.")}{" "}
               </p>
             </div>
           ) : null}
@@ -1537,12 +1603,13 @@ export function RoleManager({
               <div className="border-b border-slate-100 bg-slate-50/80 p-4 sm:p-5">
                 <label className="field">
                   <span className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-                    Search permissions
+                    {" "}
+                    {tx("Search permissions")}{" "}
                   </span>
                   <input
                     className="input"
                     onChange={(event) => setCatalogQuery(event.target.value)}
-                    placeholder="Code, area, or note"
+                    placeholder={tx("Code, area, or note")}
                     type="search"
                     value={catalogQuery}
                   />
@@ -1551,7 +1618,8 @@ export function RoleManager({
               {visibleCatalog.length === 0 ? (
                 <div className="px-6 py-14 text-center">
                   <p className="font-semibold text-slate-800">
-                    No permissions match this search.
+                    {" "}
+                    {tx("No permissions match this search.")}{" "}
                   </p>
                 </div>
               ) : (
@@ -1559,7 +1627,7 @@ export function RoleManager({
                   <div key={module}>
                     <div className="flex items-center justify-between bg-slate-50 px-4 py-2 sm:px-5">
                       <h3 className="text-xs font-bold tracking-wide text-slate-500 uppercase">
-                        {moduleLabel(module)}
+                        {tx(moduleLabel(module))}
                       </h3>
                       <span className="text-xs font-medium text-slate-400">
                         {items.length}
@@ -1578,12 +1646,12 @@ export function RoleManager({
                                 {permission.code}
                               </p>
                               {permission.is_active ? null : (
-                                <Pill tone="amber">Inactive</Pill>
+                                <Pill tone="amber">{tx("Inactive")}</Pill>
                               )}
                             </div>
                             {detail ? (
                               <p className="mt-1 text-sm leading-5 text-slate-500">
-                                {detail}
+                                {tx(detail)}
                               </p>
                             ) : null}
                             {availability ? (

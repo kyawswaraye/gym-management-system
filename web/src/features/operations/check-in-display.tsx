@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useState, type FormEvent } from "react";
 import QRCode from "qrcode";
@@ -58,6 +59,7 @@ function rotationDot(phase: RotationPhase): string {
 }
 
 export function CheckInDisplay() {
+  const tx = useTx();
   const [location, setLocation] = useState("Front desk");
   const [draft, setDraft] = useState("Front desk");
   const [editingLocation, setEditingLocation] = useState(false);
@@ -129,7 +131,7 @@ export function CheckInDisplay() {
     <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
       {error ? (
         <p className="error xl:col-span-2" role="alert">
-          {error}
+          {tx(error)}
         </p>
       ) : null}
       <section
@@ -139,13 +141,15 @@ export function CheckInDisplay() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-8">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
-              Member scan
+              {" "}
+              {tx("Member scan")}{" "}
             </p>
             <h2
               className="mt-1 text-2xl font-black tracking-tight text-slate-900"
               id="qr-title"
             >
-              Onsite check-in code
+              {" "}
+              {tx("Onsite check-in code")}{" "}
             </h2>
           </div>
           <p
@@ -164,7 +168,7 @@ export function CheckInDisplay() {
           <div className="mx-auto w-full max-w-lg rounded-2xl bg-white p-4 shadow-xl shadow-black/20 sm:p-6">
             {qr ? (
               <img
-                alt="Current onsite check-in code"
+                alt={tx("Current onsite check-in code")}
                 className="mx-auto h-auto w-full"
                 src={qr}
               />
@@ -173,19 +177,23 @@ export function CheckInDisplay() {
                 className="grid aspect-square min-h-64 place-items-center px-4 text-center text-sm font-semibold text-slate-500"
                 role="status"
               >
-                Preparing the code
+                {" "}
+                {tx("Preparing the code")}{" "}
               </div>
             )}
           </div>
           <div className="mx-auto mt-6 max-w-lg text-center">
             <p className="text-sm leading-6 text-slate-300">
               {pending
-                ? "Issuing a new code."
-                : "This code rotates automatically and is kept only on this screen."}
+                ? tx("Issuing a new code.")
+                : tx(
+                    "This code rotates automatically and is kept only on this screen.",
+                  )}
             </p>
             {expiresAt ? (
               <p className="mt-3 text-base font-semibold text-white sm:text-lg">
-                Refreshes before{" "}
+                {" "}
+                {tx("Refreshes before")}{" "}
                 <time dateTime={expiresAt}>
                   {new Date(expiresAt).toLocaleTimeString()}
                 </time>
@@ -197,25 +205,30 @@ export function CheckInDisplay() {
       <section className="mx-auto grid w-full max-w-lg content-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:mx-0 xl:max-w-none">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
-            Location
+            {" "}
+            {tx("Location")}{" "}
           </p>
           <p className="mt-2 text-xs font-medium text-slate-500">
-            Current location
+            {" "}
+            {tx("Current location")}{" "}
           </p>
           <p className="mt-1 text-2xl font-black tracking-tight text-slate-900">
             {location}
           </p>
         </div>
         <p className="text-sm leading-6 text-slate-500">
-          Each new code uses this location. The code itself stays on this
-          screen.
+          {" "}
+          {tx(
+            "Each new code uses this location. The code itself stays on this screen.",
+          )}{" "}
         </p>
         <button
           className="button button-edit w-full"
           onClick={() => setEditingLocation(true)}
           type="button"
         >
-          Update location
+          {" "}
+          {tx("Update location")}{" "}
         </button>
       </section>
       {editingLocation ? (
@@ -223,10 +236,11 @@ export function CheckInDisplay() {
           description="Each new code uses this location. The code itself stays on this screen."
           onClose={() => setEditingLocation(false)}
           onSubmit={saveLocation}
-          title="Display location"
+          title={tx("Display location")}
         >
           <label className="grid gap-2 text-sm font-semibold text-slate-800">
-            Display location
+            {" "}
+            {tx("Display location")}{" "}
             <input
               className="input"
               maxLength={80}
@@ -236,7 +250,8 @@ export function CheckInDisplay() {
             />
           </label>
           <button className="button button-edit" type="submit">
-            Update location
+            {" "}
+            {tx("Update location")}{" "}
           </button>
         </FormDialog>
       ) : null}

@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import {
   useEffect,
@@ -80,13 +81,14 @@ function bookingBorderClass(status: string): string {
 }
 
 function NoticeBanner({ message }: { message: string }) {
+  const tx = useTx();
   return (
     <p
       aria-live="polite"
       className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
       role="status"
     >
-      {message}
+      {tx(message)}
     </p>
   );
 }
@@ -120,6 +122,7 @@ function BookingDialog({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const tx = useTx();
   return (
     <div
       className="fixed inset-0 z-50 grid overflow-hidden p-2 sm:place-items-center sm:p-6"
@@ -154,10 +157,10 @@ function BookingDialog({
         <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold text-slate-900" id={titleId}>
-              {title}
+              {tx(title)}
             </h2>
             <p className="mt-1 text-sm text-slate-500" id={descriptionId}>
-              {description}
+              {tx(description)}
             </p>
           </div>
           <button
@@ -166,7 +169,8 @@ function BookingDialog({
             onClick={onClose}
             type="button"
           >
-            Close
+            {" "}
+            {tx("Close")}{" "}
           </button>
         </div>
         <fieldset
@@ -188,14 +192,15 @@ function BookingDialog({
               onClick={onClose}
               type="button"
             >
-              Cancel
+              {" "}
+              {tx("Cancel")}{" "}
             </button>
             <button
               className={`button w-full sm:w-auto ${submitClass}`}
               disabled={pending}
               type="submit"
             >
-              {submitLabel}
+              {tx(submitLabel)}
             </button>
           </div>
         </div>
@@ -215,6 +220,7 @@ export function BookingsManager({
   today: string;
   timeZone: string;
 }) {
+  const tx = useTx();
   const defaultTo = shiftDate(today, 6);
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(defaultTo);
@@ -343,7 +349,9 @@ export function BookingsManager({
       .catch((caught: unknown) => {
         if (packageToken.current !== token) return;
         setPackages([]);
-        setDialogError(phase5Error(caught, "Packages could not be loaded."));
+        setDialogError(
+          phase5Error(caught, tx("Packages could not be loaded.")),
+        );
       })
       .finally(() => {
         if (packageToken.current === token) setPackagesPending(false);
@@ -368,7 +376,7 @@ export function BookingsManager({
       bookings.reload();
       return true;
     } catch (caught) {
-      const message = phase5Error(caught, "The booking command failed.");
+      const message = phase5Error(caught, tx("The booking command failed."));
       if (scope === "dialog") setDialogError(message);
       else setCommandError(message);
       return false;
@@ -509,11 +517,14 @@ export function BookingsManager({
                 className="text-sm font-bold tracking-wide text-slate-700 uppercase"
                 id="pt-bookings-list-title"
               >
-                Session calendar
+                {" "}
+                {tx("Session calendar")}{" "}
               </h2>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                Gym-local personal-training sessions. Attendance and no-show
-                consume a package.
+                {" "}
+                {tx(
+                  "Gym-local personal-training sessions. Attendance and no-show consume a package.",
+                )}{" "}
               </p>
             </div>
             {canManage ? (
@@ -526,8 +537,7 @@ export function BookingsManager({
                 ref={createButtonRef}
                 type="button"
               >
-                <span aria-hidden="true">+</span>
-                Book session
+                <span aria-hidden="true">+</span> {tx("Book session")}{" "}
               </button>
             ) : null}
           </div>
@@ -560,7 +570,8 @@ export function BookingsManager({
                 </Field>
               </div>
               <button className="button w-full sm:w-auto" type="submit">
-                Show calendar
+                {" "}
+                {tx("Show calendar")}{" "}
               </button>
               {rangeChanged ? (
                 <button
@@ -568,13 +579,15 @@ export function BookingsManager({
                   onClick={resetRange}
                   type="button"
                 >
-                  Reset range
+                  {" "}
+                  {tx("Reset range")}{" "}
                 </button>
               ) : null}
             </form>
             <p className="text-sm text-slate-500">
-              Showing {dateFrom} to {dateTo}. Calendar range is at most 42
-              gym-local days.
+              {" "}
+              {tx("Showing")} {dateFrom} {tx("to")} {dateTo}
+              {tx(". Calendar range is at most 42 gym-local days.")}{" "}
             </p>
             <MemberSearch
               action="Search booking members"
@@ -588,7 +601,8 @@ export function BookingsManager({
                 onClick={() => setMemberFilter(null)}
                 type="button"
               >
-                Clear member filter
+                {" "}
+                {tx("Clear member filter")}{" "}
               </button>
             ) : null}
           </div>
@@ -597,7 +611,8 @@ export function BookingsManager({
             {bookings.pending && bookings.rows.length === 0 ? (
               <div className="grid gap-3" role="status">
                 <p className="text-sm font-medium text-slate-600">
-                  Loading bookings.
+                  {" "}
+                  {tx("Loading bookings.")}{" "}
                 </p>
                 <div className="grid gap-3">
                   {[0, 1, 2].map((item) => (
@@ -611,12 +626,14 @@ export function BookingsManager({
             ) : null}
             {bookings.pending && bookings.rows.length > 0 ? (
               <p className="text-sm font-medium text-slate-600" role="status">
-                Loading bookings.
+                {" "}
+                {tx("Loading bookings.")}{" "}
               </p>
             ) : null}
             {pending && !dialogKey ? (
               <p className="text-sm font-medium text-slate-600" role="status">
-                Updating the booking.
+                {" "}
+                {tx("Updating the booking.")}{" "}
               </p>
             ) : null}
             {!bookings.pending && bookings.error ? (
@@ -629,7 +646,8 @@ export function BookingsManager({
                   onClick={() => bookings.reload()}
                   type="button"
                 >
-                  Retry loading bookings
+                  {" "}
+                  {tx("Retry loading bookings")}{" "}
                 </button>
               </div>
             ) : null}
@@ -638,19 +656,22 @@ export function BookingsManager({
             bookings.rows.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
                 <p className="font-semibold text-slate-700">
-                  No PT bookings are in this range.
+                  {" "}
+                  {tx("No PT bookings are in this range.")}{" "}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
                   {filtered
-                    ? "Try another gym-local range or clear the member filter."
+                    ? tx(
+                        "Try another gym-local range or clear the member filter.",
+                      )
                     : canManage
-                      ? "Book a session to add it to this calendar."
-                      : "Sessions in this range will appear here."}
+                      ? tx("Book a session to add it to this calendar.")
+                      : tx("Sessions in this range will appear here.")}
                 </p>
               </div>
             ) : null}
             {bookings.rows.length > 0 ? (
-              <ul aria-label="PT bookings" className="grid gap-3">
+              <ul aria-label={tx("PT bookings")} className="grid gap-3">
                 {bookings.rows.map((row) => {
                   const selected = cancelling?.id === row.id;
                   return (
@@ -667,7 +688,8 @@ export function BookingsManager({
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-xs font-semibold tracking-wide text-slate-500">
-                            Session
+                            {" "}
+                            {tx("Session")}{" "}
                           </p>
                           <h3 className="text-base font-bold break-words text-slate-900">
                             <time dateTime={row.starts_at}>
@@ -682,18 +704,22 @@ export function BookingsManager({
                         <span
                           className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${bookingStatusClass(row.status)}`}
                         >
-                          {row.status}
+                          {tx(row.status)}
                         </span>
                       </div>
                       <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
                         <div className="min-w-0">
-                          <dt className="text-xs text-slate-500">Member</dt>
+                          <dt className="text-xs text-slate-500">
+                            {tx("Member")}
+                          </dt>
                           <dd className="mt-0.5 font-semibold break-words text-slate-900">
                             <IdentifierValue value={row.member_id} />
                           </dd>
                         </div>
                         <div className="min-w-0">
-                          <dt className="text-xs text-slate-500">Trainer</dt>
+                          <dt className="text-xs text-slate-500">
+                            {tx("Trainer")}
+                          </dt>
                           <dd className="mt-0.5 font-semibold break-words text-slate-900">
                             <IdentifierValue
                               value={row.trainer_staff_profile_id}
@@ -702,11 +728,11 @@ export function BookingsManager({
                         </div>
                         <div className="col-span-2 min-w-0">
                           <dt className="text-xs text-slate-500">
-                            {row.unmetered ? "Metering" : "Package"}
+                            {row.unmetered ? tx("Metering") : tx("Package")}
                           </dt>
                           <dd className="mt-0.5 font-semibold break-words text-slate-900">
                             {row.unmetered ? (
-                              `Unmetered · ${row.unmetered_reason}`
+                              `${tx("Unmetered")} · ${tx(row.unmetered_reason)}`
                             ) : (
                               <IdentifierValue
                                 value={
@@ -719,12 +745,12 @@ export function BookingsManager({
                       </dl>
                       {row.reason ? (
                         <p className="mt-3 text-sm break-words text-slate-600">
-                          Reason: {row.reason}
+                          {tx("Reason:")} {row.reason}
                         </p>
                       ) : null}
                       {canManage && row.status === "BOOKED" ? (
                         <div
-                          aria-label="Booking actions"
+                          aria-label={tx("Booking actions")}
                           className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:flex-wrap"
                           role="group"
                         >
@@ -734,7 +760,8 @@ export function BookingsManager({
                             onClick={() => attend(row)}
                             type="button"
                           >
-                            Mark attended
+                            {" "}
+                            {tx("Mark attended")}{" "}
                           </button>
                           <button
                             className="button button-warn w-full sm:w-auto"
@@ -742,7 +769,8 @@ export function BookingsManager({
                             onClick={() => markNoShow(row)}
                             type="button"
                           >
-                            Mark no-show
+                            {" "}
+                            {tx("Mark no-show")}{" "}
                           </button>
                           <button
                             aria-controls={
@@ -756,7 +784,8 @@ export function BookingsManager({
                             }
                             type="button"
                           >
-                            Cancel booking
+                            {" "}
+                            {tx("Cancel booking")}{" "}
                           </button>
                         </div>
                       ) : null}
@@ -793,19 +822,23 @@ export function BookingsManager({
           pending={pending}
           submitClass="button-edit"
           submitLabel="Save booking"
-          title="Book session"
+          title={tx("Book session")}
           titleId="book-pt-title"
         >
           <div className="grid gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-800">Trainer</h3>
+              <h3 className="text-sm font-bold text-slate-800">
+                {tx("Trainer")}
+              </h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                The session is booked with an active trainer.
+                {" "}
+                {tx("The session is booked with an active trainer.")}{" "}
               </p>
             </div>
             {trainers.pending ? (
               <p className="text-sm text-slate-500" role="status">
-                Loading trainers.
+                {" "}
+                {tx("Loading trainers.")}{" "}
               </p>
             ) : null}
             <Alert message={trainers.error} />
@@ -813,12 +846,13 @@ export function BookingsManager({
             !trainers.error &&
             trainers.items.length === 0 ? (
               <p className="text-sm text-slate-500">
-                No trainers are available.
+                {" "}
+                {tx("No trainers are available.")}{" "}
               </p>
             ) : null}
             <Field label="Trainer">
               <SelectInput name="trainer_staff_profile_id" required>
-                <option value="">Select a trainer</option>
+                <option value="">{tx("Select a trainer")}</option>
                 {trainers.items.map((trainer) => (
                   <option key={trainer.id} value={trainer.id}>
                     {trainer.display_name} ({trainer.staff_code})
@@ -829,9 +863,12 @@ export function BookingsManager({
           </div>
           <div className="grid gap-3 border-t border-slate-100 pt-5">
             <div>
-              <h3 className="text-sm font-bold text-slate-800">Member</h3>
+              <h3 className="text-sm font-bold text-slate-800">
+                {tx("Member")}
+              </h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Search active members, then choose one.
+                {" "}
+                {tx("Search active members, then choose one.")}{" "}
               </p>
             </div>
             <MemberSearch
@@ -842,9 +879,10 @@ export function BookingsManager({
           </div>
           <div className="grid gap-3 border-t border-slate-100 pt-5">
             <div>
-              <h3 className="text-sm font-bold text-slate-800">Time</h3>
+              <h3 className="text-sm font-bold text-slate-800">{tx("Time")}</h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Enter the start and end in the gym&apos;s local time.
+                {" "}
+                {tx("Enter the start and end in the gym's local time.")}{" "}
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -858,11 +896,17 @@ export function BookingsManager({
           </div>
           <div className="grid gap-3 border-t border-slate-100 pt-5">
             <div>
-              <h3 className="text-sm font-bold text-slate-800">Package</h3>
+              <h3 className="text-sm font-bold text-slate-800">
+                {tx("Package")}
+              </h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 {canUnmetered
-                  ? "Use an active PT package, or record an unmetered manager reason."
-                  : "Attendance and no-show consume one session from this package."}
+                  ? tx(
+                      "Use an active PT package, or record an unmetered manager reason.",
+                    )
+                  : tx(
+                      "Attendance and no-show consume one session from this package.",
+                    )}
               </p>
             </div>
             {canUnmetered ? (
@@ -874,8 +918,8 @@ export function BookingsManager({
                     setDialogError("");
                   }}
                   type="checkbox"
-                />
-                Unmetered manager booking
+                />{" "}
+                {tx("Unmetered manager booking")}{" "}
               </label>
             ) : null}
             {canUnmetered && unmetered ? (
@@ -884,7 +928,8 @@ export function BookingsManager({
               <>
                 {packagesPending ? (
                   <p className="text-sm text-slate-500" role="status">
-                    Loading packages.
+                    {" "}
+                    {tx("Loading packages.")}{" "}
                   </p>
                 ) : null}
                 <Alert message={packageNotice} />
@@ -893,7 +938,10 @@ export function BookingsManager({
                 !packageNotice &&
                 packages.length === 0 ? (
                   <p className="text-sm text-slate-500">
-                    No active PT packages are available for this member.
+                    {" "}
+                    {tx(
+                      "No active PT packages are available for this member.",
+                    )}{" "}
                   </p>
                 ) : null}
                 <Field label="Member package">
@@ -902,11 +950,11 @@ export function BookingsManager({
                     name="member_service_package_id"
                     required
                   >
-                    <option value="">Select a package</option>
+                    <option value="">{tx("Select a package")}</option>
                     {packages.map((row) => (
                       <option key={row.id} value={row.id}>
                         {row.package_code} · {row.package_name} ·{" "}
-                        {row.remaining_sessions} left · {row.status}
+                        {row.remaining_sessions} {tx("left ·")} {tx(row.status)}
                       </option>
                     ))}
                   </SelectInput>
@@ -929,7 +977,7 @@ export function BookingsManager({
           pending={pending}
           submitClass="button-cancel"
           submitLabel="Confirm booking cancellation"
-          title="Cancel PT booking"
+          title={tx("Cancel PT booking")}
           titleId="cancel-pt-booking-title"
         >
           <p className="text-sm text-slate-600">
@@ -942,7 +990,8 @@ export function BookingsManager({
             </time>
           </p>
           <p className="text-sm text-slate-600">
-            Member <IdentifierValue value={cancelling.member_id} />
+            {" "}
+            {tx("Member")} <IdentifierValue value={cancelling.member_id} />
           </p>
           <ReasonField label="Cancellation reason" required={false} />
         </BookingDialog>

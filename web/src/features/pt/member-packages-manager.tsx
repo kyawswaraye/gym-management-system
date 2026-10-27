@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import {
   useEffect,
@@ -103,8 +104,15 @@ function statusBadgeClass(status: string): string {
   }
 }
 
-function grantLabel(row: MemberServicePackage): string {
-  return `${row.package_code} · ${row.package_name} · member ${row.member_id}`;
+function grantLabel(
+  row: MemberServicePackage,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
+): string {
+  return tx("{code} · {name} · member {id}", {
+    code: row.package_code,
+    name: row.package_name,
+    id: row.member_id,
+  });
 }
 
 function reversibleEntries(
@@ -122,13 +130,14 @@ function grantProblem(member: PickedMember | null, body: GrantBody): string {
 }
 
 function NoticeBanner({ message }: { message: string }) {
+  const tx = useTx();
   return (
     <p
       aria-live="polite"
       className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
       role="status"
     >
-      {message}
+      {tx(message)}
     </p>
   );
 }
@@ -164,6 +173,7 @@ function ModalForm({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const tx = useTx();
   return (
     <div
       className="fixed inset-0 z-50 grid overflow-hidden p-2 sm:place-items-center sm:p-6"
@@ -195,10 +205,10 @@ function ModalForm({
         <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold text-slate-900" id={titleId}>
-              {title}
+              {tx(title)}
             </h2>
             <p className="mt-1 text-sm text-slate-500" id={descriptionId}>
-              {description}
+              {tx(description)}
             </p>
           </div>
           <button
@@ -207,7 +217,8 @@ function ModalForm({
             onClick={onClose}
             type="button"
           >
-            Close
+            {" "}
+            {tx("Close")}{" "}
           </button>
         </div>
         <fieldset
@@ -229,14 +240,15 @@ function ModalForm({
               onClick={onClose}
               type="button"
             >
-              Cancel
+              {" "}
+              {tx("Cancel")}{" "}
             </button>
             <button
               className={`button w-full sm:w-auto ${submitClass}`}
               disabled={pending || submitDisabled}
               type="submit"
             >
-              {submitLabel}
+              {tx(submitLabel)}
             </button>
           </div>
         </div>
@@ -254,11 +266,12 @@ function GrantRow({
   selected: boolean;
   onSelect: (row: MemberServicePackage) => void;
 }) {
+  const tx = useTx();
   const kind = packageKind(row.package_type);
   return (
     <li>
       <button
-        aria-label={grantLabel(row)}
+        aria-label={grantLabel(row, tx)}
         aria-pressed={selected}
         className={`w-full rounded-xl border border-l-4 border-slate-200 p-4 text-left ${typeBorderClass(kind)} ${
           selected
@@ -287,7 +300,8 @@ function GrantRow({
             ) : null}
             {selected ? (
               <span className="rounded-full bg-teal-700 px-2.5 py-1 text-xs font-bold text-white">
-                Selected
+                {" "}
+                {tx("Selected")}{" "}
               </span>
             ) : null}
           </div>
@@ -296,28 +310,28 @@ function GrantRow({
           <span
             className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClass(row.status)}`}
           >
-            {row.status}
+            {tx(row.status)}
           </span>
           <span className="sr-only"> · </span>
           <span className="text-sm font-semibold text-slate-700">
-            remaining {row.remaining_sessions} of {row.granted_sessions}
+            {tx("remaining")} {row.remaining_sessions} {tx("of")} {row.granted_sessions}
           </span>
         </p>
         <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
           <div className="col-span-2 sm:col-span-1">
-            <dt className="text-xs text-slate-500">Validity</dt>
+            <dt className="text-xs text-slate-500">{tx("Validity")}</dt>
             <dd className="mt-0.5 font-semibold text-slate-900">
-              {row.valid_from} to {row.valid_until}
+              {row.valid_from} {tx("to")} {row.valid_until}
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">Member</dt>
+            <dt className="text-xs text-slate-500">{tx("Member")}</dt>
             <dd className="mt-0.5 font-semibold text-slate-900">
               <IdentifierValue value={row.member_id} />
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">Package</dt>
+            <dt className="text-xs text-slate-500">{tx("Package")}</dt>
             <dd className="mt-0.5 font-semibold text-slate-900">
               <IdentifierValue value={row.service_package_id} />
             </dd>
@@ -329,17 +343,21 @@ function GrantRow({
 }
 
 function LedgerReferences({ entry }: { entry: ServiceSessionLedger }) {
+  const tx = useTx();
   if (!entry.pt_booking_id && !entry.class_booking_id) return null;
   return (
     <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
       {entry.pt_booking_id ? (
         <span>
-          PT booking <IdentifierValue value={entry.pt_booking_id} />
+          {" "}
+          {tx("PT booking")} <IdentifierValue value={entry.pt_booking_id} />
         </span>
       ) : null}
       {entry.class_booking_id ? (
         <span>
-          class booking <IdentifierValue value={entry.class_booking_id} />
+          {" "}
+          {tx("class booking")}{" "}
+          <IdentifierValue value={entry.class_booking_id} />
         </span>
       ) : null}
     </p>
@@ -347,6 +365,7 @@ function LedgerReferences({ entry }: { entry: ServiceSessionLedger }) {
 }
 
 function LedgerEntry({ entry }: { entry: ServiceSessionLedger }) {
+  const tx = useTx();
   return (
     <li className="rounded-xl border border-slate-200 bg-white px-4 py-3">
       <div className="flex items-start justify-between gap-3">
@@ -365,7 +384,7 @@ function LedgerEntry({ entry }: { entry: ServiceSessionLedger }) {
           className={`min-w-12 text-right text-lg font-black tabular-nums ${sessionTone(entry.session_delta)}`}
         >
           {signedSessions(entry.session_delta)}
-          <span className="sr-only"> sessions</span>
+          <span className="sr-only"> {tx("sessions")}</span>
         </p>
       </div>
       <LedgerReferences entry={entry} />
@@ -380,6 +399,7 @@ export function MemberPackagesManager({
   canAdjust: boolean;
   today: string;
 }) {
+  const tx = useTx();
   const [status, setStatus] = useState("");
   const [packageType, setPackageType] = useState("");
   const [memberFilter, setMemberFilter] = useState<PickedMember | null>(null);
@@ -537,14 +557,14 @@ export function MemberPackagesManager({
     void grantMemberPackage(body, commandKey(JSON.stringify(body)))
       .then(() => {
         key.current = null;
-        setNotice({ scope: "grant", message: "Package granted." });
+        setNotice({ scope: "grant", message: tx("Package granted.") });
         setGrantError("");
         setMode(null);
         grants.reload();
         ledger.reload();
       })
       .catch((caught: unknown) => {
-        setGrantError(phase5Error(caught, "The grant failed."));
+        setGrantError(phase5Error(caught, tx("The grant failed.")));
       })
       .finally(() => {
         pendingRef.current = false;
@@ -582,14 +602,14 @@ export function MemberPackagesManager({
     )
       .then(() => {
         key.current = null;
-        setNotice({ scope: "correct", message: "Ledger corrected." });
+        setNotice({ scope: "correct", message: tx("Ledger corrected.") });
         setCorrectError("");
         setMode(null);
         grants.reload();
         ledger.reload();
       })
       .catch((caught: unknown) => {
-        setCorrectError(phase5Error(caught, "The correction failed."));
+        setCorrectError(phase5Error(caught, tx("The correction failed.")));
       })
       .finally(() => {
         pendingRef.current = false;
@@ -612,10 +632,12 @@ export function MemberPackagesManager({
                   className="text-sm font-bold tracking-wide text-slate-700 uppercase"
                   id="grant-catalog-title"
                 >
-                  Granted packages
+                  {" "}
+                  {tx("Granted packages")}{" "}
                 </h2>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                  Code, type, balance, and validity for each grant.
+                  {" "}
+                  {tx("Code, type, balance, and validity for each grant.")}{" "}
                 </p>
               </div>
               {canAdjust ? (
@@ -629,8 +651,7 @@ export function MemberPackagesManager({
                   ref={grantButtonRef}
                   type="button"
                 >
-                  <span aria-hidden="true">+</span>
-                  Grant package
+                  <span aria-hidden="true">+</span> {tx("Grant package")}{" "}
                 </button>
               ) : null}
             </div>
@@ -646,11 +667,11 @@ export function MemberPackagesManager({
                       }}
                       value={status}
                     >
-                      <option value="">All</option>
-                      <option value="ACTIVE">ACTIVE</option>
-                      <option value="EXHAUSTED">EXHAUSTED</option>
-                      <option value="EXPIRED">EXPIRED</option>
-                      <option value="VOID">VOID</option>
+                      <option value="">{tx("All")}</option>
+                      <option value="ACTIVE">{tx("ACTIVE")}</option>
+                      <option value="EXHAUSTED">{tx("EXHAUSTED")}</option>
+                      <option value="EXPIRED">{tx("EXPIRED")}</option>
+                      <option value="VOID">{tx("VOID")}</option>
                     </SelectInput>
                   </Field>
                   <Field label="Package type">
@@ -661,9 +682,9 @@ export function MemberPackagesManager({
                       }}
                       value={packageType}
                     >
-                      <option value="">All</option>
-                      <option value="PT">PT</option>
-                      <option value="CLASS">CLASS</option>
+                      <option value="">{tx("All")}</option>
+                      <option value="PT">{tx("PT")}</option>
+                      <option value="CLASS">{tx("CLASS")}</option>
                     </SelectInput>
                   </Field>
                 </div>
@@ -689,7 +710,8 @@ export function MemberPackagesManager({
                     }}
                     type="button"
                   >
-                    Clear filters
+                    {" "}
+                    {tx("Clear filters")}{" "}
                   </button>
                 ) : null}
               </div>
@@ -702,7 +724,8 @@ export function MemberPackagesManager({
               {grants.pending && grants.rows.length === 0 ? (
                 <div className="grid gap-3" role="status">
                   <p className="text-sm font-medium text-slate-600">
-                    Loading grants.
+                    {" "}
+                    {tx("Loading grants.")}{" "}
                   </p>
                   <div className="grid gap-3">
                     {[0, 1, 2].map((item) => (
@@ -716,7 +739,8 @@ export function MemberPackagesManager({
               ) : null}
               {grants.pending && grants.rows.length > 0 ? (
                 <p className="text-sm font-medium text-slate-600" role="status">
-                  Loading grants.
+                  {" "}
+                  {tx("Loading grants.")}{" "}
                 </p>
               ) : null}
               {!grants.pending && grants.error ? (
@@ -729,26 +753,30 @@ export function MemberPackagesManager({
                     onClick={() => grants.reload()}
                     type="button"
                   >
-                    Retry loading grants
+                    {" "}
+                    {tx("Retry loading grants")}{" "}
                   </button>
                 </div>
               ) : null}
               {!grants.pending && !grants.error && grants.rows.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
                   <p className="font-semibold text-slate-700">
-                    No grants match.
+                    {" "}
+                    {tx("No grants match.")}{" "}
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
                     {filtered
-                      ? "Try changing or clearing the current filters."
+                      ? tx("Try changing or clearing the current filters.")
                       : canAdjust
-                        ? "Grant a package to add it to this list."
-                        : "Grants will appear here when a package is granted."}
+                        ? tx("Grant a package to add it to this list.")
+                        : tx(
+                            "Grants will appear here when a package is granted.",
+                          )}
                   </p>
                 </div>
               ) : null}
               {grants.rows.length > 0 ? (
-                <ul aria-label="Granted packages" className="grid gap-3">
+                <ul aria-label={tx("Granted packages")} className="grid gap-3">
                   {grants.rows.map((row) => (
                     <GrantRow
                       key={row.id}
@@ -785,10 +813,12 @@ export function MemberPackagesManager({
                   className="text-sm font-bold tracking-wide text-slate-700 uppercase"
                   id="ledger-title"
                 >
-                  Session ledger
+                  {" "}
+                  {tx("Session ledger")}{" "}
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Reason, session change, and booking references.
+                  {" "}
+                  {tx("Reason, session change, and booking references.")}{" "}
                 </p>
               </div>
               {canAdjust && selected && ledgerReady ? (
@@ -802,7 +832,8 @@ export function MemberPackagesManager({
                   ref={correctButtonRef}
                   type="button"
                 >
-                  Correct ledger
+                  {" "}
+                  {tx("Correct ledger")}{" "}
                 </button>
               ) : null}
             </div>
@@ -810,7 +841,8 @@ export function MemberPackagesManager({
             {selected ? (
               <div className="border-b border-teal-100 bg-teal-50 px-4 py-3 sm:px-5">
                 <p className="text-xs font-semibold tracking-wide text-teal-800 uppercase">
-                  Viewing
+                  {" "}
+                  {tx("Viewing")}{" "}
                 </p>
                 <p className="mt-1 font-bold text-slate-900">
                   {selected.package_code}
@@ -819,7 +851,8 @@ export function MemberPackagesManager({
                   </span>
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
-                  Member <IdentifierValue value={selected.member_id} />
+                  {" "}
+                  {tx("Member")} <IdentifierValue value={selected.member_id} />
                 </p>
               </div>
             ) : null}
@@ -831,21 +864,24 @@ export function MemberPackagesManager({
               {!selected ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
                   <p className="font-semibold text-slate-700">
-                    Choose a grant to read its ledger.
+                    {" "}
+                    {tx("Choose a grant to read its ledger.")}{" "}
                   </p>
                 </div>
               ) : null}
               {selected && !ledgerReady ? (
                 <div className="grid gap-3" role="status">
                   <p className="text-sm font-medium text-slate-600">
-                    Loading the ledger.
+                    {" "}
+                    {tx("Loading the ledger.")}{" "}
                   </p>
                   <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
                 </div>
               ) : null}
               {selected && ledgerReady && ledger.pending ? (
                 <p className="text-sm font-medium text-slate-600" role="status">
-                  Loading the ledger.
+                  {" "}
+                  {tx("Loading the ledger.")}{" "}
                 </p>
               ) : null}
               {selected && ledgerReady && !ledger.pending && ledger.error ? (
@@ -858,7 +894,8 @@ export function MemberPackagesManager({
                     onClick={() => ledger.reload()}
                     type="button"
                   >
-                    Retry loading the ledger
+                    {" "}
+                    {tx("Retry loading the ledger")}{" "}
                   </button>
                 </div>
               ) : null}
@@ -869,12 +906,16 @@ export function MemberPackagesManager({
               visibleLedger.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
                   <p className="font-semibold text-slate-700">
-                    This grant has no ledger rows.
+                    {" "}
+                    {tx("This grant has no ledger rows.")}{" "}
                   </p>
                 </div>
               ) : null}
               {selected && ledgerReady && visibleLedger.length > 0 ? (
-                <ul aria-label="Session ledger entries" className="grid gap-2">
+                <ul
+                  aria-label={tx("Session ledger entries")}
+                  className="grid gap-2"
+                >
                   {visibleLedger.map((entry) => (
                     <LedgerEntry entry={entry} key={entry.id} />
                   ))}
@@ -909,7 +950,7 @@ export function MemberPackagesManager({
           pending={pending}
           submitClass="button-create"
           submitLabel="Save grant"
-          title="Grant package"
+          title={tx("Grant package")}
           titleId="grant-title"
         >
           <MemberSearch
@@ -919,13 +960,14 @@ export function MemberPackagesManager({
           />
           {catalog.pending ? (
             <p className="text-sm text-slate-500" role="status">
-              Loading packages.
+              {" "}
+              {tx("Loading packages.")}{" "}
             </p>
           ) : null}
           <Alert message={catalog.error} />
           <Field label="Package">
             <SelectInput name="service_package_id" required>
-              <option value="">Select a package</option>
+              <option value="">{tx("Select a package")}</option>
               {catalog.items.map((row) => (
                 <option key={row.id} value={row.id}>
                   {row.type} · {row.code} · {row.name}
@@ -943,13 +985,15 @@ export function MemberPackagesManager({
           </Field>
           <Field label="Complimentary">
             <SelectInput defaultValue="true" name="complimentary">
-              <option value="true">Yes</option>
-              <option value="false">No</option>
+              <option value="true">{tx("Yes")}</option>
+              <option value="false">{tx("No")}</option>
             </SelectInput>
           </Field>
           <p className="text-sm text-slate-500">
-            A PT package must be complimentary. A paid PT grant comes from sale
-            approval.
+            {" "}
+            {tx(
+              "A PT package must be complimentary. A paid PT grant comes from sale approval.",
+            )}{" "}
           </p>
           <ReasonField label="Reason" />
         </ModalForm>
@@ -968,12 +1012,13 @@ export function MemberPackagesManager({
           submitClass="button-edit"
           submitDisabled={reversible.length === 0}
           submitLabel="Save correction"
-          title="Correct ledger"
+          title={tx("Correct ledger")}
           titleId="correct-title"
         >
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-              Selected package
+              {" "}
+              {tx("Selected package")}{" "}
             </p>
             <p className="mt-1 text-base font-bold text-slate-900">
               {selected.package_code}
@@ -982,17 +1027,18 @@ export function MemberPackagesManager({
               </span>
             </p>
             <p className="mt-2 text-sm text-slate-600">
-              Member <IdentifierValue value={selected.member_id} />
+              {" "}
+              {tx("Member")} <IdentifierValue value={selected.member_id} />
             </p>
             <p className="mt-1 text-sm text-slate-700">
               <span
                 className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClass(selected.status)}`}
               >
-                {selected.status}
+                {tx(selected.status)}
               </span>
               <span className="sr-only"> · </span>
               <span className="ml-2 font-semibold">
-                remaining {selected.remaining_sessions} of{" "}
+                {tx("remaining")} {selected.remaining_sessions} {tx("of")}{" "}
                 {selected.granted_sessions}
               </span>
             </p>
@@ -1004,7 +1050,7 @@ export function MemberPackagesManager({
               required
               value={reversesId}
             >
-              <option value="">Select an entry</option>
+              <option value="">{tx("Select an entry")}</option>
               {reversible.map((entry) => (
                 <option key={entry.id} value={entry.id}>
                   {entry.reason} · {signedSessions(entry.session_delta)} ·{" "}
@@ -1016,7 +1062,8 @@ export function MemberPackagesManager({
           {reversal ? (
             <div className="rounded-xl border border-slate-200 p-4">
               <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                Reversal entry
+                {" "}
+                {tx("Reversal entry")}{" "}
               </p>
               <div className="mt-2 flex items-start justify-between gap-3">
                 <div>
@@ -1030,7 +1077,8 @@ export function MemberPackagesManager({
                     </time>
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Entry <IdentifierValue value={reversal.id} />
+                    {" "}
+                    {tx("Entry")} <IdentifierValue value={reversal.id} />
                   </p>
                 </div>
                 <p
@@ -1044,8 +1092,12 @@ export function MemberPackagesManager({
           ) : null}
           <p className="text-sm text-slate-500">
             {reversible.length === 0
-              ? "No reversible entries are on this page. Grant entries cannot be corrected. Move to another page to reach an earlier entry."
-              : "Reversal choices are the ledger entries on this page, except grants. Move to another page to reach an earlier entry."}
+              ? tx(
+                  "No reversible entries are on this page. Grant entries cannot be corrected. Move to another page to reach an earlier entry.",
+                )
+              : tx(
+                  "Reversal choices are the ledger entries on this page, except grants. Move to another page to reach an earlier entry.",
+                )}
           </p>
           <ReasonField label="Correction reason" />
         </ModalForm>

@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -37,7 +38,11 @@ function validityUnit(value: string): ValidityUnit {
   return "MONTH";
 }
 
-function validityLabel(value: number, unit: string): string {
+function validityLabel(
+  value: number,
+  unit: string,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
+): string {
   const words: Record<string, string> = {
     DAY: "day",
     WEEK: "week",
@@ -45,8 +50,12 @@ function validityLabel(value: number, unit: string): string {
     YEAR: "year",
   };
   const word = words[unit];
-  if (!word) return `${value} ${unit.toLowerCase()}`;
-  return `${value} ${word}${value === 1 ? "" : "s"}`;
+  const label = word
+    ? value === 1
+      ? word
+      : `${word}s`
+    : unit.toLowerCase();
+  return tx("{count} {unit}", { count: value, unit: tx(label) });
 }
 
 function packageFormError(input: {
@@ -84,6 +93,7 @@ export function PackagesManager({
   canManage: boolean;
   currency: string;
 }) {
+  const tx = useTx();
   const [type, setType] = useState("");
   const [activeOnly, setActiveOnly] = useState("");
   const [notice, setNotice] = useState("");
@@ -179,13 +189,15 @@ export function PackagesManager({
       ...(packageType === "CLASS" ? { class_type_id: classTypeId } : {}),
     })
       .then(() => {
-        setNotice("Package created.");
+        setNotice(tx("Package created."));
         setFormError("");
         setOpen(false);
         packages.reload();
       })
       .catch((caught: unknown) => {
-        setFormError(phase5Error(caught, "The package could not be created."));
+        setFormError(
+          phase5Error(caught, tx("The package could not be created.")),
+        );
       })
       .finally(() => {
         pendingRef.current = false;
@@ -202,7 +214,7 @@ export function PackagesManager({
             className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
             role="status"
           >
-            {notice}
+            {tx(notice)}
           </p>
         ) : null}
 
@@ -217,11 +229,14 @@ export function PackagesManager({
                 className="text-sm font-bold tracking-wide text-slate-700 uppercase"
                 id="package-catalog-title"
               >
-                Service packages
+                {" "}
+                {tx("Service packages")}{" "}
               </h2>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                Session count, validity, and price. Saved definitions stay
-                unchanged.
+                {" "}
+                {tx(
+                  "Session count, validity, and price. Saved definitions stay unchanged.",
+                )}{" "}
               </p>
             </div>
             {canManage ? (
@@ -233,8 +248,7 @@ export function PackagesManager({
                 ref={createButtonRef}
                 type="button"
               >
-                <span aria-hidden="true">+</span>
-                Create package
+                <span aria-hidden="true">+</span> {tx("Create package")}{" "}
               </button>
             ) : null}
           </div>
@@ -242,27 +256,29 @@ export function PackagesManager({
           <div className="border-b border-slate-200 bg-slate-50/70 px-4 py-3 sm:px-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <label className="grid gap-1 text-xs font-semibold tracking-wide text-slate-500 uppercase sm:w-40">
-                Type
+                {" "}
+                {tx("Type")}{" "}
                 <SelectInput
-                  aria-label="Filter by package type"
+                  aria-label={tx("Filter by package type")}
                   onChange={(event) => setType(event.target.value)}
                   value={type}
                 >
-                  <option value="">All types</option>
-                  <option value="PT">PT</option>
-                  <option value="CLASS">CLASS</option>
+                  <option value="">{tx("All types")}</option>
+                  <option value="PT">{tx("PT")}</option>
+                  <option value="CLASS">{tx("CLASS")}</option>
                 </SelectInput>
               </label>
               <label className="grid gap-1 text-xs font-semibold tracking-wide text-slate-500 uppercase sm:w-40">
-                Status
+                {" "}
+                {tx("Status")}{" "}
                 <SelectInput
-                  aria-label="Filter by status"
+                  aria-label={tx("Filter by status")}
                   onChange={(event) => setActiveOnly(event.target.value)}
                   value={activeOnly}
                 >
-                  <option value="">Any</option>
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
+                  <option value="">{tx("Any")}</option>
+                  <option value="true">{tx("Active")}</option>
+                  <option value="false">{tx("Inactive")}</option>
                 </SelectInput>
               </label>
               {filtered ? (
@@ -274,7 +290,8 @@ export function PackagesManager({
                   }}
                   type="button"
                 >
-                  Clear filters
+                  {" "}
+                  {tx("Clear filters")}{" "}
                 </button>
               ) : null}
             </div>
@@ -284,7 +301,8 @@ export function PackagesManager({
             {packages.pending && packages.rows.length === 0 ? (
               <div className="grid gap-3" role="status">
                 <p className="text-sm font-medium text-slate-600">
-                  Loading packages.
+                  {" "}
+                  {tx("Loading packages.")}{" "}
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {[0, 1, 2].map((item) => (
@@ -298,7 +316,8 @@ export function PackagesManager({
             ) : null}
             {packages.pending && packages.rows.length > 0 ? (
               <p className="text-sm font-medium text-slate-600" role="status">
-                Loading packages.
+                {" "}
+                {tx("Loading packages.")}{" "}
               </p>
             ) : null}
             {!packages.pending && packages.error ? (
@@ -311,7 +330,8 @@ export function PackagesManager({
                   onClick={() => packages.reload()}
                   type="button"
                 >
-                  Retry loading packages
+                  {" "}
+                  {tx("Retry loading packages")}{" "}
                 </button>
               </div>
             ) : null}
@@ -320,20 +340,21 @@ export function PackagesManager({
             packages.rows.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
                 <p className="font-semibold text-slate-700">
-                  No packages match.
+                  {" "}
+                  {tx("No packages match.")}{" "}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
                   {filtered
-                    ? "Try changing or clearing the current filters."
+                    ? tx("Try changing or clearing the current filters.")
                     : canManage
-                      ? "Create a package to add it to the catalog."
-                      : "Packages will appear here when they are added."}
+                      ? tx("Create a package to add it to the catalog.")
+                      : tx("Packages will appear here when they are added.")}
                 </p>
               </div>
             ) : null}
             {packages.rows.length > 0 ? (
               <ul
-                aria-label="Package catalog"
+                aria-label={tx("Package catalog")}
                 className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
               >
                 {packages.rows.map((row) => {
@@ -371,32 +392,35 @@ export function PackagesManager({
                                 : "bg-slate-200 text-slate-600"
                             }`}
                           >
-                            {row.is_active ? "Active" : "Inactive"}
+                            {row.is_active ? tx("Active") : tx("Inactive")}
                           </span>
                         </div>
                       </div>
                       <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
                         <div>
-                          <dt className="text-xs text-slate-500">Sessions</dt>
+                          <dt className="text-xs text-slate-500">
+                            {tx("Sessions")}
+                          </dt>
                           <dd className="mt-0.5 font-semibold text-slate-900 tabular-nums">
                             {row.session_count}
                           </dd>
                         </div>
                         <div>
-                          <dt className="text-xs text-slate-500">Validity</dt>
+                          <dt className="text-xs text-slate-500">
+                            {tx("Validity")}
+                          </dt>
                           <dd className="mt-0.5 font-semibold text-slate-900">
-                            {validityLabel(
-                              row.validity_value,
-                              row.validity_unit,
-                            )}
+                            {validityLabel(row.validity_value, row.validity_unit, tx)}
                           </dd>
                         </div>
                         <div className="col-span-2 sm:col-span-1">
-                          <dt className="text-xs text-slate-500">Price</dt>
+                          <dt className="text-xs text-slate-500">
+                            {tx("Price")}
+                          </dt>
                           <dd className="mt-0.5 font-semibold break-words text-slate-900 tabular-nums">
                             {row.price}{" "}
                             <span className="text-xs font-medium text-slate-500">
-                              {row.currency}
+                              {tx(row.currency)}
                             </span>
                           </dd>
                         </div>
@@ -467,14 +491,18 @@ export function PackagesManager({
                   className="text-xl font-bold text-slate-900"
                   id="create-package-title"
                 >
-                  Create package
+                  {" "}
+                  {tx("Create package")}{" "}
                 </h2>
                 <p
                   className="mt-1 text-sm text-slate-500"
                   id="create-package-description"
                 >
-                  This definition stays unchanged after it is saved. Price is
-                  charged in {currencyLabel}.
+                  {" "}
+                  {tx(
+                    "This definition stays unchanged after it is saved. Price is charged in",
+                  )}{" "}
+                  {currencyLabel}.
                 </p>
               </div>
               <button
@@ -483,7 +511,8 @@ export function PackagesManager({
                 onClick={closeCreate}
                 type="button"
               >
-                Close
+                {" "}
+                {tx("Close")}{" "}
               </button>
             </div>
             <fieldset
@@ -492,10 +521,14 @@ export function PackagesManager({
             >
               <div className="grid gap-3">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800">Identity</h3>
+                  <h3 className="text-sm font-bold text-slate-800">
+                    {tx("Identity")}
+                  </h3>
                   <p className="mt-1 text-xs leading-5 text-slate-500">
-                    A code is assigned from the name. The name is what staff
-                    see.
+                    {" "}
+                    {tx(
+                      "A code is assigned from the name. The name is what staff see.",
+                    )}{" "}
                   </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -510,8 +543,8 @@ export function PackagesManager({
                       }}
                       value={packageType}
                     >
-                      <option value="PT">PT</option>
-                      <option value="CLASS">CLASS</option>
+                      <option value="PT">{tx("PT")}</option>
+                      <option value="CLASS">{tx("CLASS")}</option>
                     </SelectInput>
                   </Field>
                   <div className="sm:col-span-2">
@@ -519,7 +552,7 @@ export function PackagesManager({
                       <TextInput
                         maxLength={120}
                         name="name"
-                        placeholder="Ten PT sessions"
+                        placeholder={tx("Ten PT sessions")}
                         required
                       />
                     </Field>
@@ -530,11 +563,14 @@ export function PackagesManager({
               <div className="grid gap-3 border-t border-slate-100 pt-5">
                 <div>
                   <h3 className="text-sm font-bold text-slate-800">
-                    Sessions and validity
+                    {" "}
+                    {tx("Sessions and validity")}{" "}
                   </h3>
                   <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Both values must be at least 1. Validity starts when the
-                    package is granted.
+                    {" "}
+                    {tx(
+                      "Both values must be at least 1. Validity starts when the package is granted.",
+                    )}{" "}
                   </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-3">
@@ -558,10 +594,10 @@ export function PackagesManager({
                   </Field>
                   <Field label="Validity unit">
                     <SelectInput defaultValue="MONTH" name="validity_unit">
-                      <option value="DAY">DAY</option>
-                      <option value="WEEK">WEEK</option>
-                      <option value="MONTH">MONTH</option>
-                      <option value="YEAR">YEAR</option>
+                      <option value="DAY">{tx("DAY")}</option>
+                      <option value="WEEK">{tx("WEEK")}</option>
+                      <option value="MONTH">{tx("MONTH")}</option>
+                      <option value="YEAR">{tx("YEAR")}</option>
                     </SelectInput>
                   </Field>
                 </div>
@@ -569,9 +605,13 @@ export function PackagesManager({
 
               <div className="grid gap-3 border-t border-slate-100 pt-5">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800">Price</h3>
+                  <h3 className="text-sm font-bold text-slate-800">
+                    {tx("Price")}
+                  </h3>
                   <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Charged in {currencyLabel}. Use up to 2 decimal places.
+                    {" "}
+                    {tx("Charged in")} {currencyLabel}
+                    {tx(". Use up to 2 decimal places.")}{" "}
                   </p>
                 </div>
                 <Field label="Price">
@@ -587,14 +627,20 @@ export function PackagesManager({
               {packageType === "CLASS" ? (
                 <div className="grid gap-3 border-t border-slate-100 pt-5">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-800">Class</h3>
+                    <h3 className="text-sm font-bold text-slate-800">
+                      {tx("Class")}
+                    </h3>
                     <p className="mt-1 text-xs leading-5 text-slate-500">
-                      A class package requires an active class type.
+                      {" "}
+                      {tx(
+                        "A class package requires an active class type.",
+                      )}{" "}
                     </p>
                   </div>
                   {classTypes.pending ? (
                     <p className="text-sm text-slate-500" role="status">
-                      Loading class types.
+                      {" "}
+                      {tx("Loading class types.")}{" "}
                     </p>
                   ) : null}
                   <Alert message={classTypes.error} />
@@ -602,12 +648,13 @@ export function PackagesManager({
                   !classTypes.error &&
                   classTypes.items.length === 0 ? (
                     <p className="text-sm text-slate-500">
-                      No active class types are available.
+                      {" "}
+                      {tx("No active class types are available.")}{" "}
                     </p>
                   ) : null}
                   <Field label="Class type for a CLASS package">
                     <SelectInput name="class_type_id" required>
-                      <option value="">Select a class type</option>
+                      <option value="">{tx("Select a class type")}</option>
                       {classTypes.items.map((row) => (
                         <option key={row.id} value={row.id}>
                           {row.code} · {row.name}
@@ -631,14 +678,16 @@ export function PackagesManager({
                   onClick={closeCreate}
                   type="button"
                 >
-                  Cancel
+                  {" "}
+                  {tx("Cancel")}{" "}
                 </button>
                 <button
                   className="button button-create w-full sm:w-auto"
                   disabled={pending}
                   type="submit"
                 >
-                  Save package
+                  {" "}
+                  {tx("Save package")}{" "}
                 </button>
               </div>
             </div>

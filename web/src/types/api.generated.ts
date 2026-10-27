@@ -1166,6 +1166,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/member-auth/google/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["member_auth_google"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/member-auth/login/": {
     parameters: {
       query?: never;
@@ -5138,6 +5154,10 @@ export interface components {
       success: boolean;
       data: components["schemas"]["Member"];
       message: string;
+    };
+    MemberGoogleLoginInputRequest: {
+      id_token: string;
+      device_name?: string;
     };
     MemberListEnvelope: {
       /** @default true */
@@ -13320,6 +13340,63 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HealthEnvelope"];
+        };
+      };
+    };
+  };
+  member_auth_google: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MemberGoogleLoginInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["MemberGoogleLoginInputRequest"];
+        "multipart/form-data": components["schemas"]["MemberGoogleLoginInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemberTokenEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
         };
       };
     };

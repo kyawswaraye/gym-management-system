@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import {
   useEffect,
@@ -30,6 +31,7 @@ export function DialogFrame({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const tx = useTx();
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -67,11 +69,11 @@ export function DialogFrame({
         <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold text-slate-900" id={titleId}>
-              {title}
+              {tx(title)}
             </h2>
             {description ? (
               <p className="mt-1 text-sm text-slate-500" id={descriptionId}>
-                {description}
+                {tx(description)}
               </p>
             ) : null}
           </div>
@@ -81,7 +83,8 @@ export function DialogFrame({
             onClick={onClose}
             type="button"
           >
-            Close
+            {" "}
+            {tx("Close")}{" "}
           </button>
         </div>
         <div className="grid gap-4 px-5 py-4 sm:px-6">{children}</div>
@@ -113,6 +116,7 @@ export function FormDialog({
   noValidate?: boolean;
   formRef?: Ref<HTMLFormElement>;
 }) {
+  const tx = useTx();
   const titleId = useId();
   const descriptionId = useId();
   const localRef = useRef<HTMLFormElement>(null);
@@ -159,11 +163,11 @@ export function FormDialog({
         <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold text-slate-900" id={titleId}>
-              {title}
+              {tx(title)}
             </h2>
             {description ? (
               <p className="mt-1 text-sm text-slate-500" id={descriptionId}>
-                {description}
+                {tx(description)}
               </p>
             ) : null}
           </div>
@@ -173,7 +177,8 @@ export function FormDialog({
             onClick={onClose}
             type="button"
           >
-            Close
+            {" "}
+            {tx("Close")}{" "}
           </button>
         </div>
         <div className="grid gap-4 px-5 py-4 sm:px-6">{children}</div>

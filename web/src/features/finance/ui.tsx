@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import type {
   FormEvent,
@@ -12,30 +13,34 @@ import { actionButtonClass } from "@/lib/ui/action-button";
 import { IdentifierValue } from "@/lib/ui/identifier";
 
 export function Alert({ message }: { message: string }) {
+  const tx = useTx();
   if (!message) return null;
   return (
     <p className="error" role="alert">
-      {message}
+      {tx(message)}
     </p>
   );
 }
 
 export function Loading({ label }: { label: string }) {
+  const tx = useTx();
   return (
     <p className="muted" role="status">
-      {label}
+      {tx(label)}
     </p>
   );
 }
 
 export function Empty({ label }: { label: string }) {
-  return <p className="muted">{label}</p>;
+  const tx = useTx();
+  return <p className="muted">{tx(label)}</p>;
 }
 
 export function StatusText({ status }: { status: string }) {
+  const tx = useTx();
   return (
     <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold">
-      {status}
+      {tx(status)}
     </span>
   );
 }
@@ -55,13 +60,14 @@ export function CursorControls({
   onPrevious: () => void;
   onNext: () => void;
 }) {
+  const tx = useTx();
   const showPrevious = index > 0;
   const showNext = hasMore;
   if (!showPrevious && !showNext && !bounded) return null;
 
   return (
     <nav
-      aria-label="Pagination"
+      aria-label={tx("Pagination")}
       className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4"
     >
       <div className="flex items-center gap-2">
@@ -72,8 +78,7 @@ export function CursorControls({
             onClick={onPrevious}
             type="button"
           >
-            <span aria-hidden="true">←</span>
-            Previous page
+            <span aria-hidden="true">←</span> {tx("Previous page")}{" "}
           </button>
         )}
         {showNext && (
@@ -83,19 +88,20 @@ export function CursorControls({
             onClick={onNext}
             type="button"
           >
-            Next page
-            <span aria-hidden="true">→</span>
+            {" "}
+            {tx("Next page")} <span aria-hidden="true">→</span>
           </button>
         )}
         {(showPrevious || showNext) && (
           <span className="ml-1 text-xs font-medium text-slate-500">
-            Page {index + 1}
+            {tx("Page {page}", { page: index + 1 })}
           </span>
         )}
       </div>
       {bounded && (
         <p className="text-sm text-amber-700">
-          Refine the filters to see older rows.
+          {" "}
+          {tx("Refine the filters to see older rows.")}{" "}
         </p>
       )}
     </nav>
@@ -111,11 +117,12 @@ export function Field({
   error?: string | undefined;
   children: ReactNode;
 }) {
+  const tx = useTx();
   return (
     <label className="field">
-      {label}
+      {tx(label)}
       {children}
-      {error && <span className="text-sm text-red-700">{error}</span>}
+      {error && <span className="text-sm text-red-700">{tx(error)}</span>}
     </label>
   );
 }
@@ -163,6 +170,7 @@ export function CommandForm({
   onCancel: () => void;
   children?: ReactNode;
 }) {
+  const tx = useTx();
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit(new FormData(event.currentTarget));
@@ -184,14 +192,15 @@ export function CommandForm({
           onClick={onCancel}
           type="button"
         >
-          Back
+          {" "}
+          {tx("Back")}{" "}
         </button>
         <button
           className={actionButtonClass(confirmLabel)}
           disabled={pending}
           type="submit"
         >
-          {confirmLabel}
+          {tx(confirmLabel)}
         </button>
       </div>
     </FormDialog>
@@ -221,11 +230,12 @@ export function ServerFacts({
 }: {
   rows: Array<{ label: string; value: string }>;
 }) {
+  const tx = useTx();
   return (
     <dl className="grid gap-2 sm:grid-cols-2">
       {rows.map((row) => (
         <div key={row.label}>
-          <dt className="text-sm text-slate-500">{row.label}</dt>
+          <dt className="text-sm text-slate-500">{tx(row.label)}</dt>
           <dd className="font-medium">
             <IdentifierValue value={row.value} />
           </dd>

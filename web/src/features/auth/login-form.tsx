@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useId, useState, type FormEvent } from "react";
 import Link from "next/link";
@@ -17,9 +18,10 @@ export function LoginForm({
 }: {
   sessionExpired?: boolean;
 }) {
+  const tx = useTx();
   const router = useRouter();
-  const [error, setError] = useState<string | null>(
-    sessionExpired ? "Your session expired. Please sign in again." : null,
+  const [error, setError] = useState(
+    sessionExpired ? tx("Your session expired. Please sign in again.") : null,
   );
   const [pending, setPending] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
@@ -34,11 +36,11 @@ export function LoginForm({
     const password = String(form.get("password") ?? "");
     const code = String(form.get("code") ?? "").trim();
     if (mfaRequired && !/^\d{6}$/.test(code)) {
-      setError("Enter the six-digit authenticator code.");
+      setError(tx("Enter the six-digit authenticator code."));
       return;
     }
     if (!mfaRequired && (!email || !password)) {
-      setError("Enter both your email and password.");
+      setError(tx("Enter both your email and password."));
       return;
     }
 
@@ -59,7 +61,7 @@ export function LoginForm({
         },
       );
       if (!response.ok) {
-        setError(await errorMessage(response, "Sign-in failed."));
+        setError(await errorMessage(response, tx("Sign-in failed.")));
         return;
       }
       const body = (await response.json()) as {
@@ -75,7 +77,7 @@ export function LoginForm({
       router.replace(destination);
       router.refresh();
     } catch {
-      setError("The network is unavailable. Please try again.");
+      setError(tx("The network is unavailable. Please try again."));
     } finally {
       setPending(false);
     }
@@ -85,12 +87,12 @@ export function LoginForm({
     <form className="mt-6 grid gap-4" onSubmit={submit} noValidate>
       {error && (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       )}
       {!mfaRequired && (
         <div className="field">
-          <label htmlFor={emailId}>Email</label>
+          <label htmlFor={emailId}>{tx("Email")}</label>
           <input
             id={emailId}
             className="input"
@@ -104,7 +106,7 @@ export function LoginForm({
       )}
       {!mfaRequired && (
         <div className="field">
-          <label htmlFor={passwordId}>Password</label>
+          <label htmlFor={passwordId}>{tx("Password")}</label>
           <PasswordInput
             id={passwordId}
             name="password"
@@ -116,7 +118,7 @@ export function LoginForm({
       )}
       {mfaRequired && (
         <label className="field">
-          <span>Authenticator code</span>
+          <span>{tx("Authenticator code")}</span>
           <input
             className="input"
             name="code"
@@ -130,11 +132,15 @@ export function LoginForm({
         </label>
       )}
       <button className="button" type="submit" disabled={pending}>
-        {pending ? "Verifying…" : mfaRequired ? "Verify code" : "Sign in"}
+        {pending
+          ? tx("Verifying…")
+          : mfaRequired
+            ? tx("Verify code")
+            : tx("Sign in")}
       </button>
       {!mfaRequired ? (
         <p className="muted">
-          <Link href="/forgot-password">Forgot password</Link>
+          <Link href="/forgot-password">{tx("Forgot password")}</Link>
         </p>
       ) : null}
     </form>

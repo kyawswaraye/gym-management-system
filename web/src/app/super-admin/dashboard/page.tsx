@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/i18n/metadata";
 import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -6,7 +6,9 @@ import { PlatformDashboard } from "@/features/platform/platform-dashboard";
 import { hasPermission, platformHomePath } from "@/lib/auth/authorization";
 import { requirePlatformSession } from "@/lib/auth/session";
 
-export const metadata: Metadata = { title: "Dashboard" };
+export async function generateMetadata() {
+  return pageMetadata("Dashboard");
+}
 export const dynamic = "force-dynamic";
 
 export default async function SuperAdminDashboardPage() {

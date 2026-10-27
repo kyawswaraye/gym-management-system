@@ -32,9 +32,8 @@ export function navLinkIsCurrent(
   });
 }
 
-function navLinkClass(current: boolean): string {
-  const shared =
-    "shrink-0 rounded-xl border px-3 py-2.5 text-sm transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0866ff]";
+function navLinkClass(current: boolean, parent: boolean): string {
+  const shared = `shrink-0 rounded-xl border px-3 py-2.5 ${parent ? "text-sm/8" : "text-sm"} transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0866ff]`;
   if (current) {
     return `${shared} border-transparent bg-[#e7f3ff] font-semibold text-[#0866ff] hover:bg-[#d6e9ff]`;
   }
@@ -44,10 +43,12 @@ function navLinkClass(current: boolean): string {
 export function NavLink({
   href,
   peers = [],
+  parent = false,
   children,
 }: {
   href: string;
   peers?: readonly string[];
+  parent?: boolean;
   children: ReactNode;
 }) {
   const pathname = usePathname() ?? "";
@@ -55,7 +56,7 @@ export function NavLink({
   return (
     <Link
       aria-current={current ? "page" : undefined}
-      className={navLinkClass(current)}
+      className={navLinkClass(current, parent)}
       href={href}
     >
       {children}

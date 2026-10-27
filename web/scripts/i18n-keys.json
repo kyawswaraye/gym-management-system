@@ -1,0 +1,1469 @@
+[
+  {
+    "key": "Accept Owner invitation",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Create or confirm your login to join this gym as an equal-authority Owner.",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "This invitation link is incomplete.",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Accept staff invitation",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Choose a password to activate this gym staff login. You can confirm your name and phone if they need a correction.",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Forgot password",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Enter the email for your staff, owner, or linked member account. If an account exists, a reset link will be sent.",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Back to sign in",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Sign in",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Use your authorized staff or platform administrator account.",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Reset password",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Choose a new password. You will need to sign in again afterward.",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "This reset link is incomplete.",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Select gym",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Choose a gym",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Your session will be scoped to one authorized gym. This choice expires in five minutes.",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Audit logs",
+    "features": [
+      "operations",
+      "platform",
+      "nav"
+    ]
+  },
+  {
+    "key": "Cash book",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Check-ins",
+    "features": [
+      "operations",
+      "nav",
+      "reports"
+    ]
+  },
+  {
+    "key": "Classes",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Dashboard",
+    "features": [
+      "operations",
+      "platform",
+      "nav"
+    ]
+  },
+  {
+    "key": "No workspace access",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Live overview",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Owner dashboard",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Expenses",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Inventory",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Member profile",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Members",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Memberships",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Owners",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Payments",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "PT bookings",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Commissions",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Trainer dashboard",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Member packages",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Packages",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "PT sales",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Trainers",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Reports",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Financial totals",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Member activity",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Inventory insights",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Retail sales",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Roles",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Salaries",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Gym settings",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Staff",
+    "features": [
+      "operations",
+      "nav"
+    ]
+  },
+  {
+    "key": "Secure gym staff workspace",
+    "features": [
+      "common"
+    ]
+  },
+  {
+    "key": "Loading…",
+    "features": [
+      "common"
+    ]
+  },
+  {
+    "key": "Security",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Protect sensitive Owner and platform actions.",
+    "features": [
+      "auth"
+    ]
+  },
+  {
+    "key": "Page not found",
+    "features": [
+      "common"
+    ]
+  },
+  {
+    "key": "The requested page does not exist.",
+    "features": [
+      "common"
+    ]
+  },
+  {
+    "key": "Return to dashboard",
+    "features": [
+      "common"
+    ]
+  },
+  {
+    "key": "Gyms",
+    "features": [
+      "platform",
+      "nav"
+    ]
+  },
+  {
+    "key": "Platform access",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "No platform access",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "Subscriptions",
+    "features": [
+      "platform",
+      "nav"
+    ]
+  },
+  {
+    "key": "GymPilot",
+    "features": [
+      "common"
+    ]
+  },
+  {
+    "key": "Tenant workspace",
+    "features": [
+      "nav"
+    ]
+  },
+  {
+    "key": "Settings",
+    "features": [
+      "nav"
+    ]
+  },
+  {
+    "key": "Set up MFA",
+    "features": [
+      "nav"
+    ]
+  },
+  {
+    "key": "Super admin",
+    "features": [
+      "nav"
+    ]
+  },
+  {
+    "key": "Open sessions could not be loaded.",
+    "features": [
+      "finance"
+    ]
+  },
+  {
+    "key": "The list could not be loaded.",
+    "features": [
+      "finance"
+    ]
+  },
+  {
+    "key": "This page cursor repeated. Refine the filters.",
+    "features": [
+      "finance"
+    ]
+  },
+  {
+    "key": "The next page could not be loaded.",
+    "features": [
+      "finance"
+    ]
+  },
+  {
+    "key": "The previous page could not be loaded.",
+    "features": [
+      "finance"
+    ]
+  },
+  {
+    "key": "Choose a valid outcome.",
+    "features": [
+      "operations",
+      "platform"
+    ]
+  },
+  {
+    "key": "Enter a valid target ID.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Enter a page size from 1 to 100.",
+    "features": [
+      "operations",
+      "platform"
+    ]
+  },
+  {
+    "key": "The audit cursor is invalid.",
+    "features": [
+      "operations",
+      "platform"
+    ]
+  },
+  {
+    "key": "Name",
+    "features": [
+      "operations",
+      "reports"
+    ]
+  },
+  {
+    "key": "Phone",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Address line 1",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Address line 2",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "City",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Region",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Postal code",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Timezone",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Check-in duplicate window (seconds)",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Check-in challenge lifetime (seconds)",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Check-in challenge maximum uses",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Class cancellation cutoff (minutes)",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Allow manual member numbers",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Email membership expiry warnings",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Push membership expiry warnings",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "A class no-show consumes a session",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Member number",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Assigning…",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Assigned on save",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Loading the next member number.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Assigned by the gym.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "The gym assigns the next number when you save.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "First name",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Last name",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Email",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Gender",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Not specified",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Date of birth",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Address",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Country code",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Join date",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Emergency contact name",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Emergency contact phone",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Notes",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "All",
+    "features": [
+      "operations",
+      "platform"
+    ]
+  },
+  {
+    "key": "Active",
+    "features": [
+      "operations",
+      "platform",
+      "reports"
+    ]
+  },
+  {
+    "key": "Expired",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Suspended",
+    "features": [
+      "operations",
+      "platform"
+    ]
+  },
+  {
+    "key": "Cancelled",
+    "features": [
+      "operations",
+      "platform"
+    ]
+  },
+  {
+    "key": "Archived",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Enter a plan code without spaces.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Enter a plan name.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Enter a description up to 4000 characters.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Enter a whole duration of at least 1.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Choose a duration unit.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Enter a nonnegative price with up to 2 decimal places.",
+    "features": [
+      "operations",
+      "platform"
+    ]
+  },
+  {
+    "key": "Enter a note up to 4000 characters.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "will lose the",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Today",
+    "features": [
+      "operations",
+      "pt"
+    ]
+  },
+  {
+    "key": "This week",
+    "features": [
+      "operations",
+      "pt"
+    ]
+  },
+  {
+    "key": "This month",
+    "features": [
+      "operations",
+      "pt"
+    ]
+  },
+  {
+    "key": "Last month",
+    "features": [
+      "operations",
+      "pt"
+    ]
+  },
+  {
+    "key": "This year",
+    "features": [
+      "operations",
+      "pt"
+    ]
+  },
+  {
+    "key": "Active members",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "New members",
+    "features": [
+      "operations",
+      "reports"
+    ]
+  },
+  {
+    "key": "In the gym now",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Unique attendees",
+    "features": [
+      "operations",
+      "reports"
+    ]
+  },
+  {
+    "key": "Expired memberships",
+    "features": [
+      "operations",
+      "reports"
+    ]
+  },
+  {
+    "key": "Expiring in 3 days",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Expiring in 7 days",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Expiring in 30 days",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Pending approvals",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Enter a valid email address.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Enter a joined date.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Enter a commission from 0 to 100 with up to 2 decimal places.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Check the invitation.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Check the staff profile.",
+    "features": [
+      "operations"
+    ]
+  },
+  {
+    "key": "Enter a valid target gym ID.",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "Enter an action up to 100 characters.",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "Pending",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "Closed",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "Total",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "Trial",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "Past due",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "Retired",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "Enter a plan name up to 100 characters.",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "Enter an uppercase billing interval.",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "Choose ACTIVE or RETIRED.",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "Change at least one field.",
+    "features": [
+      "platform"
+    ]
+  },
+  {
+    "key": "The choices could not be loaded.",
+    "features": [
+      "pt"
+    ]
+  },
+  {
+    "key": "class booking",
+    "features": [
+      "pt"
+    ]
+  },
+  {
+    "key": "Bookings",
+    "features": [
+      "pt",
+      "reports"
+    ]
+  },
+  {
+    "key": "Unique members",
+    "features": [
+      "pt",
+      "reports"
+    ]
+  },
+  {
+    "key": "Booked sessions",
+    "features": [
+      "pt",
+      "reports"
+    ]
+  },
+  {
+    "key": "Attended sessions",
+    "features": [
+      "pt",
+      "reports"
+    ]
+  },
+  {
+    "key": "No-show sessions",
+    "features": [
+      "pt",
+      "reports"
+    ]
+  },
+  {
+    "key": "Cancelled sessions",
+    "features": [
+      "pt",
+      "reports"
+    ]
+  },
+  {
+    "key": "Date",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "New member revenue",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Renewal revenue",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "PT revenue",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Class revenue",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Product revenue",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Other revenue",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Total revenue",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Product quantity",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Product COGS",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Product gross profit",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Total expenses",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Net profit",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Staff salary",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "PT commission",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Sessions",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Open sessions",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Closed sessions",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Void sessions",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Opening cash",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Cash in",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Cash out",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Net cash flow",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Payment in",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Payment out",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Expense in",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Expense out",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Commission in",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Commission out",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Manual in",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Manual out",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Reversal in",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Reversal out",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Expected closing",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Actual closing",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Difference",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Expiring memberships",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Active memberships",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Suspended memberships",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Manual check-ins",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "QR check-ins",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "NFC check-ins",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Biometric check-ins",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Check-outs",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Open visits from day",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Unique trainers",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Metered sessions",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Unmetered sessions",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Occurrences",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Scheduled occurrences",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Completed occurrences",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Cancelled occurrences",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Available capacity",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Booked slots",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Attended slots",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "No-show slots",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Cancelled slots",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Reserved slots",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Remaining capacity",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Quantity sold",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Revenue",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Gross profit",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Opening",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Purchase",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Sale",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Sale return",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Damage",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Loss",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Adjustment",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Correction",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Net",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Category code",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Category",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Unit",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Stock",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Low stock threshold",
+    "features": [
+      "reports"
+    ]
+  },
+  {
+    "key": "Low stock",
+    "features": [
+      "reports"
+    ]
+  }
+]

@@ -74,6 +74,8 @@ Error:
 
 Internal exceptions and database details are never returned.
 
+`error.code` stays a stable English identifier. `Accept-Language: en` or `Accept-Language: my` (`mm` is an alias) chooses the language of `error.message` and `error.fields`. A missing or unrecognized header keeps those strings in English. An idempotent replay returns the first request's stored body in that request's language, and the idempotency hash does not include the language. Success responses keep `"message": "Success"`.
+
 ## 3. HTTP behavior
 
 | Status | Meaning                                         |

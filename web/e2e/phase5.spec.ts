@@ -840,7 +840,14 @@ async function expectNotice(page: Page, text: string): Promise<void> {
 }
 
 async function signOut(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  const signOutButton = page.getByRole("button", {
+    name: "Sign out",
+    exact: true,
+  });
+  if (!(await signOutButton.isVisible())) {
+    await page.locator("footer").getByRole("button").click();
+  }
+  await signOutButton.click();
   await expect(
     page.getByRole("heading", { name: "Sign in", exact: true }),
   ).toBeVisible();

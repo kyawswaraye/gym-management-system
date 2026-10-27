@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import Image from "next/image";
 import { useId, useState, type FormEvent } from "react";
@@ -16,6 +17,7 @@ type Enrollment = {
 };
 
 export function MFASetup() {
+  const tx = useTx();
   const router = useRouter();
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const passwordId = useId();
@@ -32,7 +34,9 @@ export function MFASetup() {
       const result = await platformMutation<Enrollment>(
         "auth/mfa/enroll",
         "POST",
-        { current_password: String(values.get("current_password") ?? "") },
+        {
+          current_password: String(values.get("current_password") ?? ""),
+        },
       );
       setEnrollment(result);
       setQr(
@@ -56,14 +60,10 @@ export function MFASetup() {
     setPending(true);
     const values = new FormData(event.currentTarget);
     try {
-      await platformMutation<{ mfa_enabled: boolean; mfa_recent: boolean }>(
-        "auth/mfa/enroll/confirm",
-        "POST",
-        {
-          enrollment_token: enrollment.enrollment_token,
-          code: String(values.get("code") ?? ""),
-        },
-      );
+      await platformMutation("auth/mfa/enroll/confirm", "POST", {
+        enrollment_token: enrollment.enrollment_token,
+        code: String(values.get("code") ?? ""),
+      });
       router.back();
       router.refresh();
     } catch (failure) {
@@ -78,24 +78,28 @@ export function MFASetup() {
   return (
     <section className="card max-w-xl" aria-labelledby="mfa-title">
       <h2 id="mfa-title" className="text-xl font-bold">
-        Authenticator setup
+        {" "}
+        {tx("Authenticator setup")}{" "}
       </h2>
       <p className="muted mt-2 text-sm">
-        Owner changes require a recent code from your authenticator app.
+        {" "}
+        {tx(
+          "Owner changes require a recent code from your authenticator app.",
+        )}{" "}
       </p>
       {error && (
         <p className="error mt-4" role="alert">
-          {error}
+          {tx(error)}
         </p>
       )}
       {!enrollment ? (
         <form className="mt-5 grid gap-4" onSubmit={begin}>
           <div className="field">
-            <label htmlFor={passwordId}>Current password</label>
+            <label htmlFor={passwordId}>{tx("Current password")}</label>
             <PasswordInput id={passwordId} name="current_password" required />
           </div>
           <button className="button" disabled={pending}>
-            {pending ? "Preparing…" : "Set up authenticator"}
+            {pending ? tx("Preparing…") : tx("Set up authenticator")}
           </button>
         </form>
       ) : (
@@ -106,16 +110,17 @@ export function MFASetup() {
               width={240}
               height={240}
               unoptimized
-              alt="Authenticator setup QR code"
+              alt={tx("Authenticator setup QR code")}
             />
           )}
           <p className="text-sm">
-            Manual key:{" "}
+            {" "}
+            {tx("Manual key:")}{" "}
             <code className="break-all font-mono">{enrollment.secret}</code>
           </p>
           <form className="grid gap-4" onSubmit={confirm}>
             <label className="field">
-              <span>Six-digit code</span>
+              <span>{tx("Six-digit code")}</span>
               <input
                 className="input"
                 name="code"
@@ -126,7 +131,7 @@ export function MFASetup() {
               />
             </label>
             <button className="button" disabled={pending}>
-              {pending ? "Confirming…" : "Confirm MFA"}
+              {pending ? tx("Confirming…") : tx("Confirm MFA")}
             </button>
           </form>
         </div>

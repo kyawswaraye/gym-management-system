@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useState, type FormEvent } from "react";
 
@@ -41,6 +42,7 @@ function toListItem(detail: PlatformSubscriptionDetail): PlatformSubscription {
 }
 
 export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
+  const tx = useTx();
   const [plans, setPlans] = useState<PlatformSubscription[]>([]);
   const [loading, setLoading] = useState(canManage);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -81,7 +83,7 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
     setSavedId(null);
     const planId = plan.id.toLowerCase();
     if (!PLAN_ID.test(planId)) {
-      setError("The plan identifier is invalid.");
+      setError(tx("The plan identifier is invalid."));
       return;
     }
     const values = new FormData(event.currentTarget);
@@ -124,7 +126,8 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
   if (!canManage) {
     return (
       <p className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm font-semibold text-slate-700 shadow-sm">
-        You do not have access to subscription plans.
+        {" "}
+        {tx("You do not have access to subscription plans.")}{" "}
       </p>
     );
   }
@@ -132,7 +135,8 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
     return (
       <div className="grid gap-3" role="status">
         <p className="text-sm font-medium text-slate-500">
-          Loading subscription plans.
+          {" "}
+          {tx("Loading subscription plans.")}{" "}
         </p>
         {[0, 1].map((item) => (
           <div
@@ -148,12 +152,13 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
     <div className="grid gap-4">
       {error && (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       )}
       {!error && plans.length === 0 && (
         <p className="rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center text-sm font-semibold text-slate-700 shadow-sm">
-          No subscription plans found.
+          {" "}
+          {tx("No subscription plans found.")}{" "}
         </p>
       )}
       {plans.length > 0 ? (
@@ -163,7 +168,8 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
               className="border-b border-slate-100 px-5 py-3 text-sm font-medium text-emerald-700"
               role="status"
             >
-              {plans.find((plan) => plan.id === savedId)?.code} was updated.
+              {plans.find((plan) => plan.id === savedId)?.code}{" "}
+              {tx("was updated.")}{" "}
             </p>
           ) : null}
           <div className="overflow-x-auto">
@@ -171,29 +177,34 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
               <thead>
                 <tr className="border-b border-slate-100 text-xs font-semibold tracking-wide text-slate-500 uppercase">
                   <th className="px-5 py-3" scope="col">
-                    Plan
+                    {" "}
+                    {tx("Plan")}{" "}
                   </th>
                   <th className="px-5 py-3" scope="col">
-                    Interval
+                    {" "}
+                    {tx("Interval")}{" "}
                   </th>
                   <th className="px-5 py-3" scope="col">
-                    Price
+                    {" "}
+                    {tx("Price")}{" "}
                   </th>
                   <th className="px-5 py-3" scope="col">
-                    Currency
+                    {" "}
+                    {tx("Currency")}{" "}
                   </th>
                   <th className="px-5 py-3" scope="col">
-                    Status
+                    {" "}
+                    {tx("Status")}{" "}
                   </th>
                   <th className="px-5 py-3" scope="col">
-                    <span className="sr-only">Edit</span>
+                    <span className="sr-only">{tx("Edit")}</span>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {plans.map((plan) => (
                   <tr
-                    aria-label={`${plan.code} plan`}
+                    aria-label={tx("{code} plan", { code: plan.code })}
                     className="bg-white hover:bg-slate-50"
                     key={`${plan.id}:${plan.name}:${plan.status}:${plan.price}:${plan.billing_interval}`}
                     role="article"
@@ -211,28 +222,31 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
                       {plan.price}
                     </td>
                     <td className="px-5 py-4 font-medium text-slate-700">
-                      {plan.currency}
+                      {tx(plan.currency)}
                     </td>
                     <td className="px-5 py-4">
                       <span
-                        aria-label={`Current status for ${plan.code}`}
+                        aria-label={tx("Current status for {code}", {
+                          code: plan.code,
+                        })}
                         className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
                           plan.status === "ACTIVE"
                             ? "bg-emerald-100 text-emerald-700"
                             : "bg-slate-200 text-slate-600"
                         }`}
                       >
-                        {plan.status}
+                        {tx(plan.status)}
                       </span>
                     </td>
                     <td className="px-5 py-4 text-right">
                       <button
-                        aria-label={`Edit ${plan.code}`}
+                        aria-label={tx("Edit {name}", { name: plan.code })}
                         className="button button-edit button-sm"
                         onClick={() => setEditingCode(plan.code)}
                         type="button"
                       >
-                        Edit
+                        {" "}
+                        {tx("Edit")}{" "}
                       </button>
                     </td>
                   </tr>
@@ -251,11 +265,13 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
             }}
             onSubmit={(event) => void save(event, plan)}
             pending={pendingId === plan.id}
-            title={`Edit ${plan.code}`}
+            title={tx("Edit {name}", { name: plan.code })}
           >
             <div className="grid gap-3 md:grid-cols-2">
               <label className="field">
-                <span>Name for {plan.code}</span>
+                <span>
+                  {tx("Name for")} {plan.code}
+                </span>
                 <input
                   className="input"
                   name="name"
@@ -266,7 +282,9 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
                 />
               </label>
               <label className="field">
-                <span>Price for {plan.code}</span>
+                <span>
+                  {tx("Price for")} {plan.code}
+                </span>
                 <input
                   className="input"
                   name="price"
@@ -277,7 +295,9 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
                 />
               </label>
               <label className="field">
-                <span>Billing interval for {plan.code}</span>
+                <span>
+                  {tx("Billing interval for")} {plan.code}
+                </span>
                 <input
                   className="input"
                   name="billing_interval"
@@ -288,15 +308,17 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
                 />
               </label>
               <label className="field">
-                <span>Status for {plan.code}</span>
+                <span>
+                  {tx("Status for")} {plan.code}
+                </span>
                 <select
                   className="input"
                   name="status"
                   defaultValue={plan.status}
                   disabled={pendingId !== null}
                 >
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="RETIRED">RETIRED</option>
+                  <option value="ACTIVE">{tx("ACTIVE")}</option>
+                  <option value="RETIRED">{tx("RETIRED")}</option>
                 </select>
               </label>
               <button
@@ -304,7 +326,9 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
                 type="submit"
                 disabled={pendingId !== null}
               >
-                {pendingId === plan.id ? "Saving…" : `Save ${plan.code}`}
+                {pendingId === plan.id
+                  ? tx("Saving…")
+                  : tx("Save {name}", { name: plan.code })}
               </button>
             </div>
           </FormDialog>

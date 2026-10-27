@@ -1,3 +1,5 @@
+import { tx } from "../i18n/translate";
+
 export type FieldErrors = Record<string, string[]>;
 
 export class ApiError extends Error {
@@ -29,9 +31,7 @@ export class NetworkError extends Error {
   readonly status = 0;
   readonly code = "NETWORK";
 
-  constructor(
-    message = "You appear to be offline. Check the connection and try again.",
-  ) {
+  constructor(message = tx("You appear to be offline. Check the connection and try again.")) {
     super(message);
     this.name = "NetworkError";
   }
@@ -77,7 +77,7 @@ export function parseErrorBody(
     return new ApiError(
       status,
       "INVALID_RESPONSE",
-      "The server response could not be read.",
+      tx("The server response could not be read."),
       {},
       "",
       retryAfter,
@@ -88,7 +88,7 @@ export function parseErrorBody(
   const message =
     typeof body.error.message === "string"
       ? body.error.message
-      : "The request could not be processed.";
+      : tx("The request could not be processed.");
   const requestId = typeof body.request_id === "string" ? body.request_id : "";
   return new ApiError(
     status,
@@ -117,7 +117,7 @@ export function parseSuccessBody<T>(
     throw new ApiError(
       status,
       "INVALID_RESPONSE",
-      "The server response could not be read.",
+      tx("The server response could not be read."),
     );
   }
   if (!isRecord(body) || body.success === false || !("data" in body)) {

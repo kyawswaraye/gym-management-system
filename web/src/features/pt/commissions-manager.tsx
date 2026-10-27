@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import {
   useEffect,
@@ -64,11 +65,12 @@ function commissionStatusClass(status: string): string {
 }
 
 function CommissionStatusBadge({ status }: { status: string }) {
+  const tx = useTx();
   return (
     <span
       className={`rounded-full px-2.5 py-1 text-xs font-bold ${commissionStatusClass(status)}`}
     >
-      {status}
+      {tx(status)}
     </span>
   );
 }
@@ -91,9 +93,10 @@ function Fact({
   value: string;
   emphasis?: boolean;
 }) {
+  const tx = useTx();
   return (
     <div className="rounded-xl bg-slate-50 px-3 py-2">
-      <dt className="text-xs font-medium text-slate-500">{label}</dt>
+      <dt className="text-xs font-medium text-slate-500">{tx(label)}</dt>
       <dd
         className={`mt-0.5 break-words text-slate-900 ${
           emphasis ? "text-lg font-black tabular-nums" : "font-semibold"
@@ -106,21 +109,26 @@ function Fact({
 }
 
 function NoticeBanner({ message }: { message: string }) {
+  const tx = useTx();
   return (
     <p
       aria-live="polite"
       className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
       role="status"
     >
-      {message}
+      {tx(message)}
     </p>
   );
 }
 
-function rowLabel(row: PTCommission): string {
-  return `Outstanding ${row.outstanding_amount}${
-    row.currency ? ` ${row.currency}` : ""
+function rowLabel(
+  row: PTCommission,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
+): string {
+  const detail = `${row.outstanding_amount}${
+    row.currency ? ` ${tx(row.currency)}` : ""
   }`;
+  return tx("Outstanding {detail}", { detail });
 }
 
 export function CommissionsManager({
@@ -134,6 +142,7 @@ export function CommissionsManager({
   today: string;
   membershipId: string;
 }) {
+  const tx = useTx();
   const [status, setStatus] = useState("");
   const [selected, setSelected] = useState<PTCommissionDetail | null>(null);
   const [requestedId, setRequestedId] = useState("");
@@ -225,7 +234,9 @@ export function CommissionsManager({
       setSelected(detail);
     } catch (caught) {
       if (detailToken.current !== token) return;
-      setLoadError(phase5Error(caught, "The commission could not be loaded."));
+      setLoadError(
+        phase5Error(caught, tx("The commission could not be loaded.")),
+      );
     } finally {
       if (detailToken.current === token) setDetailPending(false);
     }
@@ -271,7 +282,7 @@ export function CommissionsManager({
         if (commandToken.current !== token) return;
         key.current = null;
         setDialogError("");
-        setNotice("Payout recorded.");
+        setNotice(tx("Payout recorded."));
         setPaying(false);
         rows.reload();
         void getPtCommission(result.commission_after.id)
@@ -284,14 +295,14 @@ export function CommissionsManager({
           .catch((caught: unknown) => {
             if (commandToken.current !== token) return;
             setLoadError(
-              phase5Error(caught, "The commission could not be loaded."),
+              phase5Error(caught, tx("The commission could not be loaded.")),
             );
           });
       })
       .catch((caught: unknown) => {
         if (commandToken.current !== token) return;
         setDialogError(
-          phase5Error(caught, "The payout could not be recorded."),
+          phase5Error(caught, tx("The payout could not be recorded.")),
         );
       })
       .finally(() => endCommand(token));
@@ -313,27 +324,33 @@ export function CommissionsManager({
               className="text-sm font-bold tracking-wide text-slate-700 uppercase"
               id="pt-commissions-list-title"
             >
-              Commission list
+              {" "}
+              {tx("Commission list")}{" "}
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              Status, commission, outstanding balance, trainer, and sale.
+              {" "}
+              {tx(
+                "Status, commission, outstanding balance, trainer, and sale.",
+              )}{" "}
             </p>
           </div>
           <div className="border-b border-slate-200 bg-slate-50/70 px-4 py-3 sm:px-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <label className="grid min-w-0 flex-1 gap-1 text-xs font-semibold tracking-wide text-slate-500 uppercase sm:max-w-xs">
-                Commission status
+                {" "}
+                {tx("Commission status")}{" "}
                 <SelectInput
                   onChange={(event) => setStatus(event.target.value)}
                   value={status}
                 >
-                  <option value="">All</option>
-                  <option value="ACCRUED">Outstanding · accrued</option>
+                  <option value="">{tx("All")}</option>
+                  <option value="ACCRUED">{tx("Outstanding · accrued")}</option>
                   <option value="PARTIALLY_PAID">
-                    Outstanding · partially paid
+                    {" "}
+                    {tx("Outstanding · partially paid")}{" "}
                   </option>
-                  <option value="PAID">PAID</option>
-                  <option value="VOID">VOID</option>
+                  <option value="PAID">{tx("PAID")}</option>
+                  <option value="VOID">{tx("VOID")}</option>
                 </SelectInput>
               </label>
               {filtered ? (
@@ -342,7 +359,8 @@ export function CommissionsManager({
                   onClick={() => setStatus("")}
                   type="button"
                 >
-                  Clear filter
+                  {" "}
+                  {tx("Clear filter")}{" "}
                 </button>
               ) : null}
             </div>
@@ -351,7 +369,8 @@ export function CommissionsManager({
             {rows.pending && rows.rows.length === 0 ? (
               <div className="grid gap-3" role="status">
                 <p className="text-sm font-medium text-slate-600">
-                  Loading commissions.
+                  {" "}
+                  {tx("Loading commissions.")}{" "}
                 </p>
                 <div className="grid gap-3">
                   {[0, 1, 2].map((item) => (
@@ -365,7 +384,8 @@ export function CommissionsManager({
             ) : null}
             {rows.pending && rows.rows.length > 0 ? (
               <p className="text-sm font-medium text-slate-600" role="status">
-                Loading commissions.
+                {" "}
+                {tx("Loading commissions.")}{" "}
               </p>
             ) : null}
             {!rows.pending && rows.error ? (
@@ -378,30 +398,32 @@ export function CommissionsManager({
                   onClick={() => rows.reload()}
                   type="button"
                 >
-                  Retry loading commissions
+                  {" "}
+                  {tx("Retry loading commissions")}{" "}
                 </button>
               </div>
             ) : null}
             {!rows.pending && !rows.error && rows.rows.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
                 <p className="font-semibold text-slate-700">
-                  No commissions match.
+                  {" "}
+                  {tx("No commissions match.")}{" "}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
                   {filtered
-                    ? "Try changing or clearing the current filter."
-                    : "Commissions appear here when a sale accrues one."}
+                    ? tx("Try changing or clearing the current filter.")
+                    : tx("Commissions appear here when a sale accrues one.")}
                 </p>
               </div>
             ) : null}
             {rows.rows.length > 0 ? (
-              <ul aria-label="Commission list" className="grid gap-3">
+              <ul aria-label={tx("Commission list")} className="grid gap-3">
                 {rows.rows.map((row) => {
                   const active = selected?.id === row.id;
                   return (
                     <li key={row.id}>
                       <button
-                        aria-label={rowLabel(row)}
+                        aria-label={rowLabel(row, tx)}
                         aria-pressed={active}
                         className={`w-full rounded-xl border border-l-4 p-4 text-left ${
                           active
@@ -414,12 +436,13 @@ export function CommissionsManager({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-xs font-semibold tracking-wide text-slate-500">
-                              Outstanding
+                              {" "}
+                              {tx("Outstanding")}{" "}
                             </p>
                             <p className="text-lg font-black text-slate-900 tabular-nums">
                               {row.outstanding_amount}
                               {row.currency ? (
-                                <span className="text-xs font-semibold text-slate-500">{` ${row.currency}`}</span>
+                                <span className="text-xs font-semibold text-slate-500">{` ${tx(row.currency)}`}</span>
                               ) : null}
                             </p>
                           </div>
@@ -429,7 +452,8 @@ export function CommissionsManager({
                             ) : null}
                             {active ? (
                               <span className="inline-flex rounded-full bg-teal-700 px-2.5 py-1 text-xs font-bold text-white">
-                                Selected
+                                {" "}
+                                {tx("Selected")}{" "}
                               </span>
                             ) : null}
                           </div>
@@ -438,7 +462,8 @@ export function CommissionsManager({
                           {row.commission_amount ? (
                             <div>
                               <dt className="text-xs text-slate-500">
-                                Commission
+                                {" "}
+                                {tx("Commission")}{" "}
                               </dt>
                               <dd className="mt-0.5 font-semibold text-slate-900 tabular-nums">
                                 {moneyLabel(
@@ -450,7 +475,9 @@ export function CommissionsManager({
                           ) : null}
                           {row.paid_amount ? (
                             <div>
-                              <dt className="text-xs text-slate-500">Paid</dt>
+                              <dt className="text-xs text-slate-500">
+                                {tx("Paid")}
+                              </dt>
                               <dd className="mt-0.5 font-semibold text-slate-900 tabular-nums">
                                 {moneyLabel(row.paid_amount, row.currency)}
                               </dd>
@@ -459,7 +486,8 @@ export function CommissionsManager({
                           {row.trainer_staff_profile_id ? (
                             <div>
                               <dt className="text-xs text-slate-500">
-                                Trainer
+                                {" "}
+                                {tx("Trainer")}{" "}
                               </dt>
                               <dd className="mt-0.5 font-semibold text-slate-900">
                                 <IdentifierValue
@@ -470,7 +498,9 @@ export function CommissionsManager({
                           ) : null}
                           {row.pt_sale_id ? (
                             <div>
-                              <dt className="text-xs text-slate-500">Sale</dt>
+                              <dt className="text-xs text-slate-500">
+                                {tx("Sale")}
+                              </dt>
                               <dd className="mt-0.5 font-semibold text-slate-900">
                                 <IdentifierValue value={row.pt_sale_id} />
                               </dd>
@@ -519,7 +549,10 @@ export function CommissionsManager({
 
       {paying && selected && canPay ? (
         <SaleCommandDialog
-          description={`Use the outstanding amount for a full payout, or a smaller amount for a partial payout. Currency ${currency}.`}
+          description={tx(
+            "Use the outstanding amount for a full payout, or a smaller amount for a partial payout. Currency {currency}.",
+            { currency: tx(currency) },
+          )}
           descriptionId="payout-description"
           dialogId="payout-dialog"
           dialogRef={dialogRef}
@@ -530,12 +563,13 @@ export function CommissionsManager({
           submitClass="button-edit"
           submitDisabled={sessionsBlocked}
           submitLabel="Save payout"
-          title="Record payout"
+          title={tx("Record payout")}
           titleId="payout-title"
         >
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
             <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-              Outstanding balance
+              {" "}
+              {tx("Outstanding balance")}{" "}
             </p>
             <p className="mt-1 text-2xl font-black text-slate-900 tabular-nums">
               {selected.outstanding_amount}
@@ -591,7 +625,10 @@ export function CommissionsManager({
                 />
               ) : (
                 <p className="text-sm text-slate-600">
-                  This method is not cash, so no cash session is sent.
+                  {" "}
+                  {tx(
+                    "This method is not cash, so no cash session is sent.",
+                  )}{" "}
                 </p>
               )}
             </div>
@@ -637,6 +674,7 @@ function CommissionDetail({
   onOpenPayout: () => void;
   onRetry: () => void;
 }) {
+  const tx = useTx();
   const payments = selected?.payments ?? [];
   return (
     <section
@@ -653,12 +691,14 @@ function CommissionDetail({
                   className="text-xl font-bold text-slate-900"
                   id="commission-detail-title"
                 >
-                  Commission detail
+                  {" "}
+                  {tx("Commission detail")}{" "}
                 </h2>
                 {selected.commission_percent_snapshot &&
                 selected.gross_fee_snapshot ? (
                   <p className="mt-1 text-sm text-slate-600">
-                    {selected.commission_percent_snapshot}% of{" "}
+                    {selected.commission_percent_snapshot}
+                    {tx("% of")}{" "}
                     {moneyLabel(selected.gross_fee_snapshot, balanceCurrency)}
                   </p>
                 ) : null}
@@ -670,7 +710,8 @@ function CommissionDetail({
             {notice ? <NoticeBanner message={notice} /> : null}
             {detailPending ? (
               <p className="text-sm font-medium text-slate-600" role="status">
-                Loading commission.
+                {" "}
+                {tx("Loading commission.")}{" "}
               </p>
             ) : null}
             {loadError ? (
@@ -681,13 +722,15 @@ function CommissionDetail({
                   onClick={onRetry}
                   type="button"
                 >
-                  Retry loading commission
+                  {" "}
+                  {tx("Retry loading commission")}{" "}
                 </button>
               </div>
             ) : null}
             <div>
               <h3 className="text-sm font-bold text-slate-800">
-                Financial summary
+                {" "}
+                {tx("Financial summary")}{" "}
               </h3>
               <dl className="mt-3 grid grid-cols-2 gap-3">
                 <Fact
@@ -717,7 +760,9 @@ function CommissionDetail({
               </dl>
             </div>
             <div className="border-t border-slate-100 pt-4">
-              <h3 className="text-sm font-bold text-slate-800">Identities</h3>
+              <h3 className="text-sm font-bold text-slate-800">
+                {tx("Identities")}
+              </h3>
               <dl className="mt-3 grid grid-cols-2 gap-3">
                 <Fact
                   label="Trainer"
@@ -738,15 +783,17 @@ function CommissionDetail({
             </div>
             <div className="border-t border-slate-100 pt-4">
               <h3 className="text-sm font-bold text-slate-800">
-                Payout history
+                {" "}
+                {tx("Payout history")}{" "}
               </h3>
               {payments.length === 0 ? (
                 <p className="mt-3 text-sm text-slate-500">
-                  No payouts have been recorded.
+                  {" "}
+                  {tx("No payouts have been recorded.")}{" "}
                 </p>
               ) : (
                 <ol
-                  aria-label="Payout history"
+                  aria-label={tx("Payout history")}
                   className="mt-3 border-l border-slate-200"
                 >
                   {payments.map((payment) => (
@@ -757,7 +804,7 @@ function CommissionDetail({
             </div>
             {showPayout ? (
               <div
-                aria-label="Commission actions"
+                aria-label={tx("Commission actions")}
                 className="border-t border-slate-100 pt-4"
                 role="group"
               >
@@ -770,13 +817,15 @@ function CommissionDetail({
                   ref={payButtonRef}
                   type="button"
                 >
-                  Record payout
+                  {" "}
+                  {tx("Record payout")}{" "}
                 </button>
               </div>
             ) : null}
             {canPay && outstanding && !payerDiffers ? (
               <p className="border-t border-slate-100 pt-4 text-sm text-slate-600">
-                A different person must record this payout.
+                {" "}
+                {tx("A different person must record this payout.")}{" "}
               </p>
             ) : null}
           </>
@@ -786,11 +835,13 @@ function CommissionDetail({
               className="text-sm font-bold tracking-wide text-slate-700 uppercase"
               id="commission-detail-title"
             >
-              Commission detail
+              {" "}
+              {tx("Commission detail")}{" "}
             </h2>
             {detailPending ? (
               <p className="text-sm font-medium text-slate-600" role="status">
-                Loading commission.
+                {" "}
+                {tx("Loading commission.")}{" "}
               </p>
             ) : null}
             {loadError ? (
@@ -801,12 +852,14 @@ function CommissionDetail({
                   onClick={onRetry}
                   type="button"
                 >
-                  Retry loading commission
+                  {" "}
+                  {tx("Retry loading commission")}{" "}
                 </button>
               </div>
             ) : !detailPending ? (
               <p className="text-sm text-slate-500">
-                Select a commission to see its balance and payouts.
+                {" "}
+                {tx("Select a commission to see its balance and payouts.")}{" "}
               </p>
             ) : null}
           </>
@@ -821,6 +874,7 @@ function PayoutEntry({
 }: {
   payment: PTCommissionDetail["payments"][number];
 }) {
+  const tx = useTx();
   return (
     <li className="relative py-3 pl-4">
       <span
@@ -829,7 +883,7 @@ function PayoutEntry({
       />
       <div className="flex items-start justify-between gap-3">
         <p className="font-semibold text-slate-900 tabular-nums">
-          {payment.amount} {payment.payment_method}
+          {payment.amount} {tx(payment.payment_method)}
         </p>
         {payment.status ? (
           <CommissionStatusBadge status={payment.status} />
@@ -842,12 +896,15 @@ function PayoutEntry({
       ) : null}
       {payment.reference_number ? (
         <p className="mt-1 text-sm text-slate-600">
-          Reference {payment.reference_number}
+          {" "}
+          {tx("Reference")} {payment.reference_number}
         </p>
       ) : null}
       {payment.cash_session_id ? (
         <p className="mt-1 text-sm text-slate-600">
-          Cash session <IdentifierValue value={payment.cash_session_id} />
+          {" "}
+          {tx("Cash session")}{" "}
+          <IdentifierValue value={payment.cash_session_id} />
         </p>
       ) : null}
     </li>

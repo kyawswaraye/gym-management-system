@@ -86,11 +86,37 @@ function resolveRawApiBaseUrl(argv) {
   return readReleaseEnvFile(releaseEnvPath);
 }
 
+function readDotEnvValue(path, key) {
+  if (!existsSync(path)) {
+    return "";
+  }
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+    const separator = trimmed.indexOf("=");
+    if (separator < 1) {
+      continue;
+    }
+    if (trimmed.slice(0, separator).trim() !== key) {
+      continue;
+    }
+    return trimmed.slice(separator + 1).trim();
+  }
+  return "";
+}
+
 function releaseEnvSource(apiBaseUrl) {
+  const envPath = resolve(root, ".env");
+  const webClientId = readDotEnvValue(envPath, "GOOGLE_WEB_CLIENT_ID");
+  const iosClientId = readDotEnvValue(envPath, "GOOGLE_IOS_CLIENT_ID");
   return `/** Generated for this Android release bundle. android-release.mjs restores the previous file. */
 export const localEnv = {
   API_BASE_URL: ${JSON.stringify(apiBaseUrl)},
   APP_ENV: "release",
+  GOOGLE_WEB_CLIENT_ID: ${JSON.stringify(webClientId)},
+  GOOGLE_IOS_CLIENT_ID: ${JSON.stringify(iosClientId)},
 } as const;
 `;
 }

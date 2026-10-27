@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/i18n/use-tx";
 
 import { useId, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -38,7 +39,10 @@ async function readFailure(
         if (message) fields[key] = message;
       }
     }
-    const fieldMessage = Object.values(fields)[0];
+    if (!fields.password && fields.non_field_errors) {
+      fields.password = fields.non_field_errors;
+    }
+    const fieldMessage = fields.password || Object.values(fields)[0];
     const message =
       fieldMessage ||
       (typeof body.error?.message === "string" && body.error.message
@@ -54,10 +58,16 @@ function optionalText(
   value: string,
   label: string,
   max: number,
+  tx: (text: string, vars?: Record<string, string | number>) => string,
 ): string | null {
   if (!value) return null;
   if (value.length > max) {
-    throw new Error(`Enter a ${label.toLowerCase()} up to ${max} characters.`);
+    throw new Error(
+      tx("Enter a {label} up to {max} characters.", {
+        label: tx(label),
+        max,
+      }),
+    );
   }
   return value;
 }
@@ -81,11 +91,12 @@ function Field({
   minLength?: number;
   maxLength?: number;
 }) {
+  const tx = useTx();
   const id = useId();
   const errorId = `${id}-error`;
   return (
     <div className="field">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id}>{tx(label)}</label>
       {type === "password" ? (
         <PasswordInput
           id={id}
@@ -113,7 +124,7 @@ function Field({
       )}
       {error ? (
         <span id={errorId} className="error">
-          {error}
+          {tx(error)}
         </span>
       ) : null}
     </div>
@@ -121,6 +132,7 @@ function Field({
 }
 
 export function StaffInvitationForm({ token }: { token: string }) {
+  const tx = useTx();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<FieldErrors>({});
@@ -132,12 +144,16 @@ export function StaffInvitationForm({ token }: { token: string }) {
     const password = String(values.get("password") ?? "");
     const confirmation = String(values.get("password_confirmation") ?? "");
     if (password.length < 12 || confirmation.length < 12) {
-      setError("Use a password of at least 12 characters.");
-      setFields({});
+      const message = "Use a password of at least 12 characters.";
+      const next: FieldErrors = {};
+      if (password.length < 12) next.password = message;
+      if (confirmation.length < 12) next.password_confirmation = message;
+      setError(message);
+      setFields(next);
       return;
     }
     if (password !== confirmation) {
-      setError("Passwords do not match.");
+      setError(tx("Passwords do not match."));
       setFields({ password_confirmation: "Passwords do not match." });
       return;
     }
@@ -145,26 +161,31 @@ export function StaffInvitationForm({ token }: { token: string }) {
       StaffAcceptInput,
       "first_name" | "last_name" | "phone" | "display_name"
     >;
+
     try {
       const firstName = optionalText(
         String(values.get("first_name") ?? "").trim(),
         "First name",
         150,
+        tx,
       );
       const lastName = optionalText(
         String(values.get("last_name") ?? "").trim(),
         "Last name",
         150,
+        tx,
       );
       const phone = optionalText(
         String(values.get("phone") ?? "").trim(),
         "Phone",
         32,
+        tx,
       );
       const displayName = optionalText(
         String(values.get("display_name") ?? "").trim(),
         "Display name",
         150,
+        tx,
       );
       optional = {
         ...(firstName ? { first_name: firstName } : {}),
@@ -222,7 +243,7 @@ export function StaffInvitationForm({ token }: { token: string }) {
     <form className="mt-6 grid gap-4" noValidate onSubmit={submit}>
       {error ? (
         <p className="error" role="alert">
-          {error}
+          {tx(error)}
         </p>
       ) : null}
       <Field
@@ -234,6 +255,7 @@ export function StaffInvitationForm({ token }: { token: string }) {
         minLength={12}
         error={fields.password}
       />
+
       <Field
         label="Confirm password"
         name="password_confirmation"
@@ -243,6 +265,7 @@ export function StaffInvitationForm({ token }: { token: string }) {
         minLength={12}
         error={fields.password_confirmation}
       />
+
       <Field
         label="First name"
         name="first_name"
@@ -251,6 +274,7 @@ export function StaffInvitationForm({ token }: { token: string }) {
         maxLength={150}
         error={fields.first_name}
       />
+
       <Field
         label="Last name"
         name="last_name"
@@ -259,6 +283,7 @@ export function StaffInvitationForm({ token }: { token: string }) {
         maxLength={150}
         error={fields.last_name}
       />
+
       <Field
         label="Phone"
         name="phone"
@@ -267,6 +292,7 @@ export function StaffInvitationForm({ token }: { token: string }) {
         maxLength={32}
         error={fields.phone}
       />
+
       <Field
         label="Display name"
         name="display_name"
@@ -275,8 +301,9 @@ export function StaffInvitationForm({ token }: { token: string }) {
         maxLength={150}
         error={fields.display_name}
       />
+
       <button className="button" disabled={pending}>
-        {pending ? "Accepting…" : "Accept staff invitation"}
+        {pending ? tx("Accepting…") : tx("Accept staff invitation")}
       </button>
     </form>
   );

@@ -23,6 +23,10 @@ function memoryStore(
     },
     getBiometricGate: async () => false,
     setBiometricGate: async () => undefined,
+    getLocale: async () => (values.locale === "mm" ? "mm" : "en"),
+    setLocale: async (locale) => {
+      values.locale = locale;
+    },
     resetAll: async () => {
       delete values.refresh;
       delete values.installation;
@@ -152,7 +156,7 @@ describe("session cleanup", () => {
       memory,
       clearCache: () => undefined,
     });
-    await expect(session.login("member@example.com", "secret")).rejects.toThrow(
+    await expect(session.login("google-id-token")).rejects.toThrow(
       "Keystore unavailable.",
     );
     expect(memory.getAccessToken()).toBeNull();

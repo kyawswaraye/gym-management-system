@@ -64,6 +64,42 @@ describe("reset password", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("shows why a new password was rejected", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        Response.json({ data: { csrf_token: "csrf-token" } }),
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            success: false,
+            error: {
+              message: "The request could not be processed.",
+              fields: { password: ["This password is too common."] },
+            },
+          },
+          { status: 400 },
+        ),
+      );
+    render(<ResetPasswordForm token={token} />);
+    fireEvent.change(screen.getByLabelText("New password"), {
+      target: { value: "Password1234xx" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm password"), {
+      target: { value: "Password1234xx" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Update password" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This password is too common.",
+    );
+    expect(screen.getByLabelText("New password")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   it("posts the token once and returns to sign in", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
