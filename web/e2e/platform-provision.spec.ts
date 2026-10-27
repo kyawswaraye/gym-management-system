@@ -39,7 +39,12 @@ test("super admin provisions a gym through the browser", async ({ page }) => {
     .getByRole("combobox", { name: "Subscription *", exact: true })
     .selectOption({ label: "Trial (THB)" });
   await page.getByLabel("Timezone *", { exact: true }).fill("Asia/Yangon");
-  await page.getByLabel("City", { exact: true }).fill("Yangon");
+  await page
+    .getByRole("combobox", { name: "Region", exact: true })
+    .selectOption("Yangon Region");
+  await page
+    .getByRole("combobox", { name: "City", exact: true })
+    .selectOption("Yangon");
   await page.getByLabel("Country code", { exact: true }).fill("MM");
   await page.getByLabel("Owner first name *", { exact: true }).fill("E2E");
   await page.getByLabel("Owner last name *", { exact: true }).fill("Provision");

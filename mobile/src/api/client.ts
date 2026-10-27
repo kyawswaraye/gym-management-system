@@ -91,10 +91,11 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       query?: Record<string, string | number | undefined>;
       auth?: boolean;
       idempotencyKey?: string;
+      accept?: string;
     },
   ): Promise<FetchResponse> {
     const headers: Record<string, string> = {
-      Accept: "application/json",
+      Accept: init.accept ?? "application/json",
       "Accept-Language": options.getAcceptLanguage?.() ?? "en",
     };
     if (init.body !== undefined) {
@@ -165,7 +166,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     path: string,
     allowRetry = true,
   ): Promise<{ contentType: string; bytes: Uint8Array } | null> {
-    const response = await sendRaw(path, { method: "GET" });
+    const response = await sendRaw(path, {
+      method: "GET",
+      accept: "image/jpeg, image/png, image/webp",
+    });
     const contentType = (response.headers.get("content-type") ?? "")
       .split(";")[0]
       .trim()

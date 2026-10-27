@@ -90,3 +90,15 @@ jest.mock("react-native-image-picker", () => ({
   launchImageLibrary: jest.fn(async () => ({ assets: [] })),
   launchCamera: jest.fn(async () => ({ assets: [] })),
 }));
+
+jest.mock("react-native-nitro-image", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  return {
+    Images: {
+      loadFromEncodedImageDataAsync: jest.fn(async () => ({ id: "image" })),
+    },
+    NitroImage: ({ style }) =>
+      React.createElement(View, { style, testID: "gym-logo-pixels" }),
+  };
+});

@@ -49,6 +49,8 @@ def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     members_pt_void = ("members", "0024_pt_sale_payment_void")
     members_phase7 = ("members", "0025_phase7_notifications")
     members_device_guard = ("members", "0026_member_device_rls_and_guards")
+    members_owner_approval = ("members", "0027_owner_may_approve_own_payment")
+    members_desk_approval = ("members", "0028_desk_may_approve_own_payment")
     trainers_sale = ("trainers", "0005_pt_sale")
     trainers_sale_rls = ("trainers", "0006_pt_sale_rls_and_grants")
     trainers_pt_link = ("trainers", "0007_pt_sale_payment_link")
@@ -70,7 +72,7 @@ def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     classes_booking = ("classes", "0006_class_booking_guards")
     classes_terminal = ("classes", "0008_member_self_actors")
     assert loader.graph.leaf_nodes("inventory") == [inventory_return]
-    assert loader.graph.leaf_nodes("members") == [members_device_guard]
+    assert loader.graph.leaf_nodes("members") == [members_desk_approval]
     assert loader.graph.leaf_nodes("trainers") == [trainers_payout_window]
     assert loader.graph.leaf_nodes("classes") == [classes_terminal]
     initial = loader.disk_migrations[SALES_INITIAL].dependencies
@@ -184,6 +186,8 @@ def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     assert loader.disk_migrations[members_pt_void].dependencies == [members_pt_guard]
     assert members_pt_void in loader.disk_migrations[members_phase7].dependencies
     assert loader.disk_migrations[members_device_guard].dependencies == [members_phase7]
+    assert loader.disk_migrations[members_owner_approval].dependencies == [members_device_guard]
+    assert loader.disk_migrations[members_desk_approval].dependencies == [members_owner_approval]
     payout_source = (
         Path(__file__).resolve().parents[2]
         / "apps/trainers/migrations/0009_pt_commission_payment.py"

@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
+import { formatAppDate } from "../src/lib/date";
 import {
   expectNoBrowserSecrets,
   ownerAccount,
@@ -300,7 +301,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   expect(memberNumber).not.toBe("");
   await expect(createdRow).toContainText(PHONE);
   await expect(createdRow).toContainText("ACTIVE");
-  await expect(createdRow).toContainText(joinDate);
+  await expect(createdRow).toContainText(formatAppDate(joinDate));
 
   await test.step("search and filter the new member", async () => {
     await settleMembers(
@@ -640,7 +641,9 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
       .getByRole("button", { name: "Start membership", exact: true })
       .click();
     const sold = memberships.getByRole("row").filter({ hasText: REVISED_PLAN });
-    await expect(sold).toContainText(`${startDate} – ${startDate}`);
+    await expect(sold).toContainText(
+      `${formatAppDate(startDate)} – ${formatAppDate(startDate)}`,
+    );
     await expect(sold).toContainText("ACTIVE / UNPAID");
     await expect(sold).toContainText(`1600.00 ${currency}`);
     await expect(sold).toContainText(OPENING_NOTE);
@@ -851,7 +854,9 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   ).toContainText("No current membership.");
   await expect(
     page.getByRole("region", { name: "Membership history" }),
-  ).toContainText(`${REVISED_PLAN}: ${startDate} – ${startDate} (CANCELLED)`);
+  ).toContainText(
+    `${REVISED_PLAN}: ${formatAppDate(startDate)} – ${formatAppDate(startDate)} (CANCELLED)`,
+  );
 
   await test.step("archive the plan and the member", async () => {
     await openSection(page, "Memberships");

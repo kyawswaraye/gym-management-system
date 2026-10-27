@@ -956,13 +956,19 @@ async function expectRenderedReport(
   const last = report.rows[report.rows.length - 1];
   if (!first || !last) throw new Error("Expected at least one report row.");
   const firstRow = reportSection.getByRole("row").filter({
-    has: page.getByRole("rowheader", { name: first.date, exact: true }),
+    has: page.getByRole("rowheader", {
+      name: formatAppDate(first.date),
+      exact: true,
+    }),
   });
   await expect(firstRow).toContainText(first.total_revenue);
   await expect(firstRow).toContainText(first.net_profit);
   await expect(firstRow).toContainText(first.product_quantity);
   await expect(
-    reportSection.getByRole("rowheader", { name: last.date, exact: true }),
+    reportSection.getByRole("rowheader", {
+      name: formatAppDate(last.date),
+      exact: true,
+    }),
   ).toBeVisible();
   const totals = reportSection.getByRole("region", {
     name: "Totals",
@@ -1217,7 +1223,10 @@ async function expectRenderedStock(page: Page, report: StockPayload) {
   const first = report.rows[0];
   if (!first) throw new Error("Expected a stock movement row.");
   await expect(
-    section.getByRole("rowheader", { name: first.date, exact: true }),
+    section.getByRole("rowheader", {
+      name: formatAppDate(first.date),
+      exact: true,
+    }),
   ).toBeVisible();
   await expectTotal(
     section.getByRole("region", { name: "Totals", exact: true }),
@@ -1292,7 +1301,10 @@ async function expectRenderedOperational(
   const first = report.rows[0];
   if (!first) throw new Error(`Expected a ${title} row.`);
   await expect(
-    section.getByRole("rowheader", { name: first.date, exact: true }),
+    section.getByRole("rowheader", {
+      name: formatAppDate(first.date),
+      exact: true,
+    }),
   ).toBeVisible();
   const totalsRegion = section.getByRole("region", {
     name: "Totals",
@@ -1431,7 +1443,10 @@ async function expectRenderedCashBook(page: Page, report: CashBookPayload) {
   const first = report.rows[0];
   if (!first) throw new Error("Expected a cash-book row.");
   await expect(
-    section.getByRole("rowheader", { name: first.date, exact: true }),
+    section.getByRole("rowheader", {
+      name: formatAppDate(first.date),
+      exact: true,
+    }),
   ).toBeVisible();
   const totals = section.getByRole("region", { name: "Totals", exact: true });
   await expectTotal(totals, "Net cash flow", report.totals.net_cash_flow);

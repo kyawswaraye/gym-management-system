@@ -145,7 +145,10 @@ describe("member screens", () => {
   });
 
   it("shows the signed-in gym logo instead of the default wordmark", async () => {
-    const gymLogo = jest.fn(async () => "data:image/png;base64,AQID");
+    const gymLogo = jest.fn(async () => ({
+      contentType: "image/png",
+      bytes: Uint8Array.from([137, 80, 78, 71]),
+    }));
     const view = await renderSignedIn(<DashboardScreen />, {
       dashboard: async () => ({
         ...dashboardData,
@@ -157,6 +160,21 @@ describe("member screens", () => {
     expect(view.getByText("North Gym")).toBeTruthy();
     expect(view.queryByText("GymPilot MM")).toBeNull();
     expect(gymLogo).toHaveBeenCalled();
+  });
+
+  it("keeps the gym name when the gym logo cannot be loaded", async () => {
+    const view = await renderSignedIn(<DashboardScreen />, {
+      dashboard: async () => ({
+        ...dashboardData,
+        gym: { name: "North Gym", has_logo: true },
+      }),
+      gymLogo: async () => {
+        throw new Error("logo failed");
+      },
+    });
+    expect(await view.findByText("North Gym")).toBeTruthy();
+    expect(await view.findByText("GymPilot MM")).toBeTruthy();
+    expect(view.queryByLabelText("Gym logo")).toBeNull();
   });
 
   it("explains desk check-in when the camera is denied", async () => {

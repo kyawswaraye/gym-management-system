@@ -18,10 +18,10 @@ import { ProfileScreen } from "../screens/ProfileScreen";
 import { ScanScreen } from "../screens/ScanScreen";
 import { ScheduleScreen } from "../screens/ScheduleScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
-import { BrandMark } from "../ui/BrandMark";
+import { SplashView } from "../ui/SplashView";
 import { TabIcon, type TabIconName } from "../ui/TabIcon";
 import { Button } from "../ui/Button";
-import { ErrorState, LoadingState } from "../ui/StateView";
+import { ErrorState } from "../ui/StateView";
 import { colors, space } from "../ui/theme";
 import type {
   AccountStackParamList,
@@ -104,21 +104,7 @@ export function RootNavigator() {
   const tx = useTx();
   const auth = useAuth();
   if (auth.status === "loading") {
-    return (
-      <SafeAreaView
-        style={{
-          alignItems: "center",
-          backgroundColor: colors.background,
-          flex: 1,
-          gap: space.md,
-          justifyContent: "center",
-          padding: space.lg,
-        }}
-      >
-        <BrandMark size={96} />
-        <LoadingState label={tx("Checking your session")} />
-      </SafeAreaView>
-    );
+    return <SplashView status={tx("Checking your session")} />;
   }
   if (auth.status === "offline") {
     return (

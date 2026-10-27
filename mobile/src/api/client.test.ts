@@ -243,11 +243,14 @@ describe("member API client", () => {
         onSessionRevoked: async () => undefined,
       }),
     );
-    expect(await api.gymLogo()).toBe("data:image/png;base64,AQID");
+    expect(await api.gymLogo()).toEqual({
+      contentType: "image/png",
+      bytes: Uint8Array.from([1, 2, 3]),
+    });
     expect(await api.gymLogo()).toBeNull();
-    const authorization = (fetchImpl as jest.Mock).mock.calls[0][1].headers
-      .Authorization;
-    expect(authorization).toBe("Bearer access");
+    const headers = (fetchImpl as jest.Mock).mock.calls[0][1].headers;
+    expect(headers.Authorization).toBe("Bearer access");
+    expect(headers.Accept).toBe("image/jpeg, image/png, image/webp");
   });
 
   it("sends the member language on each request", async () => {

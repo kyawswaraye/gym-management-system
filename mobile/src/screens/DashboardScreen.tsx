@@ -11,6 +11,7 @@ import {
 } from "../dates/gymLocal";
 import { queryKeys } from "../query/keys";
 import { BrandMark } from "../ui/BrandMark";
+import { GymLogoImage } from "../ui/GymLogoImage";
 import { Card } from "../ui/Card";
 import { Fact } from "../ui/Fact";
 import { Screen } from "../ui/Screen";
@@ -39,8 +40,8 @@ export function DashboardScreen() {
       heading={
         <GymBrand
           hasLogo={gym?.has_logo ?? false}
-          name={gym?.name ?? ""}
-          pending={!gym}
+          name={gym?.name?.trim() ?? ""}
+          pending={query.isLoading}
         />
       }
       refreshControl={
@@ -86,67 +87,61 @@ function GymBrand({
     enabled: hasLogo,
     queryFn: () => api.gymLogo(),
   });
+  const media = hasLogo && logo.isSuccess ? logo.data : null;
   const waiting = pending || (hasLogo && logo.isLoading);
-  const source = hasLogo && !logo.isError ? logo.data : null;
   return (
     <View style={{ alignItems: "center", gap: 16, paddingTop: 8 }}>
       <View
         style={{
-          alignItems: "center",
           backgroundColor: colors.surface,
-          borderColor: colors.border,
           borderRadius: 28,
-          borderWidth: 1,
-          justifyContent: "center",
-          minHeight: 120,
-          minWidth: 168,
-          paddingHorizontal: 22,
-          paddingVertical: 18,
           ...elevation,
         }}
       >
-        {waiting ? (
-          <View
-            style={{
-              backgroundColor: colors.primarySoft,
-              borderRadius: 18,
-              height: 64,
-              width: 64,
-            }}
-          />
-        ) : source ? (
-          <Image
-            accessibilityIgnoresInvertColors
-            accessibilityLabel={tx("Gym logo")}
-            accessibilityRole="image"
-            resizeMode="contain"
-            source={{ uri: source }}
-            style={{ height: 72, width: 168 }}
-          />
-        ) : (
-          <View style={{ alignItems: "center", gap: 8 }}>
-            <BrandMark size={56} />
-            <Text
+        <View
+          style={{
+            alignItems: "center",
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            borderRadius: 28,
+            borderWidth: 1,
+            justifyContent: "center",
+            minHeight: 120,
+            minWidth: 200,
+            overflow: "hidden",
+            paddingHorizontal: 22,
+            paddingVertical: 18,
+          }}
+        >
+          {media ? (
+            <GymLogoImage
+              fallback={<ProductWordmark />}
+              label={tx("Gym logo")}
+              media={media}
+            />
+          ) : waiting ? (
+            <View
               style={{
-                fontSize: 18,
-                fontWeight: "700",
-                letterSpacing: 0.3,
+                backgroundColor: colors.primarySoft,
+                borderRadius: 18,
+                height: 64,
+                width: 64,
               }}
-            >
-              {tx("GymPilot MM")}
-            </Text>
-          </View>
-        )}
+            />
+          ) : (
+            <ProductWordmark />
+          )}
+        </View>
       </View>
       {name ? (
-        <View style={{ alignItems: "center", gap: 10 }}>
+        <View style={{ alignItems: "center", flexShrink: 0, gap: 10 }}>
           <Text
             accessibilityRole="header"
             style={{
-              fontSize: 28,
+              fontSize: 30,
               fontWeight: "700",
               letterSpacing: locale === "mm" ? 0 : -0.4,
-              lineHeight: locale === "mm" ? 44 : 34,
+              lineHeight: locale === "mm" ? 48 : 38,
               textAlign: "center",
             }}
           >
@@ -162,6 +157,24 @@ function GymBrand({
           />
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function ProductWordmark() {
+  const tx = useTx();
+  return (
+    <View style={{ alignItems: "center", gap: 8 }}>
+      <BrandMark size={56} />
+      <Text
+        style={{
+          fontSize: 18,
+          fontWeight: "700",
+          letterSpacing: 0.3,
+        }}
+      >
+        {tx("GymPilot MM")}
+      </Text>
     </View>
   );
 }

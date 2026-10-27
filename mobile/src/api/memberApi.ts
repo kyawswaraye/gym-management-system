@@ -19,6 +19,11 @@ function pageOf<T>(envelope: SuccessEnvelope<T[]> | undefined): Page<T> {
   };
 }
 
+export type GymLogoMedia = {
+  contentType: string;
+  bytes: Uint8Array;
+};
+
 export type MemberApi = {
   me(): Promise<Schemas["MemberSelfProfile"]>;
   updateMe(
@@ -57,7 +62,7 @@ export type MemberApi = {
   ): Promise<Schemas["CompletedFile"]>;
   photoDownloadUrl(id: string): Promise<Schemas["DownloadUrl"]>;
   deletePhoto(id: string): Promise<void>;
-  gymLogo(): Promise<string | null>;
+  gymLogo(): Promise<GymLogoMedia | null>;
 };
 
 export function createMemberApi(client: ApiClient): MemberApi {
@@ -199,26 +204,9 @@ export function createMemberApi(client: ApiClient): MemberApi {
       await client.request(`/api/v1/member/files/${id}/`, { method: "DELETE" });
     },
     async gymLogo() {
-      const media = await client.requestMedia("/api/v1/member/gym/logo/");
-      if (!media) {
-        return null;
-      }
-      return dataUri(media.contentType, media.bytes);
+      return client.requestMedia("/api/v1/member/gym/logo/");
     },
   };
-}
-
-function dataUri(contentType: string, bytes: Uint8Array): string {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let index = 0; index < bytes.length; index += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + chunk));
-  }
-  const encode = (globalThis as { btoa?: (value: string) => string }).btoa;
-  if (!encode) {
-    throw new Error("The server response could not be read.");
-  }
-  return `data:${contentType};base64,${encode(binary)}`;
 }
 
 function required<T>(envelope: SuccessEnvelope<T> | undefined): T {
