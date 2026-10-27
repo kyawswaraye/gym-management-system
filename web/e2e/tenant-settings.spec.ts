@@ -8,6 +8,7 @@ import {
 } from "./auth";
 
 test("owner updates gym settings through the browser", async ({ page }) => {
+  test.setTimeout(180_000);
   const assertResponses = watchJsonResponses(page);
   const secrets = [ownerAccount.password, ownerAccount.totpSecret];
 
@@ -52,13 +53,18 @@ test("owner updates gym settings through the browser", async ({ page }) => {
     exact: true,
   });
 
+  const profileDialog = page.getByRole("dialog", { name: "Gym profile" });
+  const operationsDialog = page.getByRole("dialog", {
+    name: "Operational settings",
+  });
+
   await profileTab.click();
   await page
     .getByRole("button", { name: "Edit gym profile", exact: true })
     .click();
-  const name = page.getByLabel("Name", { exact: true });
-  const timezone = page.getByLabel("Timezone", { exact: true });
-  const currency = page.getByRole("combobox", {
+  const name = profileDialog.getByLabel("Name", { exact: true });
+  const timezone = profileDialog.getByLabel("Timezone", { exact: true });
+  const currency = profileDialog.getByRole("combobox", {
     name: "Currency",
     exact: true,
   });
@@ -66,31 +72,42 @@ test("owner updates gym settings through the browser", async ({ page }) => {
   await expect(timezone).toHaveValue("Asia/Yangon");
   await expect(currency).toHaveValue("THB");
   await expect(
-    page.getByRole("button", { name: "Save gym profile", exact: true }),
+    profileDialog.getByRole("button", {
+      name: "Save gym profile",
+      exact: true,
+    }),
   ).toBeVisible();
+  await profileDialog
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
 
   await operationsTab.click();
   await page
     .getByRole("button", { name: "Edit operational settings", exact: true })
     .click();
-  const week = page.getByRole("combobox", {
+  const week = operationsDialog.getByRole("combobox", {
     name: "Week starts on",
     exact: true,
   });
-  const memberPrefix = page.getByLabel("Member number prefix", { exact: true });
-  const receiptPrefix = page.getByLabel("Receipt number prefix", {
+  const memberPrefix = operationsDialog.getByLabel("Member number prefix", {
     exact: true,
   });
-  const duplicateWindow = page.getByLabel(
+  const receiptPrefix = operationsDialog.getByLabel("Receipt number prefix", {
+    exact: true,
+  });
+  const duplicateWindow = operationsDialog.getByLabel(
     "Check-in duplicate window (seconds)",
     {
       exact: true,
     },
   );
-  const warningDays = page.getByLabel("Membership expiry warning days", {
-    exact: true,
-  });
-  const manualNumbers = page.getByRole("checkbox", {
+  const warningDays = operationsDialog.getByLabel(
+    "Membership expiry warning days",
+    {
+      exact: true,
+    },
+  );
+  const manualNumbers = operationsDialog.getByRole("checkbox", {
     name: "Allow manual member numbers",
     exact: true,
   });
@@ -101,29 +118,38 @@ test("owner updates gym settings through the browser", async ({ page }) => {
   await expect(warningDays).toHaveValue("0, 3, 7, 30");
   await expect(manualNumbers).not.toBeChecked();
   await expect(
-    page.getByRole("button", {
+    operationsDialog.getByRole("button", {
       name: "Save operational settings",
       exact: true,
     }),
   ).toBeVisible();
+  await operationsDialog
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
 
   await profileTab.click();
+  await page
+    .getByRole("button", { name: "Edit gym profile", exact: true })
+    .click();
   await name.fill("E2E Seed Gym East");
   await timezone.fill("Asia/Bangkok");
   await currency.selectOption("THB");
-  await page
+  await profileDialog
     .getByRole("button", { name: "Save gym profile", exact: true })
     .click();
   await expect(page.getByRole("status")).toHaveText("Gym profile saved.");
 
   await operationsTab.click();
+  await page
+    .getByRole("button", { name: "Edit operational settings", exact: true })
+    .click();
   await week.selectOption({ label: "Sunday" });
   await manualNumbers.check();
   await memberPrefix.fill("E2EMEM");
   await receiptPrefix.fill("E2ERC");
   await duplicateWindow.fill("240");
   await warningDays.fill("1, 7, 14");
-  await page
+  await operationsDialog
     .getByRole("button", { name: "Save operational settings", exact: true })
     .click();
   await expect(
@@ -138,6 +164,9 @@ test("owner updates gym settings through the browser", async ({ page }) => {
   await expect(name).toHaveValue("E2E Seed Gym East");
   await expect(timezone).toHaveValue("Asia/Bangkok");
   await expect(currency).toHaveValue("THB");
+  await profileDialog
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
 
   await operationsTab.click();
   await page

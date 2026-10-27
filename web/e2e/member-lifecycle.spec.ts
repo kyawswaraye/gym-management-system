@@ -558,6 +558,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     for (const secret of secrets) {
       expect(html.toLowerCase()).not.toContain(secret.toLowerCase());
     }
+    await profile.getByRole("button", { name: "Close", exact: true }).click();
     await page
       .getByRole("button", { name: "Remove profile photo", exact: true })
       .click();
@@ -579,6 +580,9 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   });
 
   await test.step("update the profile and confirm search follows it", async () => {
+    await page
+      .getByRole("button", { name: "Edit profile", exact: true })
+      .click();
     await profile.getByLabel("First name", { exact: true }).fill(UPDATED_FIRST);
     await profile.getByLabel("Phone", { exact: true }).fill(UPDATED_PHONE);
     await combobox(profile, "Gender").selectOption({ label: "Male" });
@@ -625,6 +629,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     await expect(profile.getByLabel("Last name", { exact: true })).toHaveValue(
       LAST_NAME,
     );
+    await profile.getByRole("button", { name: "Close", exact: true }).click();
 
     await openSection(page, "Members");
     await settleMembers(
