@@ -51,13 +51,16 @@ test("super admin provisions a gym through the browser", async ({ page }) => {
     .click();
 
   await expect(page.getByRole("status")).toHaveText(
-    "E2EPROV was provisioned and an Owner setup email was sent.",
+    "E2E-PROVISION-GYM was provisioned and an Owner setup email was sent.",
   );
-  const listed = page.getByRole("link", { name: "E2EPROV", exact: true });
+  const listed = page.getByRole("link", {
+    name: "E2E-PROVISION-GYM",
+    exact: true,
+  });
   await expect(listed).toBeVisible();
   await page
     .getByRole("textbox", { name: "Search gyms", exact: true })
-    .fill("E2EPROV");
+    .fill("E2E-PROVISION-GYM");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(listed).toBeVisible();
   await listed.click();
@@ -67,7 +70,7 @@ test("super admin provisions a gym through the browser", async ({ page }) => {
     page.getByRole("heading", { name: "E2E Provision Gym", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("E2EPROV · ACTIVE", { exact: true }),
+    page.getByText("E2E-PROVISION-GYM · ACTIVE", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("GYM_PROVISIONED", { exact: true }),

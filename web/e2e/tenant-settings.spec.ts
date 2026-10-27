@@ -58,7 +58,10 @@ test("owner updates gym settings through the browser", async ({ page }) => {
     .click();
   const name = page.getByLabel("Name", { exact: true });
   const timezone = page.getByLabel("Timezone", { exact: true });
-  const currency = page.getByLabel("Currency", { exact: true });
+  const currency = page.getByRole("combobox", {
+    name: "Currency",
+    exact: true,
+  });
   await expect(name).toHaveValue("E2E Seed Gym");
   await expect(timezone).toHaveValue("Asia/Yangon");
   await expect(currency).toHaveValue("THB");
@@ -107,7 +110,7 @@ test("owner updates gym settings through the browser", async ({ page }) => {
   await profileTab.click();
   await name.fill("E2E Seed Gym East");
   await timezone.fill("Asia/Bangkok");
-  await currency.fill("USD");
+  await currency.selectOption("THB");
   await page
     .getByRole("button", { name: "Save gym profile", exact: true })
     .click();
@@ -134,7 +137,7 @@ test("owner updates gym settings through the browser", async ({ page }) => {
     .click();
   await expect(name).toHaveValue("E2E Seed Gym East");
   await expect(timezone).toHaveValue("Asia/Bangkok");
-  await expect(currency).toHaveValue("USD");
+  await expect(currency).toHaveValue("THB");
 
   await operationsTab.click();
   await page

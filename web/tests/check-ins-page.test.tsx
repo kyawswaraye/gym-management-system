@@ -176,7 +176,11 @@ describe("check-ins page", () => {
         "Show this rotating code at the desk. Members cannot scan it from a staff login.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Display location")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Update location" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Current location")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Display location")).not.toBeInTheDocument();
     expect(
       await screen.findByRole("img", { name: "Current onsite check-in code" }),
     ).toBeInTheDocument();
@@ -226,7 +230,11 @@ describe("check-ins page", () => {
       "aria-selected",
       "false",
     );
-    expect(screen.getByLabelText("Display location")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Update location" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Current location")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Display location")).not.toBeInTheDocument();
     expect(
       await screen.findByRole("img", { name: "Current onsite check-in code" }),
     ).toBeInTheDocument();

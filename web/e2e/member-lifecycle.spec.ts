@@ -460,7 +460,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
   await expect(
     profile.getByRole("textbox", { name: "Notes", exact: true }),
   ).toHaveValue("E2E intake note");
-  await expect(profile.locator("p.muted")).toHaveText(memberNumber);
+  await expect(page.locator("p.muted")).toHaveText(memberNumber);
   await expect(
     page.getByText("No profile photo.", { exact: true }),
   ).toBeVisible();
@@ -1126,9 +1126,15 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
         ),
     );
     await page
+      .getByRole("button", { name: "Update location", exact: true })
+      .click();
+    const locationDialog = page.getByRole("dialog", {
+      name: "Display location",
+    });
+    await locationDialog
       .getByLabel("Display location", { exact: true })
       .fill("Side entrance");
-    await page
+    await locationDialog
       .getByRole("button", { name: "Update location", exact: true })
       .click();
     const second = await rotated;

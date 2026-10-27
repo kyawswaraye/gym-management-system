@@ -95,7 +95,11 @@ describe("check-ins workspace", () => {
     expect(replace).toHaveBeenCalledWith("/check-ins?view=qr", {
       scroll: false,
     });
-    expect(screen.getByLabelText("Display location")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Update location" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Front desk")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Display location")).not.toBeInTheDocument();
     expect(
       screen.queryByLabelText("Search active members"),
     ).not.toBeInTheDocument();
@@ -166,7 +170,11 @@ describe("check-ins workspace", () => {
     render(workspace("desk", false, true));
     await flush();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Display location")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Update location" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Front desk")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Display location")).not.toBeInTheDocument();
     expect(
       screen.queryByLabelText("Search active members"),
     ).not.toBeInTheDocument();

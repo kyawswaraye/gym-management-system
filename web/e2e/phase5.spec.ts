@@ -294,7 +294,8 @@ test("manager pays the trainer commission and a consumed sale does not void", as
   await expect(ledger).toContainText("ATTENDED · -1");
   await expect(ledger).not.toContainText("REFUND");
   await page.goto("/cash-book");
-  await page.getByRole("button", { name: "E2E_PT_PACK", exact: true }).click();
+  await page.getByRole("button", { name: "MAIN", exact: true }).click();
+  await expect(movements(page).getByText("E2E_PT_PACK")).toBeVisible();
   await expect(
     movements(page).getByRole("cell", { name: "100.00 THB" }),
   ).toHaveCount(1);
@@ -379,13 +380,12 @@ test("manager voids the untouched sale and runs the class cutoff", async ({
   await expect(ledger).not.toContainText("REFUND");
 
   await page.goto("/cash-book");
-  await page.getByRole("button", { name: "E2E_PT_PACK", exact: true }).click();
+  await page.getByRole("button", { name: "MAIN", exact: true }).click();
   const table = movements(page);
+  await expect(table.getByText("E2E_PT_PACK")).toBeVisible();
   await expect(table.getByRole("cell", { name: "100.00 THB" })).toHaveCount(1);
   await expect(table.getByRole("cell", { name: "80.00 THB" })).toHaveCount(2);
-  await expect(
-    table.getByRole("cell", { name: "OUT", exact: true }),
-  ).toHaveCount(3);
+  await expect(table.getByText("Out", { exact: true })).toHaveCount(3);
 
   const now = gymWall();
   const tomorrow = addDays(now.date, 1);
