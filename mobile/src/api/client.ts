@@ -168,7 +168,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   ): Promise<{ contentType: string; bytes: Uint8Array } | null> {
     const response = await sendRaw(path, {
       method: "GET",
-      accept: "image/jpeg, image/png, image/webp",
+      accept: "application/json, image/jpeg, image/png, image/webp",
     });
     const contentType = (response.headers.get("content-type") ?? "")
       .split(";")[0]

@@ -250,7 +250,9 @@ describe("member API client", () => {
     expect(await api.gymLogo()).toBeNull();
     const headers = (fetchImpl as jest.Mock).mock.calls[0][1].headers;
     expect(headers.Authorization).toBe("Bearer access");
-    expect(headers.Accept).toBe("image/jpeg, image/png, image/webp");
+    expect(headers.Accept).toBe(
+      "application/json, image/jpeg, image/png, image/webp",
+    );
   });
 
   it("sends the member language on each request", async () => {

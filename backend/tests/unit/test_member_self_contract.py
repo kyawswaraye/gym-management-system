@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from rest_framework.test import APIRequestFactory
+
 from apps.members.self_serializers import (
     MemberClassBookingWriteSerializer,
     MemberScheduleQuerySerializer,
     MemberSelfUpdateSerializer,
 )
+from apps.members.self_views import MemberGymLogoView
 
 
 def test_profile_patch_rejects_fields_outside_the_allowlist() -> None:
@@ -60,3 +63,17 @@ def test_schedule_range_is_ordered_and_at_most_42_days() -> None:
         data={"date_from": "2026-11-02", "date_to": "2026-12-13"}
     )
     assert accepted.is_valid(), accepted.errors
+
+
+def test_member_logo_negotiates_an_image_accept_header() -> None:
+    view = MemberGymLogoView()
+    request = view.initialize_request(
+        APIRequestFactory().get(
+            "/api/v1/member/gym/logo/",
+            HTTP_ACCEPT="image/jpeg, image/png, image/webp",
+        )
+    )
+    _renderer, media_type = view.get_content_negotiator().select_renderer(
+        request, view.get_renderers()
+    )
+    assert media_type.startswith("image/")

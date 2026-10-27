@@ -6,6 +6,9 @@ import {
   type Image as LoadedImage,
 } from "react-native-nitro-image";
 
+import type { GymLogoMedia } from "../api/memberApi";
+import { colors } from "./theme";
+
 type LogoViewProps = {
   image: LoadedImage;
   resizeMode?: "contain";
@@ -13,11 +16,6 @@ type LogoViewProps = {
 };
 
 const LogoView = NitroImage as (props: LogoViewProps) => JSX.Element;
-
-import type { GymLogoMedia } from "../api/memberApi";
-import { colors } from "./theme";
-
-const frame = { height: 88, width: 200 } as const;
 
 function encodedBuffer(bytes: Uint8Array): ArrayBuffer {
   const copy = new Uint8Array(bytes.byteLength);
@@ -29,10 +27,12 @@ export function GymLogoImage({
   media,
   label,
   fallback,
+  size = 64,
 }: {
   media: GymLogoMedia;
   label: string;
   fallback: ReactNode;
+  size?: number;
 }) {
   const [image, setImage] = useState<LoadedImage | null>(null);
   const [failed, setFailed] = useState(false);
@@ -72,14 +72,15 @@ export function GymLogoImage({
   if (failed) {
     return <>{fallback}</>;
   }
+  const frame = { height: size, width: size };
   if (!image) {
     return (
       <View
         style={{
           backgroundColor: colors.primarySoft,
-          borderRadius: 18,
-          height: 64,
-          width: 64,
+          borderRadius: 16,
+          height: size,
+          width: size,
         }}
       />
     );

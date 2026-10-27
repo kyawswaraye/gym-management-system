@@ -141,7 +141,8 @@ describe("member screens", () => {
     expect(view.getByText("12")).toBeTruthy();
     expect(view.getByText("Days remaining:")).toBeTruthy();
     expect(view.getByText("North Gym")).toBeTruthy();
-    expect(view.getByText("GymPilot MM")).toBeTruthy();
+    expect(view.getByText("North Gym").props.numberOfLines).toBe(3);
+    expect(view.getByLabelText("GymPilot MM")).toBeTruthy();
   });
 
   it("shows the signed-in gym logo instead of the default wordmark", async () => {
@@ -173,7 +174,8 @@ describe("member screens", () => {
       },
     });
     expect(await view.findByText("North Gym")).toBeTruthy();
-    expect(await view.findByText("GymPilot MM")).toBeTruthy();
+    expect(view.getByText("North Gym").props.numberOfLines).toBe(3);
+    expect(await view.findByLabelText("GymPilot MM")).toBeTruthy();
     expect(view.queryByLabelText("Gym logo")).toBeNull();
   });
 

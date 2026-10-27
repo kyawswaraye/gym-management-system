@@ -24,6 +24,8 @@ import {
 import { Text } from "../ui/Text";
 import { colors, elevation, radius } from "../ui/theme";
 
+const logoSize = 64;
+
 export function DashboardScreen() {
   const tx = useTx();
   const api = useMemberApi();
@@ -90,91 +92,84 @@ function GymBrand({
   const media = hasLogo && logo.isSuccess ? logo.data : null;
   const waiting = pending || (hasLogo && logo.isLoading);
   return (
-    <View style={{ alignItems: "center", gap: 16, paddingTop: 8 }}>
+    <View
+      style={{
+        alignSelf: "stretch",
+        backgroundColor: colors.surface,
+        borderRadius: radius.md,
+        ...elevation,
+      }}
+    >
       <View
         style={{
+          alignItems: "center",
           backgroundColor: colors.surface,
-          borderRadius: 28,
-          ...elevation,
+          borderColor: colors.border,
+          borderRadius: radius.md,
+          borderWidth: 1,
+          flexDirection: "row",
+          justifyContent: "center",
+          minHeight: 88,
+          overflow: "hidden",
+          paddingHorizontal: 16,
+          paddingVertical: 14,
         }}
       >
         <View
           style={{
             alignItems: "center",
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-            borderRadius: 28,
-            borderWidth: 1,
+            flexDirection: "row",
+            flexShrink: 1,
+            gap: 8,
             justifyContent: "center",
-            minHeight: 120,
-            minWidth: 200,
-            overflow: "hidden",
-            paddingHorizontal: 22,
-            paddingVertical: 18,
+            maxWidth: "100%",
           }}
         >
           {media ? (
             <GymLogoImage
-              fallback={<ProductWordmark />}
+              fallback={<DefaultMark />}
               label={tx("Gym logo")}
               media={media}
+              size={logoSize}
             />
           ) : waiting ? (
             <View
               style={{
                 backgroundColor: colors.primarySoft,
-                borderRadius: 18,
-                height: 64,
-                width: 64,
+                borderRadius: 16,
+                height: logoSize,
+                width: logoSize,
               }}
             />
           ) : (
-            <ProductWordmark />
+            <DefaultMark />
           )}
+          {name ? (
+            <Text
+              accessibilityRole="header"
+              numberOfLines={3}
+              style={{
+                flexShrink: 1,
+                fontSize: 22,
+                fontWeight: "700",
+                letterSpacing: locale === "mm" ? 0 : -0.3,
+                lineHeight: locale === "mm" ? 34 : 28,
+              }}
+            >
+              {name}
+            </Text>
+          ) : null}
         </View>
       </View>
-      {name ? (
-        <View style={{ alignItems: "center", flexShrink: 0, gap: 10 }}>
-          <Text
-            accessibilityRole="header"
-            style={{
-              fontSize: 30,
-              fontWeight: "700",
-              letterSpacing: locale === "mm" ? 0 : -0.4,
-              lineHeight: locale === "mm" ? 48 : 38,
-              textAlign: "center",
-            }}
-          >
-            {name}
-          </Text>
-          <View
-            style={{
-              backgroundColor: colors.accent,
-              borderRadius: 2,
-              height: 3,
-              width: 32,
-            }}
-          />
-        </View>
-      ) : null}
     </View>
   );
 }
 
-function ProductWordmark() {
+function DefaultMark() {
   const tx = useTx();
   return (
-    <View style={{ alignItems: "center", gap: 8 }}>
-      <BrandMark size={56} />
-      <Text
-        style={{
-          fontSize: 18,
-          fontWeight: "700",
-          letterSpacing: 0.3,
-        }}
-      >
-        {tx("GymPilot MM")}
-      </Text>
+    <View accessibilityLabel={tx("GymPilot MM")} accessibilityRole="image">
+      <BrandMark size={logoSize} />
     </View>
   );
 }

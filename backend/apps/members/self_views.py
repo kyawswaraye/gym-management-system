@@ -12,7 +12,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.renderers import JSONRenderer
+from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -158,8 +158,29 @@ class MemberDashboardView(MemberSelfView):
         return success_response(MemberSelfDashboardSerializer(payload).data)
 
 
+class MemberLogoRenderer(BaseRenderer):
+    """Accept image requests. The view returns the raw logo bytes itself."""
+
+    media_type = "image/*"
+    format = "bin"
+    charset = None
+    render_style = "binary"
+
+    def render(
+        self,
+        data: Any,
+        accepted_media_type: str | None = None,
+        renderer_context: dict[str, Any] | None = None,
+    ) -> bytes:
+        if isinstance(data, (bytes, bytearray)):
+            return bytes(data)
+        return JSONRenderer().render(data, "application/json", renderer_context)
+
+
 class MemberGymLogoView(MemberSelfView):
     """Logo bytes for the signed-in member's gym. Another gym's logo is unreachable."""
+
+    renderer_classes = [MemberLogoRenderer, JSONRenderer]
 
     @extend_schema(
         operation_id="member_gym_logo_retrieve",

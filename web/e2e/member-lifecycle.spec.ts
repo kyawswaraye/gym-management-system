@@ -770,7 +770,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
       .click();
     const current = page.getByRole("region", { name: "Current membership" });
     await expect(current).toContainText(
-      `${REVISED_PLAN}: ${startDate} – ${startDate} (UNPAID)`,
+      `${REVISED_PLAN}: ${formatAppDate(startDate)} – ${formatAppDate(startDate)} (UNPAID)`,
     );
     await expect(current).toContainText("1 day remaining");
     const attendance = page.getByRole("region", { name: "Check-ins" });

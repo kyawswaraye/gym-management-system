@@ -234,7 +234,11 @@ def test_member_home_brand_follows_the_signed_in_gym() -> None:
     assert b"North Gym" not in other_dashboard.content
     assert png not in other_dashboard.content
 
-    logo = client.get("/api/v1/member/gym/logo/", **_auth(token))
+    logo = client.get(
+        "/api/v1/member/gym/logo/",
+        HTTP_ACCEPT="image/jpeg, image/png, image/webp",
+        **_auth(token),
+    )
     assert logo.status_code == 200
     assert logo["Content-Type"] == "image/png"
     assert logo["Cache-Control"] == "private, no-store"

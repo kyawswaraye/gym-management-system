@@ -1462,9 +1462,10 @@ async function expectRenderedProfitLoss(page: Page, report: ProfitLossPayload) {
     section.getByText(report.gym.name, { exact: true }),
   ).toBeVisible();
   await expect(
-    section.getByText(`${report.range.date_from} to ${report.range.date_to}`, {
-      exact: true,
-    }),
+    section.getByText(
+      `${formatAppDate(report.range.date_from)} to ${formatAppDate(report.range.date_to)}`,
+      { exact: true },
+    ),
   ).toBeVisible();
   await revealPolicy(section);
   await expect(
