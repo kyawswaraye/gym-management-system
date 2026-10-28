@@ -526,9 +526,7 @@ def test_self_approval_mass_assignment_idempotency_and_concurrency() -> None:
 
     manager_own = _create(api, manager_headers, gym)
     manager_own_id = manager_own.json()["data"]["id"]
-    _put_lines(
-        api, manager_headers, manager_own_id, [_line(coach, gym, "BANK_TRANSFER", "45.00")]
-    )
+    _put_lines(api, manager_headers, manager_own_id, [_line(coach, gym, "BANK_TRANSFER", "45.00")])
     api.post(
         f"/api/v1/salary-periods/{manager_own_id}/submit/",
         {},
