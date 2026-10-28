@@ -429,6 +429,9 @@ test("manager voids the untouched sale and runs the class cutoff", async ({
     from: late.date,
     location: "E2E Late",
   });
+  if (finished.date < now.date) {
+    await showOccurrencesFrom(page, finished.date);
+  }
   await bookClass(page, /E2E Early/);
   await cancelClassBooking(page, "Before cutoff", 200);
   await bookClass(page, /E2E Attend/);
@@ -697,6 +700,8 @@ function finishedClasses(now: {
 } {
   const lateStart = minutesOf(lateClass(now).start);
   const end = lateStart - 2;
+  // Need ~24 minutes before the in-progress late class. Near Yangon
+  // midnight that window does not exist on the same local day.
   if (end >= 22) {
     return {
       date: now.date,
@@ -705,9 +710,9 @@ function finishedClasses(now: {
     };
   }
   return {
-    date: now.date,
-    attend: { start: "00:02", end: "00:03" },
-    noshow: { start: "00:03", end: "00:04" },
+    date: addDays(now.date, -1),
+    attend: { start: "20:00", end: "20:10" },
+    noshow: { start: "20:12", end: "20:22" },
   };
 }
 
@@ -716,15 +721,16 @@ function pastPt(now: { date: string; hours: number; minutes: number }): {
   start: string;
   end: string;
 } {
-  const attendStart = minutesOf(finishedClasses(now).attend.start);
+  const finished = finishedClasses(now);
+  const attendStart = minutesOf(finished.attend.start);
   if (attendStart >= 32) {
     return {
-      date: now.date,
+      date: finished.date,
       start: fromMinutes(attendStart - 32),
       end: fromMinutes(attendStart - 2),
     };
   }
-  return { date: now.date, start: "00:00", end: "00:01" };
+  return { date: finished.date, start: "19:00", end: "19:30" };
 }
 
 function lateClass(now: { date: string; hours: number; minutes: number }): {
@@ -1022,6 +1028,22 @@ async function recordPayout(page: Page, amount: string): Promise<void> {
     form.getByRole("button", { name: "Save payout", exact: true }).click(),
   );
   await expect(form).toBeHidden();
+}
+
+async function showOccurrencesFrom(page: Page, from: string): Promise<void> {
+  await page.getByRole("tab", { name: "This week", exact: true }).click();
+  await page.getByLabel("From", { exact: true }).fill(from);
+  const pending = page.waitForResponse(
+    (response) =>
+      response.request().method() === "GET" &&
+      /\/class-occurrences\/?/.test(new URL(response.url()).pathname) &&
+      new URL(response.url()).searchParams.get("date_from") === from,
+    { timeout: 30_000 },
+  );
+  await page
+    .getByRole("button", { name: "Show occurrences", exact: true })
+    .click();
+  expect((await pending).ok()).toBeTruthy();
 }
 
 async function createSchedule(
