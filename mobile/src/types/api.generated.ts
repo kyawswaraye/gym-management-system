@@ -17567,6 +17567,7 @@ export interface operations {
          */
         is_active?: "true" | "false";
         limit?: number;
+        search?: string;
         sku?: string;
       };
       header?: never;

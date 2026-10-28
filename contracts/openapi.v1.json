@@ -14560,6 +14560,15 @@
                     },
                     {
                         "in": "query",
+                        "name": "search",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "sku",
                         "schema": {
                             "type": "string",
