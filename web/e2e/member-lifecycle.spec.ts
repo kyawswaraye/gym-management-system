@@ -702,10 +702,10 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
     await page
       .getByLabel("Search active members", { exact: true })
       .fill(memberNumber);
-    await page.getByRole("button", { name: "Search", exact: true }).click();
     await page
+      .getByRole("list", { name: "Matching members" })
       .getByRole("button", {
-        name: `Select ${UPDATED_NAME} (${memberNumber})`,
+        name: `${UPDATED_NAME} (${memberNumber})`,
         exact: true,
       })
       .click();

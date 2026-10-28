@@ -591,16 +591,20 @@ test("trainer sees only one commission and scans an assigned member", async ({
   await page
     .getByLabel("Search active members", { exact: true })
     .fill("E2Eother");
-  await page.getByRole("button", { name: "Search", exact: true }).click();
-  await page.getByRole("button", { name: /Select E2Eother Guest/ }).click();
+  await page
+    .getByRole("list", { name: "Matching members" })
+    .getByRole("button", { name: /E2Eother Guest/ })
+    .click();
   await expect(
     page.getByRole("region", { name: /E2Eother Guest/ }),
   ).not.toContainText("Open");
   await page
     .getByLabel("Search active members", { exact: true })
     .fill("E2Eassigned");
-  await page.getByRole("button", { name: "Search", exact: true }).click();
-  await page.getByRole("button", { name: /Select E2Eassigned Member/ }).click();
+  await page
+    .getByRole("list", { name: "Matching members" })
+    .getByRole("button", { name: /E2Eassigned Member/ })
+    .click();
   await expect(
     page.getByRole("region", { name: /E2Eassigned Member/ }),
   ).toContainText("Open");
@@ -893,8 +897,11 @@ async function pickMember(
 ): Promise<void> {
   const search = scope.getByLabel(/Search/);
   await search.fill(query);
-  await scope.getByRole("button", { name: /Search/ }).click();
-  await scope.getByRole("button", { name }).click();
+  const choice = scope
+    .getByRole("list", { name: "Matching members" })
+    .getByRole("button", { name });
+  await expect(choice).toBeVisible();
+  await choice.click();
   await expect(scope.getByText(/Selected member:/)).toContainText(query);
 }
 

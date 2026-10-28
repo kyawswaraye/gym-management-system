@@ -87,13 +87,13 @@ test("a linked member redeems an onsite QR without storing member tokens", async
     await page
       .getByLabel("Search active members", { exact: true })
       .fill("E2Escan");
-    await page.getByRole("button", { name: "Search", exact: true }).click();
-    const selectMember = page.getByRole("button", {
-      name: /Select E2Escan Visitor \(MEM-\d+\)/,
-    });
+    const selectMember = page
+      .getByRole("list", { name: "Matching members" })
+      .getByRole("button", {
+        name: /E2Escan Visitor \(MEM-\d+\)/,
+      });
     await expect(selectMember).toBeVisible();
-    const memberLabel =
-      (await selectMember.innerText()).replace(/^Select /, "") || "";
+    const memberLabel = (await selectMember.innerText()) || "";
     await selectMember.click();
     const recent = page.getByRole("region", { name: memberLabel });
     await expect(recent).toContainText(`${memberLabel} · Open`);
