@@ -721,16 +721,17 @@ function pastPt(now: { date: string; hours: number; minutes: number }): {
   start: string;
   end: string;
 } {
-  const finished = finishedClasses(now);
-  const attendStart = minutesOf(finished.attend.start);
-  if (attendStart >= 32) {
+  // Keep PT on the gym-local today so it stays inside same-day trainer
+  // assignments created earlier in this serial suite.
+  const total = now.hours * 60 + now.minutes;
+  if (total >= 32) {
     return {
-      date: finished.date,
-      start: fromMinutes(attendStart - 32),
-      end: fromMinutes(attendStart - 2),
+      date: now.date,
+      start: fromMinutes(total - 32),
+      end: fromMinutes(total - 2),
     };
   }
-  return { date: finished.date, start: "19:00", end: "19:30" };
+  return { date: now.date, start: "00:00", end: "00:01" };
 }
 
 function lateClass(now: { date: string; hours: number; minutes: number }): {
