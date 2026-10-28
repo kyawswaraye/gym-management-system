@@ -130,7 +130,9 @@ class StockAdjustSerializer(StrictSerializer):
         if purchase and not has_cost:
             raise serializers.ValidationError({"unit_cost": ["Enter the purchase unit cost."]})
         if not purchase and has_cost:
-            raise serializers.ValidationError({"unit_cost": ["Only a purchase records a unit cost."]})
+            raise serializers.ValidationError(
+                {"unit_cost": ["Only a purchase records a unit cost."]}
+            )
         return attrs
 
     def validate_reason(self, value: str) -> str:

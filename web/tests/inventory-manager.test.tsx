@@ -109,6 +109,7 @@ describe("inventory", () => {
         id: "33333333-3333-4333-8333-333333333333",
         product_id: PRODUCT_ID,
         quantity: "1.250",
+        quantity_on_hand: "9.250",
         movement_type: "PURCHASE",
         unit_cost_snapshot: "0.40",
         reason: "Delivery",
@@ -141,6 +142,7 @@ describe("inventory", () => {
         id: "33333333-3333-4333-8333-333333333333",
         product_id: PRODUCT_ID,
         quantity: "-1.000",
+        quantity_on_hand: "7.000",
         movement_type: "DAMAGE",
         unit_cost_snapshot: "0.40",
         reason: "Broken bottle",
@@ -195,6 +197,7 @@ describe("inventory", () => {
         id: "33333333-3333-4333-8333-333333333333",
         product_id: PRODUCT_ID,
         quantity: "2.000",
+        quantity_on_hand: "2.000",
         movement_type: "OPENING",
         unit_cost_snapshot: "0.40",
         reason: "First count",
@@ -337,7 +340,9 @@ describe("inventory", () => {
       meta: { has_more: false, next_after: null },
     });
     render(<InventoryManager canAdjust canManage defaultDate="2026-10-18" />);
-    fireEvent.click(await screen.findByRole("tab", { name: "Stock movements" }));
+    fireEvent.click(
+      await screen.findByRole("tab", { name: "Stock movements" }),
+    );
     await waitFor(() => {
       expect(listStockMovements).toHaveBeenCalledWith(
         expect.objectContaining({ limit: "25" }),
@@ -409,7 +414,9 @@ describe("inventory", () => {
       meta: { has_more: false, next_after: null },
     });
     render(<InventoryManager canAdjust canManage defaultDate="2026-10-18" />);
-    fireEvent.click(await screen.findByRole("tab", { name: "Stock movements" }));
+    fireEvent.click(
+      await screen.findByRole("tab", { name: "Stock movements" }),
+    );
     const table = await screen.findByRole("table", { name: "Stock movements" });
     expect(
       within(table).getByRole("columnheader", { name: "On hand" }),
@@ -453,9 +460,12 @@ describe("inventory", () => {
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
       target: { value: "Towel" },
     });
-    fireEvent.change(within(dialog).getByRole("combobox", { name: "Category" }), {
-      target: { value: CATEGORY_ID },
-    });
+    fireEvent.change(
+      within(dialog).getByRole("combobox", { name: "Category" }),
+      {
+        target: { value: CATEGORY_ID },
+      },
+    );
     fireEvent.change(
       within(dialog).getByRole("textbox", { name: "Sale price" }),
       { target: { value: "2.50" } },
@@ -482,7 +492,9 @@ describe("inventory", () => {
     expect(
       within(detail).queryByText("Default unit cost"),
     ).not.toBeInTheDocument();
-    fireEvent.click(within(detail).getByRole("button", { name: "Edit product" }));
+    fireEvent.click(
+      within(detail).getByRole("button", { name: "Edit product" }),
+    );
     const editor = screen.getByRole("dialog", { name: "Edit product" });
     expect(
       within(editor).queryByRole("textbox", { name: "Default unit cost" }),

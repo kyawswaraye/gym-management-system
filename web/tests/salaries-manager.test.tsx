@@ -172,9 +172,7 @@ describe("salaries", () => {
       name: "Amount (THB)",
     });
     fireEvent.change(amounts[0]!, { target: { value: "120.5" } });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Save staff lines" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Save staff lines" }));
     await waitFor(() => {
       expect(replaceSalaryLines).toHaveBeenCalledWith(PERIOD_ID, {
         lines: [

@@ -229,17 +229,15 @@ function ProductFields({
           required
         />
       </Field>
-      {product ? null : (
-        <Field error={fields.current_unit_cost} label="Current unit cost">
-          <TextInput
-            defaultValue=""
-            inputMode="decimal"
-            name="current_unit_cost"
-            placeholder="0.00"
-            required
-          />
-        </Field>
-      )}
+      <Field error={fields.current_unit_cost} label="Current unit cost">
+        <TextInput
+          defaultValue={product?.current_unit_cost ?? ""}
+          inputMode="decimal"
+          name="current_unit_cost"
+          placeholder="0.00"
+          required
+        />
+      </Field>
       <Field error={fields.low_stock_threshold} label="Low-stock threshold">
         <TextInput
           decimalPlaces={3}
@@ -397,11 +395,11 @@ export function InventoryManager({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const sale = money(form, "sale_price");
-    const current = editing ? null : money(form, "current_unit_cost");
+    const current = money(form, "current_unit_cost");
     const threshold = canonicalQuantity(text(form, "low_stock_threshold"), {
       allowZero: true,
     });
-    if (!sale || !threshold || (!editing && !current)) {
+    if (!sale || !current || !threshold) {
       setFields({ sale_price: MONEY_ERROR });
       setFormError(MONEY_ERROR);
       return;
@@ -409,27 +407,24 @@ export function InventoryManager({
     const barcode = text(form, "barcode");
     clearFeedback();
     setPending(true);
+    const shared = {
+      name: text(form, "name"),
+      category_id: text(form, "category_id"),
+      unit: text(form, "unit").toUpperCase(),
+      sale_price: sale,
+      current_unit_cost: current,
+      default_unit_cost: current,
+      low_stock_threshold: threshold,
+    };
     const save =
       editing && product
         ? updateProduct(product.id, {
-            name: text(form, "name"),
-            category_id: text(form, "category_id"),
-            unit: text(form, "unit").toUpperCase(),
-            sale_price: sale,
-            current_unit_cost: current,
-            default_unit_cost: current,
-            low_stock_threshold: threshold,
+            ...shared,
             is_active: form.get("is_active") === "on",
             barcode: barcode || null,
           })
         : createProduct({
-            name: text(form, "name"),
-            category_id: text(form, "category_id"),
-            unit: text(form, "unit").toUpperCase(),
-            sale_price: sale,
-            current_unit_cost: current,
-            default_unit_cost: current,
-            low_stock_threshold: threshold,
+            ...shared,
             is_active: true,
             ...(barcode ? { barcode } : {}),
           });
@@ -1274,7 +1269,9 @@ export function InventoryManager({
                             movement_type: movement as MovementType,
                             business_date: text(form, "business_date"),
                             reason: text(form, "reason"),
-                            ...(purchaseCost ? { unit_cost: purchaseCost } : {}),
+                            ...(purchaseCost
+                              ? { unit_cost: purchaseCost }
+                              : {}),
                           };
                           clearFeedback();
                           setPending(true);
