@@ -1163,10 +1163,15 @@ def test_new_owner_invitation_onboards_and_replay_does_not_resend(
     assert len(mail.outbox) == 1
     message = mail.outbox[0]
     assert message.to == [owner_email]
-    assert message.body.startswith(
-        f"You were invited as an Owner of {code} Gym. Accept the invitation: "
-        "https://owners.example.test/accept-owner-invitation?token="
-    )
+    assert "You were invited to join" in message.body
+    assert f"{code} Gym" in message.body
+    assert "as an Owner" in message.body
+    assert "https://owners.example.test/accept-owner-invitation?token=" in message.body
+    assert message.alternatives
+    html_body, html_subtype = message.alternatives[0]
+    assert html_subtype == "text/html"
+    assert "Accept invitation" in html_body
+    assert f"{code} Gym" in html_body
     plaintext = invitation_token(message.body)
     gym = Gym.objects.get(code=code)
     invitation = StaffInvitation.objects.get(gym=gym)

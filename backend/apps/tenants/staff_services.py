@@ -27,6 +27,7 @@ from apps.audit.services import write_tenant_audit
 from apps.common.api.exceptions import AuthenticationFailed
 from apps.common.codes import resolve_code
 from apps.common.db.tenant_context import set_gym_context
+from apps.common.mail.invitations import render_invitation_email
 from apps.tenants.delegation import (
     RoleGrant,
     UnavailableRoleError,
@@ -313,14 +314,19 @@ def invite_staff(
     acceptance_url = (
         f"{settings.APP_PUBLIC_URL.rstrip('/')}/accept-staff-invitation?token={plaintext}"
     )
+    invitation_mail = render_invitation_email(
+        gym_name=gym.name,
+        acceptance_url=acceptance_url,
+        role="staff",
+        ttl_hours=max(1, settings.INVITATION_TTL_SECONDS // 3600),
+    )
     send_mail(
-        subject=f"Staff invitation for {gym.name}",
-        message=(
-            f"You were invited to join {gym.name} as staff. Accept the invitation: {acceptance_url}"
-        ),
+        subject=invitation_mail.subject,
+        message=invitation_mail.text,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email],
         fail_silently=False,
+        html_message=invitation_mail.html,
     )
     role_id_list = [role.id for role in roles]
     write_tenant_audit(

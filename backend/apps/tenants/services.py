@@ -24,6 +24,7 @@ from apps.audit.services import redact_audit_values, write_platform_audit, write
 from apps.common.api.exceptions import AuthenticationFailed
 from apps.common.codes import GYM_CODE, resolve_code
 from apps.common.db.tenant_context import set_gym_context
+from apps.common.mail.invitations import render_invitation_email
 from apps.tenants.exceptions import (
     IdempotencyKeyReused,
     InvalidGymTransition,
@@ -197,14 +198,19 @@ def _send_owner_acceptance_email(*, gym_name: str, recipient: str, plaintext_tok
     acceptance_url = (
         f"{settings.APP_PUBLIC_URL.rstrip('/')}/accept-owner-invitation?token={plaintext_token}"
     )
+    invitation_mail = render_invitation_email(
+        gym_name=gym_name,
+        acceptance_url=acceptance_url,
+        role="owner",
+        ttl_hours=max(1, settings.INVITATION_TTL_SECONDS // 3600),
+    )
     send_mail(
-        subject=f"Owner invitation for {gym_name}",
-        message=(
-            f"You were invited as an Owner of {gym_name}. Accept the invitation: {acceptance_url}"
-        ),
+        subject=invitation_mail.subject,
+        message=invitation_mail.text,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[recipient],
         fail_silently=False,
+        html_message=invitation_mail.html,
     )
 
 
