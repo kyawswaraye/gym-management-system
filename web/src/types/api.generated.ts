@@ -7832,6 +7832,8 @@ export interface components {
       /** Format: date */
       business_date: string;
       reason: string;
+      /** Format: decimal */
+      unit_cost?: string;
     };
     StockAdjustment: {
       movement: components["schemas"]["StockMovement"];
