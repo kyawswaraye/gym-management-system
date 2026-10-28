@@ -963,7 +963,7 @@ test("owner runs the member lifecycle, front-desk check-in, and rotating QR", as
       .getByLabel("Search members", { exact: true })
       .fill(UPDATED_FIRST);
     await expect(
-      archivedSearch.getByText("No matching members.", { exact: true }),
+      archivedSearch.getByText("No active members match.", { exact: true }),
     ).toBeVisible();
     await expect(
       archivedSearch.getByRole("list", { name: "Matching members" }),
