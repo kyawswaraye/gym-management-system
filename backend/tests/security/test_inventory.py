@@ -745,7 +745,7 @@ def test_lists_are_cursor_bound_and_do_not_scan_per_product() -> None:
 
 @override_settings(**jwt_settings())
 def test_product_list_search_matches_name_sku_barcode_and_category() -> None:
-    api, _gym, _owner, headers = _gym("INVSRCH")
+    api, _tenant, _owner, headers = _gym("INVSRCH")
     drinks = _post_category(api, headers, _category_body("DRINKS", "Cold Drinks"))
     snacks = _post_category(api, headers, _category_body("SNACKS", "Gym Snacks"))
     assert drinks.status_code == 201, drinks.content

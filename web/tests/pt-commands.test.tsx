@@ -1486,9 +1486,12 @@ describe("phase 5 command coverage", () => {
       await screen.findByRole("button", { name: "Book a class" }),
     );
     const bookDialog = screen.getByRole("dialog", { name: "Book a class" });
-    fireEvent.change(within(bookDialog).getByLabelText("Search active members"), {
-      target: { value: "Grace" },
-    });
+    fireEvent.change(
+      within(bookDialog).getByLabelText("Search active members"),
+      {
+        target: { value: "Grace" },
+      },
+    );
     fireEvent.click(
       await within(bookDialog).findByRole("button", {
         name: "Grace Hopper (M-1)",

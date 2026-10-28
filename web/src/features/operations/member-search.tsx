@@ -3,10 +3,7 @@ import { useTx } from "@/i18n/use-tx";
 
 import { useEffect, useRef, useState, type Ref } from "react";
 
-import {
-  OperationError,
-  listMembers,
-} from "@/features/operations/client";
+import { OperationError, listMembers } from "@/features/operations/client";
 import { Field } from "@/features/finance/ui";
 import type { Member } from "@/types/api";
 
@@ -98,9 +95,7 @@ export function MemberSearch({
           if (version !== searchVersion.current) return;
           setResults([]);
           setHasMore(false);
-          setError(
-            searchErrorMessage(caught, tx("Unable to search members.")),
-          );
+          setError(searchErrorMessage(caught, tx("Unable to search members.")));
         } finally {
           if (version === searchVersion.current) setPending(false);
         }

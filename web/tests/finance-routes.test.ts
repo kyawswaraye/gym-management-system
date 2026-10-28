@@ -69,7 +69,11 @@ describe("finance route allowlist", () => {
       ),
     ).toBe(true);
     expect(
-      allowsFinanceRoute("/api/v1/products/", `?search=${"x".repeat(101)}`, "GET"),
+      allowsFinanceRoute(
+        "/api/v1/products/",
+        `?search=${"x".repeat(101)}`,
+        "GET",
+      ),
     ).toBe(false);
   });
 });

@@ -398,9 +398,9 @@ export function RetailSalesManager({
   const [applied, setApplied] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [sale, setSale] = useState<RetailSale | null>(null);
-  const [productsById, setProductsById] = useState<ReadonlyMap<string, Product>>(
-    () => new Map(),
-  );
+  const [productsById, setProductsById] = useState<
+    ReadonlyMap<string, Product>
+  >(() => new Map());
   const [lines, setLines] = useState<LineDraft[]>([blankLine()]);
   const [memberId, setMemberId] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);

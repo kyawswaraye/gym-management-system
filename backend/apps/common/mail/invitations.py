@@ -110,6 +110,33 @@ def _html(
         f"You have been invited to join <strong style=\"color:{_BRAND_TEAL_DARK};\">{gym}</strong> "
         f"as {escape(role_phrase, quote=True)}."
     )
+    body_font = (
+        "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+    )
+    card_style = (
+        f"max-width:520px;background:{_WHITE};border:1px solid {_BRAND_BORDER};"
+        f"border-radius:16px;overflow:hidden;"
+    )
+    brand_mark = (
+        "margin:0;font-size:13px;letter-spacing:0.08em;"
+        "text-transform:uppercase;color:#d1f0dc;"
+    )
+    title_style = (
+        f"margin:8px 0 0;font-size:24px;line-height:1.25;"
+        f"font-weight:700;color:{_WHITE};"
+    )
+    button_link = (
+        f"display:inline-block;padding:14px 28px;font-size:16px;"
+        f"font-weight:600;color:{_WHITE};text-decoration:none;"
+    )
+    expiry = (
+        f"This link expires in {hours} hours and can be used once. "
+        "If you were not expecting this invitation, you can ignore this email."
+    )
+    footer_cell = (
+        f"padding:18px 32px;border-top:1px solid {_BRAND_BORDER};"
+        f"background:{_BRAND_SURFACE};"
+    )
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -117,15 +144,17 @@ def _html(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{escape(f"Invitation to {gym_name}", quote=True)}</title>
 </head>
-<body style="margin:0;padding:0;background:{_BRAND_SURFACE};color:{_TEXT};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:{_BRAND_SURFACE};padding:32px 16px;">
+<body style="margin:0;padding:0;background:{_BRAND_SURFACE};color:{_TEXT};font-family:{body_font};">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"
+  style="background:{_BRAND_SURFACE};padding:32px 16px;">
   <tr>
     <td align="center">
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background:{_WHITE};border:1px solid {_BRAND_BORDER};border-radius:16px;overflow:hidden;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
+        style="{card_style}">
         <tr>
           <td style="background:{_BRAND_TEAL};padding:28px 32px;">
-            <p style="margin:0;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#d1f0dc;">{product}</p>
-            <h1 style="margin:8px 0 0;font-size:24px;line-height:1.25;font-weight:700;color:{_WHITE};">You're invited</h1>
+            <p style="{brand_mark}">{product}</p>
+            <h1 style="{title_style}">You're invited</h1>
           </td>
         </tr>
         <tr>
@@ -134,10 +163,11 @@ def _html(
             <p style="margin:0 0 28px;font-size:15px;line-height:1.55;color:{_MUTED};">
               Accept below to set up your account and start working with the gym team.
             </p>
-            <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px;">
+            <table role="presentation" cellspacing="0" cellpadding="0"
+              style="margin:0 auto 28px;">
               <tr>
                 <td style="border-radius:10px;background:{_BRAND_TEAL};">
-                  <a href="{url}" style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:600;color:{_WHITE};text-decoration:none;">
+                  <a href="{url}" style="{button_link}">
                     Accept invitation
                   </a>
                 </td>
@@ -150,12 +180,12 @@ def _html(
               <a href="{url}" style="color:{_BRAND_TEAL};text-decoration:underline;">{url}</a>
             </p>
             <p style="margin:0;font-size:13px;line-height:1.5;color:{_MUTED};">
-              This link expires in {hours} hours and can be used once. If you were not expecting this invitation, you can ignore this email.
+              {expiry}
             </p>
           </td>
         </tr>
         <tr>
-          <td style="padding:18px 32px;border-top:1px solid {_BRAND_BORDER};background:{_BRAND_SURFACE};">
+          <td style="{footer_cell}">
             <p style="margin:0;font-size:12px;line-height:1.5;color:{_MUTED};">
               Sent by {product} · Staff workspace for {gym}
             </p>

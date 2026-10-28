@@ -11,10 +11,7 @@ import {
   listCheckIns,
   listMemberCheckIns,
 } from "@/features/operations/client";
-import {
-  MemberSearch,
-  memberLabel,
-} from "@/features/operations/member-search";
+import { MemberSearch, memberLabel } from "@/features/operations/member-search";
 import { TrainerScan } from "@/features/operations/trainer-scan";
 import { formatInstant, zonedLocalToIso } from "@/lib/date";
 import type { CheckInRecord, Member } from "@/types/api";
