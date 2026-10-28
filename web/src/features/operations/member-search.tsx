@@ -58,20 +58,19 @@ export function MemberSearch({
 
   const trimmed = search.trim();
   const panelOpen = trimmed.length > 0;
+  const panelResults = panelOpen ? results : [];
+  const panelHasMore = panelOpen ? hasMore : false;
+  const panelError = panelOpen ? error : "";
+  const panelPending = panelOpen ? pending : false;
 
   useEffect(() => {
-    if (!trimmed) {
-      setResults([]);
-      setHasMore(false);
-      setError("");
-      setPending(false);
-      return;
-    }
+    if (!trimmed) return undefined;
 
     const version = ++searchVersion.current;
-    setPending(true);
-    setError("");
     const timer = window.setTimeout(() => {
+      if (version !== searchVersion.current) return;
+      setPending(true);
+      setError("");
       void (async () => {
         try {
           const page = await listMembers({
@@ -106,7 +105,7 @@ export function MemberSearch({
       window.clearTimeout(timer);
       searchVersion.current += 1;
     };
-  }, [activeOnly, search, trimmed, tx]);
+  }, [activeOnly, trimmed, tx]);
 
   useEffect(() => {
     if (!panelOpen) return undefined;
@@ -139,6 +138,20 @@ export function MemberSearch({
     };
   }, [panelOpen]);
 
+  function updateSearch(value: string) {
+    setSearch(value);
+    if (!value.trim()) {
+      setResults([]);
+      setHasMore(false);
+      setError("");
+      setPending(false);
+      searchVersion.current += 1;
+      return;
+    }
+    setPending(true);
+    setError("");
+  }
+
   function choose(member: Member) {
     onSelect(member);
     setSearch("");
@@ -159,7 +172,7 @@ export function MemberSearch({
             disabled={disabled}
             maxLength={100}
             name="member_search"
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => updateSearch(event.target.value)}
             placeholder={tx("Name, number, phone, or email")}
             ref={inputRef}
             value={search}
@@ -167,22 +180,22 @@ export function MemberSearch({
         </Field>
         {panelOpen ? (
           <div className="absolute top-full right-0 left-0 z-30 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-            {pending ? (
+            {panelPending ? (
               <p className="px-3 py-2 text-sm text-slate-500" role="status">
                 {tx("Searching members.")}
               </p>
             ) : null}
-            {!pending && error ? (
+            {!panelPending && panelError ? (
               <p className="error px-3 py-2" role="alert">
-                {tx(error)}
+                {tx(panelError)}
               </p>
             ) : null}
-            {!pending && results.length > 0 ? (
+            {!panelPending && panelResults.length > 0 ? (
               <ul
                 aria-label={tx("Matching members")}
                 className="grid max-h-40 gap-0.5 overflow-y-auto overscroll-contain p-1"
               >
-                {results.map((member) => (
+                {panelResults.map((member) => (
                   <li key={member.id}>
                     <button
                       aria-pressed={selected?.id === member.id}
@@ -197,7 +210,7 @@ export function MemberSearch({
                 ))}
               </ul>
             ) : null}
-            {!pending && hasMore ? (
+            {!panelPending && panelHasMore ? (
               <p className="border-t border-slate-100 px-3 py-2 text-xs text-slate-500">
                 {tx("Showing the first matches. Type more to narrow the list.")}
               </p>

@@ -29,7 +29,7 @@ def test_staff_invitation_email_is_branded_and_keeps_plain_text_token() -> None:
 
 def test_owner_invitation_email_escapes_html_and_header_injection() -> None:
     mail = render_invitation_email(
-        gym_name='East <script>alert(1)</script>\r\nBcc: evil@example.test Gym',
+        gym_name="East <script>alert(1)</script>\r\nBcc: evil@example.test Gym",
         acceptance_url="https://app.example.test/accept-owner-invitation?token=safe-token",
         role="owner",
         ttl_hours=24,

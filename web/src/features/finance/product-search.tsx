@@ -48,26 +48,28 @@ export function ProductSearch({
   const searchVersion = useRef(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const onSelectRef = useRef(onSelect);
-  onSelectRef.current = onSelect;
   const excludeKey = excludeIds.join("\0");
 
   const trimmed = search.trim();
   const panelOpen = trimmed.length > 0;
+  const panelResults = panelOpen ? results : [];
+  const panelHasMore = panelOpen ? hasMore : false;
+  const panelError = panelOpen ? error : "";
+  const panelPending = panelOpen ? pending : false;
 
   useEffect(() => {
-    if (!trimmed) {
-      setResults([]);
-      setHasMore(false);
-      setError("");
-      setPending(false);
-      return;
-    }
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
+
+  useEffect(() => {
+    if (!trimmed) return undefined;
 
     const version = ++searchVersion.current;
     const excluded = new Set(excludeKey ? excludeKey.split("\0") : []);
-    setPending(true);
-    setError("");
     const timer = window.setTimeout(() => {
+      if (version !== searchVersion.current) return;
+      setPending(true);
+      setError("");
       void (async () => {
         try {
           const page = await listProducts({
@@ -148,6 +150,20 @@ export function ProductSearch({
     };
   }, [panelOpen]);
 
+  function updateSearch(value: string) {
+    setSearch(value);
+    if (!value.trim()) {
+      setResults([]);
+      setHasMore(false);
+      setError("");
+      setPending(false);
+      searchVersion.current += 1;
+      return;
+    }
+    setPending(true);
+    setError("");
+  }
+
   function choose(product: Product) {
     onSelect(product);
     setSearch("");
@@ -168,29 +184,29 @@ export function ProductSearch({
             disabled={disabled}
             maxLength={100}
             name="product_search"
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => updateSearch(event.target.value)}
             placeholder={tx("Name, SKU, barcode, or category")}
             value={search}
           />
         </Field>
         {panelOpen ? (
           <div className="absolute top-full right-0 left-0 z-30 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-            {pending ? (
+            {panelPending ? (
               <p className="px-3 py-2 text-sm text-slate-500" role="status">
                 {tx("Searching products.")}
               </p>
             ) : null}
-            {!pending && error ? (
+            {!panelPending && panelError ? (
               <p className="error px-3 py-2" role="alert">
-                {tx(error)}
+                {tx(panelError)}
               </p>
             ) : null}
-            {!pending && results.length > 0 ? (
+            {!panelPending && panelResults.length > 0 ? (
               <ul
                 aria-label={tx("Matching products")}
                 className="grid max-h-40 gap-0.5 overflow-y-auto overscroll-contain p-1"
               >
-                {results.map((product) => (
+                {panelResults.map((product) => (
                   <li key={product.id}>
                     <button
                       aria-pressed={selected?.id === product.id}
@@ -208,7 +224,7 @@ export function ProductSearch({
                 ))}
               </ul>
             ) : null}
-            {!pending && hasMore ? (
+            {!panelPending && panelHasMore ? (
               <p className="border-t border-slate-100 px-3 py-2 text-xs text-slate-500">
                 {tx("Showing the first matches. Type more to narrow the list.")}
               </p>

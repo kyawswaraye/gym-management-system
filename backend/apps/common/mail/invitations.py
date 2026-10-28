@@ -107,24 +107,18 @@ def _html(
     product = escape(_PRODUCT_NAME, quote=True)
     role_phrase = "Owner" if role == "owner" else "staff member"
     intro = (
-        f"You have been invited to join <strong style=\"color:{_BRAND_TEAL_DARK};\">{gym}</strong> "
+        f'You have been invited to join <strong style="color:{_BRAND_TEAL_DARK};">{gym}</strong> '
         f"as {escape(role_phrase, quote=True)}."
     )
-    body_font = (
-        "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
-    )
+    body_font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
     card_style = (
         f"max-width:520px;background:{_WHITE};border:1px solid {_BRAND_BORDER};"
         f"border-radius:16px;overflow:hidden;"
     )
     brand_mark = (
-        "margin:0;font-size:13px;letter-spacing:0.08em;"
-        "text-transform:uppercase;color:#d1f0dc;"
+        "margin:0;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#d1f0dc;"
     )
-    title_style = (
-        f"margin:8px 0 0;font-size:24px;line-height:1.25;"
-        f"font-weight:700;color:{_WHITE};"
-    )
+    title_style = f"margin:8px 0 0;font-size:24px;line-height:1.25;font-weight:700;color:{_WHITE};"
     button_link = (
         f"display:inline-block;padding:14px 28px;font-size:16px;"
         f"font-weight:600;color:{_WHITE};text-decoration:none;"
@@ -134,8 +128,7 @@ def _html(
         "If you were not expecting this invitation, you can ignore this email."
     )
     footer_cell = (
-        f"padding:18px 32px;border-top:1px solid {_BRAND_BORDER};"
-        f"background:{_BRAND_SURFACE};"
+        f"padding:18px 32px;border-top:1px solid {_BRAND_BORDER};background:{_BRAND_SURFACE};"
     )
     return f"""<!DOCTYPE html>
 <html lang="en">
