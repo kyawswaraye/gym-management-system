@@ -1046,18 +1046,23 @@ async function recordPayout(page: Page, amount: string): Promise<void> {
 
 async function showOccurrencesFrom(page: Page, from: string): Promise<void> {
   await page.getByRole("tab", { name: "This week", exact: true }).click();
-  await page.getByLabel("From", { exact: true }).fill(from);
-  const pending = page.waitForResponse(
-    (response) =>
-      response.request().method() === "GET" &&
-      /\/class-occurrences\/?/.test(new URL(response.url()).pathname) &&
-      new URL(response.url()).searchParams.get("date_from") === from,
-    { timeout: 30_000 },
-  );
-  await page
-    .getByRole("button", { name: "Show occurrences", exact: true })
-    .click();
-  expect((await pending).ok()).toBeTruthy();
+  const rangeForm = page.locator("form").filter({
+    has: page.getByRole("button", { name: "Show occurrences", exact: true }),
+  });
+  await rangeForm.getByLabel("From", { exact: true }).fill(from);
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.ok() &&
+        response.request().method() === "GET" &&
+        /\/class-occurrences\/?/.test(new URL(response.url()).pathname) &&
+        new URL(response.url()).searchParams.get("date_from") === from,
+      { timeout: 30_000 },
+    ),
+    rangeForm
+      .getByRole("button", { name: "Show occurrences", exact: true })
+      .click(),
+  ]);
 }
 
 async function createSchedule(
