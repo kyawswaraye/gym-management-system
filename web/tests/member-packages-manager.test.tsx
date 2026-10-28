@@ -150,7 +150,7 @@ describe("member package catalog", () => {
     const catalog = await screen.findByRole("region", {
       name: "Granted packages",
     });
-    const grants = within(catalog).getAllByRole("listitem");
+    const grants = await within(catalog).findAllByRole("listitem");
     expect(grants).toHaveLength(2);
 
     expect(compact(grants[0]?.textContent ?? "")).toContain("PT10");
