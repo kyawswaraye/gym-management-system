@@ -700,9 +700,9 @@ function finishedClasses(now: {
 } {
   const lateStart = minutesOf(lateClass(now).start);
   const end = lateStart - 2;
-  // Need ~24 minutes before the in-progress late class. Near Yangon
-  // midnight that window does not exist on the same local day.
-  if (end >= 22) {
+  // Same-day packing needs ~54 minutes before late so pastPt (30m) and
+  // two finished classes fit without overlapping the member's late booking.
+  if (end >= 54) {
     return {
       date: now.date,
       attend: { start: fromMinutes(end - 22), end: fromMinutes(end - 12) },
@@ -721,17 +721,26 @@ function pastPt(now: { date: string; hours: number; minutes: number }): {
   start: string;
   end: string;
 } {
-  // Keep PT on the gym-local today so it stays inside same-day trainer
-  // assignments created earlier in this serial suite.
-  const total = now.hours * 60 + now.minutes;
-  if (total >= 32) {
+  const finished = finishedClasses(now);
+  if (finished.date === now.date) {
+    const attendStart = minutesOf(finished.attend.start);
     return {
       date: now.date,
-      start: fromMinutes(total - 32),
-      end: fromMinutes(total - 2),
+      start: fromMinutes(attendStart - 32),
+      end: fromMinutes(attendStart - 2),
     };
   }
-  return { date: now.date, start: "00:00", end: "00:01" };
+  // Finished classes moved to yesterday. Keep a tiny same-day PT that ends
+  // before the in-progress late class so member bookings do not collide.
+  const lateStart = minutesOf(lateClass(now).start);
+  if (lateStart >= 3) {
+    return { date: now.date, start: "00:00", end: "00:01" };
+  }
+  return {
+    date: addDays(now.date, -1),
+    start: "19:00",
+    end: "19:30",
+  };
 }
 
 function lateClass(now: { date: string; hours: number; minutes: number }): {
@@ -915,6 +924,10 @@ async function assign(
   await expect(form).toBeVisible();
   await selectByText(combo(form, "Trainer"), trainer);
   await pickMember(form, query, member);
+  // Cover yesterday so near-midnight past PT / finished class helpers stay valid.
+  await form
+    .getByLabel("Effective from", { exact: true })
+    .fill(addDays(gymWall().date, -1));
   await runCommand(page, /\/trainer-assignments\/?$/, () =>
     form.getByRole("button", { name: "Save assignment", exact: true }).click(),
   );
