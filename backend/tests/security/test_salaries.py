@@ -25,6 +25,8 @@ from apps.tenants.models import (
     Gym,
     GymFeatureEntitlement,
     GymMembership,
+    GymMembershipRole,
+    Role,
     StaffProfile,
 )
 from tests.security.test_tenant_gym_settings import (
@@ -204,6 +206,16 @@ def test_approval_posts_one_salary_expense_and_cash_movement_per_cash_line() -> 
     assert {line["amount"] for line in lines} == {"160000.00", "80000.00"}
     payee = lines[0]["staff"]
     assert set(payee) == {"id", "staff_code", "display_name"}
+    detail = api.get(f"/api/v1/salary-periods/{period_id}/", **reception_headers)
+    assert detail.status_code == 200, detail.content
+    assert {line["amount"] for line in detail.json()["data"]["lines"]} == {
+        "160000.00",
+        "80000.00",
+    }
+    listed = api.get("/api/v1/salary-periods/", **reception_headers)
+    assert listed.status_code == 200, listed.content
+    listed_row = next(row for row in listed.json()["data"] if row["id"] == period_id)
+    assert len(listed_row["lines"]) == 2
     cash_line = next(line for line in lines if line["payment_method"] == "CASH")
     denied = api.post(
         f"/api/v1/salary-periods/{period_id}/approve/",
@@ -470,8 +482,10 @@ def test_reception_scope_mappings_and_cross_gym_relationships() -> None:
 def test_self_approval_mass_assignment_idempotency_and_concurrency() -> None:
     api, gym, _owner, owner_headers = _gym("SALRULE")
     manager = add_staff(gym, email="salrule-manager@example.test", role_key="MANAGER")
+    receptionist = add_staff(gym, email="salrule-reception@example.test", role_key="RECEPTIONIST")
     trainer = add_staff(gym, email="salrule-trainer@example.test", role_key="TRAINER")
     manager_headers = auth_headers(staff_token(manager))
+    reception_headers = auth_headers(staff_token(receptionist))
     coach = _profile(gym, trainer, "COACH", "Coach")
     mass = api.post(
         "/api/v1/salary-periods/",
@@ -492,31 +506,92 @@ def test_self_approval_mass_assignment_idempotency_and_concurrency() -> None:
         HTTP_IDEMPOTENCY_KEY=f"sal-self-sub-{uuid4().hex}",
         **owner_headers,
     )
-    self_approved = api.post(
-        f"/api/v1/salary-periods/{period_id}/approve/",
-        {},
-        format="json",
-        HTTP_IDEMPOTENCY_KEY=f"sal-self-ap-{uuid4().hex}",
-        **owner_headers,
-    )
-    assert self_approved.status_code == 403
-    posted = api.post(
+    owner_self = api.post(
         f"/api/v1/salary-periods/{period_id}/approve/",
         {},
         format="json",
         HTTP_IDEMPOTENCY_KEY="salary-hash-mismatch-01",
-        **manager_headers,
+        **owner_headers,
     )
-    assert posted.status_code == 200, posted.content
+    assert owner_self.status_code == 200, owner_self.content
     mismatch = api.post(
         f"/api/v1/salary-periods/{period_id}/approve/",
         {"cash_sessions": [{"line_id": line_id, "cash_session_id": str(uuid4())}]},
         format="json",
         HTTP_IDEMPOTENCY_KEY="salary-hash-mismatch-01",
-        **manager_headers,
+        **owner_headers,
     )
     assert mismatch.status_code == 409
     assert mismatch.json()["error"]["code"] == "IDEMPOTENCY_KEY_REUSED"
+
+    manager_own = _create(api, manager_headers, gym)
+    manager_own_id = manager_own.json()["data"]["id"]
+    _put_lines(
+        api, manager_headers, manager_own_id, [_line(coach, gym, "BANK_TRANSFER", "45.00")]
+    )
+    api.post(
+        f"/api/v1/salary-periods/{manager_own_id}/submit/",
+        {},
+        format="json",
+        HTTP_IDEMPOTENCY_KEY=f"sal-mgr-self-sub-{uuid4().hex}",
+        **manager_headers,
+    )
+    manager_self = api.post(
+        f"/api/v1/salary-periods/{manager_own_id}/approve/",
+        {},
+        format="json",
+        HTTP_IDEMPOTENCY_KEY=f"sal-mgr-self-ap-{uuid4().hex}",
+        **manager_headers,
+    )
+    assert manager_self.status_code == 403
+    assert (
+        api.post(
+            f"/api/v1/salary-periods/{manager_own_id}/approve/",
+            {},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=f"sal-mgr-owner-ap-{uuid4().hex}",
+            **owner_headers,
+        ).status_code
+        == 200
+    )
+
+    desk = add_staff(gym, email="salrule-desk@example.test", role_key="MANAGER")
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        GymMembershipRole.objects.create(
+            gym=gym,
+            gym_membership=desk,
+            role=Role.objects.get(gym=gym, key="RECEPTIONIST"),
+        )
+    desk_headers = auth_headers(staff_token(desk))
+    desk_own = _create(api, desk_headers, gym)
+    desk_own_id = desk_own.json()["data"]["id"]
+    _put_lines(api, desk_headers, desk_own_id, [_line(coach, gym, "BANK_TRANSFER", "55.00")])
+    api.post(
+        f"/api/v1/salary-periods/{desk_own_id}/submit/",
+        {},
+        format="json",
+        HTTP_IDEMPOTENCY_KEY=f"sal-desk-self-sub-{uuid4().hex}",
+        **desk_headers,
+    )
+    desk_self = api.post(
+        f"/api/v1/salary-periods/{desk_own_id}/approve/",
+        {},
+        format="json",
+        HTTP_IDEMPOTENCY_KEY=f"sal-desk-self-ap-{uuid4().hex}",
+        **desk_headers,
+    )
+    assert desk_self.status_code == 200, desk_self.content
+
+    reception_denied = api.post(
+        f"/api/v1/salary-periods/{manager_own_id}/approve/",
+        {},
+        format="json",
+        HTTP_IDEMPOTENCY_KEY=f"sal-rec-deny-{uuid4().hex}",
+        **reception_headers,
+    )
+    assert reception_denied.status_code in {403, 404}
+
     second = _create(api, manager_headers, gym)
     second_id = second.json()["data"]["id"]
     _put_lines(api, manager_headers, second_id, [_line(coach, gym, "BANK_TRANSFER", "30.00")])

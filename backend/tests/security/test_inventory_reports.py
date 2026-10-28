@@ -169,15 +169,18 @@ def _adjust(
     movement_type: str,
     day: str,
 ) -> None:
+    body = {
+        "product_id": product_id,
+        "quantity": quantity,
+        "movement_type": movement_type,
+        "business_date": day,
+        "reason": movement_type,
+    }
+    if movement_type == "PURCHASE":
+        body["unit_cost"] = "4.00"
     response = api.post(
         "/api/v1/stock-movements/adjust/",
-        {
-            "product_id": product_id,
-            "quantity": quantity,
-            "movement_type": movement_type,
-            "business_date": day,
-            "reason": movement_type,
-        },
+        body,
         format="json",
         HTTP_IDEMPOTENCY_KEY=_key("adj"),
         **headers,

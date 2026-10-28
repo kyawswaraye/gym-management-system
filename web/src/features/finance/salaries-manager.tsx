@@ -152,7 +152,7 @@ function text(form: FormData, name: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function blankLine(): LineDraft {
+function blankLine(description = ""): LineDraft {
   return {
     key: crypto.randomUUID(),
     staffId: "",
@@ -160,8 +160,33 @@ function blankLine(): LineDraft {
     amount: "",
     method: "BANK_TRANSFER",
     reference: "",
-    description: "",
+    description,
   };
+}
+
+function periodLineNote(period: {
+  description: string;
+  period_start: string;
+  period_end: string;
+}): string {
+  const note = period.description.trim();
+  if (note) return note;
+  return `Salary ${period.period_start} – ${period.period_end}`;
+}
+
+function draftsFromPeriod(period: SalaryPeriod): LineDraft[] {
+  const fallback = periodLineNote(period);
+  const saved = period.lines ?? [];
+  if (saved.length === 0) return [blankLine(fallback)];
+  return saved.map((line) => ({
+    key: line.id,
+    staffId: line.staff_profile_id,
+    staffLabel: personLabel(line.staff),
+    amount: line.amount,
+    method: line.payment_method as PaymentMethod,
+    reference: line.external_reference ?? "",
+    description: (line.description ?? "").trim() || fallback,
+  }));
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -317,7 +342,9 @@ function StaffLineList({ lines }: { lines: StaffSalaryLine[] }) {
     return (
       <p className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 ring-1 ring-slate-200/80">
         {" "}
-        {tx("No staff lines on this period.")}{" "}
+        {tx(
+          "No staff lines saved yet. Edit staff lines, then press Save staff lines.",
+        )}{" "}
       </p>
     );
   }
@@ -390,7 +417,7 @@ function LineEditor({
         <p className="mt-1 text-xs leading-5 text-slate-500">
           {" "}
           {tx(
-            "Each person appears once. Saving replaces every line on this draft.",
+            "Each person appears once. Press Save staff lines to store them on this draft.",
           )}{" "}
         </p>
       </div>
@@ -488,6 +515,7 @@ function LineEditor({
                   onChange={(event) =>
                     onPatch(line.key, { reference: event.target.value })
                   }
+                  placeholder={tx("Optional bank slip number")}
                   value={line.reference}
                 />
               </Field>
@@ -497,6 +525,7 @@ function LineEditor({
                     onChange={(event) =>
                       onPatch(line.key, { description: event.target.value })
                     }
+                    placeholder={tx("October salary")}
                     value={line.description}
                   />
                 </Field>
@@ -522,7 +551,7 @@ function LineEditor({
           type="button"
         >
           {" "}
-          {tx("Replace staff lines")}{" "}
+          {tx("Save staff lines")}{" "}
         </button>
       </div>
     </div>
@@ -602,19 +631,7 @@ export function SalariesManager({
         .then((row) => {
           if (!active) return;
           setPeriod(row);
-          setLines(
-            row.lines.length
-              ? row.lines.map((line) => ({
-                  key: line.id,
-                  staffId: line.staff_profile_id,
-                  staffLabel: personLabel(line.staff),
-                  amount: line.amount,
-                  method: line.payment_method as PaymentMethod,
-                  reference: line.external_reference,
-                  description: line.description,
-                }))
-              : [blankLine()],
-          );
+          setLines(draftsFromPeriod(row));
         })
         .catch((caught: unknown) => {
           if (!active) return;
@@ -629,7 +646,7 @@ export function SalariesManager({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [selectedId, periods.rows, tx]);
+  }, [selectedId, tx]);
 
   const detailId = detail?.id ?? "";
   useEffect(() => {
@@ -656,11 +673,13 @@ export function SalariesManager({
   function selectPeriod(id: string) {
     setSelectedId(id);
     setAction(null);
+    setLinesOpen(false);
     clearFeedback();
   }
 
   function openAction(next: Exclude<SalaryAction, null>) {
     setAction(next);
+    setLinesOpen(false);
     clearFeedback();
     if (next === "void") setCorrectionDate(defaultDate);
   }
@@ -669,8 +688,21 @@ export function SalariesManager({
     setSelectedId("");
     setPeriod(null);
     setAction(null);
+    setLinesOpen(false);
     setLines([blankLine()]);
     clearFeedback();
+  }
+
+  function openLinesEditor() {
+    if (!detail) return;
+    setLines(draftsFromPeriod(detail));
+    clearFeedback();
+    setLinesOpen(true);
+  }
+
+  function applyPeriod(row: SalaryPeriod) {
+    setPeriod(row);
+    setLines(draftsFromPeriod(row));
   }
 
   function patchLine(key: string, patch: Partial<LineDraft>) {
@@ -706,6 +738,14 @@ export function SalariesManager({
       setErrorScope("lines");
       return null;
     }
+    if (!detail) {
+      setFields({});
+      setInvalidAmountKey("");
+      setFormError("The salary period could not be loaded.");
+      setErrorScope("lines");
+      return null;
+    }
+    const fallback = periodLineNote(detail);
     const payload: SalaryLineWriteRequest[] = [];
     for (const line of lines) {
       const amount = canonicalMoney(line.amount);
@@ -716,20 +756,16 @@ export function SalariesManager({
         setErrorScope("lines");
         return null;
       }
-      if (!line.description.trim()) {
-        setInvalidAmountKey("");
-        setFields({});
-        setFormError("Enter a description for each staff line.");
-        setErrorScope("lines");
-        return null;
-      }
+      const description = line.description.trim() || fallback;
       payload.push({
         staff_profile_id: line.staffId,
         amount,
         currency,
         payment_method: line.method,
-        description: line.description.trim(),
-        ...(line.reference ? { external_reference: line.reference } : {}),
+        description,
+        ...(line.reference.trim()
+          ? { external_reference: line.reference.trim() }
+          : {}),
       });
     }
     return payload;
@@ -744,6 +780,7 @@ export function SalariesManager({
   const actionError = errorScope === "action" ? formError : "";
   const detailError = errorScope === "detail" ? formError : "";
   const canEditDraft = detail?.status === "DRAFT" && canUpdate;
+  const hasSavedLines = Boolean(detail && detail.lines.length > 0);
   const canSubmitDraft = detail?.status === "DRAFT" && canSubmit;
   const canDecide = detail?.status === "PENDING_APPROVAL" && canApprove;
   const canCancelDraft = detail?.status === "DRAFT" && canUpdate;
@@ -1255,7 +1292,7 @@ export function SalariesManager({
                   {editingLines ? (
                     <button
                       className="button button-edit"
-                      onClick={() => setLinesOpen(true)}
+                      onClick={openLinesEditor}
                       type="button"
                     >
                       {" "}
@@ -1264,7 +1301,7 @@ export function SalariesManager({
                   ) : null}
                   {editingLines && linesOpen ? (
                     <DialogFrame
-                      description="Each person appears once. Saving replaces every line on this draft."
+                      description="Fill each line, then press Save staff lines. Closing without saving discards the form."
                       onClose={() => {
                         if (!pending) setLinesOpen(false);
                       }}
@@ -1279,7 +1316,10 @@ export function SalariesManager({
                         invalidAmountKey={invalidAmountKey}
                         lines={lines}
                         onAdd={() =>
-                          setLines((current) => [...current, blankLine()])
+                          setLines((current) => [
+                            ...current,
+                            blankLine(periodLineNote(detail)),
+                          ])
                         }
                         onPatch={patchLine}
                         onRemove={(key) =>
@@ -1292,10 +1332,25 @@ export function SalariesManager({
                           if (!payload || !detail) return;
                           clearFeedback();
                           setPending(true);
-                          void replaceSalaryLines(detail.id, { lines: payload })
-                            .then((updated) => {
-                              setPeriod(updated);
+                          const periodId = detail.id;
+                          void replaceSalaryLines(periodId, { lines: payload })
+                            .then(async (updated) => {
+                              if (!updated.lines.length) {
+                                throw new Error(
+                                  "The lines could not be replaced.",
+                                );
+                              }
+                              applyPeriod(updated);
+                              try {
+                                const fresh = await getSalaryPeriod(periodId);
+                                if (fresh.lines.length > 0) {
+                                  applyPeriod(fresh);
+                                }
+                              } catch {
+                                // Keep the saved payload if the follow-up read fails.
+                              }
                               setLinesOpen(false);
+                              setAction(null);
                               periods.reload();
                             })
                             .catch((caught: unknown) =>
@@ -1340,7 +1395,18 @@ export function SalariesManager({
                         {canSubmitDraft ? (
                           <button
                             className="button"
-                            onClick={() => openAction("submit")}
+                            onClick={() => {
+                              if (!hasSavedLines) {
+                                setFormError(
+                                  "Save at least one staff line before submission.",
+                                );
+                                setErrorScope("lines");
+                                setAction(null);
+                                openLinesEditor();
+                                return;
+                              }
+                              openAction("submit");
+                            }}
                             type="button"
                           >
                             {" "}

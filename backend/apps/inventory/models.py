@@ -3,9 +3,10 @@
 Quantity on hand is the sum of ``StockMovement.quantity``. It is not a column
 and clients cannot write it. Money stays ``NUMERIC(18, 2)``. Quantities and
 the low-stock threshold are ``NUMERIC(18, 3)`` and reject extra precision
-instead of rounding it. ``current_unit_cost`` is product master data. A
-movement copies that value into ``unit_cost_snapshot`` and does not
-recalculate a weighted average.
+instead of rounding it. ``current_unit_cost`` is the catalog cost used by
+later sales. A purchase records its own unit cost, stores that cost on the
+movement, and replaces the catalog cost. Other manual movements copy the
+catalog cost. Nothing computes a weighted average.
 
 ``SALE`` is appended only by retail approval, with a negative quantity and
 ``retail_sale_line``. A full void appends one positive ``SALE_RETURN`` for the

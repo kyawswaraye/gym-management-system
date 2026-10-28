@@ -149,6 +149,41 @@ def test_manual_adjustment_accepts_exact_signed_quantity() -> None:
     )
     assert adjusted.is_valid(), adjusted.errors
     assert adjusted.validated_data["quantity"] == Decimal("-1.500")
+    priced = StockAdjustSerializer(
+        data={
+            "product_id": str(uuid4()),
+            "quantity": "2.000",
+            "movement_type": "PURCHASE",
+            "business_date": "2026-10-18",
+            "reason": "Delivered",
+            "unit_cost": "12.50",
+        }
+    )
+    assert priced.is_valid(), priced.errors
+    assert priced.validated_data["unit_cost"] == Decimal("12.50")
+    missing_cost = StockAdjustSerializer(
+        data={
+            "product_id": str(uuid4()),
+            "quantity": "2.000",
+            "movement_type": "PURCHASE",
+            "business_date": "2026-10-18",
+            "reason": "Delivered",
+        }
+    )
+    assert not missing_cost.is_valid()
+    assert "unit_cost" in missing_cost.errors
+    rejected_cost = StockAdjustSerializer(
+        data={
+            "product_id": str(uuid4()),
+            "quantity": "1.000",
+            "movement_type": "OPENING",
+            "business_date": "2026-10-18",
+            "reason": "Opening count",
+            "unit_cost": "4.00",
+        }
+    )
+    assert not rejected_cost.is_valid()
+    assert "unit_cost" in rejected_cost.errors
     query = ProductListQuerySerializer(data={"limit": 101, "sku": "WATER-1"})
     assert not query.is_valid()
     movements = StockMovementListQuerySerializer(data={"movement_type": "SALE", "limit": 25})

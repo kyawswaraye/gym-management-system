@@ -173,7 +173,7 @@ describe("salaries", () => {
     });
     fireEvent.change(amounts[0]!, { target: { value: "120.5" } });
     fireEvent.click(
-      screen.getByRole("button", { name: "Replace staff lines" }),
+      screen.getByRole("button", { name: "Save staff lines" }),
     );
     await waitFor(() => {
       expect(replaceSalaryLines).toHaveBeenCalledWith(PERIOD_ID, {
@@ -194,6 +194,53 @@ describe("salaries", () => {
           },
         ],
       });
+    });
+  });
+
+  it("keeps saved staff lines when reopening the editor after save", async () => {
+    const empty = period({ lines: [] });
+    const saved = period();
+    vi.mocked(listSalaryPeriods).mockResolvedValue({
+      data: [empty],
+      meta: { has_more: false, next_after: null },
+    });
+    vi.mocked(getSalaryPeriod).mockResolvedValue(empty);
+    vi.mocked(replaceSalaryLines).mockResolvedValue(saved);
+    render(
+      <SalariesManager
+        canApprove={false}
+        canCreate={false}
+        canSubmit={false}
+        canUpdate
+        canVoid={false}
+        currency="THB"
+        defaultDate="2026-10-18"
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "2026-10-01 – 2026-10-31" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit staff lines" }),
+    );
+    fireEvent.change(screen.getByRole("combobox", { name: "Staff" }), {
+      target: { value: STAFF_A },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Amount (THB)" }), {
+      target: { value: "100.00" },
+    });
+    // Follow-up GET returns empty (the production bug). Save payload must win.
+    vi.mocked(getSalaryPeriod).mockResolvedValue(empty);
+    fireEvent.click(screen.getByRole("button", { name: "Save staff lines" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Nilar")).toBeVisible();
+    expect(screen.getByText("Ko Ko")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Edit staff lines" }));
+    await waitFor(() => {
+      expect(screen.getAllByText("S-1 — Nilar").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("S-2 — Ko Ko").length).toBeGreaterThan(0);
     });
   });
 

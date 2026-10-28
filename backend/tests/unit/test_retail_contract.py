@@ -31,7 +31,8 @@ from apps.sales.views import (
 SALES_INITIAL = ("sales", "0001_retail_sale_foundation")
 SALES_RLS = ("sales", "0002_rls_integrity_and_grants")
 SALES_VOID = ("sales", "0003_retail_sale_void")
-SALES_LEAF = ("sales", "0004_retail_return_foundation")
+SALES_RETURN = ("sales", "0004_retail_return_foundation")
+SALES_LEAF = ("sales", "0005_owner_or_desk_may_approve_own_retail_sale")
 
 
 def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
@@ -106,23 +107,24 @@ def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     runtime_plan = loader.graph.forwards_plan(inventory_runtime)
     assert runtime_plan.index(SALES_VOID) < runtime_plan.index(inventory_runtime)
     assert inventory_runtime not in loader.graph.forwards_plan(SALES_VOID)
-    assert loader.disk_migrations[SALES_LEAF].dependencies == [
+    assert loader.disk_migrations[SALES_RETURN].dependencies == [
         ("cashbook", "0002_correction_runtime_reversal"),
         ("inventory", "0004_sale_return_runtime"),
         ("members", "0020_retail_product_reversal"),
         SALES_VOID,
         ("tenants", "0025_finance_permission_catalog"),
     ]
+    assert loader.disk_migrations[SALES_LEAF].dependencies == [SALES_RETURN]
     assert loader.disk_migrations[inventory_return].dependencies == [
         inventory_runtime,
-        SALES_LEAF,
+        SALES_RETURN,
     ]
     assert loader.disk_migrations[members_refund].dependencies == [
         members_runtime,
-        SALES_LEAF,
+        SALES_RETURN,
     ]
     return_plan = loader.graph.forwards_plan(inventory_return)
-    assert return_plan.index(SALES_LEAF) < return_plan.index(inventory_return)
+    assert return_plan.index(SALES_RETURN) < return_plan.index(inventory_return)
     assert inventory_return not in loader.graph.forwards_plan(SALES_LEAF)
     assert members_refund not in loader.graph.forwards_plan(SALES_LEAF)
     assert loader.disk_migrations[trainers_sale].dependencies == [
@@ -134,7 +136,7 @@ def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     assert loader.disk_migrations[members_pt_link].dependencies == [
         ("cashbook", "0002_correction_runtime_reversal"),
         members_refund,
-        SALES_LEAF,
+        SALES_RETURN,
         ("tenants", "0026_pt_schedule_permission_catalog"),
         trainers_sale_rls,
     ]
@@ -199,7 +201,7 @@ def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     assert pt_plan.index(members_refund) < pt_plan.index(trainers_sale)
     assert pt_plan.index(trainers_sale) < pt_plan.index(trainers_sale_rls)
     assert pt_plan.index(trainers_sale_rls) < pt_plan.index(members_pt_link)
-    assert pt_plan.index(SALES_LEAF) < pt_plan.index(members_pt_link)
+    assert pt_plan.index(SALES_RETURN) < pt_plan.index(members_pt_link)
     assert pt_plan.index(members_pt_link) < pt_plan.index(trainers_pt_link)
     assert pt_plan.index(trainers_pt_link) < pt_plan.index(members_pt_guard)
     assert pt_plan.index(members_pt_guard) < pt_plan.index(trainers_pt_guard)

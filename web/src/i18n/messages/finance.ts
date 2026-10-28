@@ -12,8 +12,10 @@ export const financeEn = {
     "A SKU is assigned from the name. Prices use two decimals, such as 12.50. Quantities use three, such as 1.000.",
   "Add a category before creating a product.":
     "Add a category before creating a product.",
+  "Add or remove?": "Add or remove?",
   "Add product line": "Add product line",
   "Add staff line": "Add staff line",
+  "Add stock": "Add stock",
   "Adjust stock": "Adjust stock",
   "All categories": "All categories",
   "and is not mapped to a session.": "and is not mapped to a session.",
@@ -44,6 +46,8 @@ export const financeEn = {
     "Changes stay on this draft until you submit it.",
   "Choose an open session only when this return refunds cash. Leave it blank when the server refund is zero.":
     "Choose an open session only when this return refunds cash. Leave it blank when the server refund is zero.",
+  "Choose whether to add or remove this quantity.":
+    "Choose whether to add or remove this quantity.",
   "Confirm adjustment": "Confirm adjustment",
   "Correction date": "Correction date",
   "Correction receipt": "Correction receipt",
@@ -62,12 +66,14 @@ export const financeEn = {
   "Download receipt": "Download receipt",
   "DRAFT — not a receipt": "DRAFT — not a receipt",
   "Drafts you save will show up here.": "Drafts you save will show up here.",
-  "Each person appears once. Saving replaces every line on this draft.":
-    "Each person appears once. Saving replaces every line on this draft.",
+  "Each person appears once. Press Save staff lines to store them on this draft.":
+    "Each person appears once. Press Save staff lines to store them on this draft.",
   "Edit draft sale": "Edit draft sale",
   "Edit period": "Edit period",
   "Edit product": "Edit product",
   "Edit staff lines": "Edit staff lines",
+  "Enter how many units, such as 1.000. The movement type sets the direction.":
+    "Enter how many units, such as 1.000. The movement type sets the direction.",
   "Estimated total": "Estimated total",
   Expense: "Expense",
   "Expense ledger": "Expense ledger",
@@ -141,7 +147,8 @@ export const financeEn = {
     "No salary periods match this status.",
   "No salary periods yet.": "No salary periods yet.",
   "No sales match this status.": "No sales match this status.",
-  "No staff lines on this period.": "No staff lines on this period.",
+  "No staff lines saved yet. Edit staff lines, then press Save staff lines.":
+    "No staff lines saved yet. Edit staff lines, then press Save staff lines.",
   "No staff records were returned.": "No staff records were returned.",
   "No stock movements yet.": "No stock movements yet.",
   "Nothing is low on stock.": "Nothing is low on stock.",
@@ -215,7 +222,14 @@ export const financeEn = {
   "Reject payment": "Reject payment",
   "Reject salary period": "Reject salary period",
   "Remove line": "Remove line",
-  "Replace staff lines": "Replace staff lines",
+  "Remove stock": "Remove stock",
+  "Fill each line, then press Save staff lines. Closing without saving discards the form.":
+    "Fill each line, then press Save staff lines. Closing without saving discards the form.",
+  "Save at least one staff line before submission.":
+    "Save at least one staff line before submission.",
+  "October salary": "October salary",
+  "Optional bank slip number": "Optional bank slip number",
+  "Save staff lines": "Save staff lines",
   "RETAIL_CORRECTION_UNAVAILABLE. This product payment cannot be voided or refunded here. Use the retail sale full void so the payment, receipt, and stock return stay together.":
     "RETAIL_CORRECTION_UNAVAILABLE. This product payment cannot be voided or refunded here. Use the retail sale full void so the payment, receipt, and stock return stay together.",
   "Review only. Submitting this draft does not print a receipt.":
@@ -311,8 +325,6 @@ export const financeEn = {
     "Try another status, register, or date.",
   "Try another status.": "Try another status.",
   "Unit cost": "Unit cost",
-  "Use three decimals, such as 1.000. A leading minus removes stock.":
-    "Use three decimals, such as 1.000. A leading minus removes stock.",
   VOID: "VOID",
   Void: "Void",
   "Void expense": "Void expense",
@@ -346,8 +358,10 @@ export const financeMm = {
     "SKU ကို အမည်မှ သတ်မှတ်ပေးပါသည်။ စျေးနှုန်းတွင် ဒသမနှစ်လုံး သုံးပါ၊ ဥပမာ 12.50။ အရေအတွက်တွင် ဒသမသုံးလုံး သုံးပါ၊ ဥပမာ 1.000။",
   "Add a category before creating a product.":
     "ကုန်ပစ္စည်း မဖန်တီးမီ အမျိုးအစားတစ်ခု ထည့်ပါ။",
+  "Add or remove?": "တိုးမည်လား၊ လျှော့မည်လား။",
   "Add product line": "ကုန်ပစ္စည်းစာရင်း ထည့်ရန်",
   "Add staff line": "ဝန်ထမ်းစာရင်း ထည့်ရန်",
+  "Add stock": "လက်ကျန်တိုးမည်",
   "Adjust stock": "လက်ကျန် ညှိရန်",
   "All categories": "အမျိုးအစားအားလုံး",
   "and is not mapped to a session.": "ဖြစ်ပြီး ငွေသားကာလနှင့် ချိတ်ဆက်မထားပါ။",
@@ -379,6 +393,8 @@ export const financeMm = {
     "တင်သွင်းသည်အထိ ပြောင်းလဲချက်များ ဤမူကြမ်းပေါ်တွင်သာ ရှိပါသည်။",
   "Choose an open session only when this return refunds cash. Leave it blank when the server refund is zero.":
     "ဤပြန်အပ်မှုက ငွေသား ပြန်အမ်းမှသာ ဖွင့်ထားသော ကာလကို ရွေးပါ။ ဆာဗာ၏ ပြန်အမ်းငွေ သုညဖြစ်လျှင် ကွက်လပ်ထားပါ။",
+  "Choose whether to add or remove this quantity.":
+    "ဤအရေအတွက်ကို တိုးမည်လား၊ လျှော့မည်လား ရွေးပါ။",
   "Confirm adjustment": "ပြင်ဆင်ချက် အတည်ပြုရန်",
   "Correction date": "ပြင်ဆင်သည့်ရက်",
   "Correction receipt": "ပြင်ဆင်ချက် ပြေစာ",
@@ -398,12 +414,14 @@ export const financeMm = {
   "DRAFT — not a receipt": "မူကြမ်း — ပြေစာ မဟုတ်ပါ",
   "Drafts you save will show up here.":
     "သိမ်းထားသော မူကြမ်းများ ဤနေရာတွင် ပေါ်လာပါမည်။",
-  "Each person appears once. Saving replaces every line on this draft.":
-    "လူတစ်ဦးလျှင် တစ်ကြောင်းသာ ပါဝင်ပါသည်။ သိမ်းလျှင် ဤမူကြမ်းရှိ စာရင်းအားလုံးကို အစားထိုးပါသည်။",
+  "Each person appears once. Press Save staff lines to store them on this draft.":
+    "လူတစ်ဦးကို တစ်ကြိမ်သာ ထည့်ပါ။ မူကြမ်းတွင် သိမ်းရန် Save staff lines နှိပ်ပါ။",
   "Edit draft sale": "အရောင်းမူကြမ်း ပြင်ရန်",
   "Edit period": "ကာလ ပြင်ရန်",
   "Edit product": "ကုန်ပစ္စည်း ပြင်ရန်",
   "Edit staff lines": "ဝန်ထမ်းစာရင်းများ ပြင်ရန်",
+  "Enter how many units, such as 1.000. The movement type sets the direction.":
+    "အရေအတွက်ကို ဒသမသုံးလုံးဖြင့် ထည့်ပါ၊ ဥပမာ 1.000။ ဦးတည်ချက်ကို အမျိုးအစားက သတ်မှတ်ပါသည်။",
   "Estimated total": "ခန့်မှန်းစုစုပေါင်း",
   Expense: "ကုန်ကျစရိတ်",
   "Expense ledger": "ကုန်ကျစရိတ်စာရင်း",
@@ -479,7 +497,8 @@ export const financeMm = {
     "ဤအခြေအနေနှင့် ကိုက်ညီသော လစာကာလ မရှိပါ။",
   "No salary periods yet.": "လစာကာလ မရှိသေးပါ။",
   "No sales match this status.": "ဤအခြေအနေနှင့် ကိုက်ညီသော အရောင်း မရှိပါ။",
-  "No staff lines on this period.": "ဤကာလတွင် ဝန်ထမ်းစာရင်း မရှိပါ။",
+  "No staff lines saved yet. Edit staff lines, then press Save staff lines.":
+    "သိမ်းထားသော ဝန်ထမ်းစာရင်း မရှိသေးပါ။ Edit staff lines နှိပ်ပြီး Save staff lines နှိပ်ပါ။",
   "No staff records were returned.": "ဝန်ထမ်းမှတ်တမ်း မတွေ့ပါ။",
   "No stock movements yet.": "ကုန်ကုန်ပစ္စည်းအဝင်အထွက် မရှိသေးပါ။",
   "Nothing is low on stock.": "လက်ကျန်နည်းသော ကုန်ပစ္စည်း မရှိပါ။",
@@ -553,7 +572,14 @@ export const financeMm = {
   "Reject payment": "ငွေပေးချေမှု ငြင်းပယ်",
   "Reject salary period": "လစာကာလ ငြင်းပယ်",
   "Remove line": "စာရင်း ဖယ်ရှားရန်",
-  "Replace staff lines": "ဝန်ထမ်းစာရင်းများ အစားထိုးရန်",
+  "Remove stock": "လက်ကျန်လျှော့မည်",
+  "Fill each line, then press Save staff lines. Closing without saving discards the form.":
+    "စာကြောင်းများ ဖြည့်ပြီး Save staff lines နှိပ်ပါ။ မသိမ်းဘဲ ပိတ်လျှင် ပုံစံ ပျက်သွားမည်။",
+  "Save at least one staff line before submission.":
+    "တင်သွင်းမီ ဝန်ထမ်းစာရင်း အနည်းဆုံးတစ်ကြောင်း သိမ်းပါ။",
+  "October salary": "အောက်တိုဘာ လစာ",
+  "Optional bank slip number": "ဘဏ်ပြေစာနံပါတ် (မဖြည့်လည်းရ)",
+  "Save staff lines": "ဝန်ထမ်းစာရင်းများ သိမ်းရန်",
   "RETAIL_CORRECTION_UNAVAILABLE. This product payment cannot be voided or refunded here. Use the retail sale full void so the payment, receipt, and stock return stay together.":
     "RETAIL_CORRECTION_UNAVAILABLE။ ဤကုန်ပစ္စည်း ငွေပေးချေမှုကို ဤနေရာတွင် ပယ်ဖျက်ခြင်း သို့မဟုတ် ပြန်အမ်းခြင်း မပြုနိုင်ပါ။ ငွေပေးချေမှု၊ ပြေစာနှင့် ကုန်လက်ကျန်ပြန်အပ်မှု တစ်ပါတည်းရှိနေစေရန် လက်လီအရောင်းတစ်ခုလုံး ပယ်ဖျက်ခြင်းကို သုံးပါ။",
   "Review only. Submitting this draft does not print a receipt.":
@@ -646,8 +672,6 @@ export const financeMm = {
     "အခြားအခြေအနေ၊ အရောင်းကောင်တာ သို့မဟုတ် ရက်စွဲဖြင့် ပြန်စစ်ကြည့်ပါ။",
   "Try another status.": "အခြားအခြေအနေဖြင့် ပြန်စစ်ကြည့်ပါ။",
   "Unit cost": "တစ်ခုလျှင် ကုန်ကျစရိတ်",
-  "Use three decimals, such as 1.000. A leading minus removes stock.":
-    "ဒသမသုံးလုံး သုံးပါ၊ ဥပမာ 1.000။ အရှေ့တွင် အနုတ်လက္ခဏာထားလျှင် လက်ကျန်လျော့ပါသည်။",
   VOID: "ပယ်ဖျက်",
   Void: "ပယ်ဖျက်",
   "Void expense": "ကုန်ကျစရိတ် ပယ်ဖျက်ရန်",

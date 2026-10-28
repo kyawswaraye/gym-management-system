@@ -5,6 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, cast
 
+from django.db.models import Q, Sum
 from rest_framework import serializers
 
 from apps.cashbook.serializers import ExactMoneyField
@@ -121,6 +122,16 @@ class StockAdjustSerializer(StrictSerializer):
     movement_type = serializers.ChoiceField(choices=_MANUAL_TYPES)
     business_date = serializers.DateField()
     reason = serializers.CharField(max_length=2000, trim_whitespace=True)
+    unit_cost = ExactMoneyField(minimum=Decimal("0"), required=False)
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        purchase = attrs.get("movement_type") == "PURCHASE"
+        has_cost = "unit_cost" in attrs
+        if purchase and not has_cost:
+            raise serializers.ValidationError({"unit_cost": ["Enter the purchase unit cost."]})
+        if not purchase and has_cost:
+            raise serializers.ValidationError({"unit_cost": ["Only a purchase records a unit cost."]})
+        return attrs
 
     def validate_reason(self, value: str) -> str:
         if value == "":
@@ -209,6 +220,7 @@ class StockMovementSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     product_id = serializers.UUIDField()
     quantity = serializers.CharField()
+    quantity_on_hand = serializers.CharField()
     movement_type = serializers.CharField()
     unit_cost_snapshot = serializers.CharField()
     reason = serializers.CharField()
@@ -309,10 +321,14 @@ def product_payload(product: Product) -> dict[str, object]:
 
 
 def movement_payload(movement: StockMovement) -> dict[str, object]:
+    on_hand = getattr(movement, "quantity_on_hand", None)
+    if on_hand is None:
+        on_hand = _balance_through(movement)
     body = {
         "id": movement.id,
         "product_id": movement.product_id,
         "quantity": format_quantity(movement.quantity),
+        "quantity_on_hand": format_quantity(on_hand),
         "movement_type": movement.movement_type,
         "unit_cost_snapshot": money_text(movement.unit_cost_snapshot),
         "reason": movement.reason,
@@ -325,6 +341,18 @@ def movement_payload(movement: StockMovement) -> dict[str, object]:
 
 _ZERO_QTY = Decimal("0.000")
 _ZERO_MONEY = Decimal("0.00")
+
+
+def _balance_through(movement: StockMovement) -> Decimal:
+    total = (
+        StockMovement.objects.filter(gym_id=movement.gym_id, product_id=movement.product_id)
+        .filter(
+            Q(created_at__lt=movement.created_at)
+            | Q(created_at=movement.created_at, id__lte=movement.id)
+        )
+        .aggregate(total=Sum("quantity"))["total"]
+    )
+    return _ZERO_QTY if total is None else total
 
 
 def _display(value: str) -> str:

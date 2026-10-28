@@ -39336,6 +39336,9 @@
                     "quantity": {
                         "type": "string"
                     },
+                    "quantity_on_hand": {
+                        "type": "string"
+                    },
                     "movement_type": {
                         "type": "string"
                     },
@@ -39366,6 +39369,7 @@
                     "movement_type",
                     "product_id",
                     "quantity",
+                    "quantity_on_hand",
                     "reason",
                     "unit_cost_snapshot"
                 ]

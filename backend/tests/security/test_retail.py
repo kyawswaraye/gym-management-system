@@ -29,6 +29,8 @@ from apps.tenants.models import (
     Gym,
     GymFeatureEntitlement,
     GymMembership,
+    GymMembershipRole,
+    Role,
 )
 from tests.security.test_tenant_gym_settings import (
     BFF_SECRET,
@@ -357,7 +359,26 @@ def test_approval_posts_stock_payment_receipt_and_cash_or_rolls_back(
     owner_sale = _create(api, owner_headers, _sale_body(product_id, gym, payment_method="CARD"))
     owner_id = owner_sale.json()["data"]["id"]
     assert _command(api, owner_headers, owner_id, "submit").status_code == 200
-    assert _command(api, owner_headers, owner_id, "approve", {}).status_code == 403
+    assert _command(api, owner_headers, owner_id, "approve", {}).status_code == 200
+    desk = add_staff(gym, email="retail-desk@example.test", role_key="MANAGER")
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        GymMembershipRole.objects.create(
+            gym=gym,
+            gym_membership=desk,
+            role=Role.objects.get(gym=gym, key="RECEPTIONIST"),
+        )
+    desk_headers = auth_headers(staff_token(desk))
+    desk_sale = _create(api, desk_headers, _sale_body(product_id, gym, payment_method="CARD"))
+    assert desk_sale.status_code == 201, desk_sale.content
+    desk_id = desk_sale.json()["data"]["id"]
+    assert _command(api, desk_headers, desk_id, "submit").status_code == 200
+    assert _command(api, desk_headers, desk_id, "approve", {}).status_code == 200
+    manager_own = _create(api, manager_headers, _sale_body(product_id, gym, payment_method="CARD"))
+    assert manager_own.status_code == 201, manager_own.content
+    manager_own_id = manager_own.json()["data"]["id"]
+    assert _command(api, manager_headers, manager_own_id, "submit").status_code == 200
+    assert _command(api, manager_headers, manager_own_id, "approve", {}).status_code == 403
 
     missing_session = _command(api, manager_headers, sale_id, "approve", {})
     assert missing_session.status_code == 400

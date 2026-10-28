@@ -158,6 +158,9 @@ def replace_lines(
             for row in lines
         ]
     )
+    cached = getattr(period, "_prefetched_objects_cache", None)
+    if isinstance(cached, dict):
+        cached.pop("lines", None)
     period.updated_by_membership_id = actor.id
     period.save(update_fields=["updated_by_membership_id", "updated_at"])
     total = sum((row["amount"] for row in lines), start=Decimal("0.00"))
@@ -229,8 +232,14 @@ def approve_period(
     if period.status != SalaryPeriod.Status.PENDING_APPROVAL:
         raise SalaryPostingConflict()
     submitter_id = period.submitted_by_membership_id
-    if submitter_id is None or actor.id in {period.created_by_membership_id, submitter_id}:
+    if submitter_id is None:
         raise PermissionDenied()
+    _deny_self_close(
+        gym_id=gym.id,
+        actor=actor,
+        created_by=period.created_by_membership_id,
+        submitted_by=submitter_id,
+    )
     lines = list(period.lines.select_for_update().order_by("id"))
     if not lines:
         raise ValidationError({"lines": ["A salary period needs at least one line."]})
@@ -494,8 +503,12 @@ def reject_period(
     _assert_approver(gym_id=gym.id, actor=actor)
     if period.status != SalaryPeriod.Status.PENDING_APPROVAL:
         raise SalaryPostingConflict()
-    if actor.id in {period.created_by_membership_id, period.submitted_by_membership_id}:
-        raise PermissionDenied()
+    _deny_self_close(
+        gym_id=gym.id,
+        actor=actor,
+        created_by=period.created_by_membership_id,
+        submitted_by=period.submitted_by_membership_id,
+    )
     list(period.lines.select_for_update().order_by("id"))
     now = timezone.now()
     period.status = SalaryPeriod.Status.REJECTED
@@ -570,11 +583,41 @@ def _reload(
     )
 
 
+def _may_close_own_salary(*, gym_id: UUID, membership_id: UUID) -> bool:
+    """The owner, or one person who is both manager and receptionist, can.
+
+    A manager who does not also work the desk still needs another approver.
+    """
+
+    if holds_protected_role(gym_id=gym_id, membership_id=membership_id, role_key="OWNER"):
+        return True
+    return holds_protected_role(
+        gym_id=gym_id, membership_id=membership_id, role_key="MANAGER"
+    ) and holds_protected_role(gym_id=gym_id, membership_id=membership_id, role_key="RECEPTIONIST")
+
+
+def _deny_self_close(
+    *,
+    gym_id: UUID,
+    actor: GymMembership,
+    created_by: UUID | None,
+    submitted_by: UUID | None,
+) -> None:
+    if actor.id not in {created_by, submitted_by}:
+        return
+    if _may_close_own_salary(gym_id=gym_id, membership_id=actor.id):
+        return
+    raise PermissionDenied()
+
+
 def _assert_approver(*, gym_id: UUID, actor: GymMembership) -> None:
-    if holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key="RECEPTIONIST"):
-        raise PermissionDenied()
     manager = holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key="MANAGER")
     owner = holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key="OWNER")
+    receptionist = holds_protected_role(
+        gym_id=gym_id, membership_id=actor.id, role_key="RECEPTIONIST"
+    )
+    if receptionist and not manager and not owner:
+        raise PermissionDenied()
     if not manager and not owner:
         raise PermissionDenied()
     if not membership_has_permission(membership=actor, code="salaries.approve"):

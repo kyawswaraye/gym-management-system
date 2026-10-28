@@ -17,7 +17,15 @@ from apps.common.db.tenant_context import set_gym_context
 from apps.expenses.models import Expense
 from apps.files.models import FileAsset
 from apps.members.services import gym_today
-from apps.tenants.models import ExpenseCategory, Feature, Gym, GymFeatureEntitlement, GymMembership
+from apps.tenants.models import (
+    ExpenseCategory,
+    Feature,
+    Gym,
+    GymFeatureEntitlement,
+    GymMembership,
+    GymMembershipRole,
+    Role,
+)
 from tests.security.test_tenant_gym_settings import (
     BFF_SECRET,
     add_staff,
@@ -466,14 +474,90 @@ def test_cash_rules_idempotency_and_receipt_gate() -> None:
         HTTP_IDEMPOTENCY_KEY=f"exp-self-sub-{uuid4().hex}",
         **headers,
     )
-    self_approved = api.post(
-        f"/api/v1/expenses/{expense_id}/approve/",
+    manager_created = _draft(
+        api,
+        manager_headers,
+        gym=gym,
+        category_id=str(internet.id),
+        method="BANK_TRANSFER",
+        amount="7.00",
+    )
+    assert manager_created.status_code == 201, manager_created.content
+    manager_expense_id = manager_created.json()["data"]["id"]
+    api.post(
+        f"/api/v1/expenses/{manager_expense_id}/submit/",
         {},
         format="json",
-        HTTP_IDEMPOTENCY_KEY=f"exp-self-ap-{uuid4().hex}",
+        HTTP_IDEMPOTENCY_KEY=f"exp-mgr-sub-{uuid4().hex}",
+        **manager_headers,
+    )
+    manager_self = api.post(
+        f"/api/v1/expenses/{manager_expense_id}/approve/",
+        {},
+        format="json",
+        HTTP_IDEMPOTENCY_KEY=f"exp-mgr-self-{uuid4().hex}",
+        **manager_headers,
+    )
+    assert manager_self.status_code == 403
+    owner_created = _draft(
+        api,
+        headers,
+        gym=gym,
+        category_id=str(internet.id),
+        method="BANK_TRANSFER",
+        amount="8.00",
+    )
+    assert owner_created.status_code == 201, owner_created.content
+    owner_expense_id = owner_created.json()["data"]["id"]
+    api.post(
+        f"/api/v1/expenses/{owner_expense_id}/submit/",
+        {},
+        format="json",
+        HTTP_IDEMPOTENCY_KEY=f"exp-owner-sub-{uuid4().hex}",
         **headers,
     )
-    assert self_approved.status_code == 403
+    owner_self = api.post(
+        f"/api/v1/expenses/{owner_expense_id}/approve/",
+        {},
+        format="json",
+        HTTP_IDEMPOTENCY_KEY=f"exp-owner-self-{uuid4().hex}",
+        **headers,
+    )
+    assert owner_self.status_code == 200, owner_self.content
+    desk = add_staff(gym, email="exprule-desk@example.test", role_key="MANAGER")
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        GymMembershipRole.objects.create(
+            gym=gym,
+            gym_membership=desk,
+            role=Role.objects.get(gym=gym, key="RECEPTIONIST"),
+        )
+    desk_headers = auth_headers(staff_token(desk))
+    desk_created = _draft(
+        api,
+        desk_headers,
+        gym=gym,
+        category_id=str(internet.id),
+        method="BANK_TRANSFER",
+        amount="6.00",
+    )
+    assert desk_created.status_code == 201, desk_created.content
+    desk_expense_id = desk_created.json()["data"]["id"]
+    api.post(
+        f"/api/v1/expenses/{desk_expense_id}/submit/",
+        {},
+        format="json",
+        HTTP_IDEMPOTENCY_KEY=f"exp-desk-sub-{uuid4().hex}",
+        **desk_headers,
+    )
+    desk_self = api.post(
+        f"/api/v1/expenses/{desk_expense_id}/approve/",
+        {},
+        format="json",
+        HTTP_IDEMPOTENCY_KEY=f"exp-desk-self-{uuid4().hex}",
+        **desk_headers,
+    )
+    assert desk_self.status_code == 200, desk_self.content
 
     opened = api.post(
         "/api/v1/cash-sessions/open/",

@@ -279,8 +279,37 @@ def page_movements(
         queryset = queryset.filter(movement_type=movement_type)
     if business_date is not None:
         queryset = queryset.filter(business_date=business_date)
-    queryset = queryset.order_by("-created_at", "-id")
+    queryset = queryset.annotate(
+        quantity_on_hand=Coalesce(
+            _movement_balance(),
+            Value(_ZERO),
+            output_field=_QTY_FIELD,
+        )
+    ).order_by("-created_at", "-id")
     return _page_time(queryset, after=after, limit=limit, scope=scope, salt=_MOVEMENT_SALT)
+
+
+def _movement_balance() -> Subquery:
+    """Stock after this row: every same-product movement through this one.
+
+    List filters do not enter the sum. A damage-only page still shows the
+    stock that remained after that damage, including earlier purchases.
+    """
+
+    total = (
+        StockMovement.objects.filter(
+            gym_id=OuterRef("gym_id"),
+            product_id=OuterRef("product_id"),
+        )
+        .filter(
+            Q(created_at__lt=OuterRef("created_at"))
+            | Q(created_at=OuterRef("created_at"), id__lte=OuterRef("id"))
+        )
+        .values("product_id")
+        .annotate(total=Sum("quantity"))
+        .values("total")
+    )
+    return Subquery(total, output_field=_QTY_FIELD)
 
 
 def _page_code(

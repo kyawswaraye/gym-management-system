@@ -7848,6 +7848,7 @@ export interface components {
       /** Format: uuid */
       product_id: string;
       quantity: string;
+      quantity_on_hand: string;
       movement_type: string;
       unit_cost_snapshot: string;
       reason: string;

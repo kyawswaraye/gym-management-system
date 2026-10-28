@@ -29,6 +29,7 @@ def get_period(*, gym_id: UUID, period_id: UUID, actor_membership_id: UUID) -> S
     period = (
         visible_periods(gym_id=gym_id, actor_membership_id=actor_membership_id)
         .filter(id=period_id)
+        .prefetch_related("lines__staff_profile")
         .first()
     )
     if period is None:

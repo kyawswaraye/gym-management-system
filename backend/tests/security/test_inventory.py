@@ -261,6 +261,7 @@ def test_catalog_is_tenant_scoped_and_permissioned() -> None:
     assert opened.json()["data"]["product"]["quantity_on_hand"] == "5.000"
     assert opened.json()["data"]["product"]["current_unit_cost"] == "10.00"
     assert opened.json()["data"]["movement"]["unit_cost_snapshot"] == "10.00"
+    assert opened.json()["data"]["movement"]["quantity_on_hand"] == "5.000"
     reception_adjust = _adjust(api, reception_headers, product_id, quantity="-1.000", gym=gym)
     assert reception_adjust.status_code == 403
     accountant_adjust = _adjust(api, accountant_headers, product_id, quantity="-1.000", gym=gym)
@@ -314,18 +315,47 @@ def test_adjustment_contract_audit_idempotency_and_low_stock() -> None:
     )
     assert forged.status_code == 400
     inexact = _adjust(
-        api, headers, product_id, quantity="1.2345", movement_type="PURCHASE", gym=gym
+        api,
+        headers,
+        product_id,
+        quantity="1.2345",
+        movement_type="PURCHASE",
+        gym=gym,
+        extra={"unit_cost": "12.50"},
     )
     assert inexact.status_code == 400
     negative_open = _adjust(
         api, headers, product_id, quantity="-1.000", movement_type="OPENING", gym=gym
     )
     assert negative_open.status_code == 400
-    purchased = _adjust(
+    missing_cost = _adjust(
         api, headers, product_id, quantity="2.000", movement_type="PURCHASE", gym=gym
     )
+    assert missing_cost.status_code == 400
+    opening_cost = _adjust(
+        api,
+        headers,
+        product_id,
+        quantity="1.000",
+        movement_type="OPENING",
+        gym=gym,
+        extra={"unit_cost": "4.00"},
+    )
+    assert opening_cost.status_code == 400
+    purchased = _adjust(
+        api,
+        headers,
+        product_id,
+        quantity="2.000",
+        movement_type="PURCHASE",
+        gym=gym,
+        extra={"unit_cost": "12.50"},
+    )
     assert purchased.status_code == 201, purchased.content
-    assert purchased.json()["data"]["product"]["current_unit_cost"] == "10.00"
+    assert purchased.json()["data"]["product"]["current_unit_cost"] == "12.50"
+    assert purchased.json()["data"]["product"]["default_unit_cost"] == "12.50"
+    assert purchased.json()["data"]["movement"]["unit_cost_snapshot"] == "12.50"
+    assert purchased.json()["data"]["movement"]["quantity_on_hand"] == "2.000"
     key = "inventory-adjust-replay01"
     first = _adjust(api, headers, product_id, quantity="-1.000", gym=gym, key=key)
     assert first.status_code == 201, first.content
@@ -361,7 +391,8 @@ def test_adjustment_contract_audit_idempotency_and_low_stock() -> None:
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         stored = Product.objects.get(id=product_id)
-        assert stored.current_unit_cost == Decimal("10.00")
+        assert stored.current_unit_cost == Decimal("12.50")
+        assert stored.default_unit_cost == Decimal("12.50")
         movements = list(StockMovement.objects.filter(product_id=product_id))
         assert len(movements) == 2
         assert sum((row.quantity for row in movements), Decimal("0")) == Decimal("1.000")
@@ -374,7 +405,18 @@ def test_adjustment_contract_audit_idempotency_and_low_stock() -> None:
         assert audit.module == "inventory"
     listed = api.get(f"/api/v1/stock-movements/?product_id={product_id}", **headers)
     assert listed.status_code == 200
-    assert len(listed.json()["data"]) == 2
+    listed_rows = listed.json()["data"]
+    assert len(listed_rows) == 2
+    assert listed_rows[0]["movement_type"] == "ADJUSTMENT"
+    assert listed_rows[0]["quantity_on_hand"] == "1.000"
+    assert listed_rows[1]["movement_type"] == "PURCHASE"
+    assert listed_rows[1]["quantity_on_hand"] == "2.000"
+    purchase_only = api.get(
+        f"/api/v1/stock-movements/?product_id={product_id}&movement_type=PURCHASE",
+        **headers,
+    )
+    assert purchase_only.status_code == 200
+    assert purchase_only.json()["data"][0]["quantity_on_hand"] == "2.000"
     foreign_movements = api.get(
         f"/api/v1/stock-movements/?product_id={product_id}",
         **other_headers,

@@ -284,8 +284,12 @@ def approve_expense(
     _assert_approver(gym_id=gym.id, actor=actor)
     if expense.status != Expense.Status.PENDING_APPROVAL:
         raise ExpensePostingConflict()
-    if actor.id in {expense.created_by_membership_id, expense.submitted_by_membership_id}:
-        raise PermissionDenied()
+    _deny_self_close(
+        gym_id=gym.id,
+        actor=actor,
+        created_by=expense.created_by_membership_id,
+        submitted_by=expense.submitted_by_membership_id,
+    )
     _sources(
         gym=gym,
         fields={
@@ -372,8 +376,12 @@ def post_staff_salary_expense(
         raise ProtectedExpenseCategory()
     if currency != gym.currency:
         raise ValidationError({"currency": ["Currency must match the selected gym."]})
-    if approver.id in {created_by_membership_id, submitted_by_membership_id}:
-        raise PermissionDenied()
+    _deny_self_close(
+        gym_id=gym.id,
+        actor=approver,
+        created_by=created_by_membership_id,
+        submitted_by=submitted_by_membership_id,
+    )
     if payment_method != Payment.Method.CASH and cash_session_id is not None:
         raise ValidationError(
             {"cash_session_id": ["Only a cash salary line can use a cash session."]}
@@ -692,8 +700,12 @@ def reject_expense(
     _assert_approver(gym_id=gym.id, actor=actor)
     if expense.status != Expense.Status.PENDING_APPROVAL:
         raise ExpensePostingConflict()
-    if actor.id in {expense.created_by_membership_id, expense.submitted_by_membership_id}:
-        raise PermissionDenied()
+    _deny_self_close(
+        gym_id=gym.id,
+        actor=actor,
+        created_by=expense.created_by_membership_id,
+        submitted_by=expense.submitted_by_membership_id,
+    )
     now = timezone.now()
     expense.status = Expense.Status.REJECTED
     expense.rejected_at = now
@@ -1026,11 +1038,41 @@ def _assert_pt_commission_approver(
         raise PermissionDenied()
 
 
+def _may_close_own_expense(*, gym_id: UUID, membership_id: UUID) -> bool:
+    """The owner, or one person who is both manager and receptionist, can.
+
+    A manager who does not also work the desk still needs another approver.
+    """
+
+    if holds_protected_role(gym_id=gym_id, membership_id=membership_id, role_key="OWNER"):
+        return True
+    return holds_protected_role(
+        gym_id=gym_id, membership_id=membership_id, role_key="MANAGER"
+    ) and holds_protected_role(gym_id=gym_id, membership_id=membership_id, role_key="RECEPTIONIST")
+
+
+def _deny_self_close(
+    *,
+    gym_id: UUID,
+    actor: GymMembership,
+    created_by: UUID | None,
+    submitted_by: UUID | None,
+) -> None:
+    if actor.id not in {created_by, submitted_by}:
+        return
+    if _may_close_own_expense(gym_id=gym_id, membership_id=actor.id):
+        return
+    raise PermissionDenied()
+
+
 def _assert_approver(*, gym_id: UUID, actor: GymMembership) -> None:
-    if holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key="RECEPTIONIST"):
-        raise PermissionDenied()
     manager = holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key="MANAGER")
     owner = holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key="OWNER")
+    receptionist = holds_protected_role(
+        gym_id=gym_id, membership_id=actor.id, role_key="RECEPTIONIST"
+    )
+    if receptionist and not manager and not owner:
+        raise PermissionDenied()
     if not manager and not owner:
         raise PermissionDenied()
     if not membership_has_permission(membership=actor, code="expenses.approve"):

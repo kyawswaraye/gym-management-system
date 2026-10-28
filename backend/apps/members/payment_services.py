@@ -720,8 +720,12 @@ def post_retail_product_payment(
         raise ValidationError({"currency": ["Currency must match the selected gym."]})
     if submitted_by_membership_id is None:
         raise ValidationError({"status": ["Only a submitted retail sale can be posted."]})
-    if approver.id in {created_by_membership_id, submitted_by_membership_id}:
-        raise PermissionDenied()
+    _deny_self_close(
+        gym_id=gym.id,
+        actor=approver,
+        created_by=created_by_membership_id,
+        submitted_by=submitted_by_membership_id,
+    )
     if method != Payment.Method.CASH and cash_session_id is not None:
         raise ValidationError({"cash_session_id": ["Only a cash sale can use a cash session."]})
     if method == Payment.Method.CASH and cash_session_id is None:
@@ -788,8 +792,12 @@ def _post_pending_charge(
         raise PaymentPostingConflict()
     if payment.submitted_by_membership_id is None:
         raise PaymentPostingConflict()
-    if approver.id in {payment.created_by_membership_id, payment.submitted_by_membership_id}:
-        raise PermissionDenied()
+    _deny_self_close(
+        gym_id=gym.id,
+        actor=approver,
+        created_by=payment.created_by_membership_id,
+        submitted_by=payment.submitted_by_membership_id,
+    )
     movement: CashTransaction | None = None
     if payment.method == Payment.Method.CASH:
         if cash_session_id is None:

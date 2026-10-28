@@ -287,7 +287,13 @@ def line_payload(line: StaffSalaryLine) -> dict[str, object]:
 
 
 def period_payload(period: SalaryPeriod) -> dict[str, object]:
-    lines = list(period.lines.select_related("staff_profile").order_by("staff_profile_id", "id"))
+    # Must run while app.gym_id is set. Salary command views use
+    # non_atomic_requests, so callers serialize inside their gym-context
+    # transaction. After replace_lines clears the prefetch cache, this hits the
+    # database and returns the lines just written.
+    lines = list(
+        period.lines.select_related("staff_profile").order_by("staff_profile_id", "id")
+    )
     body = {
         "id": period.id,
         "period_start": period.period_start,

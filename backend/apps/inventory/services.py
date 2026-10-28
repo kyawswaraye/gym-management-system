@@ -7,9 +7,10 @@ the key.
 
 ``mutate()`` reloads the actor, the active ``finance`` entitlement, and the
 live permission. The feature catalog has no separate inventory code. The
-public adjustment body has no unit cost: ``current_unit_cost`` stays product
-master data, and the movement stores that locked value as
-``unit_cost_snapshot``. There is no weighted-average update.
+A purchase must send ``unit_cost``. That cost is stored on the movement and
+replaces ``current_unit_cost`` and ``default_unit_cost``. Other manual types
+reject a unit cost and copy the locked catalog cost. There is no
+weighted-average update.
 
 The product row is locked before the on-hand sum is checked and the movement
 is inserted. A negative result is rejected. ``SALE`` and ``SALE_RETURN`` are
@@ -265,7 +266,18 @@ def adjust_stock(
     on_hand = _on_hand(gym_id=gym.id, product_id=product.id)
     if on_hand + quantity < 0:
         raise ValidationError({"quantity": ["Resulting stock cannot be negative."]})
-    snapshot = parse_money(product.current_unit_cost)
+    if movement_type == StockMovement.Type.PURCHASE:
+        if "unit_cost" not in fields:
+            raise ValidationError({"unit_cost": ["Enter the purchase unit cost."]})
+        snapshot = parse_money(fields["unit_cost"])
+        product.current_unit_cost = snapshot
+        product.default_unit_cost = snapshot
+        product.updated_by_membership_id = actor.id
+        product.save()
+    elif "unit_cost" in fields:
+        raise ValidationError({"unit_cost": ["Only a purchase records a unit cost."]})
+    else:
+        snapshot = parse_money(product.current_unit_cost)
     movement = StockMovement.objects.create(
         gym=gym,
         product=product,

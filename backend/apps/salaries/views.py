@@ -166,7 +166,10 @@ class SalaryPeriodListCreateView(SalaryCommandView):
                 limit=int(payload["limit"]),
                 after=str(payload.get("after", "")),
             )
-        return success_response([period_payload(row) for row in rows], meta=meta)
+            # Serialize inside the gym-context transaction. These views opt out of
+            # ATOMIC_REQUESTS, so a query after this block cannot see salary lines.
+            body = [period_payload(row) for row in rows]
+        return success_response(body, meta=meta)
 
     @extend_schema(
         operation_id="salary_periods_create",
@@ -249,7 +252,10 @@ class SalaryPeriodDetailView(SalaryCommandView):
                 period_id=period_id,
                 actor_membership_id=request.gym_membership.id,
             )
-        return success_response(period_payload(period))
+            # Serialize inside the gym-context transaction. These views opt out of
+            # ATOMIC_REQUESTS, so a query after this block cannot see salary lines.
+            body = period_payload(period)
+        return success_response(body)
 
     @extend_schema(
         operation_id="salary_periods_update",

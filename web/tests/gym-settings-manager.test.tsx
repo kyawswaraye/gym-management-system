@@ -148,7 +148,7 @@ describe("Gym settings manager", () => {
     expect(screen.queryByText("af131e")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Operations" }));
     expect(screen.getByText("Monday")).toBeInTheDocument();
-    expect(screen.getByText("Required")).toBeInTheDocument();
+    expect(screen.queryByText("Finance approval")).not.toBeInTheDocument();
     expect(screen.getByText("MEM-000041")).toBeInTheDocument();
     const updated = formatAppDateTime("2026-10-02T00:00:00Z");
     expect(screen.getByText(updated)).toBeInTheDocument();
@@ -251,17 +251,18 @@ describe("Gym settings manager", () => {
     );
   });
 
-  it("keeps finance approval mandatory and omits read-only settings fields", async () => {
+  it("omits the finance-approval control and read-only settings fields", async () => {
     render(<GymSettingsManager {...fullAccess} canViewProfile={false} />);
     fireEvent.click(
       await screen.findByRole("button", { name: "Edit operational settings" }),
     );
-    const approval = await screen.findByRole("checkbox", {
-      name: "Require separate finance approval",
-    });
 
-    expect(approval).toBeChecked();
-    expect(approval).toBeDisabled();
+    expect(
+      screen.queryByRole("checkbox", {
+        name: "Require separate finance approval",
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Finance approval")).not.toBeInTheDocument();
     expect(screen.getAllByText("41")).toHaveLength(1);
     expect(screen.getByText("MEM-000041")).toBeInTheDocument();
     expect(

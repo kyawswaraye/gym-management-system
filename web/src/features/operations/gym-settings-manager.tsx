@@ -806,10 +806,6 @@ function IntegerControl({
   );
 }
 
-function approvalCopy() {
-  return "Separate finance approval is mandatory and cannot be turned off. The owner, or the one person who is both manager and receptionist, can approve a payment they recorded. Expenses, retail sales, PT sales, and salary records still need a different authorized manager or owner.";
-}
-
 function ImageFrameIcon() {
   return (
     <svg aria-hidden="true" className="size-7" fill="none" viewBox="0 0 24 24">
@@ -1471,19 +1467,6 @@ function SettingsSection({
                   <Choice on={settings.class_no_show_consumes_session} />
                 </Fact>
               </SettingGroup>
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 lg:col-span-2">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h3 className="text-sm font-bold text-amber-950">
-                    {tx("Finance approval")}
-                  </h3>
-                  <Pill tone="bg-white text-amber-800 ring-amber-600/15">
-                    {tx("Required")}
-                  </Pill>
-                </div>
-                <p className="mt-2 text-sm leading-6 text-amber-950">
-                  {tx(approvalCopy())}
-                </p>
-              </div>
               <SettingGroup title="Record">
                 <Fact label="Created">{profileWhen(settings.created_at)}</Fact>
                 <Fact label="Updated">{profileWhen(settings.updated_at)}</Fact>
@@ -1622,32 +1605,6 @@ function SettingsSection({
               settings={settings}
             />
           </FormSection>
-          <fieldset className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
-            <legend className="px-1 text-sm font-bold text-amber-950">
-              {" "}
-              {tx("Finance approval")}{" "}
-            </legend>
-            <label className="flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-white px-3 py-3">
-              <span className="text-sm font-semibold text-slate-800">
-                {" "}
-                {tx("Require separate finance approval")}{" "}
-              </span>
-              <input
-                aria-describedby="finance-approval-note"
-                className="size-4 shrink-0 accent-indigo-600"
-                defaultChecked
-                disabled
-                name="require_separate_finance_approval"
-                type="checkbox"
-              />
-            </label>
-            <p
-              className="mt-2 text-xs leading-5 text-amber-950/80"
-              id="finance-approval-note"
-            >
-              {approvalCopy()}
-            </p>
-          </fieldset>
           <ReadOnlyRows
             rows={[
               {

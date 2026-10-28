@@ -177,7 +177,6 @@ export const operationsEn = {
   Filter: "Filter",
   "Filter by payment status": "Filter by payment status",
   "Filter by PT client": "Filter by PT client",
-  "Finance approval": "Finance approval",
   "Financial totals": "Financial totals",
   "Financial totals are not included in this response.":
     "Financial totals are not included in this response.",
@@ -386,7 +385,6 @@ export const operationsEn = {
   "Remove profile photo": "Remove profile photo",
   "Removing…": "Removing…",
   "Reporting period": "Reporting period",
-  "Require separate finance approval": "Require separate finance approval",
   Required: "Required",
   Restore: "Restore",
   "Restore member": "Restore member",
@@ -745,7 +743,6 @@ export const operationsMm = {
   Filter: "စစ်ထုတ်ရန်",
   "Filter by payment status": "ငွေပေးချေမှုအခြေအနေအလိုက် စစ်ထုတ်ရန်",
   "Filter by PT client": "PT Memberအလိုက် စစ်ထုတ်ရန်",
-  "Finance approval": "ငွေကြေးအတည်ပြုချက်",
   "Financial totals": "ငွေကြေးစုစုပေါင်း",
   "Financial totals are not included in this response.":
     "ဤအချက်အလက်တွင် ငွေကြေးစုစုပေါင်း မပါဝင်ပါ။",
@@ -960,7 +957,6 @@ export const operationsMm = {
   "Remove profile photo": "ကိုယ်ရေးဓာတ်ပုံကို ဖယ်ရှားရန်",
   "Removing…": "ဖယ်ရှားနေသည်…",
   "Reporting period": "အစီရင်ခံကာလ",
-  "Require separate finance approval": "သီးခြား ဘဏ္ဍာရေး အတည်ပြုချက် လိုအပ်သည်",
   Required: "လိုအပ်သည်",
   Restore: "ပြန်ထားရန်",
   "Restore member": "အဖွဲ့ဝင်ကို ပြန်ထားရန်",

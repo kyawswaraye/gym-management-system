@@ -76,6 +76,20 @@ function pretty(value: string): string {
     .join(" ");
 }
 
+function directedQuantity(
+  movement: string,
+  quantity: string,
+  direction: string,
+): string | null {
+  if (movement === "OPENING" || movement === "PURCHASE") return quantity;
+  if (movement === "DAMAGE" || movement === "LOSS") return `-${quantity}`;
+  if (movement === "ADJUSTMENT" || movement === "CORRECTION") {
+    if (direction === "add") return quantity;
+    if (direction === "remove") return `-${quantity}`;
+  }
+  return null;
+}
+
 function statusTone(status: string): string {
   const tones: Record<string, string> = {
     Active: "bg-emerald-100 text-emerald-800",
@@ -215,24 +229,17 @@ function ProductFields({
           required
         />
       </Field>
-      <Field error={fields.current_unit_cost} label="Current unit cost">
-        <TextInput
-          defaultValue={product?.current_unit_cost ?? ""}
-          inputMode="decimal"
-          name="current_unit_cost"
-          placeholder="0.00"
-          required
-        />
-      </Field>
-      <Field error={fields.default_unit_cost} label="Default unit cost">
-        <TextInput
-          defaultValue={product?.default_unit_cost ?? ""}
-          inputMode="decimal"
-          name="default_unit_cost"
-          placeholder="0.00"
-          required
-        />
-      </Field>
+      {product ? null : (
+        <Field error={fields.current_unit_cost} label="Current unit cost">
+          <TextInput
+            defaultValue=""
+            inputMode="decimal"
+            name="current_unit_cost"
+            placeholder="0.00"
+            required
+          />
+        </Field>
+      )}
       <Field error={fields.low_stock_threshold} label="Low-stock threshold">
         <TextInput
           decimalPlaces={3}
@@ -270,14 +277,17 @@ export function InventoryManager({
   const [view, setView] = useState<InventorySection>("catalog");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [appliedCategory, setAppliedCategory] = useState("");
+  const [movementProduct, setMovementProduct] = useState("");
   const [movementType, setMovementType] = useState("");
-  const [appliedMovement, setAppliedMovement] = useState("|");
+  const [movementDate, setMovementDate] = useState("");
+  const appliedMovement = `${movementProduct}|${movementType}|${movementDate}`;
   const [selectedId, setSelectedId] = useState("");
   const [product, setProduct] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [editing, setEditing] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
+  const [adjustmentType, setAdjustmentType] = useState("");
   const [formError, setFormError] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
@@ -301,16 +311,15 @@ export function InventoryManager({
       ...(after ? { after } : {}),
     }),
   );
-  const movements = useCursorPages(appliedMovement, (after) => {
-    const [productId, type, date] = appliedMovement.split("|");
-    return listStockMovements({
-      ...(productId ? { product_id: productId } : {}),
-      ...(type ? { movement_type: type } : {}),
-      ...(date ? { business_date: date } : {}),
+  const movements = useCursorPages(appliedMovement, (after) =>
+    listStockMovements({
+      ...(movementProduct ? { product_id: movementProduct } : {}),
+      ...(movementType ? { movement_type: movementType } : {}),
+      ...(movementDate ? { business_date: movementDate } : {}),
       limit: PAGE,
       ...(after ? { after } : {}),
-    });
-  });
+    }),
+  );
 
   useEffect(() => {
     if (creating) {
@@ -372,6 +381,7 @@ export function InventoryManager({
       setCreating(false);
       setEditing(false);
       setAdjusting(false);
+      setAdjustmentType("");
     }
   }
 
@@ -387,12 +397,11 @@ export function InventoryManager({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const sale = money(form, "sale_price");
-    const current = money(form, "current_unit_cost");
-    const fallback = money(form, "default_unit_cost");
+    const current = editing ? null : money(form, "current_unit_cost");
     const threshold = canonicalQuantity(text(form, "low_stock_threshold"), {
       allowZero: true,
     });
-    if (!sale || !current || !fallback || !threshold) {
+    if (!sale || !threshold || (!editing && !current)) {
       setFields({ sale_price: MONEY_ERROR });
       setFormError(MONEY_ERROR);
       return;
@@ -408,7 +417,7 @@ export function InventoryManager({
             unit: text(form, "unit").toUpperCase(),
             sale_price: sale,
             current_unit_cost: current,
-            default_unit_cost: fallback,
+            default_unit_cost: current,
             low_stock_threshold: threshold,
             is_active: form.get("is_active") === "on",
             barcode: barcode || null,
@@ -419,7 +428,7 @@ export function InventoryManager({
             unit: text(form, "unit").toUpperCase(),
             sale_price: sale,
             current_unit_cost: current,
-            default_unit_cost: fallback,
+            default_unit_cost: current,
             low_stock_threshold: threshold,
             is_active: true,
             ...(barcode ? { barcode } : {}),
@@ -453,7 +462,9 @@ export function InventoryManager({
     movements.index > 0 || movements.hasMore || movements.bounded;
   const showCategoryPaging =
     categories.index > 0 || categories.hasMore || categories.bounded;
-  const movementFiltered = appliedMovement !== "|";
+  const movementFiltered = Boolean(
+    movementProduct || movementType || movementDate,
+  );
   const productCopy =
     view === "low"
       ? {
@@ -1078,10 +1089,6 @@ export function InventoryManager({
                             value: product.current_unit_cost,
                           },
                           {
-                            label: tx("Default unit cost"),
-                            value: product.default_unit_cost,
-                          },
-                          {
                             label: tx("Low-stock threshold"),
                             value: product.low_stock_threshold,
                           },
@@ -1149,6 +1156,7 @@ export function InventoryManager({
                             className="button"
                             onClick={() => {
                               setAdjusting(true);
+                              setAdjustmentType("");
                               setEditing(false);
                               clearFeedback();
                             }}
@@ -1212,10 +1220,11 @@ export function InventoryManager({
                     ) : null}
                     {adjusting && canAdjust ? (
                       <FormDialog
-                        description="Use three decimals, such as 1.000. A leading minus removes stock."
+                        description="Enter how many units, such as 1.000. The movement type sets the direction."
                         onClose={() => {
                           if (pending) return;
                           setAdjusting(false);
+                          setAdjustmentType("");
                           clearFeedback();
                         }}
                         onSubmit={(event) => {
@@ -1223,9 +1232,9 @@ export function InventoryManager({
                           const form = new FormData(event.currentTarget);
                           const quantity = canonicalQuantity(
                             text(form, "quantity"),
-                            { allowNegative: true },
                           );
                           const movement = text(form, "movement_type");
+                          const direction = text(form, "direction");
                           if (
                             !quantity ||
                             quantity === "0.000" ||
@@ -1237,12 +1246,35 @@ export function InventoryManager({
                             });
                             return;
                           }
+                          const signed = directedQuantity(
+                            movement,
+                            quantity,
+                            direction,
+                          );
+                          if (!signed) {
+                            setFields({
+                              direction:
+                                "Choose whether to add or remove this quantity.",
+                            });
+                            return;
+                          }
+                          const purchaseCost =
+                            movement === "PURCHASE"
+                              ? money(form, "unit_cost")
+                              : null;
+                          if (movement === "PURCHASE" && !purchaseCost) {
+                            setFields({
+                              unit_cost: "Enter the purchase unit cost.",
+                            });
+                            return;
+                          }
                           const body: StockAdjustRequest = {
                             product_id: product.id,
-                            quantity,
+                            quantity: signed,
                             movement_type: movement as MovementType,
                             business_date: text(form, "business_date"),
                             reason: text(form, "reason"),
+                            ...(purchaseCost ? { unit_cost: purchaseCost } : {}),
                           };
                           clearFeedback();
                           setPending(true);
@@ -1250,6 +1282,7 @@ export function InventoryManager({
                             .then((result) => {
                               setProduct(result.product);
                               setAdjusting(false);
+                              setAdjustmentType("");
                               clearFeedback();
                               products.reload();
                               movements.reload();
@@ -1267,7 +1300,6 @@ export function InventoryManager({
                           <div className="grid gap-4 sm:grid-cols-2">
                             <Field error={fields.quantity} label="Quantity">
                               <TextInput
-                                allowNegative
                                 decimalPlaces={3}
                                 inputMode="decimal"
                                 name="quantity"
@@ -1279,7 +1311,13 @@ export function InventoryManager({
                               error={fields.movement_type}
                               label="Movement type"
                             >
-                              <SelectInput name="movement_type" required>
+                              <SelectInput
+                                name="movement_type"
+                                onChange={(event) =>
+                                  setAdjustmentType(event.currentTarget.value)
+                                }
+                                required
+                              >
                                 <option value="">{tx("Select a type")}</option>
                                 {MANUAL_TYPES.map((item) => (
                                   <option key={item} value={item}>
@@ -1288,6 +1326,36 @@ export function InventoryManager({
                                 ))}
                               </SelectInput>
                             </Field>
+                            {adjustmentType === "PURCHASE" ? (
+                              <Field error={fields.unit_cost} label="Unit cost">
+                                <TextInput
+                                  inputMode="decimal"
+                                  name="unit_cost"
+                                  placeholder="0.00"
+                                />
+                              </Field>
+                            ) : null}
+                            {adjustmentType === "ADJUSTMENT" ||
+                            adjustmentType === "CORRECTION" ? (
+                              <div className="sm:col-span-2">
+                                <Field
+                                  error={fields.direction}
+                                  label="Add or remove?"
+                                >
+                                  <SelectInput name="direction">
+                                    <option value="">
+                                      {tx("Add or remove?")}
+                                    </option>
+                                    <option value="add">
+                                      {tx("Add stock")}
+                                    </option>
+                                    <option value="remove">
+                                      {tx("Remove stock")}
+                                    </option>
+                                  </SelectInput>
+                                </Field>
+                              </div>
+                            ) : null}
                             <Field
                               error={fields.business_date}
                               label="Business date"
@@ -1312,6 +1380,7 @@ export function InventoryManager({
                               disabled={pending}
                               onClick={() => {
                                 setAdjusting(false);
+                                setAdjustmentType("");
                                 clearFeedback();
                               }}
                               type="button"
@@ -1357,18 +1426,15 @@ export function InventoryManager({
               {" "}
               {tx("Purchases, sales, damage, and manual corrections.")}{" "}
             </p>
-            <form
+            <div
               className={`mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end ${fieldTone}`}
-              onSubmit={(event) => {
-                event.preventDefault();
-                const form = new FormData(event.currentTarget);
-                setAppliedMovement(
-                  `${text(form, "product_id")}|${text(form, "movement_type")}|${text(form, "business_date")}`,
-                );
-              }}
             >
               <Field label="Product">
-                <SelectInput name="product_id">
+                <SelectInput
+                  name="product_id"
+                  onChange={(event) => setMovementProduct(event.target.value)}
+                  value={movementProduct}
+                >
                   <option value="">{tx("Any product")}</option>
                   {products.rows.map((row) => (
                     <option key={row.id} value={row.id}>
@@ -1392,15 +1458,29 @@ export function InventoryManager({
                 </SelectInput>
               </Field>
               <Field label="Business date">
-                <TextInput name="business_date" type="date" />
+                <TextInput
+                  name="business_date"
+                  onChange={(event) => setMovementDate(event.target.value)}
+                  type="date"
+                  value={movementDate}
+                />
               </Field>
               <div className="flex items-end justify-end sm:col-span-2 xl:col-span-1">
-                <button className="button" type="submit">
+                <button
+                  className="button button-cancel"
+                  disabled={!movementFiltered}
+                  onClick={() => {
+                    setMovementProduct("");
+                    setMovementType("");
+                    setMovementDate("");
+                  }}
+                  type="button"
+                >
                   {" "}
-                  {tx("Apply filters")}{" "}
+                  {tx("Clear filters")}{" "}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
           {movements.pending && movements.rows.length === 0 ? (
             <LoadingRows label="Loading stock movements." />
@@ -1465,6 +1545,13 @@ export function InventoryManager({
                       {tx("Quantity")}{" "}
                     </th>
                     <th
+                      className="px-5 py-2.5 text-right text-xs font-semibold"
+                      scope="col"
+                    >
+                      {" "}
+                      {tx("On hand")}{" "}
+                    </th>
+                    <th
                       className="hidden px-5 py-2.5 text-right text-xs font-semibold sm:table-cell"
                       scope="col"
                     >
@@ -1513,6 +1600,9 @@ export function InventoryManager({
                           className={`px-5 py-3 text-right font-semibold tabular-nums ${quantityTone(row.quantity)}`}
                         >
                           {row.quantity}
+                        </td>
+                        <td className="px-5 py-3 text-right font-semibold text-slate-900 tabular-nums">
+                          {row.quantity_on_hand}
                         </td>
                         <td className="hidden px-5 py-3 text-right text-slate-600 tabular-nums sm:table-cell">
                           {row.unit_cost_snapshot}

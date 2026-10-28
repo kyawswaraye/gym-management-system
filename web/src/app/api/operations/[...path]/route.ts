@@ -30,6 +30,14 @@ export async function PATCH(request: NextRequest, context: Context) {
   );
 }
 
+export async function PUT(request: NextRequest, context: Context) {
+  return authenticatedMutation(
+    request,
+    await djangoPath(request, context),
+    "PUT",
+  );
+}
+
 export async function DELETE(request: NextRequest, context: Context) {
   return authenticatedMutation(
     request,

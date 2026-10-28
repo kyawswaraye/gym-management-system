@@ -16,7 +16,8 @@ EXPENSE_POSTING_COMMIT = ("expenses", "0003_expense_posting_commit_current_row")
 SALARY_INITIAL = ("salaries", "0001_salary_period_and_line")
 SALARY_RLS = ("salaries", "0002_rls_integrity_and_grants")
 SALARY_LEAF = ("salaries", "0003_salary_period_void")
-EXPENSE_LEAF = ("expenses", "0005_salary_void_set")
+EXPENSE_VOID_SET = ("expenses", "0005_salary_void_set")
+EXPENSE_LEAF = ("expenses", "0006_owner_or_desk_may_approve_own_expense")
 SALARY_APP_PLAN = (
     ("expenses", "0001_expense_receipt_and_expense"),
     ("expenses", "0002_rls_integrity_and_grants"),
@@ -40,10 +41,11 @@ def test_salary_leaf_requires_expense_posting_commit_migration() -> None:
     assert ("expenses", "0004_correction_runtime_reversal") in loader.disk_migrations[
         SALARY_LEAF
     ].dependencies
-    assert SALARY_LEAF in loader.disk_migrations[EXPENSE_LEAF].dependencies
+    assert SALARY_LEAF in loader.disk_migrations[EXPENSE_VOID_SET].dependencies
     assert ("expenses", "0004_correction_runtime_reversal") in loader.disk_migrations[
-        EXPENSE_LEAF
+        EXPENSE_VOID_SET
     ].dependencies
+    assert EXPENSE_VOID_SET in loader.disk_migrations[EXPENSE_LEAF].dependencies
     void_plan = loader.graph.forwards_plan(SALARY_LEAF)
     assert void_plan.index(("expenses", "0004_correction_runtime_reversal")) < void_plan.index(
         SALARY_LEAF
