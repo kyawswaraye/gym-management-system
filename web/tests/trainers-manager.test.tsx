@@ -124,9 +124,9 @@ async function chooseTrainer(dialog: HTMLElement) {
 }
 
 async function chooseMember(dialog: HTMLElement) {
-  fireEvent.click(
-    within(dialog).getByRole("button", { name: "Search members" }),
-  );
+  fireEvent.change(within(dialog).getByLabelText("Search active members"), {
+    target: { value: "Grace" },
+  });
   fireEvent.click(
     await within(dialog).findByRole("button", { name: "Grace Hopper (M-1)" }),
   );
@@ -332,7 +332,7 @@ describe("create assignment dialog", () => {
       within(dialog).getByRole("button", { name: "Save assignment" }),
     ).toBeDisabled();
     expect(
-      within(dialog).getByRole("button", { name: "Search members" }),
+      within(dialog).getByLabelText("Search active members"),
     ).toBeDisabled();
 
     fireEvent.keyDown(dialog, { key: "Escape" });

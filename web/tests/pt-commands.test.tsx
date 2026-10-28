@@ -398,7 +398,9 @@ describe("phase 5 command coverage", () => {
     fireEvent.change(screen.getByLabelText("Trainer"), {
       target: { value: TRAINER },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Search members" }));
+    fireEvent.change(screen.getByLabelText("Search active members"), {
+      target: { value: "Grace" },
+    });
     fireEvent.click(
       await screen.findByRole("button", { name: "Grace Hopper (M-1)" }),
     );
@@ -1243,7 +1245,9 @@ describe("phase 5 command coverage", () => {
     fireEvent.change(screen.getByLabelText("Trainer"), {
       target: { value: TRAINER },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Search members" }));
+    fireEvent.change(screen.getByLabelText("Search active members"), {
+      target: { value: "Grace" },
+    });
     fireEvent.click(
       await screen.findByRole("button", { name: "Grace Hopper (M-1)" }),
     );
@@ -1482,9 +1486,9 @@ describe("phase 5 command coverage", () => {
       await screen.findByRole("button", { name: "Book a class" }),
     );
     const bookDialog = screen.getByRole("dialog", { name: "Book a class" });
-    fireEvent.click(
-      within(bookDialog).getByRole("button", { name: "Search members" }),
-    );
+    fireEvent.change(within(bookDialog).getByLabelText("Search active members"), {
+      target: { value: "Grace" },
+    });
     fireEvent.click(
       await within(bookDialog).findByRole("button", {
         name: "Grace Hopper (M-1)",

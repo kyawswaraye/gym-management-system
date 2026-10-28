@@ -61,6 +61,16 @@ describe("finance route allowlist", () => {
         "GET",
       ),
     ).toBeNull();
+    expect(
+      allowsFinanceRoute(
+        "/api/v1/products/",
+        "?search=WATER&is_active=true&limit=10",
+        "GET",
+      ),
+    ).toBe(true);
+    expect(
+      allowsFinanceRoute("/api/v1/products/", `?search=${"x".repeat(101)}`, "GET"),
+    ).toBe(false);
   });
 });
 

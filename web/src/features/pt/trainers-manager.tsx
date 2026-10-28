@@ -379,7 +379,6 @@ export function TrainersManager({
         <div className="grid gap-5 p-4 sm:p-5">
           <div className="grid items-end gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-[minmax(0,1fr)_14rem_auto]">
             <MemberSearch
-              action="Search assignment members"
               label="Filter assignments by member"
               onSelect={setMemberFilter}
               selected={memberFilter}

@@ -359,11 +359,18 @@ describe("inventory", () => {
       );
     });
 
-    await screen.findByRole("option", { name: "WATER — Water" });
-    fireEvent.change(screen.getByRole("combobox", { name: "Product" }), {
-      target: { value: PRODUCT_ID },
-    });
+    expect(screen.getByText("Any product")).toBeVisible();
+    fireEvent.change(
+      screen.getByPlaceholderText("Name, SKU, barcode, or category"),
+      { target: { value: "WATER" } },
+    );
+    expect(
+      await screen.findByText(/Selected product: WATER — Water/),
+    ).toBeVisible();
     await waitFor(() => {
+      expect(listProducts).toHaveBeenCalledWith(
+        expect.objectContaining({ search: "WATER", limit: "10" }),
+      );
       expect(listStockMovements).toHaveBeenCalledWith(
         expect.objectContaining({
           product_id: PRODUCT_ID,
@@ -389,6 +396,7 @@ describe("inventory", () => {
     await waitFor(() => {
       expect(listStockMovements).toHaveBeenCalledWith({ limit: "25" });
     });
+    expect(screen.getByText("Any product")).toBeVisible();
   });
 
   it("shows the stock on hand after each movement", async () => {

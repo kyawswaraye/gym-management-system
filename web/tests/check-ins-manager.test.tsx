@@ -149,16 +149,15 @@ describe("Check-ins manager", () => {
     fireEvent.change(screen.getByLabelText("Search active members"), {
       target: { value: "Ada" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Select Ada Lovelace (MEM-000001)",
+        name: "Ada Lovelace (MEM-000001)",
       }),
     );
     expect(listMembers).toHaveBeenCalledWith({
       search: "Ada",
       status: "ACTIVE",
-      limit: 25,
+      limit: 10,
     });
     expect(await screen.findByText("No check-ins yet.")).toBeInTheDocument();
 

@@ -48,6 +48,7 @@ export const financeEn = {
     "Choose an open session only when this return refunds cash. Leave it blank when the server refund is zero.",
   "Choose whether to add or remove this quantity.":
     "Choose whether to add or remove this quantity.",
+  "Clear to walk-in": "Clear to walk-in",
   "Confirm adjustment": "Confirm adjustment",
   "Correction date": "Correction date",
   "Correction receipt": "Correction receipt",
@@ -110,11 +111,13 @@ export const financeEn = {
   "Manual adjustment": "Manual adjustment",
   "Manual net": "Manual net",
   "Manual stock adjustment": "Manual stock adjustment",
+  "Matching products": "Matching products",
   Membership: "Membership",
   Movement: "Movement",
   "Movement history": "Movement history",
   "Movement type": "Movement type",
   "Name or member number": "Name or member number",
+  "Name, SKU, barcode, or category": "Name, SKU, barcode, or category",
   "New category": "New category",
   "New custom category": "New custom category",
   "New product": "New product",
@@ -129,10 +132,11 @@ export const financeEn = {
   "No categories yet.": "No categories yet.",
   "No expenses match this status.": "No expenses match this status.",
   "No expenses yet.": "No expenses yet.",
-  "No low-stock products in this category.":
-    "No low-stock products in this category.",
   "No issued receipt is available to reprint.":
     "No issued receipt is available to reprint.",
+  "No low-stock products in this category.":
+    "No low-stock products in this category.",
+  "No matching products.": "No matching products.",
   "No member": "No member",
   "No membership": "No membership",
   "No movements match these filters.": "No movements match these filters.",
@@ -263,6 +267,7 @@ export const financeEn = {
   "Save sale changes": "Save sale changes",
   "Save the dates first. Add each staff amount after the draft opens.":
     "Save the dates first. Add each staff amount after the draft opens.",
+  "Searching products.": "Searching products.",
   "Select a category": "Select a category",
   "Select a product": "Select a product",
   "Select a row to review, submit, or approve it.":
@@ -272,6 +277,7 @@ export const financeEn = {
   "Select an open session": "Select an open session",
   "Select direction": "Select direction",
   "Select staff": "Select staff",
+  "Selected product: {name}": "Selected product: {name}",
   "Session detail": "Session detail",
   Sold: "Sold",
   "Sold quantity": "Sold quantity",
@@ -324,6 +330,7 @@ export const financeEn = {
   "Try another status, register, or date.":
     "Try another status, register, or date.",
   "Try another status.": "Try another status.",
+  "Unable to search products.": "Unable to search products.",
   "Unit cost": "Unit cost",
   VOID: "VOID",
   Void: "Void",
@@ -395,6 +402,7 @@ export const financeMm = {
     "ဤပြန်အပ်မှုက ငွေသား ပြန်အမ်းမှသာ ဖွင့်ထားသော ကာလကို ရွေးပါ။ ဆာဗာ၏ ပြန်အမ်းငွေ သုညဖြစ်လျှင် ကွက်လပ်ထားပါ။",
   "Choose whether to add or remove this quantity.":
     "ဤအရေအတွက်ကို တိုးမည်လား၊ လျှော့မည်လား ရွေးပါ။",
+  "Clear to walk-in": "လာရောက်ဝယ်သူအဖြစ် ပြန်ထားရန်",
   "Confirm adjustment": "ပြင်ဆင်ချက် အတည်ပြုရန်",
   "Correction date": "ပြင်ဆင်သည့်ရက်",
   "Correction receipt": "ပြင်ဆင်ချက် ပြေစာ",
@@ -458,11 +466,13 @@ export const financeMm = {
   "Manual adjustment": "ကိုယ်တိုင်ပြင်ဆင်ချက်",
   "Manual net": "ကိုယ်တိုင်ညှိ အသားတင်",
   "Manual stock adjustment": "ကိုယ်တိုင် လက်ကျန်ပြင်ဆင်ချက်",
+  "Matching products": "ကိုက်ညီသော ကုန်ပစ္စည်းများ",
   Membership: "အသင်းဝင်မှု",
   Movement: "အဝင်အထွက်",
   "Movement history": "အဝင်အထွက်မှတ်တမ်း",
   "Movement type": "အဝင်အထွက်အမျိုးအစား",
   "Name or member number": "အမည် သို့မဟုတ် အဖွဲ့ဝင်နံပါတ်",
+  "Name, SKU, barcode, or category": "အမည်၊ SKU၊ ဘားကုဒ် သို့မဟုတ် အမျိုးအစား",
   "New category": "အမျိုးအစား အသစ်",
   "New custom category": "စိတ်ကြိုက်အမျိုးအစား အသစ်",
   "New product": "ကုန်ပစ္စည်း အသစ်",
@@ -488,6 +498,7 @@ export const financeMm = {
     "ဤစစ်ထုတ်ချက်များနှင့် ကိုက်ညီသော အဝင်အထွက် မရှိပါ။",
   "No movements were returned for this session.":
     "ဤကာလအတွက် အဝင်အထွက် မတွေ့ပါ။",
+  "No matching products.": "ကိုက်ညီသော ကုန်ပစ္စည်း မရှိပါ။",
   "No payments were returned.": "ငွေပေးချေမှု မတွေ့ပါ။",
   "No products in this category.": "ဤအမျိုးအစားတွင် ကုန်ပစ္စည်း မရှိပါ။",
   "No products yet.": "ကုန်ပစ္စည်း မရှိသေးပါ။",
@@ -613,8 +624,10 @@ export const financeMm = {
   "Save sale changes": "အရောင်းပြောင်းလဲချက် သိမ်းရန်",
   "Save the dates first. Add each staff amount after the draft opens.":
     "ရက်စွဲများကို အရင်သိမ်းပါ။ မူကြမ်းပွင့်ပြီးမှ ဝန်ထမ်းတစ်ဦးချင်း၏ ပမာဏကို ထည့်ပါ။",
+  "Searching products.": "ကုန်ပစ္စည်းများ ရှာနေပါသည်။",
   "Select a category": "အမျိုးအစား ရွေးပါ",
   "Select a product": "ကုန်ပစ္စည်း ရွေးပါ",
+  "Selected product: {name}": "ရွေးထားသော ကုန်ပစ္စည်း: {name}",
   "Select a row to review, submit, or approve it.":
     "စစ်ဆေးရန်၊ တင်သွင်းရန် သို့မဟုတ် အတည်ပြုရန် တန်းတစ်ခု ရွေးပါ။",
   "Select a sale to review, submit, or approve it.":
@@ -671,6 +684,7 @@ export const financeMm = {
   "Try another status, register, or date.":
     "အခြားအခြေအနေ၊ အရောင်းကောင်တာ သို့မဟုတ် ရက်စွဲဖြင့် ပြန်စစ်ကြည့်ပါ။",
   "Try another status.": "အခြားအခြေအနေဖြင့် ပြန်စစ်ကြည့်ပါ။",
+  "Unable to search products.": "ကုန်ပစ္စည်းများကို ရှာ၍ မရပါ။",
   "Unit cost": "တစ်ခုလျှင် ကုန်ကျစရိတ်",
   VOID: "ပယ်ဖျက်",
   Void: "ပယ်ဖျက်",

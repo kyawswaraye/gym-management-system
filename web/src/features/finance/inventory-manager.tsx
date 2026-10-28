@@ -17,6 +17,7 @@ import {
 import { FormDialog } from "@/components/form-dialog";
 import { fieldMap, financeError } from "@/features/finance/errors";
 import { canonicalMoney, canonicalQuantity } from "@/features/finance/money";
+import { ProductSearch } from "@/features/finance/product-search";
 import { formatAppDate } from "@/lib/date";
 import { useCursorPages } from "@/features/finance/paging";
 import {
@@ -275,10 +276,10 @@ export function InventoryManager({
   const [view, setView] = useState<InventorySection>("catalog");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [appliedCategory, setAppliedCategory] = useState("");
-  const [movementProduct, setMovementProduct] = useState("");
+  const [movementProduct, setMovementProduct] = useState<Product | null>(null);
   const [movementType, setMovementType] = useState("");
   const [movementDate, setMovementDate] = useState("");
-  const appliedMovement = `${movementProduct}|${movementType}|${movementDate}`;
+  const appliedMovement = `${movementProduct?.id ?? ""}|${movementType}|${movementDate}`;
   const [selectedId, setSelectedId] = useState("");
   const [product, setProduct] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
@@ -311,7 +312,7 @@ export function InventoryManager({
   );
   const movements = useCursorPages(appliedMovement, (after) =>
     listStockMovements({
-      ...(movementProduct ? { product_id: movementProduct } : {}),
+      ...(movementProduct ? { product_id: movementProduct.id } : {}),
       ...(movementType ? { movement_type: movementType } : {}),
       ...(movementDate ? { business_date: movementDate } : {}),
       limit: PAGE,
@@ -449,7 +450,11 @@ export function InventoryManager({
     categories.rows.map((category) => [category.id, category.name]),
   );
   const productById = new Map(
-    [...products.rows, ...lowStock.rows].map((row) => [row.id, row]),
+    [
+      ...products.rows,
+      ...lowStock.rows,
+      ...(movementProduct ? [movementProduct] : []),
+    ].map((row) => [row.id, row]),
   );
   const showProductPaging =
     activeRows.index > 0 || activeRows.hasMore || activeRows.bounded;
@@ -1424,22 +1429,16 @@ export function InventoryManager({
               {tx("Purchases, sales, damage, and manual corrections.")}{" "}
             </p>
             <div
-              className={`mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end ${fieldTone}`}
+              className={`mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end ${fieldTone}`}
             >
-              <Field label="Product">
-                <SelectInput
-                  name="product_id"
-                  onChange={(event) => setMovementProduct(event.target.value)}
-                  value={movementProduct}
-                >
-                  <option value="">{tx("Any product")}</option>
-                  {products.rows.map((row) => (
-                    <option key={row.id} value={row.id}>
-                      {row.sku} — {row.name}
-                    </option>
-                  ))}
-                </SelectInput>
-              </Field>
+              <div className="sm:col-span-2 xl:col-span-1">
+                <ProductSearch
+                  activeOnly={false}
+                  emptySelectedLabel="Any product"
+                  onSelect={setMovementProduct}
+                  selected={movementProduct}
+                />
+              </div>
               <Field label="Movement type">
                 <SelectInput
                   name="movement_type"
@@ -1467,7 +1466,7 @@ export function InventoryManager({
                   className="button button-cancel"
                   disabled={!movementFiltered}
                   onClick={() => {
-                    setMovementProduct("");
+                    setMovementProduct(null);
                     setMovementType("");
                     setMovementDate("");
                   }}

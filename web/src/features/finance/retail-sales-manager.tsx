@@ -22,7 +22,7 @@ import {
   cancelRetailSale,
   createRetailSale,
   getRetailSale,
-  listProducts,
+  getProduct,
   listRetailSales,
   rejectRetailSale,
   returnRetailSale,
@@ -40,6 +40,7 @@ import {
   previewLineAmount,
 } from "@/features/finance/money";
 import { useCursorPages } from "@/features/finance/paging";
+import { ProductSearch } from "@/features/finance/product-search";
 import {
   Alert,
   CursorControls,
@@ -48,7 +49,8 @@ import {
   SelectInput,
   TextInput,
 } from "@/features/finance/ui";
-import { listMembers } from "@/features/operations/client";
+import { operationGet } from "@/features/operations/client";
+import { MemberSearch } from "@/features/operations/member-search";
 import { actionButtonClass } from "@/lib/ui/action-button";
 import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
@@ -153,15 +155,22 @@ function blankLine(): LineDraft {
   };
 }
 
-function memberLabel(
-  members: readonly Member[],
+function memberChoiceLabel(member: {
+  member_number: string;
+  first_name: string;
+  last_name: string;
+}): string {
+  return `${member.member_number} — ${member.first_name} ${member.last_name}`;
+}
+
+function saleMemberLabel(
+  member: Member | null,
   memberId: string | null,
   tx: (text: string) => string,
 ): string {
   if (!memberId) return tx("Walk-in");
-  const member = members.find((item) => item.id === memberId);
-  if (!member) return tx("Member");
-  return `${member.member_number} · ${member.first_name} ${member.last_name}`;
+  if (member && member.id === memberId) return memberChoiceLabel(member);
+  return tx("Member");
 }
 
 function lineSummary(
@@ -181,12 +190,12 @@ function lineSummary(
 
 function previewTotal(
   lines: readonly LineDraft[],
-  products: readonly Product[],
+  productsById: ReadonlyMap<string, Product>,
 ): string | null {
   let total = 0n;
   let count = 0;
   for (const line of lines) {
-    const product = products.find((item) => item.id === line.productId);
+    const product = productsById.get(line.productId);
     if (!product) continue;
     const preview = previewLineAmount(
       line.quantity,
@@ -389,10 +398,12 @@ export function RetailSalesManager({
   const [applied, setApplied] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [sale, setSale] = useState<RetailSale | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [productsById, setProductsById] = useState<ReadonlyMap<string, Product>>(
+    () => new Map(),
+  );
   const [lines, setLines] = useState<LineDraft[]>([blankLine()]);
   const [memberId, setMemberId] = useState("");
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [method, setMethod] = useState<PaymentMethod>("CASH");
   const [businessDate, setBusinessDate] = useState(defaultDate);
   const [reference, setReference] = useState("");
@@ -425,35 +436,11 @@ export function RetailSalesManager({
   );
 
   useEffect(() => {
-    let active = true;
-    const timer = window.setTimeout(() => {
-      void Promise.all([
-        listMembers({ limit: 25 }),
-        listProducts({ is_active: "true", limit: "100" }),
-      ])
-        .then(([memberPage, productPage]) => {
-          if (!active) return;
-          setMembers(memberPage.data);
-          setProducts(productPage.data);
-        })
-        .catch(() => {
-          if (!active) return;
-          setMembers([]);
-          setProducts([]);
-        });
-    }, 0);
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!selectedId) return undefined;
     let active = true;
     const timer = window.setTimeout(() => {
       void getRetailSale(selectedId)
-        .then((row) => {
+        .then(async (row) => {
           if (!active) return;
           setSale(row);
           setLines(
@@ -468,10 +455,38 @@ export function RetailSalesManager({
           setMethod(row.payment_method as PaymentMethod);
           setBusinessDate(row.business_date);
           setReference(row.reference_number);
+          const loaded = await Promise.all(
+            row.lines.map((line) =>
+              getProduct(line.product_id).catch(() => null),
+            ),
+          );
+          if (!active) return;
+          setProductsById((current) => {
+            const next = new Map(current);
+            for (const product of loaded) {
+              if (product) next.set(product.id, product);
+            }
+            return next;
+          });
+          if (!row.member_id) {
+            setSelectedMember(null);
+            return;
+          }
+          try {
+            const member = await operationGet<Member>(
+              `members/${row.member_id}/`,
+            );
+            if (!active) return;
+            setSelectedMember(member);
+          } catch {
+            if (!active) return;
+            setSelectedMember(null);
+          }
         })
         .catch((caught: unknown) => {
           if (!active) return;
           setSale(null);
+          setSelectedMember(null);
           setFormError(
             financeError(caught, tx("The sale could not be loaded.")),
           );
@@ -482,6 +497,15 @@ export function RetailSalesManager({
       window.clearTimeout(timer);
     };
   }, [selectedId, sales.rows, tx]);
+
+  function rememberProduct(product: Product) {
+    setProductsById((current) => {
+      if (current.get(product.id) === product) return current;
+      const next = new Map(current);
+      next.set(product.id, product);
+      return next;
+    });
+  }
 
   function fail(caught: unknown, fallback: string) {
     setFields(fieldMap(caught));
@@ -511,6 +535,7 @@ export function RetailSalesManager({
     setFields({});
     setLines([blankLine()]);
     setMemberId("");
+    setSelectedMember(null);
     setMethod("CASH");
     setBusinessDate(defaultDate);
     setReference("");
@@ -549,7 +574,7 @@ export function RetailSalesManager({
     (canCreate && creatingSale && !editing) ||
     (editing && canUpdate && sale?.status === "DRAFT");
   const showPaging = sales.index > 0 || sales.hasMore || sales.bounded;
-  const estimate = previewTotal(lines, products);
+  const estimate = previewTotal(lines, productsById);
   const canEditDraft = sale?.status === "DRAFT" && canUpdate;
   const canSubmitDraft = sale?.status === "DRAFT" && canSubmit;
   const canDecide = sale?.status === "PENDING_APPROVAL" && canApprove;
@@ -626,21 +651,33 @@ export function RetailSalesManager({
           <div className={`grid gap-4 ${fieldTone}`}>
             <Alert message={formError} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <Field label="Member">
-                  <SelectInput
-                    onChange={(event) => setMemberId(event.target.value)}
-                    value={memberId}
+              <div className="sm:col-span-2 grid gap-2">
+                <MemberSearch
+                  activeOnly={false}
+                  disabled={pending}
+                  emptySelectedLabel="Walk-in"
+                  formatMember={memberChoiceLabel}
+                  label="Member"
+                  onSelect={(member) => {
+                    setSelectedMember(member);
+                    setMemberId(member.id);
+                  }}
+                  selected={selectedMember}
+                  showEmptySelected
+                />
+                {selectedMember ? (
+                  <button
+                    className="button button-cancel w-fit"
+                    disabled={pending}
+                    onClick={() => {
+                      setSelectedMember(null);
+                      setMemberId("");
+                    }}
+                    type="button"
                   >
-                    <option value="">{tx("Walk-in")}</option>
-                    {members.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.member_number} — {member.first_name}{" "}
-                        {member.last_name}
-                      </option>
-                    ))}
-                  </SelectInput>
-                </Field>
+                    {tx("Clear to walk-in")}
+                  </button>
+                ) : null}
               </div>
               <Field label="Business date">
                 <TextInput
@@ -691,9 +728,7 @@ export function RetailSalesManager({
                 </button>
               </div>
               {lines.map((line, index) => {
-                const product = products.find(
-                  (item) => item.id === line.productId,
-                );
+                const product = productsById.get(line.productId) ?? null;
                 const preview = product
                   ? previewLineAmount(
                       line.quantity,
@@ -701,6 +736,12 @@ export function RetailSalesManager({
                       line.discount,
                     )
                   : null;
+                const usedElsewhere = lines
+                  .filter(
+                    (item) =>
+                      item.key !== line.key && item.productId.length > 0,
+                  )
+                  .map((item) => item.productId);
                 return (
                   <div
                     className="rounded-xl border border-slate-200 bg-slate-50/80 p-3"
@@ -727,27 +768,21 @@ export function RetailSalesManager({
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="sm:col-span-2">
-                        <Field label="Product">
-                          <SelectInput
-                            onChange={(event) =>
-                              setLines((current) =>
-                                current.map((item) =>
-                                  item.key === line.key
-                                    ? { ...item, productId: event.target.value }
-                                    : item,
-                                ),
-                              )
-                            }
-                            value={line.productId}
-                          >
-                            <option value="">{tx("Select a product")}</option>
-                            {products.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.sku} — {item.name} · {item.sale_price}
-                              </option>
-                            ))}
-                          </SelectInput>
-                        </Field>
+                        <ProductSearch
+                          disabled={pending}
+                          excludeIds={usedElsewhere}
+                          onSelect={(picked) => {
+                            rememberProduct(picked);
+                            setLines((current) =>
+                              current.map((item) =>
+                                item.key === line.key
+                                  ? { ...item, productId: picked.id }
+                                  : item,
+                              ),
+                            );
+                          }}
+                          selected={product}
+                        />
                       </div>
                       <Field error={fields.quantity} label="Quantity">
                         <TextInput
@@ -1043,7 +1078,7 @@ export function RetailSalesManager({
                       <p className="mt-1 text-sm text-slate-500">
                         {formatAppDate(sale.business_date)} ·{" "}
                         {tx(pretty(sale.payment_method))} ·{" "}
-                        {memberLabel(members, sale.member_id, tx)}
+                        {saleMemberLabel(selectedMember, sale.member_id, tx)}
                       </p>
                     </div>
                     <StatusPill status={sale.status} />

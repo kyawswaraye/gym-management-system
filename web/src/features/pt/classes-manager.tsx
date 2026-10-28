@@ -1591,7 +1591,6 @@ export function ClassesManager({
                 </div>
                 <div className="border-y border-slate-100 bg-slate-50/70 px-4 py-4 sm:px-5">
                   <MemberSearch
-                    action="Search class booking members"
                     label="Filter class bookings by member"
                     onSelect={setBookingMember}
                     selected={bookingMember}

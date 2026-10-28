@@ -512,6 +512,7 @@ export function listProducts(values: {
   is_active?: string;
   sku?: string;
   barcode?: string;
+  search?: string;
   limit?: string;
   after?: string;
 }): Promise<CollectionPage<Product>> {

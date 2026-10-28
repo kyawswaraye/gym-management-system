@@ -729,7 +729,6 @@ export function SalesManager({
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
               <div className="min-w-0 flex-1">
                 <MemberSearch
-                  action="Search sale members"
                   label="Filter sales by member"
                   onSelect={setMemberFilter}
                   selected={memberFilter}

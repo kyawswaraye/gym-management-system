@@ -111,9 +111,9 @@ async function openBookDialog() {
 }
 
 async function chooseGrace(dialog: HTMLElement) {
-  fireEvent.click(
-    within(dialog).getByRole("button", { name: "Search members" }),
-  );
+  fireEvent.change(within(dialog).getByLabelText("Search active members"), {
+    target: { value: "Grace" },
+  });
   fireEvent.click(
     await within(dialog).findByRole("button", { name: "Grace Hopper (M-1)" }),
   );
@@ -276,9 +276,9 @@ describe("PT bookings calendar", () => {
       ),
     ).toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Search booking members" }),
-    );
+    fireEvent.change(screen.getByLabelText("Filter bookings by member"), {
+      target: { value: "Grace" },
+    });
     fireEvent.click(
       await screen.findByRole("button", { name: "Grace Hopper (M-1)" }),
     );
@@ -440,9 +440,9 @@ describe("book session dialog", () => {
     expect(createPtBooking).not.toHaveBeenCalled();
 
     await chooseGrace(dialog);
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "Search members" }),
-    );
+    fireEvent.change(within(dialog).getByLabelText("Search active members"), {
+      target: { value: "Ada" },
+    });
     fireEvent.click(
       await within(dialog).findByRole("button", { name: "Ada Lovelace (M-2)" }),
     );

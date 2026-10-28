@@ -216,7 +216,10 @@ async function openSaleRow() {
   return detail;
 }
 
-async function chooseMember(scope: HTMLElement, action = "Search members") {
+async function chooseMember(
+  scope: HTMLElement,
+  label = "Search active members",
+) {
   vi.mocked(listMembers).mockResolvedValue(
     page([
       {
@@ -227,7 +230,9 @@ async function chooseMember(scope: HTMLElement, action = "Search members") {
       },
     ]),
   );
-  fireEvent.click(within(scope).getByRole("button", { name: action }));
+  fireEvent.change(within(scope).getByLabelText(label), {
+    target: { value: "Grace" },
+  });
   fireEvent.click(
     await within(scope).findByRole("button", { name: "Grace Hopper (M-1)" }),
   );
@@ -296,7 +301,7 @@ describe("PT sales list and detail", () => {
     );
     await chooseMember(
       screen.getByRole("region", { name: "Sales" }),
-      "Search sale members",
+      "Filter sales by member",
     );
     await waitFor(() =>
       expect(listPtSales).toHaveBeenCalledWith(

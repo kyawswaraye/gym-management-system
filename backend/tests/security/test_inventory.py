@@ -698,6 +698,7 @@ def test_lists_are_cursor_bound_and_do_not_scan_per_product() -> None:
                     is_active=None,
                     sku="",
                     barcode="",
+                    search="",
                     limit=limit_rows,
                     after="",
                 )
@@ -723,6 +724,7 @@ def test_lists_are_cursor_bound_and_do_not_scan_per_product() -> None:
                 is_active=None,
                 sku="",
                 barcode="",
+                search="",
                 limit=25,
                 after="",
             )
@@ -739,3 +741,53 @@ def test_lists_are_cursor_bound_and_do_not_scan_per_product() -> None:
     assert "Index" in rendered
     assert "Seq Scan on inventory_product" not in rendered
     assert "gym_id" in low_sql
+
+
+@override_settings(**jwt_settings())
+def test_product_list_search_matches_name_sku_barcode_and_category() -> None:
+    api, _gym, _owner, headers = _gym("INVSRCH")
+    drinks = _post_category(api, headers, _category_body("DRINKS", "Cold Drinks"))
+    snacks = _post_category(api, headers, _category_body("SNACKS", "Gym Snacks"))
+    assert drinks.status_code == 201, drinks.content
+    assert snacks.status_code == 201, snacks.content
+    water = _post_product(
+        api,
+        headers,
+        drinks.json()["data"]["id"],
+        sku="WATER-1",
+        extra={"barcode": "5901234123457", "name": "Spring Water"},
+    )
+    bar = _post_product(
+        api,
+        headers,
+        snacks.json()["data"]["id"],
+        sku="PROTEIN-BAR",
+        extra={"barcode": "8801234567890", "name": "Chocolate Bar"},
+    )
+    assert water.status_code == 201, water.content
+    assert bar.status_code == 201, bar.content
+
+    by_name = api.get("/api/v1/products/?search=Spring", **headers)
+    assert by_name.status_code == 200, by_name.content
+    assert [row["sku"] for row in by_name.json()["data"]] == ["WATER-1"]
+
+    by_sku = api.get("/api/v1/products/?search=PROTEIN", **headers)
+    assert by_sku.status_code == 200, by_sku.content
+    assert [row["sku"] for row in by_sku.json()["data"]] == ["PROTEIN-BAR"]
+
+    by_barcode = api.get("/api/v1/products/?search=8801234567890", **headers)
+    assert by_barcode.status_code == 200, by_barcode.content
+    assert [row["sku"] for row in by_barcode.json()["data"]] == ["PROTEIN-BAR"]
+
+    by_category = api.get("/api/v1/products/?search=Snacks", **headers)
+    assert by_category.status_code == 200, by_category.content
+    assert [row["sku"] for row in by_category.json()["data"]] == ["PROTEIN-BAR"]
+
+    by_code = api.get("/api/v1/products/?search=DRINKS", **headers)
+    assert by_code.status_code == 200, by_code.content
+    assert [row["sku"] for row in by_code.json()["data"]] == ["WATER-1"]
+
+    blank = api.get("/api/v1/products/?search=", **headers)
+    assert blank.status_code == 400
+    too_long = api.get(f"/api/v1/products/?search={'x' * 101}", **headers)
+    assert too_long.status_code == 400

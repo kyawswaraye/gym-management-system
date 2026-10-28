@@ -10,8 +10,11 @@ import {
   createCheckIn,
   listCheckIns,
   listMemberCheckIns,
-  listMembers,
 } from "@/features/operations/client";
+import {
+  MemberSearch,
+  memberLabel,
+} from "@/features/operations/member-search";
 import { TrainerScan } from "@/features/operations/trainer-scan";
 import { formatInstant, zonedLocalToIso } from "@/lib/date";
 import type { CheckInRecord, Member } from "@/types/api";
@@ -20,11 +23,6 @@ type DeskMember = Pick<
   Member,
   "id" | "member_number" | "first_name" | "last_name"
 >;
-
-function memberLabel(member: DeskMember): string {
-  const name = `${member.first_name} ${member.last_name}`.trim();
-  return name ? `${name} (${member.member_number})` : member.member_number;
-}
 
 function failureMessage(caught: unknown): string {
   if (caught instanceof OperationError) return caught.message;
@@ -157,8 +155,6 @@ export function CheckInsManager({
   timeZone: string;
 }) {
   const tx = useTx();
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<DeskMember[]>([]);
   const [selected, setSelected] = useState<DeskMember | null>(null);
   const [history, setHistory] = useState<CheckInRecord[]>([]);
   const [openVisits, setOpenVisits] = useState<CheckInRecord[]>([]);
@@ -199,27 +195,6 @@ export function CheckInsManager({
       cancelled = true;
     };
   }, []);
-
-  async function searchMembers(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPending(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const page = await listMembers({
-        search,
-        status: "ACTIVE",
-        limit: 25,
-      });
-      setResults(page.data);
-      if (page.data.length === 0) setNotice(tx("No active members match."));
-    } catch (caught) {
-      setResults([]);
-      setError(failureMessage(caught));
-    } finally {
-      setPending(false);
-    }
-  }
 
   async function selectMember(member: DeskMember) {
     setSelected(member);
@@ -306,8 +281,6 @@ export function CheckInsManager({
 
   const showCheckout = Boolean(canUpdate && openForSelected);
   const showCheckIn = canCreate;
-  const searchMiss = notice === "No active members match.";
-
   return (
     <div className="grid gap-6">
       {canScan ? <TrainerScan membershipId={membershipId} /> : null}
@@ -316,7 +289,7 @@ export function CheckInsManager({
           {tx(error)}
         </p>
       ) : null}
-      {notice && !searchMiss ? (
+      {notice ? (
         <p
           aria-live="polite"
           className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
@@ -387,75 +360,28 @@ export function CheckInsManager({
             )}
           </div>
         </section>
-        <form className={cardClass} onSubmit={searchMembers}>
+        <section aria-labelledby="member-lookup-title" className={cardClass}>
           <div className="border-b border-slate-100 px-5 py-4">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
               {" "}
               {tx("Member lookup")}{" "}
             </p>
-            <h2 className="mt-1 text-xl font-bold text-slate-900">
+            <h2
+              className="mt-1 text-xl font-bold text-slate-900"
+              id="member-lookup-title"
+            >
               {" "}
               {tx("Find a member")}{" "}
             </h2>
           </div>
           <div className="grid gap-4 p-5">
-            <label className="grid gap-2 text-sm font-semibold text-slate-800">
-              {" "}
-              {tx("Search active members")}{" "}
-              <input
-                className="input"
-                name="search"
-                onChange={(event) => setSearch(event.target.value)}
-                required
-                value={search}
-              />
-            </label>
-            <button
-              className="button w-full sm:w-fit"
+            <MemberSearch
               disabled={pending}
-              type="submit"
-            >
-              {" "}
-              {tx("Search")}{" "}
-            </button>
-            {results.length > 0 ? (
-              <ul
-                aria-label={tx("Matching members")}
-                className="grid max-h-80 gap-2 overflow-y-auto p-1"
-              >
-                {results.map((member) => {
-                  const active = selected?.id === member.id;
-                  return (
-                    <li key={member.id}>
-                      <button
-                        aria-pressed={active}
-                        className={`button button-cancel w-full justify-start text-left ${
-                          active
-                            ? "outline outline-2 outline-offset-2 outline-[#0866ff]"
-                            : ""
-                        }`}
-                        disabled={pending}
-                        onClick={() => void selectMember(member)}
-                        type="button"
-                      >
-                        {tx("Select {name}", { name: memberLabel(member) })}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : null}
-            {searchMiss ? (
-              <p
-                aria-live="polite"
-                className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm font-medium text-slate-600"
-                role="status"
-              >
-                {tx(notice)}
-              </p>
-            ) : null}
+              onSelect={(member) => void selectMember(member)}
+              selected={selected}
+            />
           </div>
-        </form>
+        </section>
       </div>
       {selected ? (
         <section aria-labelledby="selected-member-title" className={cardClass}>

@@ -54,10 +54,10 @@ import {
 } from "@/features/finance/ui";
 import {
   getGymProfile,
-  listMembers,
   listMemberships,
   operationGet,
 } from "@/features/operations/client";
+import { MemberSearch } from "@/features/operations/member-search";
 import { actionButtonClass } from "@/lib/ui/action-button";
 import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
@@ -456,9 +456,6 @@ export function PaymentsManager({
   const [payment, setPayment] = useState<Payment | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [memberships, setMemberships] = useState<Membership[]>([]);
-  const [memberSearch, setMemberSearch] = useState("");
-  const [memberSearchLoading, setMemberSearchLoading] = useState(false);
-  const [memberSearchError, setMemberSearchError] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [draftMember, setDraftMember] = useState("");
   const [action, setAction] = useState<Action>(null);
@@ -521,32 +518,6 @@ export function PaymentsManager({
         ? correctionDate
         : "",
   );
-
-  useEffect(() => {
-    const trimmed = memberSearch.trim();
-    if (!trimmed) return undefined;
-    let active = true;
-    const timer = window.setTimeout(() => {
-      void listMembers({ search: trimmed, limit: 25 })
-        .then((page) => {
-          if (!active) return;
-          setMembers(page.data);
-          setMemberSearchError("");
-        })
-        .catch(() => {
-          if (!active) return;
-          setMembers([]);
-          setMemberSearchError("Unable to search members.");
-        })
-        .finally(() => {
-          if (active) setMemberSearchLoading(false);
-        });
-    }, 250);
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [memberSearch]);
 
   useEffect(() => {
     if (!draftMember) return undefined;
@@ -700,33 +671,24 @@ export function PaymentsManager({
   }
 
   function resetMemberLookup() {
-    setMemberSearch("");
     setMembers([]);
-    setMemberSearchLoading(false);
-    setMemberSearchError("");
     setSelectedMember(null);
     setDraftMember("");
     setMemberships([]);
   }
 
-  function searchMembers(value: string) {
-    setMemberSearch(value);
-    const trimmed = value.trim();
-    if (!trimmed) {
-      setMembers([]);
-      setMemberSearchLoading(false);
-      setMemberSearchError("");
-      return;
-    }
-    setMembers([]);
-    setMemberSearchLoading(true);
-    setMemberSearchError("");
-  }
-
   function chooseMember(member: Member | null) {
     setDraftMember(member?.id ?? "");
     setSelectedMember(member);
-    if (!member) setMemberships([]);
+    if (member) {
+      setMembers((current) =>
+        current.some((row) => row.id === member.id)
+          ? current
+          : [member, ...current],
+      );
+    } else {
+      setMemberships([]);
+    }
   }
 
   async function afterChange(id: string) {
@@ -1304,13 +1266,9 @@ export function PaymentsManager({
                           defaultDate={payment.business_date}
                           fields={fields}
                           memberId={draftMember}
-                          memberSearch={memberSearch}
-                          memberSearchError={memberSearchError}
-                          memberSearchLoading={memberSearchLoading}
                           members={members}
                           memberships={memberships}
                           onMember={chooseMember}
-                          onSearch={searchMembers}
                           payment={payment}
                           selectedMember={selectedMember}
                         />
@@ -1804,13 +1762,9 @@ export function PaymentsManager({
                   defaultDate={defaultDate}
                   fields={fields}
                   memberId={draftMember}
-                  memberSearch={memberSearch}
-                  memberSearchError={memberSearchError}
-                  memberSearchLoading={memberSearchLoading}
                   members={members}
                   memberships={memberships}
                   onMember={chooseMember}
-                  onSearch={searchMembers}
                   selectedMember={selectedMember}
                   wide
                 />
@@ -2055,7 +2009,11 @@ export function PaymentsManager({
   );
 }
 
-function memberChoiceLabel(member: Member): string {
+function memberChoiceLabel(member: {
+  member_number: string;
+  first_name: string;
+  last_name: string;
+}): string {
   return `${member.member_number} — ${member.first_name} ${member.last_name}`;
 }
 
@@ -2076,11 +2034,7 @@ function PaymentFields({
   memberId,
   members,
   memberships,
-  memberSearch,
-  memberSearchError,
-  memberSearchLoading,
   onMember,
-  onSearch,
   payment,
   selectedMember,
   wide = false,
@@ -2091,17 +2045,12 @@ function PaymentFields({
   memberId: string;
   members: readonly Member[];
   memberships: readonly Membership[];
-  memberSearch: string;
-  memberSearchError: string;
-  memberSearchLoading: boolean;
   onMember: (member: Member | null) => void;
-  onSearch: (value: string) => void;
   payment?: Payment;
   selectedMember: Member | null;
   wide?: boolean;
 }) {
   const tx = useTx();
-  const trimmedSearch = memberSearch.trim();
   const [purpose, setPurpose] = useState(
     payment?.purpose === "OTHER" ? "OTHER" : "MEMBERSHIP",
   );
@@ -2115,59 +2064,14 @@ function PaymentFields({
   return (
     <div className={wide ? "grid gap-5" : "grid gap-4"}>
       <div className="grid gap-3">
-        <Field label="Find member">
-          <TextInput
-            autoComplete="off"
-            maxLength={100}
-            onChange={(event) => onSearch(event.target.value)}
-            placeholder={tx("Name, number, phone, or email")}
-            value={memberSearch}
-          />
-        </Field>
-        {memberSearchLoading ? (
-          <p className="text-sm text-slate-500" role="status">
-            {tx("Searching members.")}
-          </p>
-        ) : null}
-        {memberSearchError ? (
-          <p className="error" role="alert">
-            {tx(memberSearchError)}
-          </p>
-        ) : null}
-        {trimmedSearch &&
-        !memberSearchLoading &&
-        members.length === 0 &&
-        !memberSearchError ? (
-          <p className="muted">{tx("No matching members.")}</p>
-        ) : null}
-        {trimmedSearch && members.length > 0 ? (
-          <ul
-            aria-label={tx("Matching members")}
-            className="grid max-h-48 gap-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1"
-          >
-            {members.map((member) => (
-              <li key={member.id}>
-                <button
-                  aria-pressed={memberId === member.id}
-                  className="w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 aria-pressed:bg-amber-100 aria-pressed:text-amber-900"
-                  onClick={() => onMember(member)}
-                  type="button"
-                >
-                  {memberChoiceLabel(member)}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {selectedMember ? (
-          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
-            {tx("Selected member: {name}", {
-              name: memberChoiceLabel(selectedMember),
-            })}
-          </p>
-        ) : memberId ? null : (
-          <p className="text-sm text-slate-500">{tx("No member selected.")}</p>
-        )}
+        <MemberSearch
+          activeOnly={false}
+          formatMember={memberChoiceLabel}
+          label="Find member"
+          onSelect={onMember}
+          selected={selectedMember}
+          showEmptySelected={!memberId}
+        />
         <div className={columns}>
           <Field
             error={fields.member_id}

@@ -590,7 +590,6 @@ export function BookingsManager({
               {tx(". Calendar range is at most 42 gym-local days.")}{" "}
             </p>
             <MemberSearch
-              action="Search booking members"
               label="Filter bookings by member"
               onSelect={setMemberFilter}
               selected={memberFilter}

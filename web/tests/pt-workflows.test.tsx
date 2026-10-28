@@ -214,7 +214,9 @@ describe("phase 5 workflows", () => {
       }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Create assignment" }));
-    fireEvent.click(screen.getByRole("button", { name: "Search members" }));
+    fireEvent.change(screen.getByLabelText("Search active members"), {
+      target: { value: "Grace" },
+    });
     fireEvent.click(
       await screen.findByRole("button", { name: "Grace Hopper (M-1)" }),
     );
@@ -320,7 +322,9 @@ describe("phase 5 workflows", () => {
         },
       ]),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Search members" }));
+    fireEvent.change(screen.getByLabelText("Search active members"), {
+      target: { value: "Grace" },
+    });
     fireEvent.click(
       await screen.findByRole("button", { name: "Grace Hopper (M-1)" }),
     );

@@ -155,6 +155,13 @@ class ProductListQuerySerializer(StrictSerializer):
     is_active = serializers.ChoiceField(choices=("true", "false"), required=False)
     sku = serializers.RegexField(_SKU, max_length=32, required=False)
     barcode = serializers.CharField(required=False, max_length=80)
+    search = serializers.CharField(
+        required=False,
+        allow_blank=False,
+        max_length=100,
+        trim_whitespace=True,
+        min_length=1,
+    )
     limit = serializers.IntegerField(required=False, min_value=1, max_value=100, default=25)
     after = serializers.CharField(required=False, allow_blank=False, max_length=2048)
 

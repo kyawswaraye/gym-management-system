@@ -686,7 +686,6 @@ export function MemberPackagesManager({
                 </div>
                 <div className="min-w-0 flex-1">
                   <MemberSearch
-                    action="Search grant members"
                     label="Filter grants by member"
                     onSelect={(picked) => {
                       setMemberFilter(picked);

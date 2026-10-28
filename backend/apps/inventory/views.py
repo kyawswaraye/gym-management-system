@@ -260,6 +260,7 @@ class ProductListCreateView(InventoryCommandView):
                 is_active=payload.get("is_active"),
                 sku=str(payload.get("sku", "")),
                 barcode=str(payload.get("barcode", "")),
+                search=str(payload.get("search", "")),
                 limit=int(payload["limit"]),
                 after=str(payload.get("after", "")),
             )

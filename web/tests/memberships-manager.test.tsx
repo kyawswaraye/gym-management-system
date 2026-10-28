@@ -412,7 +412,7 @@ describe("Memberships manager", () => {
     expect(listMembers).toHaveBeenCalledWith({
       search: "Zara",
       status: "ACTIVE",
-      limit: 25,
+      limit: 10,
     });
 
     fireEvent.change(screen.getByLabelText("Plan"), {

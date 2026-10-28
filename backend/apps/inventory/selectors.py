@@ -172,6 +172,23 @@ def page_categories(
     )
 
 
+def _product_search_filter(search: str) -> Q:
+    raw = " ".join(search.split())
+    if not raw:
+        return Q()
+    compact = "".join(raw.split()).upper()
+    folded = raw.casefold()
+    return (
+        Q(name__icontains=raw)
+        | Q(sku__icontains=compact)
+        | Q(barcode__icontains=compact)
+        | Q(unit__icontains=raw)
+        | Q(category__code__icontains=compact)
+        | Q(category__name__icontains=raw)
+        | Q(category__normalized_name__icontains=folded)
+    )
+
+
 def page_products(
     *,
     gym_id: UUID,
@@ -180,6 +197,7 @@ def page_products(
     is_active: bool | None,
     sku: str,
     barcode: str,
+    search: str,
     limit: int,
     after: str,
 ) -> tuple[list[Product], dict[str, Any]]:
@@ -192,10 +210,11 @@ def page_products(
         "is_active": "" if is_active is None else str(is_active),
         "sku": sku,
         "barcode": barcode,
+        "search": search,
         "limit": str(limit),
         "ordering": "sku ASC, id ASC",
     }
-    queryset = Product.objects.filter(gym_id=gym_id)
+    queryset = Product.objects.filter(gym_id=gym_id).select_related("category")
     if category_id is not None:
         queryset = queryset.filter(category_id=category_id)
     if is_active is not None:
@@ -204,6 +223,8 @@ def page_products(
         queryset = queryset.filter(sku=sku)
     if barcode:
         queryset = queryset.filter(barcode=barcode)
+    if search.strip():
+        queryset = queryset.filter(_product_search_filter(search))
     queryset = with_quantity_on_hand(queryset, gym_id=gym_id).order_by("sku", "id")
     return _page_code(
         queryset,

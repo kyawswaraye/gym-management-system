@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   approveRetailSale,
+  getProduct,
   getRetailSale,
   listCashSessions,
   listProducts,
@@ -18,6 +19,7 @@ vi.mock("@/features/finance/client", () => ({
   approveRetailSale: vi.fn(),
   cancelRetailSale: vi.fn(),
   createRetailSale: vi.fn(),
+  getProduct: vi.fn(),
   getRetailSale: vi.fn(),
   listCashSessions: vi.fn(),
   listProducts: vi.fn(),
@@ -31,6 +33,7 @@ vi.mock("@/features/finance/client", () => ({
 
 vi.mock("@/features/operations/client", () => ({
   listMembers: vi.fn(),
+  operationGet: vi.fn(),
 }));
 
 const SALE_ID = "11111111-1111-4111-8111-111111111111";
@@ -156,6 +159,7 @@ describe("retail sales", () => {
       data: [product()],
       meta: { has_more: false, next_after: null },
     });
+    vi.mocked(getProduct).mockResolvedValue(product());
     vi.mocked(listCashSessions).mockResolvedValue({
       data: [till()],
       meta: { has_more: false, next_after: null },
@@ -247,10 +251,13 @@ describe("retail sales", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/partial return/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "New retail sale" }));
-    await screen.findByRole("option", { name: /WATER/ });
-    fireEvent.change(screen.getByRole("combobox", { name: "Product" }), {
-      target: { value: PRODUCT_ID },
-    });
+    fireEvent.change(
+      screen.getByPlaceholderText("Name, SKU, barcode, or category"),
+      { target: { value: "WATER" } },
+    );
+    expect(
+      await screen.findByText(/Selected product: WATER — Water/),
+    ).toBeVisible();
     fireEvent.change(screen.getByRole("textbox", { name: "Quantity" }), {
       target: { value: "1.25" },
     });

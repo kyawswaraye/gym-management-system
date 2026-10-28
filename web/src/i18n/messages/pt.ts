@@ -342,6 +342,8 @@ export const ptEn = {
     "Status, commission, outstanding balance, trainer, and sale.",
   "Submit sale": "Submit sale",
   Team: "Team",
+  "Showing the first matches. Type more to narrow the list.":
+    "Showing the first matches. Type more to narrow the list.",
   "Ten PT sessions": "Ten PT sessions",
   "The assignment command failed.": "The assignment command failed.",
   "The booking command failed.": "The booking command failed.",
@@ -755,6 +757,8 @@ export const ptMm = {
     "အခြေအနေ၊ ကော်မရှင်၊ ပေးရန်ကျန် လက်ကျန်၊ Trainerနှင့် အရောင်း။",
   "Submit sale": "အရောင်း တင်သွင်းရန်",
   Team: "အဖွဲ့",
+  "Showing the first matches. Type more to narrow the list.":
+    "ပထမဆုံး ကိုက်ညီသူများကိုသာ ပြထားပါသည်။ စာရင်းကျဉ်းရန် စာလုံးထပ်ရိုက်ပါ။",
   "Ten PT sessions": "PT လေ့ကျင့်ချိန် ဆယ်ခု",
   "The assignment command failed.":
     "တာဝန်ပေးအပ်မှု လုပ်ဆောင်ချက် မအောင်မြင်ပါ။",

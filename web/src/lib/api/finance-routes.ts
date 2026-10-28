@@ -347,14 +347,25 @@ const FINANCE_ROUTES: readonly Rule[] = [
       "is_active",
       "sku",
       "barcode",
+      "search",
       "limit",
       "after",
     ]),
-    check: (values) =>
-      uuidValue(values, "category_id") &&
-      flagValue(values, "is_active") &&
-      textValue(values, "sku", SKU) &&
-      textValue(values, "barcode", /^[A-Za-z0-9._:-]{1,80}$/),
+    check: (values) => {
+      const search = values.get("search");
+      if (
+        search !== undefined &&
+        (search.length > 100 || search.trim().length === 0)
+      ) {
+        return false;
+      }
+      return (
+        uuidValue(values, "category_id") &&
+        flagValue(values, "is_active") &&
+        textValue(values, "sku", SKU) &&
+        textValue(values, "barcode", /^[A-Za-z0-9._:-]{1,80}$/)
+      );
+    },
   },
   {
     pattern: /^\/api\/v1\/products\/low-stock\/$/,

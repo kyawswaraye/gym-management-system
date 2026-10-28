@@ -635,7 +635,7 @@ describe("payments manager", () => {
     const match = await screen.findByRole("button", {
       name: "MEM-000001 — Ada Lovelace",
     });
-    expect(listMembers).toHaveBeenCalledWith({ search: "Ada", limit: 25 });
+    expect(listMembers).toHaveBeenCalledWith({ search: "Ada", limit: 10 });
     fireEvent.click(match);
     expect(
       screen.getByText("Selected member: MEM-000001 — Ada Lovelace"),

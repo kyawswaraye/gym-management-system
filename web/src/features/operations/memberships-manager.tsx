@@ -5,11 +5,11 @@ import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 
 import {
   listAllMembershipPlans,
-  listMembers,
   listMembershipExpiry,
   listMemberships,
   operationMutation,
 } from "@/features/operations/client";
+import { MemberSearch } from "@/features/operations/member-search";
 import {
   updateMembership,
   updateMembershipPlan,
@@ -90,7 +90,11 @@ function errorText(caught: unknown, fallback: string): string {
   return caught instanceof Error ? caught.message : fallback;
 }
 
-function memberOptionLabel(member: Member): string {
+function memberOptionLabel(member: {
+  member_number: string;
+  first_name: string;
+  last_name: string;
+}): string {
   const name = `${member.first_name} ${member.last_name}`.trim();
   return `${member.member_number} — ${name}`;
 }
@@ -371,10 +375,6 @@ export function MembershipsManager({
   const [listMode, setListMode] = useState<ListMode>("all");
   const [status, setStatus] = useState<"" | MembershipStatus>("");
   const [paymentStatus, setPaymentStatus] = useState<"" | PaymentStatus>("");
-  const [memberQuery, setMemberQuery] = useState("");
-  const [memberResults, setMemberResults] = useState<Member[]>([]);
-  const [memberSearchLoading, setMemberSearchLoading] = useState(false);
-  const [memberSearchError, setMemberSearchError] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [knownMembers, setKnownMembers] = useState<ReadonlyMap<string, Member>>(
     () => new Map(),
@@ -384,7 +384,6 @@ export function MembershipsManager({
   const planRequest = useRef(0);
   const planLocks = useRef(new Set<string>());
   const planVersions = useRef(new Map<string, number>());
-  const memberSearchVersion = useRef(0);
   const listEpoch = useRef(0);
   const memberEpoch = useRef(0);
   const membershipBusy = useRef<string | null>(null);
@@ -524,41 +523,6 @@ export function MembershipsManager({
       listEpoch.current += 1;
     };
   }, [listMode, paymentStatus, status, tx]);
-
-  useEffect(() => {
-    const trimmed = memberQuery.trim();
-    if (!trimmed) return;
-    const version = ++memberSearchVersion.current;
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const page = await listMembers({
-            search: trimmed,
-            status: "ACTIVE",
-            limit: 25,
-          });
-          if (version !== memberSearchVersion.current) return;
-          setMemberResults(page.data);
-          setKnownMembers((current) => rememberMembers(current, page.data));
-          setMemberSearchError("");
-        } catch (caught) {
-          if (version !== memberSearchVersion.current) return;
-          setMemberResults([]);
-          setMemberSearchError(
-            errorText(caught, tx("Unable to search members.")),
-          );
-        } finally {
-          if (version === memberSearchVersion.current) {
-            setMemberSearchLoading(false);
-          }
-        }
-      })();
-    }, 250);
-    return () => {
-      window.clearTimeout(timer);
-      memberSearchVersion.current += 1;
-    };
-  }, [memberQuery, tx]);
 
   useEffect(() => {
     if (showMembershipForm) {
@@ -893,7 +857,6 @@ export function MembershipsManager({
 
   const activePlans = planError ? [] : plans.filter((plan) => plan.is_active);
   const showPlanTable = !planError && plans.length > 0;
-  const trimmedMemberQuery = memberQuery.trim();
 
   return (
     <div className="grid gap-5">
@@ -1636,80 +1599,14 @@ export function MembershipsManager({
                   {" "}
                   {tx("Member selection")}{" "}
                 </legend>
-                <label className="field">
-                  {" "}
-                  {tx("Search members")}{" "}
-                  <input
-                    aria-label={tx("Search members")}
-                    className="input"
-                    maxLength={100}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      setMemberQuery(value);
-                      memberSearchVersion.current += 1;
-                      if (!value.trim()) {
-                        setMemberResults([]);
-                        setMemberSearchLoading(false);
-                        setMemberSearchError("");
-                        return;
-                      }
-                      setMemberSearchLoading(true);
-                      setMemberSearchError("");
-                    }}
-                    placeholder={tx("Name, number, phone, or email")}
-                    ref={memberSearchRef}
-                    value={memberQuery}
-                  />
-                </label>
-                {memberSearchLoading ? (
-                  <p className="text-sm text-slate-500" role="status">
-                    {" "}
-                    {tx("Searching members.")}{" "}
-                  </p>
-                ) : null}
-                {memberSearchError ? (
-                  <p className="error" role="alert">
-                    {memberSearchError}
-                  </p>
-                ) : null}
-                {!memberSearchLoading &&
-                trimmedMemberQuery &&
-                memberResults.length === 0 &&
-                !memberSearchError ? (
-                  <p className="muted">{tx("No matching members.")}</p>
-                ) : null}
-                {memberResults.length > 0 ? (
-                  <ul
-                    aria-label={tx("Matching members")}
-                    className="grid max-h-48 gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2"
-                  >
-                    {memberResults.map((member) => (
-                      <li key={member.id}>
-                        <button
-                          aria-pressed={selectedMember?.id === member.id}
-                          className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 aria-pressed:bg-amber-100 aria-pressed:text-amber-900"
-                          onClick={() => selectMember(member)}
-                          type="button"
-                        >
-                          {memberOptionLabel(member)}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                <p
-                  className={
-                    selectedMember
-                      ? "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-800"
-                      : "rounded-lg border border-dashed border-slate-300 px-3 py-2.5 text-sm text-slate-500"
-                  }
-                >
-                  {selectedMember
-                    ? tx("Selected member: {name}", {
-                        name: memberOptionLabel(selectedMember),
-                      })
-                    : tx("No member selected.")}
-                </p>
+                <MemberSearch
+                  formatMember={memberOptionLabel}
+                  inputRef={memberSearchRef}
+                  label="Search members"
+                  onSelect={selectMember}
+                  selected={selectedMember}
+                  showEmptySelected
+                />
               </fieldset>
               <div className="grid gap-4 sm:grid-cols-2 [&_.field]:text-sm [&_.field]:font-semibold [&_.field]:text-slate-700">
                 <label className="field sm:col-span-2">

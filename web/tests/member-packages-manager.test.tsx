@@ -267,9 +267,9 @@ describe("member package catalog", () => {
     fireEvent.change(screen.getByLabelText("Package type"), {
       target: { value: "" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Search grant members" }),
-    );
+    fireEvent.change(screen.getByLabelText("Filter grants by member"), {
+      target: { value: "Grace" },
+    });
     fireEvent.click(
       await screen.findByRole("button", { name: "Grace Hopper (M-1)" }),
     );
@@ -519,9 +519,9 @@ describe("grant package dialog", () => {
   }
 
   async function fillGrant(dialog: HTMLElement, reason = "Courtesy") {
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "Search members" }),
-    );
+    fireEvent.change(within(dialog).getByLabelText("Search active members"), {
+      target: { value: "Grace" },
+    });
     fireEvent.click(
       await within(dialog).findByRole("button", { name: "Grace Hopper (M-1)" }),
     );

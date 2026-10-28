@@ -456,6 +456,8 @@ export const operationsEn = {
     "Show the gym address on the receipt.",
   "Show the gym logo on the receipt.": "Show the gym logo on the receipt.",
   "Show the gym phone on the receipt.": "Show the gym phone on the receipt.",
+  "Showing the first matches. Type more to narrow the list.":
+    "Showing the first matches. Type more to narrow the list.",
   "Showing only actions recorded for your membership.":
     "Showing only actions recorded for your membership.",
   "Start a membership or manage the plans available to members.":
@@ -1028,6 +1030,8 @@ export const operationsMm = {
   "Show the gym logo on the receipt.": "ပြေစာပေါ်တွင် Gym လိုဂိုကို ပြပါ။",
   "Show the gym phone on the receipt.":
     "ပြေစာပေါ်တွင် Gym ဖုန်းနံပါတ်ကို ပြပါ။",
+  "Showing the first matches. Type more to narrow the list.":
+    "ပထမဆုံး ကိုက်ညီသူများကိုသာ ပြထားပါသည်။ စာရင်းကျဉ်းရန် စာလုံးထပ်ရိုက်ပါ။",
   "Showing only actions recorded for your membership.":
     "သင့်အသင်းဝင်မှုအတွက် မှတ်တမ်းတင်ထားသော လုပ်ဆောင်ချက်များကိုသာ ပြထားပါသည်။",
   "Start a membership or manage the plans available to members.":
