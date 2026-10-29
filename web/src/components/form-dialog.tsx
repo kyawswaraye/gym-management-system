@@ -185,7 +185,10 @@ export function FormDialog({
         </div>
         <div className="grid gap-4 px-5 py-4 sm:px-6">
           {pending ? (
-            <p className="text-sm font-medium text-slate-600" role="status">
+            <p
+              aria-live="polite"
+              className="text-sm font-medium text-slate-600"
+            >
               {tx(pendingLabel)}
             </p>
           ) : null}
