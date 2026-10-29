@@ -31,6 +31,14 @@ OCI_OUTPUTS = (
     "type=oci,dest=release/web,tar=false",
     "type=oci,dest=release/postgres,tar=false",
 )
+WEB_OBJECT_ORIGINS_BUILD_ARG = (
+    "NEXT_PUBLIC_OBJECT_ORIGINS=${{ vars.NEXT_PUBLIC_OBJECT_ORIGINS }}"
+)
+# Exact browser origin for virtual-hosted S3 in ap-southeast-1.
+# Bucket names are public; the value is not a credential.
+VIRTUAL_HOSTED_OBJECT_ORIGIN_RE = re.compile(
+    r"\Ahttps://[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]\.s3\.ap-southeast-1\.amazonaws\.com\Z"
+)
 MAX_INDEX_BYTES = 1_048_576
 MAX_MANIFEST_BYTES = 20 * 1_048_576
 PUBLISH_PERMISSIONS = {
@@ -490,8 +498,17 @@ def _lint_build_steps(steps: list[dict[str, Any]]) -> list[str]:
             errors.append("image builds must not push")
         if options.get("provenance") is not False or options.get("sbom") is not False:
             errors.append("BuildKit provenance must stay off; GitHub attestations run after push")
-        if "build-args" in options or "secrets" in options or "tags" in options:
-            errors.append("image builds must not take tags, build args, or secrets")
+        if "secrets" in options or "tags" in options:
+            errors.append("image builds must not take tags or secrets")
+        context = str(options.get("context", ""))
+        if "build-args" in options:
+            build_args = str(options.get("build-args", "")).strip()
+            if context != "web" or build_args != WEB_OBJECT_ORIGINS_BUILD_ARG:
+                errors.append(
+                    "only the web image may take NEXT_PUBLIC_OBJECT_ORIGINS from repository vars"
+                )
+        elif context == "web":
+            errors.append("web image must bake NEXT_PUBLIC_OBJECT_ORIGINS from repository vars")
         outputs = str(options.get("outputs", ""))
         if outputs not in OCI_OUTPUTS:
             errors.append("image builds must export OCI layouts with tar=false")
@@ -595,16 +612,45 @@ def _lint_shell(document: dict[str, Any]) -> list[str]:
                 for key, value in options.items():
                     if isinstance(value, str) and ":latest" in value:
                         errors.append(f"{name} uses a latest tag in {key}")
-                    if key in {"build-args", "secrets"} and "build-push-action" in str(
-                        step.get("uses", "")
-                    ):
+                    if key == "secrets" and "build-push-action" in str(step.get("uses", "")):
                         errors.append(f"{name} passes build secrets")
+                    if (
+                        key == "build-args"
+                        and "build-push-action" in str(step.get("uses", ""))
+                        and str(value).strip() != WEB_OBJECT_ORIGINS_BUILD_ARG
+                    ):
+                        errors.append(f"{name} passes disallowed build args")
     secret_text = json.dumps(document)
     if "secrets." in secret_text and secret_text.count("secrets.GITHUB_TOKEN") != secret_text.count(
         "secrets."
     ):
         errors.append("release workflow may use only GITHUB_TOKEN")
+    if "vars.NEXT_PUBLIC_OBJECT_ORIGINS" not in secret_text:
+        errors.append("web image release must read vars.NEXT_PUBLIC_OBJECT_ORIGINS")
+    if "check-object-origins" not in secret_text:
+        errors.append("web image release must verify the browser object origin before build")
     return errors
+
+
+def check_object_origins(value: str | None = None) -> str:
+    """Refuse a release when the baked browser object origin is missing or wrong."""
+
+    configured = (value if value is not None else os.environ.get("NEXT_PUBLIC_OBJECT_ORIGINS", "")).strip()
+    if not configured:
+        raise ReleaseError(
+            "Set repository variable NEXT_PUBLIC_OBJECT_ORIGINS to "
+            "https://{bucket}.s3.ap-southeast-1.amazonaws.com before image-release"
+        )
+    if "," in configured:
+        raise ReleaseError(
+            "NEXT_PUBLIC_OBJECT_ORIGINS must be one virtual-hosted HTTPS origin for production"
+        )
+    if not VIRTUAL_HOSTED_OBJECT_ORIGIN_RE.fullmatch(configured):
+        raise ReleaseError(
+            "NEXT_PUBLIC_OBJECT_ORIGINS must match "
+            "https://{bucket}.s3.ap-southeast-1.amazonaws.com"
+        )
+    return configured
 
 
 def _manifest_from_env() -> dict[str, Any]:
@@ -723,6 +769,7 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
 
     commands.add_parser("check-ref")
+    commands.add_parser("check-object-origins")
     owner = commands.add_parser("normalize-owner")
     owner.add_argument("--owner", required=True)
     tag = commands.add_parser("immutable-tag")
@@ -759,6 +806,8 @@ def main(argv: list[str] | None = None) -> int:
                 sha=os.environ["RELEASE_SHA"],
                 input_sha=os.environ.get("RELEASE_INPUT_SHA", ""),
             )
+        elif args.command == "check-object-origins":
+            print(check_object_origins())
         elif args.command == "normalize-owner":
             print(normalize_owner(args.owner))
         elif args.command == "immutable-tag":

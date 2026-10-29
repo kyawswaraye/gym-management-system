@@ -32,6 +32,26 @@ def test_release_workflow_passes_static_checks() -> None:
     assert load().lint_repository_release(ROOT) == []
 
 
+def test_check_object_origins_requires_virtual_hosted_https() -> None:
+    module = load()
+    assert (
+        module.check_object_origins(
+            "https://gym-prod.s3.ap-southeast-1.amazonaws.com"
+        )
+        == "https://gym-prod.s3.ap-southeast-1.amazonaws.com"
+    )
+    with pytest.raises(module.ReleaseError, match="repository variable"):
+        module.check_object_origins("")
+    with pytest.raises(module.ReleaseError, match="virtual-hosted"):
+        module.check_object_origins(
+            "https://s3.ap-southeast-1.amazonaws.com,https://other.example"
+        )
+    with pytest.raises(module.ReleaseError, match="must match"):
+        module.check_object_origins("https://s3.ap-southeast-1.amazonaws.com")
+    with pytest.raises(module.ReleaseError, match="must match"):
+        module.check_object_origins("http://gym-prod.s3.ap-southeast-1.amazonaws.com")
+
+
 def test_latest_and_tag_only_references_fail() -> None:
     module = load()
     assert module.lint_release_workflow_text(workflow_text() + "\n# latest\n")

@@ -266,8 +266,14 @@ function readDirectUpload(data: unknown, ownerId: string): DirectUpload {
   ) {
     transferFailure(recoverable);
   }
-  if (typeof upload.url !== "string" || !isAllowedObjectUrl(upload.url)) {
+  if (typeof upload.url !== "string") {
     transferFailure(recoverable);
+  }
+  if (!isAllowedObjectUrl(upload.url)) {
+    throw new FileTransferError(
+      "The profile photo upload origin is not allowed.",
+      recoverable,
+    );
   }
   if (!isRecord(upload.fields)) transferFailure(recoverable);
   const entries = Object.entries(upload.fields);

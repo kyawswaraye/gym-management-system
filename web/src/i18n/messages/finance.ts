@@ -294,6 +294,9 @@ export const financeEn = {
   "The adjustment could not be recorded.":
     "The adjustment could not be recorded.",
   "The expense could not be loaded.": "The expense could not be loaded.",
+  "The file service did not accept the receipt.":
+    "The file service did not accept the receipt.",
+  "The file service is unavailable.": "The file service is unavailable.",
   "The payment could not be loaded.": "The payment could not be loaded.",
   "The last receipt could not be loaded.":
     "The last receipt could not be loaded.",
@@ -304,6 +307,8 @@ export const financeEn = {
     "The printer setup could not be loaded.",
   "The product could not be loaded.": "The product could not be loaded.",
   "The receipt could not be printed.": "The receipt could not be printed.",
+  "The receipt upload origin is not allowed.":
+    "The receipt upload origin is not allowed.",
   "The salary period could not be loaded.":
     "The salary period could not be loaded.",
   "The session could not be closed.": "The session could not be closed.",
@@ -331,6 +336,7 @@ export const financeEn = {
     "Try another status, register, or date.",
   "Try another status.": "Try another status.",
   "Unable to search products.": "Unable to search products.",
+  "Unable to upload the receipt.": "Unable to upload the receipt.",
   "Unit cost": "Unit cost",
   VOID: "VOID",
   Void: "Void",
@@ -650,6 +656,9 @@ export const financeMm = {
   "Test print": "စမ်းသပ် ပုံနှိပ်ရန်",
   "The adjustment could not be recorded.": "ပြင်ဆင်ချက်ကို မှတ်တမ်းတင်၍ မရပါ။",
   "The expense could not be loaded.": "ကုန်ကျစရိတ်ကို မရယူနိုင်ပါ။",
+  "The file service did not accept the receipt.":
+    "ဖိုင်ဝန်ဆောင်မှုက ပြေစာပုံကို လက်မခံပါ။",
+  "The file service is unavailable.": "ဖိုင်ဝန်ဆောင်မှု မရနိုင်ပါ။",
   "The payment could not be loaded.": "ငွေပေးချေမှုကို မရယူနိုင်ပါ။",
   "The last receipt could not be loaded.": "နောက်ဆုံးပြေစာကို မရယူနိုင်ပါ။",
   "The member on this draft could not be loaded.":
@@ -658,6 +667,8 @@ export const financeMm = {
   "The printer setup could not be loaded.": "ပရင်တာပြင်ဆင်ချက်ကို မရယူနိုင်ပါ။",
   "The product could not be loaded.": "ကုန်ပစ္စည်းကို မရယူနိုင်ပါ။",
   "The receipt could not be printed.": "ပြေစာကို ပုံနှိပ်၍ မရပါ။",
+  "The receipt upload origin is not allowed.":
+    "ပြေစာတင်မည့် object origin ကို ခွင့်မပြုထားပါ။",
   "The salary period could not be loaded.": "လစာကာလကို မရယူနိုင်ပါ။",
   "The session could not be closed.": "ကာလကို ပိတ်၍ မရပါ။",
   "The session could not be loaded.": "ကာလကို မရယူနိုင်ပါ။",
@@ -685,6 +696,7 @@ export const financeMm = {
     "အခြားအခြေအနေ၊ အရောင်းကောင်တာ သို့မဟုတ် ရက်စွဲဖြင့် ပြန်စစ်ကြည့်ပါ။",
   "Try another status.": "အခြားအခြေအနေဖြင့် ပြန်စစ်ကြည့်ပါ။",
   "Unable to search products.": "ကုန်ပစ္စည်းများကို ရှာ၍ မရပါ။",
+  "Unable to upload the receipt.": "ပြေစာပုံကို တင်၍ မရပါ။",
   "Unit cost": "တစ်ခုလျှင် ကုန်ကျစရိတ်",
   VOID: "ပယ်ဖျက်",
   Void: "ပယ်ဖျက်",

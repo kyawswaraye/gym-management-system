@@ -8,16 +8,20 @@ http://{$OBJECT_PUBLIC_HOST:files.localhost} {
 		Vary Origin
 		-Access-Control-Allow-Credentials
 	}
-	@allowed_origin header Origin {$OBJECT_CORS_ORIGIN:http://localhost:3000}
-	header @allowed_origin Access-Control-Allow-Origin {$OBJECT_CORS_ORIGIN:http://localhost:3000}
+	# This proxy is loopback-only (local + E2E). Reflect explicit local Origins so
+	# APP_ORIGINS / web port drift (3000 vs 3010) does not break CORS. Production
+	# browsers talk to S3 directly and do not use this file.
+	@allowed_origin header_regexp Origin ^https?://(localhost|127\.0\.0\.1|\[::1\]|[A-Za-z0-9.-]+\.localhost)(:\d+)?$
+	header @allowed_origin Access-Control-Allow-Origin {http.request.header.Origin}
 
 	# Preflight only. The browser upload is a form POST and the photo is a GET.
 	# Content-Type is the only request header that form POST may preflight.
 	@preflight {
 		method OPTIONS
-		header Origin {$OBJECT_CORS_ORIGIN:http://localhost:3000}
+		header_regexp Origin ^https?://(localhost|127\.0\.0\.1|\[::1\]|[A-Za-z0-9.-]+\.localhost)(:\d+)?$
 	}
 	handle @preflight {
+		header Access-Control-Allow-Origin {http.request.header.Origin}
 		header Access-Control-Allow-Methods "GET, POST"
 		header Access-Control-Allow-Headers "Content-Type"
 		respond "" 204

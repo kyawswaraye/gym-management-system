@@ -87,6 +87,10 @@ jobs:
         env:
           DIGEST: ${{ steps.api.outputs.digest }}
         run: python3 scripts/release_supply_chain.py bind-digest --digest "$DIGEST" --layout release/api --output release/api-digest.txt
+      - name: Require browser object origin
+        env:
+          NEXT_PUBLIC_OBJECT_ORIGINS: ${{ vars.NEXT_PUBLIC_OBJECT_ORIGINS }}
+        run: python3 scripts/release_supply_chain.py check-object-origins
       - name: Build web image
         id: web
         uses: docker/build-push-action@v7
@@ -97,6 +101,7 @@ jobs:
           push: false
           provenance: false
           sbom: false
+          build-args: NEXT_PUBLIC_OBJECT_ORIGINS=${{ vars.NEXT_PUBLIC_OBJECT_ORIGINS }}
           outputs: type=oci,dest=release/web,tar=false
       - name: Bind web layout to its digest
         env:

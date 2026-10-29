@@ -39,8 +39,16 @@ Runtime settings:
 
 - `MINIO_ADDRESSING_STYLE=virtual`
 - `MINIO_REGION=ap-southeast-1`
-- HTTPS endpoint and public URL
+- HTTPS endpoint and public URL (`MINIO_PUBLIC_URL=https://s3.ap-southeast-1.amazonaws.com`)
 - bucket and origin allowlists
+
+The browser posts to the virtual-hosted origin
+`https://{bucket}.s3.ap-southeast-1.amazonaws.com`. That exact origin must be
+baked into the web image as `NEXT_PUBLIC_OBJECT_ORIGINS` (repository Actions
+variable, public, not a secret). Changing the bucket requires a new web image
+build; a runtime Compose change does not update the client allowlist. Set the
+variable before `image-release`. Who sets it: the operator who owns the approved
+production bucket name.
 
 Local and E2E Compose keep path-style `docker.io/pgsty/silo`.
 

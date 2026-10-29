@@ -1,4 +1,4 @@
-.PHONY: check-python check-node db-up db-down db-logs migrate backend-install backend-check backend-test backend-test-pg web-install web-check web-test mobile-install mobile-check mobile-test mobile-android mobile-android-release mobile-ios e2e openapi-export openapi-generate openapi-check check validate-production production-images
+.PHONY: check-python check-node db-up db-down db-logs files-up files-down e2e-files-up e2e-files-down migrate backend-install backend-check backend-test backend-test-pg web-install web-check web-test mobile-install mobile-check mobile-test mobile-android mobile-android-release mobile-ios e2e openapi-export openapi-generate openapi-check check validate-production production-images
 
 ifneq ($(wildcard .env),)
 include .env
@@ -19,6 +19,19 @@ db-down:
 
 db-logs:
 	docker compose logs -f postgres
+
+files-up:
+	docker compose up -d minio minio-init object-proxy clamav
+
+files-down:
+	docker compose stop object-proxy minio-init minio clamav
+
+# Browser E2E / local web on :3010 with API on :8010 signs files.localhost:18088.
+e2e-files-up:
+	bash -lc 'export E2E_ENV_ROOT="$$(pwd)"; source scripts/e2e-env.sh; e2e_prepare_env; source scripts/e2e-files.sh; e2e_start_file_services'
+
+e2e-files-down:
+	bash -lc 'export E2E_ENV_ROOT="$$(pwd)"; source scripts/e2e-files.sh; e2e_stop_file_services'
 
 migrate: check-python
 	cd backend && \

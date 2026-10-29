@@ -474,8 +474,11 @@ export const operationsEn = {
   "The invitation link stops working, and this person leaves the list.":
     "The invitation link stops working, and this person leaves the list.",
   "The owner list could not be loaded.": "The owner list could not be loaded.",
+  "The file service is unavailable.": "The file service is unavailable.",
   "The profile photo upload did not finish.":
     "The profile photo upload did not finish.",
+  "The profile photo upload origin is not allowed.":
+    "The profile photo upload origin is not allowed.",
   "The profile photo was uploaded and still needs to be attached.":
     "The profile photo was uploaded and still needs to be attached.",
   "These choices apply the next time a receipt is printed.":
@@ -1048,8 +1051,11 @@ export const operationsMm = {
   "The invitation link stops working, and this person leaves the list.":
     "ဖိတ်ကြားချက် လင့်ခ် အလုပ်မလုပ်တော့ပါ။ ဤသူသည် စာရင်းမှ ထွက်သွားပါသည်။",
   "The owner list could not be loaded.": "ပိုင်ရှင် စာရင်းကို မရယူနိုင်ပါ။",
+  "The file service is unavailable.": "ဖိုင်ဝန်ဆောင်မှု မရနိုင်ပါ။",
   "The profile photo upload did not finish.":
     "ကိုယ်ရေးဓာတ်ပုံ တင်ခြင်း မပြီးဆုံးပါ။",
+  "The profile photo upload origin is not allowed.":
+    "ကိုယ်ရေးဓာတ်ပုံတင်မည့် object origin ကို ခွင့်မပြုထားပါ။",
   "The profile photo was uploaded and still needs to be attached.":
     "ကိုယ်ရေးဓာတ်ပုံကို တင်ပြီးပါပြီ။ တွဲထည့်ရန် ကျန်ရှိပါသေးသည်။",
   "These choices apply the next time a receipt is printed.":

@@ -56,24 +56,31 @@ export async function uploadExpenseReceipt(
     intent.purpose !== "EXPENSE_RECEIPT" ||
     intent.owner_type !== "GYM" ||
     upload.method !== "POST" ||
-    typeof upload.url !== "string" ||
-    !isAllowedObjectUrl(upload.url)
+    typeof upload.url !== "string"
   ) {
     failure("Unable to upload the receipt.", intent.file_id);
+  }
+  if (!isAllowedObjectUrl(upload.url)) {
+    failure("The receipt upload origin is not allowed.", intent.file_id);
   }
   const form = new FormData();
   for (const [key, value] of Object.entries(upload.fields)) {
     if (key !== "file") form.append(key, value);
   }
   form.append("file", file);
-  const posted = await fetch(upload.url, {
-    method: "POST",
-    body: form,
-    credentials: "omit",
-    cache: "no-store",
-    redirect: "error",
-    mode: "cors",
-  });
+  let posted: Response;
+  try {
+    posted = await fetch(upload.url, {
+      method: "POST",
+      body: form,
+      credentials: "omit",
+      cache: "no-store",
+      redirect: "error",
+      mode: "cors",
+    });
+  } catch {
+    failure("The file service is unavailable.", intent.file_id);
+  }
   if (posted.status !== 204) {
     failure("The file service did not accept the receipt.", intent.file_id);
   }
