@@ -448,35 +448,47 @@ def test_approval_posts_stock_payment_receipt_and_cash_or_rolls_back(
 
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
-        movements = StockMovement.objects.filter(product_id=product_id, movement_type="SALE")
+        movements = StockMovement.objects.filter(
+            product_id=product_id,
+            movement_type="SALE",
+            retail_sale_line__sale_id=sale_id,
+        )
         assert movements.count() == 1
         movement = movements.get()
         assert movement.quantity == Decimal("-1.250")
         assert movement.unit_cost_snapshot == Decimal("4.00")
         assert movement.retail_sale_line_id is not None
-        posted_payments = Payment.objects.filter(gym_id=gym.id, purpose="PRODUCT", status="POSTED")
+        assert (
+            StockMovement.objects.filter(product_id=product_id, movement_type="SALE").count() == 3
+        )
+        posted_payments = Payment.objects.filter(
+            gym_id=gym.id, purpose="PRODUCT", status="POSTED", retail_sale_id=sale_id
+        )
         assert posted_payments.count() == 1
-        assert Receipt.objects.filter(gym_id=gym.id, status="ISSUED").count() == 1
+        assert (
+            Payment.objects.filter(gym_id=gym.id, purpose="PRODUCT", status="POSTED").count() == 3
+        )
+        assert Receipt.objects.filter(gym_id=gym.id, status="ISSUED").count() == 3
         cash_in = CashTransaction.objects.filter(
             gym_id=gym.id, source_type="PAYMENT", direction="IN"
         )
         assert cash_in.count() == 1
         product = api.get(f"/api/v1/products/{product_id}/", **headers)
-    assert product.json()["data"]["sold_quantity"] == "1.250"
-    assert product.json()["data"]["revenue"] == "12.00"
-    assert product.json()["data"]["quantity_on_hand"] == "3.750"
+    assert product.json()["data"]["sold_quantity"] == "3.750"
+    assert product.json()["data"]["revenue"] == "36.00"
+    assert product.json()["data"]["quantity_on_hand"] == "1.250"
 
     daily = api.get(f"/api/v1/sales/daily/?date={gym_today(gym).isoformat()}", **headers)
     assert daily.status_code == 200, daily.content
     report = daily.json()["data"]
-    assert report["product_quantity"] == "1.250"
-    assert report["product_revenue"] == "12.00"
-    assert report["product_cogs"] == "5.00"
-    assert report["product_gross_profit"] == "7.00"
+    assert report["product_quantity"] == "3.750"
+    assert report["product_revenue"] == "36.00"
+    assert report["product_cogs"] == "15.00"
+    assert report["product_gross_profit"] == "21.00"
     assert report["product_total"] == report["product_revenue"]
     assert report["pt_total"] == "0.00"
     assert report["class_total"] == "0.00"
-    assert report["gross_sales"] == "12.00"
+    assert report["gross_sales"] == "36.00"
 
     assert api.get(f"/api/v1/retail-sales/{sale_id}/", **other_headers).status_code == 404
     with transaction.atomic(), connection.cursor() as cursor:
