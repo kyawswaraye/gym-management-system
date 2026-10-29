@@ -412,9 +412,14 @@ def test_approval_posts_stock_payment_receipt_and_cash_or_rolls_back(
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         assert (
-            StockMovement.objects.filter(product_id=product_id, movement_type="SALE").count() == 0
+            StockMovement.objects.filter(
+                product_id=product_id,
+                movement_type="SALE",
+                retail_sale_line__retail_sale_id=sale_id,
+            ).count()
+            == 0
         )
-        assert Payment.objects.filter(purpose="PRODUCT").count() == 0
+        assert Payment.objects.filter(purpose="PRODUCT", retail_sale_id=sale_id).count() == 0
         assert RetailSale.objects.get(id=sale_id).status == "PENDING_APPROVAL"
 
     approved = _command(api, manager_headers, sale_id, "approve", {"cash_session_id": session_id})

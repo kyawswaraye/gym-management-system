@@ -15,7 +15,8 @@ from apps.salaries.serializers import (
 EXPENSE_POSTING_COMMIT = ("expenses", "0003_expense_posting_commit_current_row")
 SALARY_INITIAL = ("salaries", "0001_salary_period_and_line")
 SALARY_RLS = ("salaries", "0002_rls_integrity_and_grants")
-SALARY_LEAF = ("salaries", "0003_salary_period_void")
+SALARY_VOID = ("salaries", "0003_salary_period_void")
+SALARY_LEAF = ("salaries", "0004_owner_or_desk_may_approve_own_salary")
 EXPENSE_VOID_SET = ("expenses", "0005_salary_void_set")
 EXPENSE_LEAF = ("expenses", "0006_owner_or_desk_may_approve_own_expense")
 SALARY_APP_PLAN = (
@@ -37,22 +38,26 @@ def test_salary_leaf_requires_expense_posting_commit_migration() -> None:
     assert EXPENSE_POSTING_COMMIT in loader.disk_migrations[SALARY_INITIAL].dependencies
     assert loader.graph.leaf_nodes("salaries") == [SALARY_LEAF]
     assert loader.graph.leaf_nodes("expenses") == [EXPENSE_LEAF]
-    assert SALARY_RLS in loader.disk_migrations[SALARY_LEAF].dependencies
+    assert SALARY_RLS in loader.disk_migrations[SALARY_VOID].dependencies
     assert ("expenses", "0004_correction_runtime_reversal") in loader.disk_migrations[
-        SALARY_LEAF
+        SALARY_VOID
     ].dependencies
-    assert SALARY_LEAF in loader.disk_migrations[EXPENSE_VOID_SET].dependencies
+    assert SALARY_VOID in loader.disk_migrations[SALARY_LEAF].dependencies
+    assert SALARY_VOID in loader.disk_migrations[EXPENSE_VOID_SET].dependencies
     assert ("expenses", "0004_correction_runtime_reversal") in loader.disk_migrations[
         EXPENSE_VOID_SET
     ].dependencies
     assert EXPENSE_VOID_SET in loader.disk_migrations[EXPENSE_LEAF].dependencies
-    void_plan = loader.graph.forwards_plan(SALARY_LEAF)
+    void_plan = loader.graph.forwards_plan(SALARY_VOID)
     assert void_plan.index(("expenses", "0004_correction_runtime_reversal")) < void_plan.index(
-        SALARY_LEAF
+        SALARY_VOID
     )
     assert EXPENSE_LEAF not in void_plan
+    assert SALARY_LEAF not in void_plan
     expense_plan = loader.graph.forwards_plan(EXPENSE_LEAF)
-    assert expense_plan.index(SALARY_LEAF) < expense_plan.index(EXPENSE_LEAF)
+    assert expense_plan.index(SALARY_VOID) < expense_plan.index(EXPENSE_LEAF)
+    leaf_plan = loader.graph.forwards_plan(SALARY_LEAF)
+    assert leaf_plan.index(SALARY_VOID) < leaf_plan.index(SALARY_LEAF)
     assert SALARY_INITIAL in loader.graph.node_map[EXPENSE_POSTING_COMMIT].children
     loader.graph.ensure_not_cyclic()
 

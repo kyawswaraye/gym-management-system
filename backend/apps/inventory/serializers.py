@@ -7,6 +7,7 @@ from typing import Any, cast
 
 from django.db.models import Q, Sum
 from rest_framework import serializers
+from rest_framework.utils import html
 
 from apps.cashbook.serializers import ExactMoneyField
 from apps.common.codes import SKU_CODE, OptionalPatternField
@@ -150,12 +151,29 @@ class ProductCategoryListQuerySerializer(StrictSerializer):
         return value == "true"
 
 
+class PresentNonBlankCharField(serializers.CharField):
+    """Reject a present blank query value.
+
+    QueryDict treats an optional non-blank CharField's empty value as omitted.
+    A blank ``search`` must stay a 400 when the key is present.
+    """
+
+    def get_value(self, dictionary: Any) -> Any:
+        if html.is_html_input(dictionary) and self.field_name in dictionary:
+            value = dictionary[self.field_name]
+            if isinstance(value, str) and (
+                value == "" or (self.trim_whitespace and value.strip() == "")
+            ):
+                return ""
+        return super().get_value(dictionary)
+
+
 class ProductListQuerySerializer(StrictSerializer):
     category_id = serializers.UUIDField(required=False)
     is_active = serializers.ChoiceField(choices=("true", "false"), required=False)
     sku = serializers.RegexField(_SKU, max_length=32, required=False)
     barcode = serializers.CharField(required=False, max_length=80)
-    search = serializers.CharField(
+    search = PresentNonBlankCharField(
         required=False,
         allow_blank=False,
         max_length=100,
