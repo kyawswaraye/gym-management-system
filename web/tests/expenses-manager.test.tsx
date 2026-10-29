@@ -303,6 +303,16 @@ describe("expenses", () => {
       meta: { has_more: false, next_after: null },
     });
     vi.mocked(getExpense).mockResolvedValue(draft);
+    let releaseDownload: (value: {
+      url: string;
+      contentType: "image/png";
+    }) => void = () => undefined;
+    vi.mocked(getFileDownloadUrl).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseDownload = resolve;
+        }),
+    );
     render(
       <ExpensesManager
         canApprove={false}
@@ -321,9 +331,18 @@ describe("expenses", () => {
       await screen.findByRole("button", { name: "Cleaning supplies" }),
     );
     expect(
+      await screen.findByText("Loading the receipt evidence."),
+    ).toBeVisible();
+    releaseDownload({ url: RECEIPT_URL, contentType: "image/png" });
+    expect(
       await screen.findByRole("img", { name: "Receipt evidence" }),
     ).toHaveAttribute("src", RECEIPT_URL);
+    expect(screen.getByText("Loading the receipt evidence.")).toBeVisible();
+    fireEvent.load(screen.getByRole("img", { name: "Receipt evidence" }));
     expect(getFileDownloadUrl).toHaveBeenCalledWith(RECEIPT_ID);
+    expect(
+      screen.queryByText("Loading the receipt evidence."),
+    ).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "Edit draft" }));
     expect(
       await screen.findAllByRole("img", { name: "Receipt evidence" }),
@@ -364,6 +383,11 @@ describe("expenses", () => {
     expect(
       await screen.findByRole("img", { name: "Receipt evidence" }),
     ).toHaveAttribute("src", "blob:expense-receipt");
+    expect(screen.getByText("Loading the receipt evidence.")).toBeVisible();
+    fireEvent.load(screen.getByRole("img", { name: "Receipt evidence" }));
+    expect(
+      screen.queryByText("Loading the receipt evidence."),
+    ).not.toBeInTheDocument();
     expect(getFileDownloadUrl).not.toHaveBeenCalled();
   });
 });

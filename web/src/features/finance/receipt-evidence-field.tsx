@@ -6,6 +6,18 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Field } from "@/features/finance/ui";
 import { getFileDownloadUrl } from "@/features/operations/client";
 
+function ReceiptLoading() {
+  const tx = useTx();
+  return (
+    <div className="grid gap-2" role="status">
+      <p className="text-sm font-medium text-slate-600">
+        {tx("Loading the receipt evidence.")}
+      </p>
+      <div className="h-40 animate-pulse rounded-xl bg-slate-100 ring-1 ring-slate-200" />
+    </div>
+  );
+}
+
 export function ReceiptEvidencePreview({
   fileId,
 }: {
@@ -13,7 +25,8 @@ export function ReceiptEvidencePreview({
 }) {
   const tx = useTx();
   const [url, setUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(Boolean(fileId));
+  const [fetching, setFetching] = useState(Boolean(fileId));
+  const [imageReady, setImageReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [seenFileId, setSeenFileId] = useState(fileId ?? "");
   const requestRef = useRef(0);
@@ -22,7 +35,8 @@ export function ReceiptEvidencePreview({
   if (seenFileId !== fileKey) {
     setSeenFileId(fileKey);
     setUrl(null);
-    setLoading(Boolean(fileKey));
+    setFetching(Boolean(fileKey));
+    setImageReady(false);
     setFailed(false);
   }
 
@@ -33,13 +47,15 @@ export function ReceiptEvidencePreview({
       .then((file) => {
         if (request !== requestRef.current) return;
         setUrl(file.url);
-        setLoading(false);
+        setFetching(false);
+        setImageReady(false);
         setFailed(false);
       })
       .catch(() => {
         if (request !== requestRef.current) return;
         setUrl(null);
-        setLoading(false);
+        setFetching(false);
+        setImageReady(false);
         setFailed(true);
       });
     return () => {
@@ -49,31 +65,34 @@ export function ReceiptEvidencePreview({
 
   if (!fileId) return null;
 
-  if (loading) {
-    return (
-      <p className="text-sm text-slate-500" role="status">
-        {tx("Loading the receipt evidence.")}
-      </p>
-    );
-  }
+  if (fetching) return <ReceiptLoading />;
 
   if (url) {
     return (
-      <img
-        alt={tx("Receipt evidence")}
-        className="max-h-64 w-full rounded-xl bg-slate-50 object-contain ring-1 ring-slate-200"
-        onError={() => {
-          setUrl(null);
-          setFailed(true);
-        }}
-        src={url}
-      />
+      <div className="grid gap-2">
+        {!imageReady ? <ReceiptLoading /> : null}
+        <img
+          alt={tx("Receipt evidence")}
+          className={
+            imageReady
+              ? "max-h-64 w-full rounded-xl bg-slate-50 object-contain ring-1 ring-slate-200"
+              : "pointer-events-none absolute h-0 w-0 opacity-0"
+          }
+          onError={() => {
+            setUrl(null);
+            setImageReady(false);
+            setFailed(true);
+          }}
+          onLoad={() => setImageReady(true)}
+          src={url}
+        />
+      </div>
     );
   }
 
   if (failed) {
     return (
-      <p className="text-sm text-slate-500" role="status">
+      <p className="text-sm font-medium text-slate-600" role="status">
         {tx("Unable to display the receipt evidence.")}
       </p>
     );
@@ -89,6 +108,7 @@ export function ReceiptEvidenceField({
 }) {
   const tx = useTx();
   const [localUrl, setLocalUrl] = useState<string | null>(null);
+  const [localReady, setLocalReady] = useState(false);
   const localUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -102,10 +122,12 @@ export function ReceiptEvidenceField({
     if (!file) {
       localUrlRef.current = null;
       setLocalUrl(null);
+      setLocalReady(false);
       return;
     }
     const url = URL.createObjectURL(file);
     localUrlRef.current = url;
+    setLocalReady(false);
     setLocalUrl(url);
   }
 
@@ -134,12 +156,20 @@ export function ReceiptEvidenceField({
         {tx("JPEG, PNG, or WebP up to 5 MB.")}
       </p>
       {localUrl ? (
-        <img
-          alt={tx("Receipt evidence")}
-          className="mt-3 max-h-64 w-full rounded-xl bg-slate-50 object-contain ring-1 ring-slate-200"
-          onError={() => replaceLocal(null)}
-          src={localUrl}
-        />
+        <div className="mt-3 grid gap-2">
+          {!localReady ? <ReceiptLoading /> : null}
+          <img
+            alt={tx("Receipt evidence")}
+            className={
+              localReady
+                ? "max-h-64 w-full rounded-xl bg-slate-50 object-contain ring-1 ring-slate-200"
+                : "pointer-events-none absolute h-0 w-0 opacity-0"
+            }
+            onError={() => replaceLocal(null)}
+            onLoad={() => setLocalReady(true)}
+            src={localUrl}
+          />
+        </div>
       ) : (
         <div className="mt-3">
           <ReceiptEvidencePreview fileId={attachedFileId} />
