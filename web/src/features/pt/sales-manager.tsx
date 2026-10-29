@@ -1593,9 +1593,7 @@ export function SalesManager({
                 </Field>
                 <Field label="Payment business date">
                   <TextInput
-                    defaultValue={
-                      selected?.payment?.business_date ?? today
-                    }
+                    defaultValue={selected?.payment?.business_date ?? today}
                     name="payment_business_date"
                     type="date"
                   />

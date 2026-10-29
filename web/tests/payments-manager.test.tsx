@@ -658,12 +658,9 @@ describe("payments manager", () => {
       await screen.findByRole("button", { name: "Record payment" }),
     );
     expect(screen.getByText("No member selected.")).toBeVisible();
-    fireEvent.change(
-      screen.getByPlaceholderText("Name or member number"),
-      {
-        target: { value: "Ada" },
-      },
-    );
+    fireEvent.change(screen.getByPlaceholderText("Name or member number"), {
+      target: { value: "Ada" },
+    });
     const match = await screen.findByRole("button", {
       name: "MEM-000001 — Ada Lovelace",
     });

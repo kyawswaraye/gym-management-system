@@ -1071,9 +1071,7 @@ export function ClassesManager({
     if (pendingRef.current || !canAttend || row.status !== "BOOKED") return;
     if (Date.now() < Date.parse(row.starts_at)) {
       setNotice("");
-      setError(
-        "Too early. Wait until the class starts, then mark attended.",
-      );
+      setError("Too early. Wait until the class starts, then mark attended.");
       return;
     }
     void command(
@@ -1087,9 +1085,7 @@ export function ClassesManager({
     if (pendingRef.current || !canAttend || row.status !== "BOOKED") return;
     if (Date.now() < Date.parse(row.ends_at)) {
       setNotice("");
-      setError(
-        "Too early. Wait until the class ends, then mark no-show.",
-      );
+      setError("Too early. Wait until the class ends, then mark no-show.");
       return;
     }
     void command(
@@ -1236,7 +1232,10 @@ export function ClassesManager({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {types.rows.map((row) => (
-                        <tr className="align-top hover:bg-slate-50" key={row.id}>
+                        <tr
+                          className="align-top hover:bg-slate-50"
+                          key={row.id}
+                        >
                           <td className="max-w-[18rem] px-4 py-3 sm:px-5">
                             <p className="font-semibold break-words text-slate-900">
                               {row.name}
@@ -1421,7 +1420,10 @@ export function ClassesManager({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {schedules.rows.map((row) => (
-                        <tr className="align-top hover:bg-slate-50" key={row.id}>
+                        <tr
+                          className="align-top hover:bg-slate-50"
+                          key={row.id}
+                        >
                           <td className="px-4 py-3 whitespace-nowrap text-slate-900 sm:px-5">
                             <p className="font-semibold">
                               {weekdaySummary(row.weekdays)}
@@ -1595,9 +1597,7 @@ export function ClassesManager({
                   ) : null}
                   {occurrences.rows.length > 0 ? (
                     <div
-                      className={
-                        occurrences.pending ? "opacity-60" : undefined
-                      }
+                      className={occurrences.pending ? "opacity-60" : undefined}
                     >
                       {!wide ? (
                         <ul
@@ -1613,10 +1613,7 @@ export function ClassesManager({
                                 <div className="min-w-0">
                                   <p className="font-semibold text-slate-900">
                                     {formatLocalDate(row.local_date)}
-                                    <span className="text-slate-400">
-                                      {" "}
-                                      ·{" "}
-                                    </span>
+                                    <span className="text-slate-400"> · </span>
                                     <span className="tabular-nums">
                                       {occurrenceClock(row)}
                                     </span>
@@ -1756,8 +1753,7 @@ export function ClassesManager({
                                     <StatusPill status={row.status} />
                                   </td>
                                   <td className="px-1 py-3 text-right">
-                                    {canManage &&
-                                    row.status === "SCHEDULED" ? (
+                                    {canManage && row.status === "SCHEDULED" ? (
                                       <button
                                         className="button button-cancel button-sm"
                                         disabled={pending}
@@ -1907,316 +1903,318 @@ export function ClassesManager({
                       }
                     >
                       {!wide ? (
-                      <ul
-                        aria-label={tx("Class bookings")}
-                        className="grid gap-3"
-                      >
-                        {bookings.rows.map((row) => {
-                          const occurrence = occurrences.rows.find(
-                            (item) => item.id === row.class_occurrence_id,
-                          );
-                          return (
-                            <li
-                              className="rounded-xl border border-slate-200 bg-white p-3"
-                              key={row.id}
-                            >
-                              <div className="flex flex-wrap items-start justify-between gap-2">
-                                <div className="min-w-0">
-                                  <p className="font-semibold tabular-nums text-slate-900">
-                                    {bookingClock(row)}
-                                  </p>
-                                  <p className="mt-1 text-sm font-semibold break-words text-slate-800">
-                                    {row.member_name || (
-                                      <IdentifierValue value={row.member_id} />
-                                    )}
-                                  </p>
-                                  <p className="mt-1 text-xs break-words text-slate-500">
-                                    {occurrence ? (
-                                      <NamedId
-                                        id={occurrence.class_type_id}
-                                        name={typeName(
-                                          occurrence.class_type_id,
-                                        )}
-                                      />
-                                    ) : (
-                                      <IdentifierValue
-                                        value={row.class_occurrence_id}
-                                      />
-                                    )}
-                                    {" · "}
-                                    {row.unmetered ? (
-                                      <>
-                                        {tx("Unmetered")}
-                                        {row.unmetered_reason
-                                          ? ` · ${row.unmetered_reason}`
-                                          : ""}
-                                      </>
-                                    ) : (
-                                      <IdentifierValue
-                                        value={
-                                          row.member_service_package_id ??
-                                          "missing"
-                                        }
-                                      />
-                                    )}
-                                  </p>
+                        <ul
+                          aria-label={tx("Class bookings")}
+                          className="grid gap-3"
+                        >
+                          {bookings.rows.map((row) => {
+                            const occurrence = occurrences.rows.find(
+                              (item) => item.id === row.class_occurrence_id,
+                            );
+                            return (
+                              <li
+                                className="rounded-xl border border-slate-200 bg-white p-3"
+                                key={row.id}
+                              >
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="font-semibold tabular-nums text-slate-900">
+                                      {bookingClock(row)}
+                                    </p>
+                                    <p className="mt-1 text-sm font-semibold break-words text-slate-800">
+                                      {row.member_name || (
+                                        <IdentifierValue
+                                          value={row.member_id}
+                                        />
+                                      )}
+                                    </p>
+                                    <p className="mt-1 text-xs break-words text-slate-500">
+                                      {occurrence ? (
+                                        <NamedId
+                                          id={occurrence.class_type_id}
+                                          name={typeName(
+                                            occurrence.class_type_id,
+                                          )}
+                                        />
+                                      ) : (
+                                        <IdentifierValue
+                                          value={row.class_occurrence_id}
+                                        />
+                                      )}
+                                      {" · "}
+                                      {row.unmetered ? (
+                                        <>
+                                          {tx("Unmetered")}
+                                          {row.unmetered_reason
+                                            ? ` · ${row.unmetered_reason}`
+                                            : ""}
+                                        </>
+                                      ) : (
+                                        <IdentifierValue
+                                          value={
+                                            row.member_service_package_id ??
+                                            "missing"
+                                          }
+                                        />
+                                      )}
+                                    </p>
+                                  </div>
+                                  <StatusPill status={row.status} />
                                 </div>
-                                <StatusPill status={row.status} />
-                              </div>
-                              {row.status === "BOOKED" &&
-                              (canAttend || canCancelBooking) ? (
-                                <div
-                                  aria-label={tx("Booking actions")}
-                                  className="mt-3 grid gap-2"
-                                  role="group"
-                                >
-                                  {canAttend ? (
-                                    <>
-                                      <button
-                                        className="button button-success button-sm w-full"
-                                        disabled={
-                                          pending ||
-                                          Date.now() <
+                                {row.status === "BOOKED" &&
+                                (canAttend || canCancelBooking) ? (
+                                  <div
+                                    aria-label={tx("Booking actions")}
+                                    className="mt-3 grid gap-2"
+                                    role="group"
+                                  >
+                                    {canAttend ? (
+                                      <>
+                                        <button
+                                          className="button button-success button-sm w-full"
+                                          disabled={
+                                            pending ||
+                                            Date.now() <
+                                              Date.parse(row.starts_at)
+                                          }
+                                          onClick={() => attend(row)}
+                                          title={
+                                            Date.now() <
                                             Date.parse(row.starts_at)
-                                        }
-                                        onClick={() => attend(row)}
-                                        title={
-                                          Date.now() <
-                                          Date.parse(row.starts_at)
-                                            ? tx(
-                                                "Available after the class starts.",
-                                              )
-                                            : undefined
-                                        }
-                                        type="button"
-                                      >
-                                        {" "}
-                                        {tx("Mark attended")}{" "}
-                                      </button>
-                                      <button
-                                        className="button button-warn button-sm w-full"
-                                        disabled={
-                                          pending ||
-                                          Date.now() < Date.parse(row.ends_at)
-                                        }
-                                        onClick={() => markNoShow(row)}
-                                        title={
-                                          Date.now() < Date.parse(row.ends_at)
-                                            ? tx(
-                                                "Available after the class ends.",
-                                              )
-                                            : undefined
-                                        }
-                                        type="button"
-                                      >
-                                        {" "}
-                                        {tx("Mark no-show")}{" "}
-                                      </button>
-                                    </>
-                                  ) : null}
-                                  {canCancelBooking ? (
-                                    <button
-                                      className="button button-cancel button-sm w-full"
-                                      disabled={pending}
-                                      onClick={(event) =>
-                                        openDialog(
-                                          { kind: "cancel-booking", row },
-                                          event.currentTarget,
-                                        )
-                                      }
-                                      type="button"
-                                    >
-                                      {" "}
-                                      {tx("Cancel booking")}{" "}
-                                    </button>
-                                  ) : null}
-                                </div>
-                              ) : null}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                      ) : (
-                      <div className="w-full overflow-x-auto">
-                        <table className="w-full min-w-[44rem] text-left text-sm">
-                          <caption className="sr-only">
-                            {tx("Class bookings")}
-                          </caption>
-                          <thead className="border-b border-slate-200 text-slate-500">
-                            <tr>
-                              <th
-                                className="px-1 py-2.5 text-xs font-semibold"
-                                scope="col"
-                              >
-                                {tx("When")}
-                              </th>
-                              <th
-                                className="px-3 py-2.5 text-xs font-semibold"
-                                scope="col"
-                              >
-                                {tx("Member")}
-                              </th>
-                              <th
-                                className="px-3 py-2.5 text-xs font-semibold"
-                                scope="col"
-                              >
-                                {tx("Class")}
-                              </th>
-                              <th
-                                className="hidden px-3 py-2.5 text-xs font-semibold lg:table-cell"
-                                scope="col"
-                              >
-                                {tx("Pack")}
-                              </th>
-                              <th
-                                className="px-3 py-2.5 text-xs font-semibold"
-                                scope="col"
-                              >
-                                {tx("Status")}
-                              </th>
-                              <th
-                                className="px-1 py-2.5 text-xs font-semibold"
-                                scope="col"
-                              >
-                                <span className="sr-only">
-                                  {tx("Actions")}
-                                </span>
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {bookings.rows.map((row) => {
-                              const occurrence = occurrences.rows.find(
-                                (item) => item.id === row.class_occurrence_id,
-                              );
-                              return (
-                                <tr className="align-top" key={row.id}>
-                                  <td className="px-1 py-3 whitespace-nowrap font-semibold tabular-nums text-slate-900">
-                                    {bookingClock(row)}
-                                  </td>
-                                  <td className="max-w-[14rem] px-3 py-3 font-semibold break-words text-slate-900">
-                                    {row.member_name || (
-                                      <IdentifierValue
-                                        value={row.member_id}
-                                      />
-                                    )}
-                                  </td>
-                                  <td className="max-w-[12rem] px-3 py-3 break-words text-slate-700">
-                                    {occurrence ? (
-                                      <NamedId
-                                        id={occurrence.class_type_id}
-                                        name={typeName(
-                                          occurrence.class_type_id,
-                                        )}
-                                      />
-                                    ) : (
-                                      <IdentifierValue
-                                        value={row.class_occurrence_id}
-                                      />
-                                    )}
-                                  </td>
-                                  <td className="hidden max-w-[10rem] px-3 py-3 break-words text-slate-600 lg:table-cell">
-                                    {row.unmetered ? (
-                                      <>
-                                        {tx("Unmetered")}
-                                        {row.unmetered_reason
-                                          ? ` · ${row.unmetered_reason}`
-                                          : ""}
+                                              ? tx(
+                                                  "Available after the class starts.",
+                                                )
+                                              : undefined
+                                          }
+                                          type="button"
+                                        >
+                                          {" "}
+                                          {tx("Mark attended")}{" "}
+                                        </button>
+                                        <button
+                                          className="button button-warn button-sm w-full"
+                                          disabled={
+                                            pending ||
+                                            Date.now() < Date.parse(row.ends_at)
+                                          }
+                                          onClick={() => markNoShow(row)}
+                                          title={
+                                            Date.now() < Date.parse(row.ends_at)
+                                              ? tx(
+                                                  "Available after the class ends.",
+                                                )
+                                              : undefined
+                                          }
+                                          type="button"
+                                        >
+                                          {" "}
+                                          {tx("Mark no-show")}{" "}
+                                        </button>
                                       </>
-                                    ) : (
-                                      <IdentifierValue
-                                        value={
-                                          row.member_service_package_id ??
-                                          "missing"
-                                        }
-                                      />
-                                    )}
-                                  </td>
-                                  <td className="px-3 py-3">
-                                    <StatusPill status={row.status} />
-                                  </td>
-                                  <td className="px-1 py-3">
-                                    {row.status === "BOOKED" &&
-                                    (canAttend || canCancelBooking) ? (
-                                      <div
-                                        aria-label={tx("Booking actions")}
-                                        className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:justify-end"
-                                        role="group"
-                                      >
-                                        {canAttend ? (
-                                          <>
-                                            <button
-                                              className="button button-success button-sm"
-                                              disabled={
-                                                pending ||
-                                                Date.now() <
-                                                  Date.parse(row.starts_at)
-                                              }
-                                              onClick={() => attend(row)}
-                                              title={
-                                                Date.now() <
-                                                Date.parse(row.starts_at)
-                                                  ? tx(
-                                                      "Available after the class starts.",
-                                                    )
-                                                  : undefined
-                                              }
-                                              type="button"
-                                            >
-                                              {" "}
-                                              {tx("Mark attended")}{" "}
-                                            </button>
-                                            <button
-                                              className="button button-warn button-sm"
-                                              disabled={
-                                                pending ||
-                                                Date.now() <
-                                                  Date.parse(row.ends_at)
-                                              }
-                                              onClick={() => markNoShow(row)}
-                                              title={
-                                                Date.now() <
-                                                Date.parse(row.ends_at)
-                                                  ? tx(
-                                                      "Available after the class ends.",
-                                                    )
-                                                  : undefined
-                                              }
-                                              type="button"
-                                            >
-                                              {" "}
-                                              {tx("Mark no-show")}{" "}
-                                            </button>
-                                          </>
-                                        ) : null}
-                                        {canCancelBooking ? (
-                                          <button
-                                            className="button button-cancel button-sm"
-                                            disabled={pending}
-                                            onClick={(event) =>
-                                              openDialog(
-                                                {
-                                                  kind: "cancel-booking",
-                                                  row,
-                                                },
-                                                event.currentTarget,
-                                              )
-                                            }
-                                            type="button"
-                                          >
-                                            {" "}
-                                            {tx("Cancel booking")}{" "}
-                                          </button>
-                                        ) : null}
-                                      </div>
                                     ) : null}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                                    {canCancelBooking ? (
+                                      <button
+                                        className="button button-cancel button-sm w-full"
+                                        disabled={pending}
+                                        onClick={(event) =>
+                                          openDialog(
+                                            { kind: "cancel-booking", row },
+                                            event.currentTarget,
+                                          )
+                                        }
+                                        type="button"
+                                      >
+                                        {" "}
+                                        {tx("Cancel booking")}{" "}
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        <div className="w-full overflow-x-auto">
+                          <table className="w-full min-w-[44rem] text-left text-sm">
+                            <caption className="sr-only">
+                              {tx("Class bookings")}
+                            </caption>
+                            <thead className="border-b border-slate-200 text-slate-500">
+                              <tr>
+                                <th
+                                  className="px-1 py-2.5 text-xs font-semibold"
+                                  scope="col"
+                                >
+                                  {tx("When")}
+                                </th>
+                                <th
+                                  className="px-3 py-2.5 text-xs font-semibold"
+                                  scope="col"
+                                >
+                                  {tx("Member")}
+                                </th>
+                                <th
+                                  className="px-3 py-2.5 text-xs font-semibold"
+                                  scope="col"
+                                >
+                                  {tx("Class")}
+                                </th>
+                                <th
+                                  className="hidden px-3 py-2.5 text-xs font-semibold lg:table-cell"
+                                  scope="col"
+                                >
+                                  {tx("Pack")}
+                                </th>
+                                <th
+                                  className="px-3 py-2.5 text-xs font-semibold"
+                                  scope="col"
+                                >
+                                  {tx("Status")}
+                                </th>
+                                <th
+                                  className="px-1 py-2.5 text-xs font-semibold"
+                                  scope="col"
+                                >
+                                  <span className="sr-only">
+                                    {tx("Actions")}
+                                  </span>
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {bookings.rows.map((row) => {
+                                const occurrence = occurrences.rows.find(
+                                  (item) => item.id === row.class_occurrence_id,
+                                );
+                                return (
+                                  <tr className="align-top" key={row.id}>
+                                    <td className="px-1 py-3 whitespace-nowrap font-semibold tabular-nums text-slate-900">
+                                      {bookingClock(row)}
+                                    </td>
+                                    <td className="max-w-[14rem] px-3 py-3 font-semibold break-words text-slate-900">
+                                      {row.member_name || (
+                                        <IdentifierValue
+                                          value={row.member_id}
+                                        />
+                                      )}
+                                    </td>
+                                    <td className="max-w-[12rem] px-3 py-3 break-words text-slate-700">
+                                      {occurrence ? (
+                                        <NamedId
+                                          id={occurrence.class_type_id}
+                                          name={typeName(
+                                            occurrence.class_type_id,
+                                          )}
+                                        />
+                                      ) : (
+                                        <IdentifierValue
+                                          value={row.class_occurrence_id}
+                                        />
+                                      )}
+                                    </td>
+                                    <td className="hidden max-w-[10rem] px-3 py-3 break-words text-slate-600 lg:table-cell">
+                                      {row.unmetered ? (
+                                        <>
+                                          {tx("Unmetered")}
+                                          {row.unmetered_reason
+                                            ? ` · ${row.unmetered_reason}`
+                                            : ""}
+                                        </>
+                                      ) : (
+                                        <IdentifierValue
+                                          value={
+                                            row.member_service_package_id ??
+                                            "missing"
+                                          }
+                                        />
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-3">
+                                      <StatusPill status={row.status} />
+                                    </td>
+                                    <td className="px-1 py-3">
+                                      {row.status === "BOOKED" &&
+                                      (canAttend || canCancelBooking) ? (
+                                        <div
+                                          aria-label={tx("Booking actions")}
+                                          className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:justify-end"
+                                          role="group"
+                                        >
+                                          {canAttend ? (
+                                            <>
+                                              <button
+                                                className="button button-success button-sm"
+                                                disabled={
+                                                  pending ||
+                                                  Date.now() <
+                                                    Date.parse(row.starts_at)
+                                                }
+                                                onClick={() => attend(row)}
+                                                title={
+                                                  Date.now() <
+                                                  Date.parse(row.starts_at)
+                                                    ? tx(
+                                                        "Available after the class starts.",
+                                                      )
+                                                    : undefined
+                                                }
+                                                type="button"
+                                              >
+                                                {" "}
+                                                {tx("Mark attended")}{" "}
+                                              </button>
+                                              <button
+                                                className="button button-warn button-sm"
+                                                disabled={
+                                                  pending ||
+                                                  Date.now() <
+                                                    Date.parse(row.ends_at)
+                                                }
+                                                onClick={() => markNoShow(row)}
+                                                title={
+                                                  Date.now() <
+                                                  Date.parse(row.ends_at)
+                                                    ? tx(
+                                                        "Available after the class ends.",
+                                                      )
+                                                    : undefined
+                                                }
+                                                type="button"
+                                              >
+                                                {" "}
+                                                {tx("Mark no-show")}{" "}
+                                              </button>
+                                            </>
+                                          ) : null}
+                                          {canCancelBooking ? (
+                                            <button
+                                              className="button button-cancel button-sm"
+                                              disabled={pending}
+                                              onClick={(event) =>
+                                                openDialog(
+                                                  {
+                                                    kind: "cancel-booking",
+                                                    row,
+                                                  },
+                                                  event.currentTarget,
+                                                )
+                                              }
+                                              type="button"
+                                            >
+                                              {" "}
+                                              {tx("Cancel booking")}{" "}
+                                            </button>
+                                          ) : null}
+                                        </div>
+                                      ) : null}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
                       )}
                     </div>
                   ) : null}
@@ -2550,7 +2548,9 @@ export function ClassesManager({
                     {tx("Special case: no pack")}
                   </span>
                   <span className="mt-0.5 block text-xs text-slate-500">
-                    {tx("Managers only. Write a reason instead of using a pack.")}
+                    {tx(
+                      "Managers only. Write a reason instead of using a pack.",
+                    )}
                   </span>
                 </span>
               </label>

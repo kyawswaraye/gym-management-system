@@ -783,9 +783,7 @@ function CommissionDetail({
                 />
                 <Fact
                   label="Sale"
-                  value={
-                    selected.pt_sale_description || selected.pt_sale_id
-                  }
+                  value={selected.pt_sale_description || selected.pt_sale_id}
                 />
                 {selected.created_by_display_name ||
                 selected.created_by_membership_id ? (

@@ -1,6 +1,8 @@
 export const ptEn = {
-  "Filled from Free pack. Edit only if you need a clearer note.": "Filled from Free pack. Edit only if you need a clearer note.",
-  "No = member already paid. Record the payment in Payments first. Paid PT packs still come from a PT sale.": "No = member already paid. Record the payment in Payments first. Paid PT packs still come from a PT sale.",
+  "Filled from Free pack. Edit only if you need a clearer note.":
+    "Filled from Free pack. Edit only if you need a clearer note.",
+  "No = member already paid. Record the payment in Payments first. Paid PT packs still come from a PT sale.":
+    "No = member already paid. Record the payment in Payments first. Paid PT packs still come from a PT sale.",
   "Yes = give the pack for free.": "Yes = give the pack for free.",
   "Paid pack grant": "Paid pack grant",
   "Free pack grant": "Free pack grant",

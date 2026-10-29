@@ -108,9 +108,7 @@ function packageCell(row: PTBooking, tx: (text: string) => string) {
   if (row.unmetered) {
     return `${tx("Unmetered")} · ${tx(row.unmetered_reason)}`;
   }
-  return (
-    <IdentifierValue value={row.member_service_package_id ?? "missing"} />
-  );
+  return <IdentifierValue value={row.member_service_package_id ?? "missing"} />;
 }
 
 function BookingActions({
@@ -759,9 +757,7 @@ export function BookingsManager({
               </div>
             ) : null}
             {bookings.rows.length > 0 ? (
-              <div
-                className={bookings.pending ? "opacity-60" : undefined}
-              >
+              <div className={bookings.pending ? "opacity-60" : undefined}>
                 {!wide ? (
                   <ul aria-label={tx("PT bookings")} className="grid gap-3">
                     {bookings.rows.map((row) => {

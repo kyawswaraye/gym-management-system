@@ -862,7 +862,8 @@ export const operationsMm = {
   "Name, key, or permission": "အမည်၊ သော့ သို့မဟုတ် ခွင့်ပြုချက်",
   "Name, number, phone, or email": "အမည်၊ နံပါတ်၊ ဖုန်း သို့မဟုတ် အီးမေးလ်",
   "Name or member number": "အမည် သို့မဟုတ် member နံပါတ်",
-  "Phone or email works too.": "ဖုန်း သို့မဟုတ် အီးမေးလ်လည်း ရိုက်ရှာလို့ရပါတယ်။",
+  "Phone or email works too.":
+    "ဖုန်း သို့မဟုတ် အီးမေးလ်လည်း ရိုက်ရှာလို့ရပါတယ်။",
   "Net paid": "အသားတင် ပေးချေပြီး",
   "New plan": "အစီအစဉ် အသစ်",
   "Newest events are first. Open one to read the change.":

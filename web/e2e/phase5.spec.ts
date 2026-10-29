@@ -70,11 +70,11 @@ test("owner assigns trainers and prepares the catalogs", async ({ page }) => {
     .click();
   const classType = titledForm(page, "create-class-type-title");
   await expect(classType).toBeVisible();
-  await classType.getByLabel("Name", { exact: true }).fill("E2E Cycle");
+  await classType.getByLabel("Class name", { exact: true }).fill("E2E Cycle");
   await classType
-    .getByLabel("Default duration minutes", { exact: true })
+    .getByLabel("Usual length (minutes)", { exact: true })
     .fill("60");
-  await classType.getByLabel("Default capacity", { exact: true }).fill("4");
+  await classType.getByLabel("Usual seats", { exact: true }).fill("4");
   await runCommand(page, /\/class-types\/?$/, () =>
     classType
       .getByRole("button", { name: "Create class type", exact: true })
@@ -98,8 +98,8 @@ test("owner assigns trainers and prepares the catalogs", async ({ page }) => {
   const grant = titledForm(page, "grant-title");
   await expect(grant).toBeVisible();
   await pickMember(grant, "E2Escan", /E2Escan Visitor/);
-  await selectByText(combo(grant, "Package"), "CLASS · E2E_CLASS_PACK");
-  await grant.getByLabel("Reason", { exact: true }).fill("E2E class grant");
+  await selectByText(combo(grant, "Which pack?"), "CLASS · E2E_CLASS_PACK");
+  await grant.getByLabel("Short note", { exact: true }).fill("E2E class grant");
   await runCommand(page, /\/member-service-packages\/?$/, () =>
     grant.getByRole("button", { name: "Save grant", exact: true }).click(),
   );
@@ -989,12 +989,11 @@ async function createSale(
   await pickMember(form, "E2Escan", /E2Escan Visitor/);
   await selectByText(combo(form, "Trainer"), input.trainer);
   await form.getByLabel("Description", { exact: true }).fill(input.description);
-  await form.getByLabel("Gross fee", { exact: true }).fill(input.gross);
   if (input.packageLabel) {
     await selectByText(combo(form, "PT package"), input.packageLabel);
   }
   if (input.payment) {
-    await combo(form, "Payment draft").selectOption("set");
+    await combo(form, "Member's money").selectOption("set");
     await form
       .getByLabel("Payment description", { exact: true })
       .fill(input.description);
@@ -1002,6 +1001,9 @@ async function createSale(
       .getByLabel("Payment amount", { exact: true })
       .fill(input.payment);
     await combo(form, "Payment method").selectOption("CASH");
+  } else {
+    await combo(form, "Member's money").selectOption("omit");
+    await form.getByLabel("Sale total", { exact: true }).fill(input.gross);
   }
   await runCommand(page, /\/pt-sales\/?$/, () =>
     form.getByRole("button", { name: "Save draft", exact: true }).click(),
@@ -1116,9 +1118,7 @@ async function bookClass(page: Page, occurrence: RegExp): Promise<void> {
   await pickMember(form, "E2Escan", /E2Escan Visitor/);
   await selectByText(combo(form, "Which class pack?"), "E2E_CLASS_PACK");
   await runCommand(page, /\/class-bookings\/?$/, () =>
-    form
-      .getByRole("button", { name: "Save booking", exact: true })
-      .click(),
+    form.getByRole("button", { name: "Save booking", exact: true }).click(),
   );
   await expect(form).toBeHidden();
 }

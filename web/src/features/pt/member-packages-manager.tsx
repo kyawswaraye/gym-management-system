@@ -1042,7 +1042,9 @@ export function MemberPackagesManager({
           </Field>
           <p className="-mt-3 text-xs text-slate-500">
             {" "}
-            {tx("Filled from Free pack. Edit only if you need a clearer note.")}{" "}
+            {tx(
+              "Filled from Free pack. Edit only if you need a clearer note.",
+            )}{" "}
           </p>
         </ModalForm>
       ) : null}

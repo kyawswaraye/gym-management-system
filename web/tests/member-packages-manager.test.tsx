@@ -228,7 +228,9 @@ describe("member package catalog", () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /PT10 · Ten sessions · M-1 · Grace Hopper/ }),
+      screen.getByRole("button", {
+        name: /PT10 · Ten sessions · M-1 · Grace Hopper/,
+      }),
     );
     expect(
       screen.queryByText("Choose a grant to read its ledger."),
@@ -597,7 +599,9 @@ describe("grant package dialog", () => {
     ).toHaveAttribute("aria-controls", "grant-package-dialog");
 
     fireEvent.mouseDown(within(dialog).getByLabelText("Short note"));
-    expect(screen.getByRole("dialog", { name: "Give pack to member" })).toBe(dialog);
+    expect(screen.getByRole("dialog", { name: "Give pack to member" })).toBe(
+      dialog,
+    );
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(
@@ -656,7 +660,9 @@ describe("grant package dialog", () => {
     expect(dialog).toContainElement(failure);
     expect(screen.getAllByRole("alert")).toEqual([failure]);
     expect(screen.queryByText("Package granted.")).not.toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "Give pack to member" })).toBe(dialog);
+    expect(screen.getByRole("dialog", { name: "Give pack to member" })).toBe(
+      dialog,
+    );
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -759,7 +765,9 @@ describe("grant package dialog", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     fireEvent.mouseDown(dialog.parentElement ?? dialog);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save grant" }));
-    expect(screen.getByRole("dialog", { name: "Give pack to member" })).toBe(dialog);
+    expect(screen.getByRole("dialog", { name: "Give pack to member" })).toBe(
+      dialog,
+    );
     expect(grantMemberPackage).toHaveBeenCalledTimes(1);
 
     await act(async () => {
