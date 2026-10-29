@@ -609,12 +609,32 @@ class OwnerInvitationCancelView(APIView):
 
 class AdminGymOwnerCreateView(APIView):
     authentication_classes = [PlatformJWTAuthentication]
-    permission_classes = [
-        IsAuthenticated,
-        RequiresPlatformPermissions,
-        RequiresRecentMFA,
-    ]
-    required_permissions = ("platform.owners.create",)
+    required_permissions: tuple[str, ...] = ("platform.owners.create",)
+
+    def get_permissions(self) -> Sequence[Any]:
+        if self.request.method == "GET":
+            self.required_permissions = ("platform.gyms.view",)
+            return [IsAuthenticated(), RequiresPlatformPermissions()]
+        self.required_permissions = ("platform.owners.create",)
+        return [
+            IsAuthenticated(),
+            RequiresPlatformPermissions(),
+            RequiresRecentMFA(),
+        ]
+
+    @extend_schema(
+        operation_id="admin_gym_owners_list",
+        responses={
+            200: OwnerListEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request, gym_id: uuid.UUID) -> Response:
+        gym = get_object_or_404(Gym, id=gym_id)
+        owners = visible_owner_memberships(gym)
+        return success_response([owner_membership_data(owner) for owner in owners])
 
     @extend_schema(
         operation_id="admin_gym_owner_invite",

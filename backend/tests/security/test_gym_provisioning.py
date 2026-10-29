@@ -1606,6 +1606,11 @@ def test_platform_assisted_owner_creation_requires_mfa_and_permission() -> None:
     assert staff_denied.json()["error"]["code"] == "AUTHENTICATION_FAILED"
 
     platform_headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
+    listed = client.get(f"/api/v1/admin/gyms/{gym_id}/owners/", **platform_headers)
+    assert listed.status_code == 200, listed.content
+    assert {
+        row["email"] for row in listed.json()["data"]
+    } == {"assisted-initial-owner@example.test"}
     blocked = client.post(
         f"/api/v1/admin/gyms/{gym_id}/owners/",
         {"email": "assisted-added@example.test", "first_name": "Added", "last_name": "Owner"},

@@ -17,6 +17,7 @@ import {
 } from "@/features/operations/myanmar-place-fields";
 import { formatAppDateTime } from "@/lib/date";
 import type {
+  OwnerItem,
   PlatformAuditItem,
   PlatformGymDetail,
   PlatformSubscription,
@@ -69,6 +70,7 @@ export function GymDetailManager({
   const locale = useLocale();
   const [gym, setGym] = useState<PlatformGymDetail | null>(null);
   const [plans, setPlans] = useState<PlatformSubscription[]>([]);
+  const [owners, setOwners] = useState<OwnerItem[]>([]);
   const [audits, setAudits] = useState<PlatformAuditItem[]>([]);
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -81,20 +83,23 @@ export function GymDetailManager({
   const [success, setSuccess] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    const [detail, subscriptions, auditCollection] = await Promise.all([
-      platformGet<PlatformGymDetail>(`admin/gyms/${gymId}`),
-      capabilities.canManageSubscriptions
-        ? platformGet<PlatformSubscription[]>("admin/subscriptions")
-        : Promise.resolve([]),
-      capabilities.canViewAudit
-        ? platformGetCollection<PlatformAuditItem>(
-            `admin/audit-logs?target_gym_id=${encodeURIComponent(gymId)}`,
-          )
-        : Promise.resolve(null),
-    ]);
+    const [detail, subscriptions, ownerRows, auditCollection] =
+      await Promise.all([
+        platformGet<PlatformGymDetail>(`admin/gyms/${gymId}`),
+        capabilities.canManageSubscriptions
+          ? platformGet<PlatformSubscription[]>("admin/subscriptions")
+          : Promise.resolve([]),
+        platformGet<OwnerItem[]>(`admin/gyms/${gymId}/owners`),
+        capabilities.canViewAudit
+          ? platformGetCollection<PlatformAuditItem>(
+              `admin/audit-logs?target_gym_id=${encodeURIComponent(gymId)}`,
+            )
+          : Promise.resolve(null),
+      ]);
     return {
       detail,
       subscriptions,
+      owners: ownerRows,
       audits: auditCollection?.data ?? [],
     };
   }, [capabilities.canManageSubscriptions, capabilities.canViewAudit, gymId]);
@@ -106,6 +111,7 @@ export function GymDetailManager({
         if (active) {
           setGym(data.detail);
           setPlans([...data.subscriptions].sort(compareSubscriptionPlans));
+          setOwners(data.owners);
           setAudits(data.audits);
         }
       })
@@ -127,8 +133,24 @@ export function GymDetailManager({
     const values = new FormData(event.currentTarget);
     const request: Record<string, unknown> = {};
     if (capabilities.canUpdate) {
+      const name = String(values.get("name") ?? "").trim();
+      if (!name) {
+        setError(tx("Enter a gym name."));
+        return;
+      }
+      const countryCode = String(values.get("country_code") ?? "")
+        .trim()
+        .toUpperCase();
+      if (countryCode && !/^[A-Z]{2}$/.test(countryCode)) {
+        setError(tx("Enter a 2-letter country code such as MM."));
+        return;
+      }
+      const timezone = String(values.get("timezone") ?? "").trim();
+      if (!timezone) {
+        setError(tx("Enter a timezone."));
+        return;
+      }
       for (const field of [
-        "name",
         "email",
         "phone",
         "address_line1",
@@ -136,18 +158,22 @@ export function GymDetailManager({
         "city",
         "region",
         "postal_code",
-        "country_code",
-        "timezone",
         "currency",
       ]) {
         request[field] = String(values.get(field) ?? "").trim();
       }
-      request.legal_name = request.name;
+      request.name = name;
+      request.legal_name = name;
+      request.country_code = countryCode;
+      request.timezone = timezone;
     }
     if (capabilities.canManageSubscriptions) {
-      request.subscription_plan_id = String(
-        values.get("subscription_plan_id") ?? "",
-      );
+      const planId = String(values.get("subscription_plan_id") ?? "").trim();
+      if (!planId) {
+        setError(tx("Select a subscription plan."));
+        return;
+      }
+      request.subscription_plan_id = planId;
       request.subscription_status = String(
         values.get("subscription_status") ?? "",
       );
@@ -171,6 +197,7 @@ export function GymDetailManager({
       const data = await fetchData();
       setGym(data.detail);
       setPlans([...data.subscriptions].sort(compareSubscriptionPlans));
+      setOwners(data.owners);
       setAudits(data.audits);
     } catch (reason) {
       setError(
@@ -207,6 +234,7 @@ export function GymDetailManager({
       const data = await fetchData();
       setGym(data.detail);
       setPlans([...data.subscriptions].sort(compareSubscriptionPlans));
+      setOwners(data.owners);
       setAudits(data.audits);
     } catch (failure) {
       setError(
@@ -239,6 +267,9 @@ export function GymDetailManager({
         "Owner invitation request accepted. A live pending invitation is not resent. A new link is possible after expiry for a passwordless active Owner.",
       );
       form.reset();
+      const data = await fetchData();
+      setOwners(data.owners);
+      setAudits(data.audits);
     } catch (failure) {
       setError(
         failure instanceof Error ? failure.message : "Unable to invite Owner.",
@@ -246,6 +277,11 @@ export function GymDetailManager({
     } finally {
       setPending(false);
     }
+  }
+
+  function ownerName(owner: OwnerItem): string {
+    const name = `${owner.first_name} ${owner.last_name}`.trim();
+    return name || owner.email;
   }
 
   if (!gym && !error) return <p className="muted">{tx("Loading gym…")}</p>;
@@ -259,16 +295,16 @@ export function GymDetailManager({
         {" "}
         {tx("← Back to gyms")}{" "}
       </Link>
-      {error && (
+      {error && !editingSettings && !lifecycleOpen && !invitingOwner ? (
         <p className="error" role="alert">
           {tx(error)}
         </p>
-      )}
-      {success && (
+      ) : null}
+      {success && !editingSettings ? (
         <p className="text-sm font-medium text-emerald-700" role="status">
           {tx(success)}
         </p>
-      )}
+      ) : null}
       {gym && (
         <>
           <section className={panelClass}>
@@ -293,6 +329,8 @@ export function GymDetailManager({
               </span>
             </div>
             <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Fact label="Email" value={gym.email} />
+              <Fact label="Phone" value={gym.phone} />
               <Fact label="Plan" value={gym.subscription_plan_name ?? ""} />
               <Fact label="Timezone" value={gym.timezone} />
               <Fact label="Currency" value={gym.currency} />
@@ -302,6 +340,40 @@ export function GymDetailManager({
               />
               <Fact label="City" value={myanmarPlaceText(gym.city, locale)} />
             </dl>
+          </section>
+
+          <section className={panelClass} aria-labelledby="gym-owners-title">
+            <h2 id="gym-owners-title" className="text-xl font-bold">
+              {tx("Owners")}
+            </h2>
+            <p className="muted mt-2 text-sm">
+              {tx("Active and pending owners for this gym.")}
+            </p>
+            {owners.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-600">
+                {tx("No owners are listed.")}
+              </p>
+            ) : (
+              <ul className="mt-4 grid gap-3" aria-label={tx("Owners")}>
+                {owners.map((owner) => (
+                  <li
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                    key={owner.gym_membership_id}
+                  >
+                    <p className="font-semibold text-slate-900">
+                      {ownerName(owner)}
+                    </p>
+                    <p className="mt-1 break-all text-sm text-slate-700">
+                      {owner.email}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                      {tx(owner.status)}
+                      {owner.phone ? ` · ${owner.phone}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           {(capabilities.canUpdate || capabilities.canManageSubscriptions) && (
@@ -330,28 +402,45 @@ export function GymDetailManager({
               </section>
               {editingSettings ? (
                 <FormDialog
+                  noValidate
                   onClose={() => {
-                    if (!pending) setEditingSettings(false);
+                    if (pending) return;
+                    setEditingSettings(false);
+                    setError(null);
                   }}
                   onSubmit={save}
                   pending={pending}
                   title={tx("Gym settings")}
                   wide
                 >
+                  {error ? (
+                    <p className="error" role="alert">
+                      {tx(error)}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-slate-500">
+                      {tx(
+                        "Scroll if needed, then use Save changes at the bottom.",
+                      )}
+                    </p>
+                  )}
                   <div className="grid gap-4 md:grid-cols-2">
                     {capabilities.canUpdate && (
                       <>
                         {(
                           [
-                            ["name", "Name"],
-                            ["email", "Email"],
-                            ["phone", "Phone"],
-                            ["address_line1", "Address line 1"],
-                            ["address_line2", "Address line 2"],
+                            ["name", "Name", true],
+                            ["email", "Email", false],
+                            ["phone", "Phone", false],
+                            ["address_line1", "Address line 1", false],
+                            ["address_line2", "Address line 2", false],
                           ] as const
-                        ).map(([field, label]) => (
+                        ).map(([field, label, required]) => (
                           <label className="field" key={field}>
-                            <span>{tx(label)}</span>
+                            <span>
+                              {tx(label)}
+                              {required ? " *" : ""}
+                            </span>
                             <input
                               className="input"
                               name={field}
@@ -359,6 +448,7 @@ export function GymDetailManager({
                                 gym[field as keyof PlatformGymDetail] ?? "",
                               )}
                               disabled={pending}
+                              required={required}
                             />
                           </label>
                         ))}
@@ -370,13 +460,16 @@ export function GymDetailManager({
                         />
                         {(
                           [
-                            ["postal_code", "Postal code"],
-                            ["country_code", "Country code"],
-                            ["timezone", "Timezone"],
+                            ["postal_code", "Postal code", false],
+                            ["country_code", "Country code", false],
+                            ["timezone", "Timezone", true],
                           ] as const
-                        ).map(([field, label]) => (
+                        ).map(([field, label, required]) => (
                           <label className="field" key={field}>
-                            <span>{tx(label)}</span>
+                            <span>
+                              {tx(label)}
+                              {required ? " *" : ""}
+                            </span>
                             <input
                               className="input"
                               name={field}
@@ -384,6 +477,7 @@ export function GymDetailManager({
                                 gym[field as keyof PlatformGymDetail] ?? "",
                               )}
                               disabled={pending}
+                              required={required}
                             />
                           </label>
                         ))}
@@ -406,13 +500,19 @@ export function GymDetailManager({
                     {capabilities.canManageSubscriptions && (
                       <>
                         <label className="field">
-                          <span>{tx("Subscription plan")}</span>
+                          <span>{tx("Subscription plan")} *</span>
                           <select
                             className="input"
                             name="subscription_plan_id"
                             defaultValue={gym.subscription_plan_id ?? ""}
                             disabled={pending}
+                            required
                           >
+                            {plans.length === 0 ? (
+                              <option value="">
+                                {tx("No subscription plans available.")}
+                              </option>
+                            ) : null}
                             {plans.map((plan) => (
                               <option key={plan.id} value={plan.id}>
                                 {plan.name} ({tx(plan.currency)})
@@ -463,9 +563,12 @@ export function GymDetailManager({
                         </label>
                       </>
                     )}
+                  </div>
+                  <div className="sticky bottom-0 z-10 -mx-5 mt-2 border-t border-slate-100 bg-white px-5 py-3 sm:-mx-6 sm:px-6">
                     <button
-                      className="button button-edit md:col-span-2"
+                      className="button button-edit w-full sm:w-auto"
                       disabled={pending}
+                      type="submit"
                     >
                       {pending ? tx("Saving…") : tx("Save changes")}
                     </button>
@@ -501,11 +604,18 @@ export function GymDetailManager({
                 <DialogFrame
                   description="Suspending immediately revokes tenant staff sessions."
                   onClose={() => {
-                    if (!pending) setLifecycleOpen(false);
+                    if (pending) return;
+                    setLifecycleOpen(false);
+                    setError(null);
                   }}
                   pending={pending}
                   title={tx("Lifecycle")}
                 >
+                  {error ? (
+                    <p className="error" role="alert">
+                      {tx(error)}
+                    </p>
+                  ) : null}
                   <label className="field">
                     <span>{tx("Reason *")}</span>
                     <textarea
@@ -593,12 +703,19 @@ export function GymDetailManager({
               ) : invitingOwner ? (
                 <FormDialog
                   onClose={() => {
-                    if (!pending) setInvitingOwner(false);
+                    if (pending) return;
+                    setInvitingOwner(false);
+                    setError(null);
                   }}
                   onSubmit={inviteOwner}
                   pending={pending}
                   title={tx("Add Owner")}
                 >
+                  {error ? (
+                    <p className="error" role="alert">
+                      {tx(error)}
+                    </p>
+                  ) : null}
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="field">
                       <label>

@@ -53,7 +53,28 @@ const gym: PlatformGymDetail = {
 describe("Super Admin gym detail manager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getItem.mockResolvedValue(gym);
+    getItem.mockImplementation(async (path: string) => {
+      if (path === `admin/gyms/${gym.id}`) return gym;
+      if (path === `admin/gyms/${gym.id}/owners`) {
+        return [
+          {
+            gym_membership_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            user_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            email: "owner@example.test",
+            first_name: "Ada",
+            last_name: "Owner",
+            phone: "",
+            status: "ACTIVE",
+            is_owner: true,
+            authz_version: 1,
+            invited_at: null,
+            activated_at: "2026-09-30T00:00:00Z",
+          },
+        ];
+      }
+      if (path === "admin/subscriptions") return [];
+      throw new Error(`Unexpected platformGet path: ${path}`);
+    });
     getCollection.mockResolvedValue({
       success: true,
       data: [
@@ -96,12 +117,46 @@ describe("Super Admin gym detail manager", () => {
     );
 
     expect(await screen.findByText("Yangon Fitness")).toBeInTheDocument();
+    expect(screen.getByText("Ada Owner")).toBeInTheDocument();
+    expect(screen.getByText("owner@example.test")).toBeInTheDocument();
     expect(screen.getByText("GYM_UPDATED")).toBeInTheDocument();
     expect(screen.queryByText("Gym settings")).not.toBeInTheDocument();
     expect(screen.queryByText("Lifecycle")).not.toBeInTheDocument();
+    expect(getItem).toHaveBeenCalledWith(`admin/gyms/${gym.id}/owners`);
     expect(getCollection).toHaveBeenCalledWith(
       `admin/audit-logs?target_gym_id=${gym.id}`,
     );
+  });
+
+  it("keeps Save changes visible and shows validation inside the dialog", async () => {
+    render(
+      <GymDetailManager
+        gymId={gym.id}
+        capabilities={{
+          canUpdate: true,
+          canManageSubscriptions: true,
+          canActivate: false,
+          canSuspend: false,
+          canViewAudit: false,
+          canCreateOwner: false,
+          mfaRecent: false,
+        }}
+      />,
+    );
+    await screen.findByText("Yangon Fitness");
+    fireEvent.click(screen.getByRole("button", { name: "Edit gym settings" }));
+    const dialog = screen.getByRole("dialog", { name: "Gym settings" });
+    expect(
+      within(dialog).getByRole("button", { name: "Save changes" }),
+    ).toBeVisible();
+    fireEvent.change(within(dialog).getByLabelText("Name *"), {
+      target: { value: "" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "Enter a gym name.",
+    );
+    expect(mutate).not.toHaveBeenCalled();
   });
 
   it("requires a reason and explicit confirmation before suspension", async () => {

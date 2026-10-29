@@ -4,6 +4,8 @@ export const platformEn = {
   "A gym code is assigned from the gym name.":
     "A gym code is assigned from the gym name.",
   "Activate gym": "Activate gym",
+  "Active and pending owners for this gym.":
+    "Active and pending owners for this gym.",
   "Add Owner": "Add Owner",
   "Any gym": "Any gym",
   "Audit timeline": "Audit timeline",
@@ -20,10 +22,14 @@ export const platformEn = {
   "Edit gym settings": "Edit gym settings",
   "Email delivery is required. A live pending invitation is not resent. A new link is possible after expiry for a passwordless active Owner.":
     "Email delivery is required. A live pending invitation is not resent. A new link is possible after expiry for a passwordless active Owner.",
+  "Enter a 2-letter country code such as MM.":
+    "Enter a 2-letter country code such as MM.",
+  "Enter a gym name.": "Enter a gym name.",
   "Enter a plan name up to 100 characters.":
     "Enter a plan name up to 100 characters.",
   "Enter a reason of at least 3 characters.":
     "Enter a reason of at least 3 characters.",
+  "Enter a timezone.": "Enter a timezone.",
   "Enter a valid target gym ID.": "Enter a valid target gym ID.",
   "Enter an action up to 100 characters.":
     "Enter an action up to 100 characters.",
@@ -48,9 +54,12 @@ export const platformEn = {
   "Newest events first. Open one to see who changed it and what changed. Sensitive values stay hidden.":
     "Newest events first. Open one to see who changed it and what changed. Sensitive values stay hidden.",
   "No gyms found.": "No gyms found.",
+  "No owners are listed.": "No owners are listed.",
   "No platform access": "No platform access",
+  "No subscription plans available.": "No subscription plans available.",
   "No subscription plans found.": "No subscription plans found.",
   Owner: "Owner",
+  Owners: "Owners",
   "Owner email *": "Owner email *",
   "Owner first name *": "Owner first name *",
   "Owner last name *": "Owner last name *",
@@ -72,9 +81,12 @@ export const platformEn = {
   Retired: "Retired",
   "Search by name or code": "Search by name or code",
   "Search gyms": "Search gyms",
+  "Scroll if needed, then use Save changes at the bottom.":
+    "Scroll if needed, then use Save changes at the bottom.",
   "Search the directory, filter by status, or provision a new gym.":
     "Search the directory, filter by status, or provision a new gym.",
   "Select a plan": "Select a plan",
+  "Select a subscription plan.": "Select a subscription plan.",
   "Select an active subscription plan.": "Select an active subscription plan.",
   "Send Owner invitation": "Send Owner invitation",
   "Status for": "Status for",
@@ -112,6 +124,8 @@ export const platformMm = {
   "A gym code is assigned from the gym name.":
     "Gym ကုဒ်ကို Gym အမည်မှ သတ်မှတ်ပေးပါသည်။",
   "Activate gym": "Gym ကို အသက်သွင်းရန်",
+  "Active and pending owners for this gym.":
+    "ဤ Gym အတွက် အသုံးပြုနေသောနှင့် ဆိုင်းငံ့ထားသော ပိုင်ရှင်များ။",
   "Add Owner": "ပိုင်ရှင် ထည့်ရန်",
   "Any gym": "မည်သည့် Gym မဆို",
   "Audit timeline": "စာရင်းစစ် အချိန်စဉ်",
@@ -128,10 +142,14 @@ export const platformMm = {
   "Edit gym settings": "Gym သတ်မှတ်ချက်များ ပြင်ရန်",
   "Email delivery is required. A live pending invitation is not resent. A new link is possible after expiry for a passwordless active Owner.":
     "အီးမေးလ် ပို့ဆောင်မှု လိုအပ်ပါသည်။ မကုန်ဆုံးသေးသော ဆိုင်းငံ့ဖိတ်ကြားချက်ကို ပြန်မပို့ပါ။ စကားဝှက်မရှိသေးသော အသုံးပြုနေသော ပိုင်ရှင်အတွက် သက်တမ်းကုန်ပြီးနောက် လင့်ခ်အသစ် ထုတ်နိုင်ပါသည်။",
+  "Enter a 2-letter country code such as MM.":
+    "နိုင်ငံကုဒ်ကို MM ကဲ့သို့ စာလုံး ၂ လုံး ထည့်ပါ။",
+  "Enter a gym name.": "Gym အမည် ထည့်ပါ။",
   "Enter a plan name up to 100 characters.":
     "အစီအစဉ်အမည်ကို စာလုံးရေ ၁၀၀ အထိ ထည့်ပါ။",
   "Enter a reason of at least 3 characters.":
     "အနည်းဆုံး စာလုံးရေ ၃ လုံးရှိသော အကြောင်းပြချက် ထည့်ပါ။",
+  "Enter a timezone.": "အချိန်ဇုန် ထည့်ပါ။",
   "Enter a valid target gym ID.": "မှန်ကန်သော သက်ဆိုင်ရာ Gym ID ထည့်ပါ။",
   "Enter an action up to 100 characters.":
     "လုပ်ဆောင်ချက်ကို စာလုံးရေ ၁၀၀ အထိ ထည့်ပါ။",
@@ -157,9 +175,12 @@ export const platformMm = {
   "Newest events first. Open one to see who changed it and what changed. Sensitive values stay hidden.":
     "ဖြစ်ရပ်အသစ်များကို အရင်ပြပါသည်။ မည်သူ ပြောင်းခဲ့သည်နှင့် မည်သည့်အရာ ပြောင်းခဲ့သည်ကို ကြည့်ရန် တစ်ခုကို ဖွင့်ပါ။ ထိခိုက်လွယ်သော တန်ဖိုးများကို ဖုံးကွယ်ထားပါသည်။",
   "No gyms found.": "Gym မတွေ့ပါ။",
+  "No owners are listed.": "ဖော်ပြထားသော ပိုင်ရှင် မရှိပါ။",
   "No platform access": "ပလက်ဖောင်း အသုံးပြုခွင့် မရှိပါ",
+  "No subscription plans available.": "အသင်းဝင်မှု အစီအစဉ် မရှိပါ။",
   "No subscription plans found.": "အသင်းဝင်မှု အစီအစဉ် မတွေ့ပါ။",
   Owner: "ပိုင်ရှင်",
+  Owners: "ပိုင်ရှင်များ",
   "Owner email *": "ပိုင်ရှင် အီးမေးလ် *",
   "Owner first name *": "ပိုင်ရှင် အမည် *",
   "Owner last name *": "ပိုင်ရှင် မျိုးရိုးအမည် *",
@@ -181,9 +202,12 @@ export const platformMm = {
   Retired: "ရပ်နားထား",
   "Search by name or code": "အမည် သို့မဟုတ် ကုဒ်ဖြင့် ရှာပါ",
   "Search gyms": "Gym များ ရှာဖွေရန်",
+  "Scroll if needed, then use Save changes at the bottom.":
+    "လိုအပ်ရင် scroll ဆွဲပြီး အောက်ဆုံးရှိ Save changes ကို သုံးပါ။",
   "Search the directory, filter by status, or provision a new gym.":
     "Gym စာရင်းကို ရှာပါ၊ အခြေအနေဖြင့် စစ်ထုတ်ပါ၊ သို့မဟုတ် Gym အသစ် ဖန်တီးပါ။",
   "Select a plan": "အစီအစဉ် ရွေးပါ",
+  "Select a subscription plan.": "အသင်းဝင်မှု အစီအစဉ် ရွေးပါ။",
   "Select an active subscription plan.":
     "အသုံးပြုနေသော အသင်းဝင်မှု အစီအစဉ်ကို ရွေးပါ။",
   "Send Owner invitation": "ပိုင်ရှင် ဖိတ်ကြားချက် ပို့ရန်",
