@@ -35,17 +35,13 @@ def test_release_workflow_passes_static_checks() -> None:
 def test_check_object_origins_requires_virtual_hosted_https() -> None:
     module = load()
     assert (
-        module.check_object_origins(
-            "https://gym-prod.s3.ap-southeast-1.amazonaws.com"
-        )
+        module.check_object_origins("https://gym-prod.s3.ap-southeast-1.amazonaws.com")
         == "https://gym-prod.s3.ap-southeast-1.amazonaws.com"
     )
     with pytest.raises(module.ReleaseError, match="repository variable"):
         module.check_object_origins("")
     with pytest.raises(module.ReleaseError, match="virtual-hosted"):
-        module.check_object_origins(
-            "https://s3.ap-southeast-1.amazonaws.com,https://other.example"
-        )
+        module.check_object_origins("https://s3.ap-southeast-1.amazonaws.com,https://other.example")
     with pytest.raises(module.ReleaseError, match="must match"):
         module.check_object_origins("https://s3.ap-southeast-1.amazonaws.com")
     with pytest.raises(module.ReleaseError, match="must match"):
