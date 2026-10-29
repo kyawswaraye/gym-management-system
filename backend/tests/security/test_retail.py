@@ -415,7 +415,7 @@ def test_approval_posts_stock_payment_receipt_and_cash_or_rolls_back(
             StockMovement.objects.filter(
                 product_id=product_id,
                 movement_type="SALE",
-                retail_sale_line__retail_sale_id=sale_id,
+                retail_sale_line__sale_id=sale_id,
             ).count()
             == 0
         )
