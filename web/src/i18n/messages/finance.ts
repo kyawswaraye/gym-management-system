@@ -699,8 +699,7 @@ export const financeMm = {
   "Try another status, register, or date.":
     "အခြားအခြေအနေ၊ အရောင်းကောင်တာ သို့မဟုတ် ရက်စွဲဖြင့် ပြန်စစ်ကြည့်ပါ။",
   "Try another status.": "အခြားအခြေအနေဖြင့် ပြန်စစ်ကြည့်ပါ။",
-  "Unable to display the receipt evidence.":
-    "ပြေစာအထောက်အထားကို ပြ၍မရပါ။",
+  "Unable to display the receipt evidence.": "ပြေစာအထောက်အထားကို ပြ၍မရပါ။",
   "Unable to search products.": "ကုန်ပစ္စည်းများကို ရှာ၍ မရပါ။",
   "Unable to upload the receipt.": "ပြေစာပုံကို တင်၍ မရပါ။",
   "Unit cost": "တစ်ခုလျှင် ကုန်ကျစရိတ်",

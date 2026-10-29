@@ -1,12 +1,7 @@
 "use client";
 
 import { useTx } from "@/i18n/use-tx";
-import {
-  useEffect,
-  useRef,
-  useState,
-  type ChangeEvent,
-} from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { Field } from "@/features/finance/ui";
 import { getFileDownloadUrl } from "@/features/operations/client";
@@ -90,7 +85,7 @@ export function ReceiptEvidencePreview({
 export function ReceiptEvidenceField({
   attachedFileId = null,
 }: {
-  attachedFileId?: string | null;
+  attachedFileId?: string | null | undefined;
 }) {
   const tx = useTx();
   const [localUrl, setLocalUrl] = useState<string | null>(null);

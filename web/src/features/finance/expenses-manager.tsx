@@ -375,7 +375,7 @@ function ExpenseFields({
       {canUploadReceipt ? (
         <div className={span}>
           <ReceiptEvidenceField
-            attachedFileId={expense?.receipt_file_asset_id}
+            attachedFileId={expense?.receipt_file_asset_id ?? null}
           />
         </div>
       ) : null}
