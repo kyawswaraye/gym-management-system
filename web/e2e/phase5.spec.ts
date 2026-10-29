@@ -70,11 +70,11 @@ test("owner assigns trainers and prepares the catalogs", async ({ page }) => {
     .click();
   const classType = titledForm(page, "create-class-type-title");
   await expect(classType).toBeVisible();
-  await classType.getByLabel("Name", { exact: true }).fill("E2E Cycle");
+  await classType.getByLabel("Class name", { exact: true }).fill("E2E Cycle");
   await classType
-    .getByLabel("Default duration minutes", { exact: true })
+    .getByLabel("Usual length (minutes)", { exact: true })
     .fill("60");
-  await classType.getByLabel("Default capacity", { exact: true }).fill("4");
+  await classType.getByLabel("Usual seats", { exact: true }).fill("4");
   await runCommand(page, /\/class-types\/?$/, () =>
     classType
       .getByRole("button", { name: "Create class type", exact: true })
@@ -98,8 +98,8 @@ test("owner assigns trainers and prepares the catalogs", async ({ page }) => {
   const grant = titledForm(page, "grant-title");
   await expect(grant).toBeVisible();
   await pickMember(grant, "E2Escan", /E2Escan Visitor/);
-  await selectByText(combo(grant, "Package"), "CLASS · E2E_CLASS_PACK");
-  await grant.getByLabel("Reason", { exact: true }).fill("E2E class grant");
+  await selectByText(combo(grant, "Which pack?"), "CLASS · E2E_CLASS_PACK");
+  await grant.locator('textarea[name="reason"]').fill("E2E class grant");
   await runCommand(page, /\/member-service-packages\/?$/, () =>
     grant.getByRole("button", { name: "Save grant", exact: true }).click(),
   );
@@ -189,7 +189,7 @@ test("owner approves reception sales with the open cash session", async ({
   await expect(saleDetail(page)).toContainText("POSTED");
 
   await page.goto("/pt/member-packages");
-  const grant = page.locator("li").filter({ hasText: "E2E_PT_PACK" });
+  const grant = page.getByRole("row").filter({ hasText: "E2E_PT_PACK" });
   await expect(grant).toHaveCount(1);
   await grant.getByRole("button").click();
   await expect(
@@ -286,9 +286,11 @@ test("manager pays the trainer commission and a consumed sale does not void", as
   await expect(commissionDetail(page)).toContainText("POSTED");
   await page.goto("/pt/member-packages");
   const consumed = page
-    .locator("li")
-    .filter({ hasText: "ACTIVE · remaining 3 of 4" });
-  await consumed.getByRole("button", { name: /E2E_PT_PACK/ }).click();
+    .getByRole("row")
+    .filter({ hasText: "E2E_PT_PACK" })
+    .filter({ hasText: "ACTIVE" })
+    .filter({ hasText: "3/4" });
+  await consumed.getByRole("button").click();
   const ledger = page.getByRole("region", { name: "Session ledger" });
   await expect(ledger).toContainText("GRANT · 4");
   await expect(ledger).toContainText("ATTENDED · -1");
@@ -332,7 +334,7 @@ test("owner approves the untouched sale", async ({ page }) => {
   await expect(saleDetail(page)).toContainText("POSTED");
   await page.goto("/pt/member-packages");
   await expect(
-    page.locator("li").filter({ hasText: "E2E_PT_PACK" }),
+    page.getByRole("row").filter({ hasText: "E2E_PT_PACK" }),
   ).toHaveCount(2);
   await expectNoBrowserSecrets(page, secretValues(accounts));
   await assertResponses();
@@ -366,16 +368,20 @@ test("manager voids the untouched sale and runs the class cutoff", async ({
 
   await page.goto("/pt/member-packages");
   const refunded = page
-    .locator("li")
-    .filter({ hasText: "VOID · remaining 0 of 4" });
-  await refunded.getByRole("button", { name: /E2E_PT_PACK/ }).click();
+    .getByRole("row")
+    .filter({ hasText: "E2E_PT_PACK" })
+    .filter({ hasText: "VOID" })
+    .filter({ hasText: "0/4" });
+  await refunded.getByRole("button").click();
   const ledger = page.getByRole("region", { name: "Session ledger" });
   await expect(ledger).toContainText("GRANT · 4");
   await expect(ledger).toContainText("REFUND · -4");
   const consumed = page
-    .locator("li")
-    .filter({ hasText: "ACTIVE · remaining 3 of 4" });
-  await consumed.getByRole("button", { name: /E2E_PT_PACK/ }).click();
+    .getByRole("row")
+    .filter({ hasText: "E2E_PT_PACK" })
+    .filter({ hasText: "ACTIVE" })
+    .filter({ hasText: "3/4" });
+  await consumed.getByRole("button").click();
   await expect(ledger).toContainText("ATTENDED · -1");
   await expect(ledger).not.toContainText("REFUND");
 
@@ -449,7 +455,7 @@ test("manager voids the untouched sale and runs the class cutoff", async ({
 
   await page.goto("/pt/member-packages");
   await page
-    .locator("li")
+    .getByRole("row")
     .filter({ hasText: "E2E_CLASS_PACK" })
     .getByRole("button")
     .click();
@@ -460,7 +466,10 @@ test("manager voids the untouched sale and runs the class cutoff", async ({
     page.getByRole("region", { name: "Session ledger" }),
   ).toContainText("POLICY_NO_SHOW · -1");
   await expect(
-    page.locator("li").filter({ hasText: "remaining 2 of 4" }),
+    page
+      .getByRole("row")
+      .filter({ hasText: "E2E_CLASS_PACK" })
+      .filter({ hasText: "2/4" }),
   ).toBeVisible();
 
   await expectNoBrowserSecrets(page, secretValues(accounts));
@@ -989,12 +998,11 @@ async function createSale(
   await pickMember(form, "E2Escan", /E2Escan Visitor/);
   await selectByText(combo(form, "Trainer"), input.trainer);
   await form.getByLabel("Description", { exact: true }).fill(input.description);
-  await form.getByLabel("Gross fee", { exact: true }).fill(input.gross);
   if (input.packageLabel) {
     await selectByText(combo(form, "PT package"), input.packageLabel);
   }
   if (input.payment) {
-    await combo(form, "Payment draft").selectOption("set");
+    await combo(form, "Member's money").selectOption("set");
     await form
       .getByLabel("Payment description", { exact: true })
       .fill(input.description);
@@ -1002,6 +1010,9 @@ async function createSale(
       .getByLabel("Payment amount", { exact: true })
       .fill(input.payment);
     await combo(form, "Payment method").selectOption("CASH");
+  } else {
+    await combo(form, "Member's money").selectOption("omit");
+    await form.getByLabel("Sale total", { exact: true }).fill(input.gross);
   }
   await runCommand(page, /\/pt-sales\/?$/, () =>
     form.getByRole("button", { name: "Save draft", exact: true }).click(),
@@ -1112,13 +1123,11 @@ async function bookClass(page: Page, occurrence: RegExp): Promise<void> {
   await page.getByRole("button", { name: "Book a class", exact: true }).click();
   const form = titledForm(page, "book-class-title");
   await expect(form).toBeVisible();
-  await selectByText(combo(form, "Occurrence"), occurrence.source);
+  await selectByText(combo(form, "Which class time?"), occurrence.source);
   await pickMember(form, "E2Escan", /E2Escan Visitor/);
-  await selectByText(combo(form, "Class package"), "E2E_CLASS_PACK");
+  await selectByText(combo(form, "Which class pack?"), "E2E_CLASS_PACK");
   await runCommand(page, /\/class-bookings\/?$/, () =>
-    form
-      .getByRole("button", { name: "Save class booking", exact: true })
-      .click(),
+    form.getByRole("button", { name: "Save booking", exact: true }).click(),
   );
   await expect(form).toBeHidden();
 }

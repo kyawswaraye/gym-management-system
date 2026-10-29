@@ -11,6 +11,7 @@ from rest_framework import serializers
 from apps.classes.models import ClassBooking, ClassOccurrence, ClassSchedule, ClassType
 from apps.classes.recurrence import MAX_INCLUSIVE_DAYS
 from apps.common.codes import OptionalPatternField
+from apps.members.models import Member
 from apps.users.serializers import StrictSerializer
 
 _CODE = re.compile(r"^[A-Z][A-Z0-9_]{0,31}$")
@@ -368,6 +369,7 @@ class ClassBookingSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     class_occurrence_id = serializers.UUIDField()
     member_id = serializers.UUIDField()
+    member_name = serializers.CharField()
     member_service_package_id = serializers.UUIDField(allow_null=True)
     unmetered = serializers.BooleanField()
     unmetered_reason = serializers.CharField()
@@ -411,12 +413,49 @@ class ClassBookingListQuerySerializer(StrictSerializer):
     view = serializers.ChoiceField(choices=["list", "calendar"], required=False, default="list")
 
 
-def class_booking_payload(row: ClassBooking) -> dict[str, object]:
+def _member_label(row: Member) -> str:
+    name = " ".join(
+        part for part in [row.first_name.strip(), row.last_name.strip()] if part
+    ).strip()
+    if row.member_number and name:
+        return f"{row.member_number} · {name}"
+    return name or row.member_number or ""
+
+
+def class_booking_labels(rows: list[ClassBooking]) -> dict[str, str]:
+    if not rows:
+        return {}
+    gym_ids = {row.gym_id for row in rows}
+    member_ids = {row.member_id for row in rows}
+    return {
+        str(row.id): _member_label(row)
+        for row in Member.objects.filter(gym_id__in=gym_ids, id__in=member_ids).only(
+            "id", "member_number", "first_name", "last_name"
+        )
+    }
+
+
+def class_booking_payloads(rows: list[ClassBooking]) -> list[dict[str, object]]:
+    labels = class_booking_labels(rows)
+    return [
+        class_booking_payload(row, member_name=labels.get(str(row.member_id), "")) for row in rows
+    ]
+
+
+def class_booking_payload(
+    row: ClassBooking,
+    *,
+    member_name: str | None = None,
+) -> dict[str, object]:
     occurrence = row.class_occurrence
+    if member_name is None:
+        labels = class_booking_labels([row])
+        member_name = labels.get(str(row.member_id), "")
     return {
         "id": row.id,
         "class_occurrence_id": row.class_occurrence_id,
         "member_id": row.member_id,
+        "member_name": member_name,
         "member_service_package_id": row.member_service_package_id,
         "unmetered": row.unmetered,
         "unmetered_reason": row.unmetered_reason,

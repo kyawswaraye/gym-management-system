@@ -1,4 +1,17 @@
 export const ptEn = {
+  "Filled from Free pack. Edit only if you need a clearer note.":
+    "Filled from Free pack. Edit only if you need a clearer note.",
+  "No = member already paid. Record the payment in Payments first. Paid PT packs still come from a PT sale.":
+    "No = member already paid. Record the payment in Payments first. Paid PT packs still come from a PT sale.",
+  "Yes = give the pack for free.": "Yes = give the pack for free.",
+  "Paid pack grant": "Paid pack grant",
+  "Free pack grant": "Free pack grant",
+  "Short note": "Short note",
+  "Free pack?": "Free pack?",
+  "Which pack?": "Which pack?",
+  "Give pack to member": "Give pack to member",
+  "Member, package, remaining sessions, and validity.":
+    "Member, package, remaining sessions, and validity.",
   ". Calendar range is at most 42 gym-local days.":
     ". Calendar range is at most 42 gym-local days.",
   ". Generated": ". Generated",
@@ -8,7 +21,13 @@ export const ptEn = {
   "· capacity": "· capacity",
   "· Exclusive": "· Exclusive",
   "· From": "· From",
+  "· seats": "· seats",
   "% of": "% of",
+  "1) Pick the class time. 2) Pick the member. 3) Pick their class pack. Save.":
+    "1) Pick the class time. 2) Pick the member. 3) Pick their class pack. Save.",
+  "1. Class time": "1. Class time",
+  "2. Who is joining?": "2. Who is joining?",
+  "3. Their class pack": "3. Their class pack",
   "A class package requires an active class type.":
     "A class package requires an active class type.",
   "A code is assigned from the name and stays fixed.":
@@ -37,6 +56,19 @@ export const ptEn = {
   "Book a class": "Book a class",
   "Book a class to add it to this range.":
     "Book a class to add it to this range.",
+  "Sign up for a class": "Sign up for a class",
+  "Available after the class starts.": "Available after the class starts.",
+  "Available after the class ends.": "Available after the class ends.",
+  "Too early. Wait until the class starts, then mark attended.":
+    "Too early. Wait until the class starts, then mark attended.",
+  "Too early. Wait until the class ends, then mark no-show.":
+    "Too early. Wait until the class ends, then mark no-show.",
+  "Too early. Mark attended after the class starts. Mark no-show after it ends.":
+    "Too early. Mark attended after the class starts. Mark no-show after it ends.",
+  "Marked attended. Status is ATTENDED now.":
+    "Marked attended. Status is ATTENDED now.",
+  "Marked no-show. Status is NO_SHOW now.":
+    "Marked no-show. Status is NO_SHOW now.",
   "Book a session to add it to this calendar.":
     "Book a session to add it to this calendar.",
   "Book session": "Book session",
@@ -66,14 +98,45 @@ export const ptEn = {
     "Choose a scheduled occurrence and an active class package.",
   "Choose a trainer to see currently assigned members.":
     "Choose a trainer to see currently assigned members.",
-  "Choose a trainer, an active member, and the dates this assignment covers.":
-    "Choose a trainer, an active member, and the dates this assignment covers.",
+  "PT only. Link a member to a trainer for sales and bookings. Skip this for monthly gym use or classes.":
+    "PT only. Link a member to a trainer for sales and bookings. Skip this for monthly gym use or classes.",
+  "PT member–trainer links only. Not for monthly membership or classes.":
+    "PT member–trainer links only. Not for monthly membership or classes.",
   "Choose an active class type and the trainer who leads it.":
     "Choose an active class type and the trainer who leads it.",
   "Choose an active member and package. A paid PT grant comes from sale approval.":
     "Choose an active member and package. A paid PT grant comes from sale approval.",
-  "Choose the member, trainer, fee, and any package or payment draft.":
-    "Choose the member, trainer, fee, and any package or payment draft.",
+  "Pick the member, trainer, and sale total. Record the member's money here before you save.":
+    "Pick the member, trainer, and sale total. Record the member's money here before you save.",
+  Money: "Money",
+  "Sale total splits into trainer pay and gym keep. Member money is separate.":
+    "Sale total splits into trainer pay and gym keep. Member money is separate.",
+  "Sale total": "Sale total",
+  "Trainer pay": "Trainer pay",
+  "Gym keeps": "Gym keeps",
+  "Still to pay trainer": "Still to pay trainer",
+  "From the member": "From the member",
+  "To the trainer": "To the trainer",
+  Recorded: "Recorded",
+  "Not recorded on this sale. Open Payments if you need to take money later.":
+    "Not recorded on this sale. Open Payments if you need to take money later.",
+  "Open Payments": "Open Payments",
+  "Trainer pay is waiting. Open Commissions to pay it.":
+    "Trainer pay is waiting. Open Commissions to pay it.",
+  "Open Commissions": "Open Commissions",
+  "Trainer is paid.": "Trainer is paid.",
+  "Who and what": "Who and what",
+  "Sessions granted": "Sessions granted",
+  "Trainer payout history": "Trainer payout history",
+  "Select a sale to see the member, trainer, money, and next step.":
+    "Select a sale to see the member, trainer, money, and next step.",
+  "Member's money": "Member's money",
+  "Take money from the member here. If you skip this, the sale can still be approved, but member payment will be missing.":
+    "Take money from the member here. If you skip this, the sale can still be approved, but member payment will be missing.",
+  "Yes — record money from the member": "Yes — record money from the member",
+  "Not now / leave unchanged": "Not now / leave unchanged",
+  "Remove member money from this draft": "Remove member money from this draft",
+  Yes: "Yes",
   "Choose the trainer, member, and gym-local time. A metered booking uses one active PT package.":
     "Choose the trainer, member, and gym-local time. A metered booking uses one active PT package.",
   Class: "Class",
@@ -125,8 +188,14 @@ export const ptEn = {
   "Default capacity": "Default capacity",
   "Default duration minutes": "Default duration minutes",
   "Draft cancelled.": "Draft cancelled.",
-  "Duration and capacity for new schedules.":
-    "Duration and capacity for new schedules.",
+  "Class kinds such as Yoga or HIIT. Set the usual length and how many people fit before you make a schedule.":
+    "Class kinds such as Yoga or HIIT. Set the usual length and how many people fit before you make a schedule.",
+  "Name the class kind (for example Yoga). Length and seat count become the usual values when you add schedules.":
+    "Name the class kind (for example Yoga). Length and seat count become the usual values when you add schedules.",
+  "Class name": "Class name",
+  "Short note (optional)": "Short note (optional)",
+  "Usual length (minutes)": "Usual length (minutes)",
+  "Usual seats": "Usual seats",
   "Edit class type": "Edit class type",
   "Effective from": "Effective from",
   "Effective until": "Effective until",
@@ -215,6 +284,8 @@ export const ptEn = {
     "No reversible entries are on this page. Grant entries cannot be corrected. Move to another page to reach an earlier entry.",
   "No scheduled occurrences are in this range.":
     "No scheduled occurrences are in this range.",
+  "No class times in this date range. Make a schedule first, or change the dates above.":
+    "No class times in this date range. Make a schedule first, or change the dates above.",
   "No schedules match.": "No schedules match.",
   "No session days in this range.": "No session days in this range.",
   "No trainers are available.": "No trainers are available.",
@@ -228,6 +299,8 @@ export const ptEn = {
     "Occurrences are generated inside this gym-local range.",
   "Only scheduled occurrences in the current range are listed.":
     "Only scheduled occurrences in the current range are listed.",
+  "One visit comes off this pack when they attend.":
+    "One visit comes off this pack when they attend.",
   Outstanding: "Outstanding",
   "Outstanding · accrued": "Outstanding · accrued",
   "Outstanding · partially paid": "Outstanding · partially paid",
@@ -298,7 +371,21 @@ export const ptEn = {
     "Schedules will appear here when they are added.",
   "Search active members, then choose one.":
     "Search active members, then choose one.",
+  "Search by name, number, phone, or email.":
+    "Search by name, number, phone, or email.",
+  "Select a class pack": "Select a class pack",
+  "Select a class time": "Select a class time",
   "Select a class type": "Select a class type",
+  "Special case: no pack": "Special case: no pack",
+  "Managers only. Write a reason instead of using a pack.":
+    "Managers only. Write a reason instead of using a pack.",
+  "These are class times from your schedule in the dates shown above.":
+    "These are class times from your schedule in the dates shown above.",
+  "This member has no class pack yet. Give them a class package first.":
+    "This member has no class pack yet. Give them a class package first.",
+  "Which class pack?": "Which class pack?",
+  "Which class time?": "Which class time?",
+  "Why no pack?": "Why no pack?",
   "Select a commission to see its balance and payouts.":
     "Select a commission to see its balance and payouts.",
   "Select a package": "Select a package",
@@ -313,8 +400,10 @@ export const ptEn = {
   "Selected member:": "Selected member:",
   "Selected package": "Selected package",
   "Service date": "Service date",
-  "Service date, fee, member, trainer, and status.":
-    "Service date, fee, member, trainer, and status.",
+  "Date, sale, member, trainer, fee, and status.":
+    "Date, sale, member, trainer, fee, and status.",
+  Fee: "Fee",
+  Sale: "Sale",
   "Service packages": "Service packages",
   Session: "Session",
   "Session calendar": "Session calendar",
@@ -409,6 +498,19 @@ export const ptEn = {
 } as const;
 
 export const ptMm = {
+  "Give pack to member": "Member ကို pack ပေးရန်",
+  "Member, package, remaining sessions, and validity.":
+    "Member၊ package၊ ကျန် session နှင့် သက်တမ်း။",
+  "Which pack?": "ဘယ် pack လဲ?",
+  "Free pack?": "အခမဲ့ pack လား?",
+  "Short note": "အတိုချုံး မှတ်ချက်",
+  "Free pack grant": "အခမဲ့ pack ပေးခြင်း",
+  "Paid pack grant": "ပိုက်ဆံယူပြီး pack ပေးခြင်း",
+  "Yes = give the pack for free.": "Yes = pack ကို အခမဲ့ ပေးသည်။",
+  "No = member already paid. Record the payment in Payments first. Paid PT packs still come from a PT sale.":
+    "No = Member က ပိုက်ဆံပေးပြီးသား။ Payments မှာ အရင် မှတ်ပါ။ ပိုက်ဆံယူ PT pack ကတော့ PT sale ကနေ လာသည်။",
+  "Filled from Free pack. Edit only if you need a clearer note.":
+    "Free pack အလိုက် ဖြည့်ထားသည်။ ပိုရှင်းအောင် လိုမှ ပြင်ပါ။",
   ". Calendar range is at most 42 gym-local days.":
     "။ ပြက္ခဒိန် အပိုင်းအခြားသည် Gym ဒေသအချိန် ရက် ၄၂ ထက် မပိုရ။",
   ". Generated": "။ ထုတ်လုပ်ချိန်",
@@ -418,7 +520,13 @@ export const ptMm = {
   "· capacity": "· လူဦးရေ",
   "· Exclusive": "· သီးသန့်",
   "· From": "· မှ",
+  "· seats": "· နေရာ",
   "% of": "% ၊ အခြေပမာဏ",
+  "1) Pick the class time. 2) Pick the member. 3) Pick their class pack. Save.":
+    "၁) အတန်းချိန် ရွေးပါ။ ၂) အဖွဲ့ဝင် ရွေးပါ။ ၃) သူတို့ရဲ့ အတန်း pack ရွေးပါ။ သိမ်းပါ။",
+  "1. Class time": "၁. အတန်းချိန်",
+  "2. Who is joining?": "၂. ဘယ်သူ တက်မလဲ?",
+  "3. Their class pack": "၃. သူတို့ရဲ့ အတန်း pack",
   "A class package requires an active class type.":
     "အတန်း ပက်ကေ့ဂျ်တစ်ခုအတွက် အသုံးပြုနေသော အတန်း အမျိုးအစား လိုအပ်သည်။",
   "A code is assigned from the name and stays fixed.":
@@ -447,6 +555,19 @@ export const ptMm = {
   "Book a class": "အတန်း ကြိုတင်စာရင်းသွင်းရန်",
   "Book a class to add it to this range.":
     "ဤအပိုင်းအခြားသို့ ထည့်ရန် အတန်းတစ်ခု ကြိုတင်စာရင်းသွင်းပါ။",
+  "Sign up for a class": "အတန်းစာရင်းသွင်းရန်",
+  "Available after the class starts.": "အတန်းစပြီးမှ နှိပ်လို့ရမယ်။",
+  "Available after the class ends.": "အတန်းပြီးမှ နှိပ်လို့ရမယ်။",
+  "Too early. Wait until the class starts, then mark attended.":
+    "စောလွန်းသေးတယ်။ အတန်းစပြီးမှ တက်ရောက်မှတ်ပါ။",
+  "Too early. Wait until the class ends, then mark no-show.":
+    "စောလွန်းသေးတယ်။ အတန်းပြီးမှ မလာဘူးမှတ်ပါ။",
+  "Too early. Mark attended after the class starts. Mark no-show after it ends.":
+    "စောလွန်းသေးတယ်။ တက်ရောက်မှတ် = အတန်းစပြီးမှ။ မလာဘူးမှတ် = အတန်းပြီးမှ။",
+  "Marked attended. Status is ATTENDED now.":
+    "တက်ရောက်မှတ်ပြီးပါပြီ။ အခြေအနေ ATTENDED ဖြစ်သွားပါပြီ။",
+  "Marked no-show. Status is NO_SHOW now.":
+    "မလာဘူးမှတ်ပြီးပါပြီ။ အခြေအနေ NO_SHOW ဖြစ်သွားပါပြီ။",
   "Book a session to add it to this calendar.":
     "ဤပြက္ခဒိန်သို့ ထည့်ရန် လေ့ကျင့်ချိန်တစ်ခု ကြိုတင်စာရင်းသွင်းပါ။",
   "Book session": "လေ့ကျင့်ချိန် ကြိုတင်စာရင်းသွင်းရန်",
@@ -476,14 +597,45 @@ export const ptMm = {
     "စီစဉ်ထားသော အတန်းချိန်တစ်ခုနှင့် အသုံးပြုနေသော အတန်း ပက်ကေ့ဂျ်တစ်ခုကို ရွေးပါ။",
   "Choose a trainer to see currently assigned members.":
     "လက်ရှိ တာဝန်ပေးထားသော အဖွဲ့ဝင်များကို ကြည့်ရန် Trainerတစ်ဦး ရွေးပါ။",
-  "Choose a trainer, an active member, and the dates this assignment covers.":
-    "Trainerတစ်ဦး၊ အသုံးပြုနေသော အဖွဲ့ဝင်တစ်ဦးနှင့် ဤတာဝန်ပေးအပ်မှု အကျုံးဝင်သည့် ရက်များကို ရွေးပါ။",
+  "PT only. Link a member to a trainer for sales and bookings. Skip this for monthly gym use or classes.":
+    "PT အတွက်သာ။ အရောင်းနှင့် ချိန်းဆိုမှုအတွက် Member ကို Trainer နှင့် ချိတ်ပါ။ လစဉ် Gym သုံးခြင်း သို့မဟုတ် Class အတွက် ကျော်ပါ။",
+  "PT member–trainer links only. Not for monthly membership or classes.":
+    "PT Member–Trainer ချိတ်မှုသာ။ လစဉ် အသင်းဝင်မှု သို့မဟုတ် Class အတွက် မဟုတ်ပါ။",
   "Choose an active class type and the trainer who leads it.":
     "အသုံးပြုနေသော အတန်း အမျိုးအစားနှင့် ၎င်းကို ဦးဆောင်သည့် Trainerကို ရွေးပါ။",
   "Choose an active member and package. A paid PT grant comes from sale approval.":
     "အသုံးပြုနေသော အဖွဲ့ဝင်နှင့် ပက်ကေ့ဂျ်ကို ရွေးပါ။ အခပေး PT ပေးအပ်ချက်သည် အရောင်း အတည်ပြုမှုမှ ရရှိသည်။",
-  "Choose the member, trainer, fee, and any package or payment draft.":
-    "အဖွဲ့ဝင်၊ Trainer၊ ကြေးနှင့် ပက်ကေ့ဂျ် သို့မဟုတ် ငွေပေးချေမှု မူကြမ်းကို ရွေးပါ။",
+  "Pick the member, trainer, and sale total. Record the member's money here before you save.":
+    "Member၊ Trainerနှင့် အရောင်းစုစုပေါင်းကို ရွေးပါ။ သိမ်းမီ Member ငွေကို ဤနေရာမှာ မှတ်ပါ။",
+  Money: "ငွေ",
+  "Sale total splits into trainer pay and gym keep. Member money is separate.":
+    "အရောင်းစုစုပေါင်းကို Trainer ပေးငွေနှင့် Gym ထားငွေ ခွဲသည်။ Member ငွေက သီးခြားဖြစ်သည်။",
+  "Sale total": "အရောင်းစုစုပေါင်း",
+  "Trainer pay": "Trainer ပေးငွေ",
+  "Gym keeps": "Gym ထားငွေ",
+  "Still to pay trainer": "Trainer ကို ပေးရန်ကျန်",
+  "From the member": "Member ထံမှ",
+  "To the trainer": "Trainer ထံသို့",
+  Recorded: "မှတ်ပြီး",
+  "Not recorded on this sale. Open Payments if you need to take money later.":
+    "ဤအရောင်းမှာ မမှတ်ရသေး။ နောက်မှ ငွေယူရန် Payments ကို ဖွင့်ပါ။",
+  "Open Payments": "Payments ဖွင့်ရန်",
+  "Trainer pay is waiting. Open Commissions to pay it.":
+    "Trainer ပေးငွေ စောင့်နေသည်။ ပေးရန် Commissions ကို ဖွင့်ပါ။",
+  "Open Commissions": "Commissions ဖွင့်ရန်",
+  "Trainer is paid.": "Trainer ကို ပေးပြီးပါပြီ။",
+  "Who and what": "ဘယ်သူနှင့် ဘာလဲ",
+  "Sessions granted": "Session ပေးပြီး",
+  "Trainer payout history": "Trainer ထုတ်ပေးမှတ်တမ်း",
+  "Select a sale to see the member, trainer, money, and next step.":
+    "Member၊ Trainer၊ ငွေနှင့် နောက်တစ်ဆင့်ကို ကြည့်ရန် အရောင်းတစ်ခု ရွေးပါ။",
+  "Member's money": "Member ငွေ",
+  "Take money from the member here. If you skip this, the sale can still be approved, but member payment will be missing.":
+    "Member ထံမှ ငွေကို ဤနေရာမှာ ယူပါ။ ကျော်လျှင် အရောင်း အတည်ပြုနိုင်သေးသော်လည်း Member ငွေ ပျောက်နေမည်။",
+  "Yes — record money from the member": "ဟုတ် — Member ငွေ မှတ်မည်",
+  "Not now / leave unchanged": "ယခုမလုပ် / မပြောင်း",
+  "Remove member money from this draft": "ဤမူကြမ်းမှ Member ငွေ ဖယ်ရှားရန်",
+  Yes: "ဟုတ်",
   "Choose the trainer, member, and gym-local time. A metered booking uses one active PT package.":
     "Trainer၊ အဖွဲ့ဝင်နှင့် Gym ဒေသအချိန်ကို ရွေးပါ။ လေ့ကျင့်ချိန်နှုတ်ယူသော ကြိုတင်စာရင်းသည် အသုံးပြုနေသော PT ပက်ကေ့ဂျ်တစ်ခုကို သုံးသည်။",
   Class: "အတန်း",
@@ -536,8 +688,14 @@ export const ptMm = {
   "Default capacity": "ပုံသေ လူဦးရေ",
   "Default duration minutes": "ပုံသေ ကြာချိန် (မိနစ်)",
   "Draft cancelled.": "မူကြမ်းကို ပယ်ဖျက်ပြီးပါပြီ။",
-  "Duration and capacity for new schedules.":
-    "အချိန်ဇယားအသစ်များအတွက် ကြာချိန်နှင့် လူဦးရေ။",
+  "Class kinds such as Yoga or HIIT. Set the usual length and how many people fit before you make a schedule.":
+    "Yoga သို့မဟုတ် HIIT ကဲ့သို့ အတန်းအမျိုးအစား။ အချိန်ဇယားမလုပ်မီ ပုံမှန်ကြာချိန်နှင့် လူအရေအတွက် သတ်မှတ်ပါ။",
+  "Name the class kind (for example Yoga). Length and seat count become the usual values when you add schedules.":
+    "အတန်းအမျိုးအစား အမည်ပေးပါ (ဥပမာ Yoga)။ ကြာချိန်နှင့် နေရာအရေအတွက်သည် အချိန်ဇယားထည့်သည့်အခါ ပုံမှန်တန်ဖိုး ဖြစ်သည်။",
+  "Class name": "အတန်းအမည်",
+  "Short note (optional)": "အတိုချုံး မှတ်ချက် (မဖြည့်လည်းရ)",
+  "Usual length (minutes)": "ပုံမှန်ကြာချိန် (မိနစ်)",
+  "Usual seats": "ပုံမှန်လူဦးရေ",
   "Edit class type": "အတန်း အမျိုးအစား ပြင်ရန်",
   "Effective from": "စတင်သက်ရောက်သည့်ရက်",
   "Effective until": "သက်ရောက်မှုပြီးဆုံးသည့်ရက်",
@@ -629,6 +787,8 @@ export const ptMm = {
     "ဤစာမျက်နှာတွင် ပြန်လှန်နိုင်သော စာရင်းချက် မရှိပါ။ ပေးအပ်ချက် စာရင်းချက်များကို ပြင်ဆင်၍ မရပါ။ စောသော စာရင်းချက်သို့ ရောက်ရန် အခြားစာမျက်နှာသို့ သွားပါ။",
   "No scheduled occurrences are in this range.":
     "ဤအပိုင်းအခြားတွင် စီစဉ်ထားသော အတန်းချိန် မရှိပါ။",
+  "No class times in this date range. Make a schedule first, or change the dates above.":
+    "ဤရက်အပိုင်းတွင် အတန်းချိန် မရှိပါ။ အရင် အချိန်ဇယား လုပ်ပါ၊ သို့မဟုတ် အပေါ်ရှိ ရက်များကို ပြောင်းပါ။",
   "No schedules match.": "ကိုက်ညီသော အချိန်ဇယား မရှိပါ။",
   "No session days in this range.":
     "ဤအပိုင်းအခြားတွင် လေ့ကျင့်ချိန်ရှိသော ရက် မရှိပါ။",
@@ -643,6 +803,8 @@ export const ptMm = {
     "အတန်းချိန်များကို ဤ Gym ဒေသအချိန် အပိုင်းအခြားအတွင်း ထုတ်ပေးသည်။",
   "Only scheduled occurrences in the current range are listed.":
     "လက်ရှိ အပိုင်းအခြားအတွင်း စီစဉ်ထားသော အတန်းချိန်များကိုသာ ဖော်ပြသည်။",
+  "One visit comes off this pack when they attend.":
+    "တက်ရောက်သည့်အခါ ဤ pack မှ တစ်ကြိမ် နှုတ်သည်။",
   Outstanding: "ပေးရန်ကျန်",
   "Outstanding · accrued": "ပေးရန်ကျန် · ဖြစ်ပေါ်ပြီး",
   "Outstanding · partially paid": "ပေးရန်ကျန် · တစ်စိတ်တစ်ပိုင်း ပေးချေပြီး",
@@ -713,7 +875,21 @@ export const ptMm = {
     "အချိန်ဇယားများ ထည့်သည့်အခါ ဤနေရာတွင် ပြသပါမည်။",
   "Search active members, then choose one.":
     "အသုံးပြုနေသော အဖွဲ့ဝင်များကို ရှာဖွေပြီး တစ်ဦးကို ရွေးပါ။",
+  "Search by name, number, phone, or email.":
+    "အမည်၊ နံပါတ်၊ ဖုန်း သို့မဟုတ် အီးမေးလ်ဖြင့် ရှာပါ။",
+  "Select a class pack": "အတန်း pack ရွေးပါ",
+  "Select a class time": "အတန်းချိန် ရွေးပါ",
   "Select a class type": "အတန်း အမျိုးအစား ရွေးပါ",
+  "Special case: no pack": "အထူးအခြေအနေ: pack မသုံး",
+  "Managers only. Write a reason instead of using a pack.":
+    "စီမံခန့်ခွဲသူသာ။ pack မသုံးဘဲ အကြောင်းရင်း ရေးပါ။",
+  "These are class times from your schedule in the dates shown above.":
+    "အပေါ်တွင် ပြထားသော ရက်များအတွင်း အချိန်ဇယားမှ အတန်းချိန်များ။",
+  "This member has no class pack yet. Give them a class package first.":
+    "ဤအဖွဲ့ဝင်တွင် အတန်း pack မရှိသေးပါ။ အရင် အတန်း ပက်ကေ့ဂျ် ပေးပါ။",
+  "Which class pack?": "ဘယ်အတန်း pack လဲ?",
+  "Which class time?": "ဘယ်အတန်းချိန်လဲ?",
+  "Why no pack?": "pack မသုံးရသည့် အကြောင်း?",
   "Select a commission to see its balance and payouts.":
     "လက်ကျန်နှင့် ထုတ်ပေးငွေများကို ကြည့်ရန် ကော်မရှင်တစ်ခု ရွေးပါ။",
   "Select a package": "ပက်ကေ့ဂျ် ရွေးပါ",
@@ -728,8 +904,10 @@ export const ptMm = {
   "Selected member:": "ရွေးထားသော အဖွဲ့ဝင်:",
   "Selected package": "ရွေးထားသော ပက်ကေ့ဂျ်",
   "Service date": "ဝန်ဆောင်မှုရက်",
-  "Service date, fee, member, trainer, and status.":
-    "ဝန်ဆောင်မှုရက်၊ ကြေး၊ အဖွဲ့ဝင်၊ Trainerနှင့် အခြေအနေ။",
+  "Date, sale, member, trainer, fee, and status.":
+    "ရက်စွဲ၊ အရောင်း၊ အဖွဲ့ဝင်၊ Trainer၊ ကြေးနှင့် အခြေအနေ။",
+  Fee: "ကြေး",
+  Sale: "အရောင်း",
   "Service packages": "ဝန်ဆောင်မှု ပက်ကေ့ဂျ်များ",
   Session: "လေ့ကျင့်ချိန်",
   "Session calendar": "လေ့ကျင့်ချိန် ပြက္ခဒိန်",

@@ -41,6 +41,7 @@ from apps.trainers.serializers import (
     PageQuerySerializer,
     ledger_entry_payload,
     member_package_payload,
+    member_package_payloads,
 )
 from apps.users.permissions import RequiresEntitlement, RequiresPermission
 
@@ -150,7 +151,8 @@ class MemberPackageListCreateView(MemberPackageCommandView):
                 limit=int(payload["limit"]),
                 after=str(payload.get("after", "")),
             )
-        return success_response([member_package_payload(row) for row in rows], meta=meta)
+            data = member_package_payloads(rows)
+        return success_response(data, meta=meta)
 
     @extend_schema(
         operation_id="member_service_packages_grant",
@@ -231,7 +233,8 @@ class MemberPackageDetailView(MemberPackageAPIView):
                 actor=request.gym_membership,
                 package_id=id,
             )
-        return success_response(member_package_payload(row))
+            data = member_package_payload(row)
+        return success_response(data)
 
 
 class MemberPackageLedgerView(MemberPackageAPIView):

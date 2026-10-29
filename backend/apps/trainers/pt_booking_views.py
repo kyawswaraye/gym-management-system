@@ -40,6 +40,7 @@ from apps.trainers.serializers import (
     PTBookingListQuerySerializer,
     PTBookingWriteSerializer,
     pt_booking_payload,
+    pt_booking_payloads,
 )
 from apps.users.permissions import RequiresEntitlement, RequiresPermission
 
@@ -110,7 +111,8 @@ class PTBookingListCreateView(PTBookingCommandView):
                 limit=int(payload["limit"]),
                 after=str(payload.get("after", "")),
             )
-        return success_response([pt_booking_payload(row) for row in rows], meta=meta)
+            data = pt_booking_payloads(rows)
+        return success_response(data, meta=meta)
 
     @extend_schema(
         operation_id="pt_bookings_create",
@@ -182,7 +184,8 @@ class PTBookingDetailView(PTBookingCommandView):
         with transaction.atomic():
             set_gym_context(gym_id=request.gym.id)
             row = get_pt_booking(gym=request.gym, actor=request.gym_membership, booking_id=id)
-        return success_response(pt_booking_payload(row))
+            data = pt_booking_payload(row)
+        return success_response(data)
 
 
 class PTBookingAttendView(PTBookingCommandView):

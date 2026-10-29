@@ -358,6 +358,12 @@ export function TrainersManager({
               {" "}
               {tx("Assignments")}{" "}
             </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {" "}
+              {tx(
+                "PT member–trainer links only. Not for monthly membership or classes.",
+              )}{" "}
+            </p>
           </div>
           {canCreate ? (
             <button
@@ -562,7 +568,7 @@ export function TrainersManager({
                 <p className="mt-1 text-sm text-slate-500">
                   {" "}
                   {tx(
-                    "Choose a trainer, an active member, and the dates this assignment covers.",
+                    "PT only. Link a member to a trainer for sales and bookings. Skip this for monthly gym use or classes.",
                   )}{" "}
                 </p>
               </div>

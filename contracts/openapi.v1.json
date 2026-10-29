@@ -26842,6 +26842,9 @@
                         "type": "string",
                         "format": "uuid"
                     },
+                    "member_name": {
+                        "type": "string"
+                    },
                     "member_service_package_id": {
                         "type": "string",
                         "format": "uuid",
@@ -26925,6 +26928,7 @@
                     "ends_at",
                     "id",
                     "member_id",
+                    "member_name",
                     "member_service_package_id",
                     "no_show_at",
                     "no_show_by_membership_id",
@@ -31616,6 +31620,9 @@
                         "type": "string",
                         "format": "uuid"
                     },
+                    "member_name": {
+                        "type": "string"
+                    },
                     "service_package_id": {
                         "type": "string",
                         "format": "uuid"
@@ -31703,6 +31710,7 @@
                     "granted_sessions",
                     "id",
                     "member_id",
+                    "member_name",
                     "package_code",
                     "package_name",
                     "package_type",
@@ -32745,9 +32753,15 @@
                         "type": "string",
                         "format": "uuid"
                     },
+                    "trainer_display_name": {
+                        "type": "string"
+                    },
                     "member_id": {
                         "type": "string",
                         "format": "uuid"
+                    },
+                    "member_name": {
+                        "type": "string"
                     },
                     "member_service_package_id": {
                         "type": "string",
@@ -32831,12 +32845,14 @@
                     "ends_at",
                     "id",
                     "member_id",
+                    "member_name",
                     "member_service_package_id",
                     "no_show_at",
                     "no_show_by_membership_id",
                     "reason",
                     "starts_at",
                     "status",
+                    "trainer_display_name",
                     "trainer_staff_profile_id",
                     "unmetered",
                     "unmetered_reason",
@@ -32966,9 +32982,15 @@
                         "type": "string",
                         "format": "uuid"
                     },
+                    "pt_sale_description": {
+                        "type": "string"
+                    },
                     "trainer_staff_profile_id": {
                         "type": "string",
                         "format": "uuid"
+                    },
+                    "trainer_display_name": {
+                        "type": "string"
                     },
                     "gross_fee_snapshot": {
                         "type": "string"
@@ -33003,6 +33025,9 @@
                         "type": "string",
                         "format": "uuid"
                     },
+                    "created_by_display_name": {
+                        "type": "string"
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time"
@@ -33012,6 +33037,7 @@
                     "commission_amount",
                     "commission_percent_snapshot",
                     "created_at",
+                    "created_by_display_name",
                     "created_by_membership_id",
                     "currency",
                     "gross_fee_snapshot",
@@ -33020,8 +33046,10 @@
                     "outstanding_amount",
                     "paid_amount",
                     "paid_at",
+                    "pt_sale_description",
                     "pt_sale_id",
                     "status",
+                    "trainer_display_name",
                     "trainer_staff_profile_id"
                 ]
             },
@@ -33036,9 +33064,15 @@
                         "type": "string",
                         "format": "uuid"
                     },
+                    "pt_sale_description": {
+                        "type": "string"
+                    },
                     "trainer_staff_profile_id": {
                         "type": "string",
                         "format": "uuid"
+                    },
+                    "trainer_display_name": {
+                        "type": "string"
                     },
                     "gross_fee_snapshot": {
                         "type": "string"
@@ -33072,6 +33106,9 @@
                     "created_by_membership_id": {
                         "type": "string",
                         "format": "uuid"
+                    },
+                    "created_by_display_name": {
+                        "type": "string"
                     },
                     "created_at": {
                         "type": "string",
@@ -33088,6 +33125,7 @@
                     "commission_amount",
                     "commission_percent_snapshot",
                     "created_at",
+                    "created_by_display_name",
                     "created_by_membership_id",
                     "currency",
                     "gross_fee_snapshot",
@@ -33097,8 +33135,10 @@
                     "paid_amount",
                     "paid_at",
                     "payments",
+                    "pt_sale_description",
                     "pt_sale_id",
                     "status",
+                    "trainer_display_name",
                     "trainer_staff_profile_id"
                 ]
             },
@@ -33347,9 +33387,15 @@
                         "type": "string",
                         "format": "uuid"
                     },
+                    "member_name": {
+                        "type": "string"
+                    },
                     "trainer_staff_profile_id": {
                         "type": "string",
                         "format": "uuid"
+                    },
+                    "trainer_display_name": {
+                        "type": "string"
                     },
                     "service_date": {
                         "type": "string",
@@ -33398,6 +33444,10 @@
                     "service_package_id": {
                         "type": "string",
                         "format": "uuid",
+                        "nullable": true
+                    },
+                    "package_name": {
+                        "type": "string",
                         "nullable": true
                     },
                     "package_price_snapshot": {
@@ -33507,8 +33557,10 @@
                     "gym_share",
                     "id",
                     "member_id",
+                    "member_name",
                     "member_service_package_id",
                     "outstanding_amount",
+                    "package_name",
                     "package_price_snapshot",
                     "paid_amount",
                     "payment",
@@ -33524,6 +33576,7 @@
                     "status",
                     "submitted_at",
                     "submitted_by_membership_id",
+                    "trainer_display_name",
                     "trainer_staff_profile_id",
                     "updated_at",
                     "updated_by_membership_id",

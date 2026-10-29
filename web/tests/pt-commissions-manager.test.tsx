@@ -83,7 +83,9 @@ function commission(extra: Record<string, unknown> = {}): PTCommissionDetail {
   return {
     id: COMMISSION,
     pt_sale_id: SALE,
+    pt_sale_description: "Ten PT Sessions",
     trainer_staff_profile_id: TRAINER,
+    trainer_display_name: "Ada Trainer",
     gross_fee_snapshot: "100.00",
     commission_percent_snapshot: "10.00",
     commission_amount: "10.00",
@@ -94,6 +96,7 @@ function commission(extra: Record<string, unknown> = {}): PTCommissionDetail {
     status: "ACCRUED",
     paid_at: null,
     created_by_membership_id: "creator",
+    created_by_display_name: "Desk Owner",
     created_at: "2026-10-19T00:00:00Z",
     payments: [],
     ...extra,
@@ -203,14 +206,16 @@ describe("commission list and detail", () => {
       screen.getByRole("button", { name: "Retry loading commissions" }),
     );
 
-    const row = await screen.findByRole("button", {
+    const select = await screen.findByRole("button", {
       name: "Outstanding 10.00 MMK",
     });
-    expect(row).toHaveAttribute("aria-pressed", "false");
-    expect(within(row).getByTitle(TRAINER)).toHaveTextContent("111111");
-    expect(within(row).getByTitle(SALE)).toHaveTextContent("333333");
-    expect(within(row).getByText("ACCRUED")).toBeInTheDocument();
-    expect(within(row).getAllByText("10.00 MMK").length).toBeGreaterThan(0);
+    expect(select).toHaveAttribute("aria-pressed", "false");
+    const row = select.closest("tr");
+    expect(row).not.toBeNull();
+    expect(within(row!).getByText("Ada Trainer")).toBeInTheDocument();
+    expect(within(row!).getByText("Ten PT Sessions")).toBeInTheDocument();
+    expect(within(row!).getByText("ACCRUED")).toBeInTheDocument();
+    expect(within(row!).getAllByText("10.00 MMK").length).toBeGreaterThan(0);
     expect(
       screen.getByText("Select a commission to see its balance and payouts."),
     ).toBeInTheDocument();
@@ -255,7 +260,6 @@ describe("commission list and detail", () => {
     expect(
       await screen.findByRole("button", { name: "Outstanding 10.00 MMK" }),
     ).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("Selected")).toBeInTheDocument();
     expect(getPtCommission).toHaveBeenCalledWith(COMMISSION);
   });
 
@@ -277,10 +281,9 @@ describe("commission list and detail", () => {
     expect(within(panel).getByText("6.00 MMK")).toBeInTheDocument();
     expect(within(panel).getByText("4.00 MMK")).toBeInTheDocument();
     expect(within(panel).getByText("PARTIALLY_PAID")).toBeInTheDocument();
-    expect(within(panel).getByTitle(TRAINER)).toHaveTextContent("111111");
-    expect(within(panel).getByTitle(SALE)).toHaveTextContent("333333");
-    expect(within(panel).getByTitle(COMMISSION)).toHaveTextContent("555555");
-    expect(within(panel).getByText("creator")).toBeInTheDocument();
+    expect(within(panel).getByText("Ada Trainer")).toBeInTheDocument();
+    expect(within(panel).getByText("Ten PT Sessions")).toBeInTheDocument();
+    expect(within(panel).getByText("Desk Owner")).toBeInTheDocument();
 
     const history = within(panel).getByRole("list", { name: "Payout history" });
     expect(within(history).getByText("4.00 CASH")).toBeInTheDocument();

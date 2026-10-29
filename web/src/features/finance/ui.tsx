@@ -258,15 +258,22 @@ export function ReasonField({
   name = "reason",
   error,
   required = true,
+  defaultValue,
 }: {
   label: string;
   name?: string;
   error?: string | undefined;
   required?: boolean;
+  defaultValue?: string;
 }) {
   return (
     <Field error={error} label={label} required={required}>
-      <textarea className="input min-h-24" name={name} required={required} />
+      <textarea
+        className="input min-h-24"
+        defaultValue={defaultValue}
+        name={name}
+        required={required}
+      />
     </Field>
   );
 }

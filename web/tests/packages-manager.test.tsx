@@ -115,7 +115,10 @@ describe("package catalog", () => {
     ).toBeInTheDocument();
     expect(within(catalog).getByText(/stay unchanged/)).toBeInTheDocument();
 
-    const packages = await within(catalog).findAllByRole("listitem");
+    const table = within(catalog).getByRole("table", {
+      name: "Package catalog",
+    });
+    const packages = within(table).getAllByRole("row").slice(1);
     expect(packages).toHaveLength(2);
     expect(packages[0]).toHaveTextContent("Ten sessions");
     expect(packages[0]).toHaveTextContent("PT10");
@@ -125,7 +128,6 @@ describe("package catalog", () => {
     expect(packages[0]).toHaveTextContent("3 months");
     expect(packages[0]).toHaveTextContent("100.00");
     expect(packages[0]).toHaveTextContent("MMK");
-    expect(packages[0]).toHaveClass("border-l-amber-400", "bg-white");
     expect(within(packages[0]!).getByText("PT")).toHaveClass(
       "bg-amber-100",
       "text-amber-800",
@@ -140,7 +142,7 @@ describe("package catalog", () => {
     expect(packages[1]).toHaveTextContent("Inactive");
     expect(packages[1]).toHaveTextContent("1 week");
     expect(packages[1]).toHaveTextContent("0.00");
-    expect(packages[1]).toHaveClass("border-l-sky-500", "bg-slate-50");
+    expect(packages[1]).toHaveClass("bg-slate-50");
     expect(within(packages[1]!).getByText("CLASS")).toHaveClass(
       "bg-sky-100",
       "text-sky-800",
@@ -148,11 +150,6 @@ describe("package catalog", () => {
     expect(within(packages[1]!).getByText("Inactive")).toHaveClass(
       "bg-slate-200",
       "text-slate-600",
-    );
-    expect(within(catalog).getByRole("list")).toHaveClass(
-      "grid-cols-1",
-      "sm:grid-cols-2",
-      "xl:grid-cols-3",
     );
   });
 
@@ -262,12 +259,14 @@ describe("package catalog", () => {
     renderManager();
     expect(await screen.findByText("Ten sessions")).toBeInTheDocument();
     const catalog = screen.getByRole("region", { name: "Service packages" });
-    const list = within(catalog).getByRole("list");
+    const table = within(catalog).getByRole("table", {
+      name: "Package catalog",
+    });
     const paging = within(catalog).getByRole("navigation", {
       name: "Pagination",
     });
     expect(
-      list.compareDocumentPosition(paging) & Node.DOCUMENT_POSITION_FOLLOWING,
+      table.compareDocumentPosition(paging) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     fireEvent.click(within(paging).getByRole("button", { name: "Next page" }));
     expect(await screen.findByText("Yoga intro")).toBeInTheDocument();

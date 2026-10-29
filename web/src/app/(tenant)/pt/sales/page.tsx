@@ -20,7 +20,7 @@ export default async function PtSalesPage() {
   return (
     <section aria-labelledby="pt-sales-title">
       <PageHeader
-        description="Draft a sale, optionally attach a package and payment, then submit it for approval. An owner, or a combined manager and receptionist, may approve their own sale."
+        description="1) Create a draft with the member's money. 2) Submit. 3) Approve. Then pay the trainer from Commissions."
         eyebrow="Personal training"
         title="PT sales"
         titleId="pt-sales-title"

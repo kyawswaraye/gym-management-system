@@ -1,6 +1,7 @@
 "use client";
 import { useTx } from "@/i18n/use-tx";
 
+import Link from "next/link";
 import {
   useEffect,
   useRef,
@@ -103,13 +104,17 @@ function saleLabel(
   row: PTSale,
   tx: (text: string, vars?: Record<string, string | number>) => string,
 ): string {
-  const packagePart = row.service_package_id
-    ? ` ${tx("package")} ${row.service_package_id}`
-    : "";
+  const member = row.member_name || row.member_id;
+  const trainer = row.trainer_display_name || row.trainer_staff_profile_id;
+  const packagePart = row.package_name
+    ? ` ${tx("package")} ${row.package_name}`
+    : row.service_package_id
+      ? ` ${tx("package")} ${row.service_package_id}`
+      : "";
   const paymentPart = row.payment?.method
     ? ` ${tx("payment")} ${tx(row.payment.method)}`
     : "";
-  return `${formatAppDate(row.service_date)} ${row.description} ${row.gross_fee} ${tx(row.currency)} ${tx("member")} ${row.member_id} ${tx("trainer")} ${row.trainer_staff_profile_id}${packagePart}${paymentPart} ${tx(row.status)}`;
+  return `${formatAppDate(row.service_date)} ${row.description} ${row.gross_fee} ${tx(row.currency)} ${tx("member")} ${member} ${tx("trainer")} ${trainer}${packagePart}${paymentPart} ${tx(row.status)}`;
 }
 
 function SaleStatusBadge({ status }: { status: string }) {
@@ -141,7 +146,7 @@ function Fact({
           emphasis ? "text-lg font-black tabular-nums" : "font-semibold"
         }`}
       >
-        <IdentifierValue value={value} />
+        {value}
       </dd>
     </div>
   );
@@ -185,6 +190,13 @@ export function SalesManager({
 }) {
   const tx = useTx();
   const [status, setStatus] = useState("");
+  const [draftAmount, setDraftAmount] = useState("");
+  const [draftPackageId, setDraftPackageId] = useState("");
+  const [draftDescription, setDraftDescription] = useState("");
+  const [draftPaymentChoice, setDraftPaymentChoice] = useState<
+    "set" | "omit" | "clear"
+  >("set");
+  const [draftPaymentDescription, setDraftPaymentDescription] = useState("");
   const [memberFilter, setMemberFilter] = useState<PickedMember | null>(null);
   const [selected, setSelected] = useState<PTSale | null>(null);
   const [commission, setCommission] = useState<PTCommissionDetail | null>(null);
@@ -201,6 +213,7 @@ export function SalesManager({
   const [voidDate, setVoidDate] = useState(today);
   const [mode, setMode] = useState<SaleMode | null>(null);
   const key = useRef<{ fingerprint: string; value: string } | null>(null);
+  const paymentDescriptionTouched = useRef(false);
   const pendingRef = useRef(false);
   const commandToken = useRef(0);
   const detailToken = useRef(0);
@@ -343,7 +356,40 @@ export function SalesManager({
     if (pendingRef.current || mode !== null) return;
     setDialogError("");
     if (next === "void") setVoidDate(today);
+    if (next === "create") {
+      paymentDescriptionTouched.current = false;
+      setDraftAmount("");
+      setDraftPackageId("");
+      setDraftDescription("");
+      setDraftPaymentChoice("set");
+      setDraftPaymentDescription("");
+    } else if (next === "edit" && selected) {
+      paymentDescriptionTouched.current = false;
+      setDraftAmount(selected.payment?.amount ?? selected.gross_fee ?? "");
+      setDraftPackageId(selected.service_package_id ?? "");
+      setDraftDescription(selected.description ?? "");
+      setDraftPaymentChoice(selected.payment ? "set" : "omit");
+      setDraftPaymentDescription(
+        selected.payment?.description ?? selected.description ?? "",
+      );
+    }
     setMode(next);
+  }
+
+  function setSaleDescription(value: string) {
+    setDraftDescription(value);
+    if (!paymentDescriptionTouched.current) {
+      setDraftPaymentDescription(value);
+    }
+  }
+
+  function choosePackage(packageId: string) {
+    setDraftPackageId(packageId);
+    const pack = packages.items.find((row) => row.id === packageId);
+    if (!pack) return;
+    paymentDescriptionTouched.current = false;
+    setDraftAmount(pack.price);
+    setSaleDescription(pack.name);
   }
 
   async function openSale(saleId: string) {
@@ -707,7 +753,7 @@ export function SalesManager({
               </h2>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
                 {" "}
-                {tx("Service date, fee, member, trainer, and status.")}{" "}
+                {tx("Date, sale, member, trainer, fee, and status.")}{" "}
               </p>
             </div>
             {canCreate ? (
@@ -768,9 +814,9 @@ export function SalesManager({
             </div>
           </div>
 
-          <div className="grid gap-4 p-4 sm:p-5">
+          <div>
             {sales.pending && sales.rows.length === 0 ? (
-              <div className="grid gap-3" role="status">
+              <div className="grid gap-3 p-4 sm:p-5" role="status">
                 <p className="text-sm font-medium text-slate-600">
                   {" "}
                   {tx("Loading sales.")}{" "}
@@ -778,36 +824,32 @@ export function SalesManager({
                 <div className="grid gap-3">
                   {[0, 1, 2].map((item) => (
                     <div
-                      className="h-24 animate-pulse rounded-xl bg-slate-100"
+                      className="h-12 animate-pulse rounded-xl bg-slate-100"
                       key={item}
                     />
                   ))}
                 </div>
               </div>
             ) : null}
-            {sales.pending && sales.rows.length > 0 ? (
-              <p className="text-sm font-medium text-slate-600" role="status">
-                {" "}
-                {tx("Loading sales.")}{" "}
-              </p>
-            ) : null}
             {!sales.pending && sales.error ? (
-              <div className="grid gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
-                <p className="text-sm font-medium text-red-800" role="alert">
-                  {sales.error}
-                </p>
-                <button
-                  className="button w-fit"
-                  onClick={() => sales.reload()}
-                  type="button"
-                >
-                  {" "}
-                  {tx("Retry loading sales")}{" "}
-                </button>
+              <div className="grid gap-3 p-4 sm:p-5">
+                <div className="grid gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+                  <p className="text-sm font-medium text-red-800" role="alert">
+                    {sales.error}
+                  </p>
+                  <button
+                    className="button w-fit"
+                    onClick={() => sales.reload()}
+                    type="button"
+                  >
+                    {" "}
+                    {tx("Retry loading sales")}{" "}
+                  </button>
+                </div>
               </div>
             ) : null}
             {!sales.pending && !sales.error && sales.rows.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center m-4 sm:m-5">
                 <p className="font-semibold text-slate-700">
                   {" "}
                   {tx("No PT sales match.")}{" "}
@@ -822,100 +864,112 @@ export function SalesManager({
               </div>
             ) : null}
             {sales.rows.length > 0 ? (
-              <ul aria-label={tx("Sale list")} className="grid gap-3">
-                {sales.rows.map((row) => {
-                  const active = selected?.id === row.id;
-                  return (
-                    <li key={row.id}>
-                      <button
-                        aria-label={saleLabel(row, tx)}
-                        aria-pressed={active}
-                        className={`w-full rounded-xl border border-l-4 p-4 text-left ${
-                          active
-                            ? "border-l-teal-700 bg-teal-50 ring-2 ring-teal-600"
-                            : "border-l-slate-300 bg-white hover:bg-slate-50"
-                        } border-slate-200`}
-                        onClick={() => void openSale(row.id)}
-                        type="button"
+              <div
+                className={`overflow-x-auto ${sales.pending ? "opacity-60" : ""}`}
+              >
+                <table className="w-full text-left text-sm">
+                  <caption className="sr-only">{tx("Sale list")}</caption>
+                  <thead className="border-b border-slate-200 text-slate-500">
+                    <tr>
+                      <th
+                        className="px-5 py-2.5 text-xs font-semibold"
+                        scope="col"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold tracking-wide text-slate-500">
-                              <time dateTime={row.service_date}>
-                                {formatAppDate(row.service_date)}
-                              </time>
-                            </p>
-                            <h3 className="text-base font-bold break-words text-slate-900">
+                        {" "}
+                        {tx("Date")}{" "}
+                      </th>
+                      <th
+                        className="px-5 py-2.5 text-xs font-semibold"
+                        scope="col"
+                      >
+                        {" "}
+                        {tx("Sale")}{" "}
+                      </th>
+                      <th
+                        className="px-5 py-2.5 text-xs font-semibold"
+                        scope="col"
+                      >
+                        {" "}
+                        {tx("Member")}{" "}
+                      </th>
+                      <th
+                        className="hidden px-5 py-2.5 text-xs font-semibold md:table-cell"
+                        scope="col"
+                      >
+                        {" "}
+                        {tx("Trainer")}{" "}
+                      </th>
+                      <th
+                        className="px-5 py-2.5 text-right text-xs font-semibold"
+                        scope="col"
+                      >
+                        {" "}
+                        {tx("Fee")}{" "}
+                      </th>
+                      <th
+                        className="px-5 py-2.5 text-xs font-semibold"
+                        scope="col"
+                      >
+                        {" "}
+                        {tx("Status")}{" "}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {sales.rows.map((row) => {
+                      const active = selected?.id === row.id;
+                      return (
+                        <tr
+                          className={
+                            active
+                              ? "bg-teal-50 shadow-[inset_3px_0_0_#0f766e]"
+                              : "hover:bg-slate-50"
+                          }
+                          key={row.id}
+                        >
+                          <td className="px-5 py-3 whitespace-nowrap text-slate-600">
+                            <time dateTime={row.service_date}>
+                              {formatAppDate(row.service_date)}
+                            </time>
+                          </td>
+                          <td className="px-5 py-3">
+                            <button
+                              aria-current={active ? "true" : undefined}
+                              aria-label={saleLabel(row, tx)}
+                              className="text-left font-semibold text-slate-900"
+                              onClick={() => void openSale(row.id)}
+                              type="button"
+                            >
                               {tx(row.description)}
-                            </h3>
-                          </div>
-                          <div className="shrink-0 text-right">
-                            <p className="text-lg font-black text-slate-900 tabular-nums">
-                              {row.gross_fee}{" "}
-                              <span className="text-xs font-semibold text-slate-500">
-                                {tx(row.currency)}
-                              </span>
-                            </p>
-                            {active ? (
-                              <span className="mt-1 inline-flex rounded-full bg-teal-700 px-2.5 py-1 text-xs font-bold text-white">
-                                {" "}
-                                {tx("Selected")}{" "}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                        <div className="mt-3">
-                          <SaleStatusBadge status={row.status} />
-                        </div>
-                        <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
-                          <div>
-                            <dt className="text-xs text-slate-500">
-                              {tx("Member")}
-                            </dt>
-                            <dd className="mt-0.5 font-semibold text-slate-900">
+                            </button>
+                          </td>
+                          <td className="max-w-[12rem] truncate px-5 py-3 text-slate-700">
+                            {row.member_name || (
                               <IdentifierValue value={row.member_id} />
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-xs text-slate-500">
-                              {tx("Trainer")}
-                            </dt>
-                            <dd className="mt-0.5 font-semibold text-slate-900">
+                            )}
+                          </td>
+                          <td className="hidden max-w-[12rem] truncate px-5 py-3 text-slate-700 md:table-cell">
+                            {row.trainer_display_name || (
                               <IdentifierValue
                                 value={row.trainer_staff_profile_id}
                               />
-                            </dd>
-                          </div>
-                          {row.service_package_id ? (
-                            <div>
-                              <dt className="text-xs text-slate-500">
-                                {" "}
-                                {tx("Package")}{" "}
-                              </dt>
-                              <dd className="mt-0.5 font-semibold text-slate-900">
-                                <IdentifierValue
-                                  value={row.service_package_id}
-                                />
-                              </dd>
-                            </div>
-                          ) : null}
-                          {row.payment?.method ? (
-                            <div>
-                              <dt className="text-xs text-slate-500">
-                                {" "}
-                                {tx("Payment")}{" "}
-                              </dt>
-                              <dd className="mt-0.5 font-semibold text-slate-900">
-                                {row.payment.method}
-                              </dd>
-                            </div>
-                          ) : null}
-                        </dl>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+                            )}
+                          </td>
+                          <td className="px-5 py-3 text-right font-semibold whitespace-nowrap text-slate-900 tabular-nums">
+                            {row.gross_fee}{" "}
+                            <span className="font-medium text-slate-400">
+                              {tx(row.currency)}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3">
+                            <SaleStatusBadge status={row.status} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             ) : null}
           </div>
           {showPaging ? (
@@ -986,47 +1040,137 @@ export function SalesManager({
                   </div>
                 ) : null}
                 {actionError ? <Alert message={actionError} /> : null}
-                <div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <h3 className="text-sm font-bold text-slate-800">
                     {" "}
-                    {tx("Financial summary")}{" "}
+                    {tx("Money")}{" "}
                   </h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {" "}
+                    {tx(
+                      "Sale total splits into trainer pay and gym keep. Member money is separate.",
+                    )}{" "}
+                  </p>
                   <dl className="mt-3 grid grid-cols-2 gap-3">
                     <Fact
                       emphasis
-                      label="Gross fee"
+                      label="Sale total"
                       value={`${selected.gross_fee} ${tx(selected.currency)}`}
                     />
                     <Fact
-                      emphasis
-                      label="Outstanding"
-                      value={selected.outstanding_amount}
+                      label="Trainer pay"
+                      value={`${selected.commission_amount} ${tx(selected.currency)}`}
                     />
                     <Fact
-                      label="Commission"
-                      value={selected.commission_amount}
+                      label="Gym keeps"
+                      value={`${selected.gym_share} ${tx(selected.currency)}`}
                     />
-                    <Fact label="Gym share" value={selected.gym_share} />
+                    <Fact
+                      label="Still to pay trainer"
+                      value={`${
+                        commission?.outstanding_amount ??
+                        selected.outstanding_amount
+                      } ${tx(selected.currency)}`}
+                    />
                   </dl>
+                  {selected.status === "POSTED" ? (
+                    <div className="mt-4 grid gap-3 border-t border-slate-200 pt-3">
+                      <div>
+                        <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                          {" "}
+                          {tx("From the member")}{" "}
+                        </p>
+                        {selected.payment ? (
+                          <p className="mt-1 text-sm font-semibold text-slate-900">
+                            {tx("Recorded")} · {tx(selected.payment.method)}
+                            {selected.payment.amount
+                              ? ` · ${selected.payment.amount}`
+                              : ""}
+                            {selected.payment.currency
+                              ? ` ${tx(selected.payment.currency)}`
+                              : ""}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-sm text-slate-700">
+                            {" "}
+                            {tx(
+                              "Not recorded on this sale. Open Payments if you need to take money later.",
+                            )}{" "}
+                          </p>
+                        )}
+                        {!selected.payment ? (
+                          <Link
+                            className="mt-2 inline-flex text-sm font-semibold text-teal-800 underline-offset-4 hover:underline"
+                            href="/payments"
+                          >
+                            {" "}
+                            {tx("Open Payments")}{" "}
+                          </Link>
+                        ) : null}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                          {" "}
+                          {tx("To the trainer")}{" "}
+                        </p>
+                        {(commission?.outstanding_amount ??
+                          selected.outstanding_amount) !== "0.00" ? (
+                          <>
+                            <p className="mt-1 text-sm text-slate-700">
+                              {" "}
+                              {tx(
+                                "Trainer pay is waiting. Open Commissions to pay it.",
+                              )}{" "}
+                            </p>
+                            <Link
+                              className="mt-2 inline-flex text-sm font-semibold text-teal-800 underline-offset-4 hover:underline"
+                              href="/pt/commissions"
+                            >
+                              {" "}
+                              {tx("Open Commissions")}{" "}
+                            </Link>
+                          </>
+                        ) : (
+                          <p className="mt-1 text-sm font-semibold text-slate-900">
+                            {" "}
+                            {tx("Trainer is paid.")}{" "}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                  {printableReceiptIds.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {printableReceiptIds.map((id) => (
+                        <ReceiptPrintLink key={id} receiptId={id} />
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="border-t border-slate-100 pt-4">
                   <h3 className="text-sm font-bold text-slate-800">
                     {" "}
-                    {tx("Package and payment")}{" "}
+                    {tx("Who and what")}{" "}
                   </h3>
                   <dl className="mt-3 grid grid-cols-2 gap-3">
-                    <Fact label="Member" value={selected.member_id} />
+                    <Fact
+                      label="Member"
+                      value={selected.member_name || selected.member_id}
+                    />
                     <Fact
                       label="Trainer"
-                      value={selected.trainer_staff_profile_id}
+                      value={
+                        selected.trainer_display_name ||
+                        selected.trainer_staff_profile_id
+                      }
                     />
                     <Fact
                       label="Package"
-                      value={selected.service_package_id ?? "None"}
-                    />
-                    <Fact
-                      label="Payment"
-                      value={selected.payment?.method ?? "None"}
+                      value={
+                        selected.package_name ||
+                        selected.service_package_id ||
+                        "None"
+                      }
                     />
                     {selected.package_price_snapshot ? (
                       <Fact
@@ -1035,26 +1179,7 @@ export function SalesManager({
                       />
                     ) : null}
                     {selected.member_service_package_id ? (
-                      <Fact
-                        label="Granted package"
-                        value={selected.member_service_package_id}
-                      />
-                    ) : null}
-                    {selected.payment?.amount ? (
-                      <Fact
-                        label="Payment amount"
-                        value={`${selected.payment.amount}${
-                          selected.payment.currency
-                            ? ` ${tx(selected.payment.currency)}`
-                            : ""
-                        }`}
-                      />
-                    ) : null}
-                    {selected.payment?.business_date ? (
-                      <Fact
-                        label="Payment date"
-                        value={formatAppDate(selected.payment.business_date)}
-                      />
+                      <Fact label="Sessions granted" value={tx("Yes")} />
                     ) : null}
                     {selected.payment?.reference_number ? (
                       <Fact
@@ -1062,20 +1187,7 @@ export function SalesManager({
                         value={selected.payment.reference_number}
                       />
                     ) : null}
-                    {selected.payment?.status ? (
-                      <Fact
-                        label="Payment status"
-                        value={tx(selected.payment.status)}
-                      />
-                    ) : null}
                   </dl>
-                  {printableReceiptIds.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {printableReceiptIds.map((id) => (
-                        <ReceiptPrintLink key={id} receiptId={id} />
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
                 {selected.rejection_reason ? (
                   <p className="text-sm text-slate-700">
@@ -1095,7 +1207,7 @@ export function SalesManager({
                   <div className="border-t border-slate-100 pt-4">
                     <h3 className="text-sm font-bold text-slate-800">
                       {" "}
-                      {tx("Commission")}{" "}
+                      {tx("Trainer payout history")}{" "}
                     </h3>
                     {commission ? (
                       <div className="mt-3 grid gap-3">
@@ -1310,7 +1422,7 @@ export function SalesManager({
                   <p className="text-sm text-slate-500">
                     {" "}
                     {tx(
-                      "Select a sale to see its fee, package, payment, and commission.",
+                      "Select a sale to see the member, trainer, money, and next step.",
                     )}{" "}
                   </p>
                 )}
@@ -1328,7 +1440,7 @@ export function SalesManager({
                   "Update the draft. Leave the payment draft unchanged, replace it, or remove it.",
                 )
               : tx(
-                  "Choose the member, trainer, fee, and any package or payment draft.",
+                  "Pick the member, trainer, and sale total. Record the member's money here before you save.",
                 )
           }
           descriptionId="sale-form-description"
@@ -1391,72 +1503,112 @@ export function SalesManager({
           </div>
           <Field label="Description">
             <TextInput
-              defaultValue={selected?.description ?? ""}
               name="description"
+              onChange={(event) => setSaleDescription(event.target.value)}
               required
+              value={draftDescription}
             />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Gross fee">
-              <TextInput
-                defaultValue={selected?.gross_fee ?? ""}
-                inputMode="decimal"
-                name="gross_fee"
-                required
-              />
-            </Field>
-            <Field label="PT package">
-              <SelectInput
-                defaultValue={selected?.service_package_id ?? ""}
-                name="service_package_id"
-              >
-                <option value="">{tx("None")}</option>
-                {packages.items.map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {row.code} · {row.name} · {row.price}
-                  </option>
-                ))}
-              </SelectInput>
-            </Field>
-          </div>
+          <Field label="PT package">
+            <SelectInput
+              name="service_package_id"
+              onChange={(event) => choosePackage(event.target.value)}
+              value={draftPackageId}
+            >
+              <option value="">{tx("None")}</option>
+              {packages.items.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.code} · {row.name} · {row.price}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
           <div className="grid gap-4 border-t border-slate-100 pt-4">
             <h3 className="text-sm font-bold text-slate-800">
-              {tx("Payment draft")}
+              {tx("Member's money")}
             </h3>
-            <Field label="Payment draft">
-              <SelectInput defaultValue="omit" name="payment_choice">
-                <option value="omit">{tx("Leave unchanged or omit")}</option>
-                <option value="set">{tx("Set payment draft")}</option>
-                <option value="clear">{tx("Remove payment draft")}</option>
+            <p className="text-sm text-slate-600">
+              {" "}
+              {tx(
+                "Take money from the member here. If you skip this, the sale can still be approved, but member payment will be missing.",
+              )}{" "}
+            </p>
+            <Field label="Member's money">
+              <SelectInput
+                name="payment_choice"
+                onChange={(event) =>
+                  setDraftPaymentChoice(
+                    event.target.value as "set" | "omit" | "clear",
+                  )
+                }
+                value={draftPaymentChoice}
+              >
+                <option value="set">
+                  {tx("Yes — record money from the member")}
+                </option>
+                <option value="omit">{tx("Not now / leave unchanged")}</option>
+                {mode === "edit" ? (
+                  <option value="clear">
+                    {tx("Remove member money from this draft")}
+                  </option>
+                ) : null}
               </SelectInput>
             </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Payment description">
-                <TextInput name="payment_description" />
-              </Field>
-              <Field label="Payment amount">
-                <TextInput inputMode="decimal" name="payment_amount" />
-              </Field>
-              <Field label="Payment method">
-                <SelectInput defaultValue="CASH" name="payment_method">
-                  {METHODS.map((method) => (
-                    <option key={method} value={method}>
-                      {method}
-                    </option>
-                  ))}
-                </SelectInput>
-              </Field>
-              <Field label="Payment business date">
+            {draftPaymentChoice === "set" ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <input name="gross_fee" type="hidden" value={draftAmount} />
+                <Field label="Payment description">
+                  <TextInput
+                    name="payment_description"
+                    onChange={(event) => {
+                      paymentDescriptionTouched.current = true;
+                      setDraftPaymentDescription(event.target.value);
+                    }}
+                    value={draftPaymentDescription}
+                  />
+                </Field>
+                <Field label="Payment amount">
+                  <TextInput
+                    inputMode="decimal"
+                    name="payment_amount"
+                    onChange={(event) => setDraftAmount(event.target.value)}
+                    required
+                    value={draftAmount}
+                  />
+                </Field>
+                <Field label="Payment method">
+                  <SelectInput defaultValue="CASH" name="payment_method">
+                    {METHODS.map((method) => (
+                      <option key={method} value={method}>
+                        {method}
+                      </option>
+                    ))}
+                  </SelectInput>
+                </Field>
+                <Field label="Payment business date">
+                  <TextInput
+                    defaultValue={selected?.payment?.business_date ?? today}
+                    name="payment_business_date"
+                    type="date"
+                  />
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label="Payment reference">
+                    <TextInput name="reference_number" />
+                  </Field>
+                </div>
+              </div>
+            ) : (
+              <Field label="Sale total">
                 <TextInput
-                  defaultValue={today}
-                  name="payment_business_date"
-                  type="date"
+                  inputMode="decimal"
+                  name="gross_fee"
+                  onChange={(event) => setDraftAmount(event.target.value)}
+                  required
+                  value={draftAmount}
                 />
               </Field>
-            </div>
-            <Field label="Payment reference">
-              <TextInput name="reference_number" />
-            </Field>
+            )}
           </div>
         </SaleCommandDialog>
       ) : null}

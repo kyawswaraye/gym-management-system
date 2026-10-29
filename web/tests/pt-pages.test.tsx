@@ -143,7 +143,9 @@ describe("phase 5 page gates", () => {
       screen.getByRole("heading", { level: 1, name: "Trainers" }),
     ).toHaveAttribute("id", "trainers-title");
     expect(screen.getByText("Personal training")).toBeInTheDocument();
-    expect(screen.getByText(/Review your coaching team/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/For personal training only\. Assign a member/),
+    ).toBeInTheDocument();
     expect(screen.queryByText("◇")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Create assignment" }),

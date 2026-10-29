@@ -329,10 +329,10 @@ describe("phase 5 workflows", () => {
       await screen.findByRole("button", { name: "Grace Hopper (M-1)" }),
     );
     await screen.findByRole("option", { name: /PT · PT10/ });
-    fireEvent.change(screen.getByLabelText("Package"), {
+    fireEvent.change(screen.getByLabelText("Which pack?"), {
       target: { value: TRAINER },
     });
-    fireEvent.change(screen.getByLabelText("Reason"), {
+    fireEvent.change(screen.getByLabelText("Short note"), {
       target: { value: "Courtesy" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save grant" }));
@@ -445,7 +445,9 @@ describe("phase 5 workflows", () => {
     const detail = {
       id: ASSIGNMENT,
       pt_sale_id: TRAINER,
+      pt_sale_description: "PT session",
       trainer_staff_profile_id: TRAINER,
+      trainer_display_name: "Ada Trainer",
       gross_fee_snapshot: "100.00",
       commission_percent_snapshot: "10.00",
       commission_amount: "10.00",
@@ -456,6 +458,7 @@ describe("phase 5 workflows", () => {
       status: "ACCRUED",
       paid_at: null,
       created_by_membership_id: "creator",
+      created_by_display_name: "Desk Manager",
       created_at: "2026-10-19T00:00:00Z",
       payments: [],
     };

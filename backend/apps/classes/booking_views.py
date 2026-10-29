@@ -29,6 +29,7 @@ from apps.classes.serializers import (
     ClassBookingListQuerySerializer,
     ClassBookingWriteSerializer,
     class_booking_payload,
+    class_booking_payloads,
 )
 from apps.classes.views import (
     IDEMPOTENCY_HEADER,
@@ -103,7 +104,8 @@ class ClassBookingListCreateView(ClassCommandView):
                 limit=int(payload["limit"]),
                 after=str(payload.get("after", "")),
             )
-        return success_response([class_booking_payload(row) for row in rows], meta=meta)
+            data = class_booking_payloads(rows)
+        return success_response(data, meta=meta)
 
     @extend_schema(
         operation_id="class_bookings_create",
