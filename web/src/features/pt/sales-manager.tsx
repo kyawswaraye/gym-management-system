@@ -513,7 +513,6 @@ export function SalesManager({
         sales.reload();
       })
       .catch((caught: unknown) => {
-        key.current = null;
         setDialogError(
           phase5Error(caught, tx("The draft could not be saved.")),
         );
@@ -535,7 +534,6 @@ export function SalesManager({
         sales.reload();
       })
       .catch((caught: unknown) => {
-        key.current = null;
         setActionError(
           phase5Error(caught, tx("The sale could not be submitted.")),
         );
@@ -571,7 +569,6 @@ export function SalesManager({
         sales.reload();
       })
       .catch((caught: unknown) => {
-        key.current = null;
         setDialogError(
           phase5Error(caught, tx("The sale could not be approved.")),
         );
@@ -602,7 +599,6 @@ export function SalesManager({
         sales.reload();
       })
       .catch((caught: unknown) => {
-        key.current = null;
         setDialogError(
           phase5Error(caught, tx("The sale could not be rejected.")),
         );
@@ -633,7 +629,6 @@ export function SalesManager({
         sales.reload();
       })
       .catch((caught: unknown) => {
-        key.current = null;
         setDialogError(
           phase5Error(caught, tx("The draft could not be cancelled.")),
         );
@@ -714,7 +709,6 @@ export function SalesManager({
         sales.reload();
       })
       .catch((caught: unknown) => {
-        key.current = null;
         setDialogError(
           phase5Error(caught, tx("The sale could not be voided.")),
         );

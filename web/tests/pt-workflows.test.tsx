@@ -329,10 +329,10 @@ describe("phase 5 workflows", () => {
       await screen.findByRole("button", { name: "Grace Hopper (M-1)" }),
     );
     await screen.findByRole("option", { name: /PT · PT10/ });
-    fireEvent.change(screen.getByLabelText("Package"), {
+    fireEvent.change(screen.getByLabelText("Which pack?"), {
       target: { value: TRAINER },
     });
-    fireEvent.change(screen.getByLabelText("Reason"), {
+    fireEvent.change(screen.getByLabelText("Short note"), {
       target: { value: "Courtesy" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save grant" }));

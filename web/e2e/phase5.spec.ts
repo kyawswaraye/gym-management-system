@@ -189,7 +189,7 @@ test("owner approves reception sales with the open cash session", async ({
   await expect(saleDetail(page)).toContainText("POSTED");
 
   await page.goto("/pt/member-packages");
-  const grant = page.locator("li").filter({ hasText: "E2E_PT_PACK" });
+  const grant = page.getByRole("row").filter({ hasText: "E2E_PT_PACK" });
   await expect(grant).toHaveCount(1);
   await grant.getByRole("button").click();
   await expect(
@@ -286,9 +286,11 @@ test("manager pays the trainer commission and a consumed sale does not void", as
   await expect(commissionDetail(page)).toContainText("POSTED");
   await page.goto("/pt/member-packages");
   const consumed = page
-    .locator("li")
-    .filter({ hasText: "ACTIVE · remaining 3 of 4" });
-  await consumed.getByRole("button", { name: /E2E_PT_PACK/ }).click();
+    .getByRole("row")
+    .filter({ hasText: "E2E_PT_PACK" })
+    .filter({ hasText: "ACTIVE" })
+    .filter({ hasText: "3/4" });
+  await consumed.getByRole("button").click();
   const ledger = page.getByRole("region", { name: "Session ledger" });
   await expect(ledger).toContainText("GRANT · 4");
   await expect(ledger).toContainText("ATTENDED · -1");
@@ -332,7 +334,7 @@ test("owner approves the untouched sale", async ({ page }) => {
   await expect(saleDetail(page)).toContainText("POSTED");
   await page.goto("/pt/member-packages");
   await expect(
-    page.locator("li").filter({ hasText: "E2E_PT_PACK" }),
+    page.getByRole("row").filter({ hasText: "E2E_PT_PACK" }),
   ).toHaveCount(2);
   await expectNoBrowserSecrets(page, secretValues(accounts));
   await assertResponses();
@@ -366,16 +368,20 @@ test("manager voids the untouched sale and runs the class cutoff", async ({
 
   await page.goto("/pt/member-packages");
   const refunded = page
-    .locator("li")
-    .filter({ hasText: "VOID · remaining 0 of 4" });
-  await refunded.getByRole("button", { name: /E2E_PT_PACK/ }).click();
+    .getByRole("row")
+    .filter({ hasText: "E2E_PT_PACK" })
+    .filter({ hasText: "VOID" })
+    .filter({ hasText: "0/4" });
+  await refunded.getByRole("button").click();
   const ledger = page.getByRole("region", { name: "Session ledger" });
   await expect(ledger).toContainText("GRANT · 4");
   await expect(ledger).toContainText("REFUND · -4");
   const consumed = page
-    .locator("li")
-    .filter({ hasText: "ACTIVE · remaining 3 of 4" });
-  await consumed.getByRole("button", { name: /E2E_PT_PACK/ }).click();
+    .getByRole("row")
+    .filter({ hasText: "E2E_PT_PACK" })
+    .filter({ hasText: "ACTIVE" })
+    .filter({ hasText: "3/4" });
+  await consumed.getByRole("button").click();
   await expect(ledger).toContainText("ATTENDED · -1");
   await expect(ledger).not.toContainText("REFUND");
 
@@ -449,7 +455,7 @@ test("manager voids the untouched sale and runs the class cutoff", async ({
 
   await page.goto("/pt/member-packages");
   await page
-    .locator("li")
+    .getByRole("row")
     .filter({ hasText: "E2E_CLASS_PACK" })
     .getByRole("button")
     .click();
@@ -460,7 +466,10 @@ test("manager voids the untouched sale and runs the class cutoff", async ({
     page.getByRole("region", { name: "Session ledger" }),
   ).toContainText("POLICY_NO_SHOW · -1");
   await expect(
-    page.locator("li").filter({ hasText: "remaining 2 of 4" }),
+    page
+      .getByRole("row")
+      .filter({ hasText: "E2E_CLASS_PACK" })
+      .filter({ hasText: "2/4" }),
   ).toBeVisible();
 
   await expectNoBrowserSecrets(page, secretValues(accounts));

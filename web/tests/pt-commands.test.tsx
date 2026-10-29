@@ -330,7 +330,7 @@ describe("phase 5 command coverage", () => {
     vi.mocked(adjustPackageLedger).mockResolvedValue({} as never);
     render(<MemberPackagesManager canAdjust today="2026-10-19" />);
     fireEvent.click(
-      await screen.findByRole("button", { name: /PT10 · Ten · member/ }),
+      await screen.findByRole("button", { name: /PT10 · Ten · / }),
     );
     expect(await screen.findByText(/GRANT/)).toBeInTheDocument();
     const next = screen
@@ -407,7 +407,10 @@ describe("phase 5 command coverage", () => {
     fireEvent.change(screen.getByLabelText("Description"), {
       target: { value: "Pack" },
     });
-    fireEvent.change(screen.getByLabelText("Gross fee"), {
+    fireEvent.change(screen.getByLabelText("Member's money"), {
+      target: { value: "omit" },
+    });
+    fireEvent.change(screen.getByLabelText("Sale total"), {
       target: { value: "100.00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
@@ -456,7 +459,7 @@ describe("phase 5 command coverage", () => {
     fireEvent.change(screen.getByLabelText("Description"), {
       target: { value: "Updated" },
     });
-    fireEvent.change(screen.getByLabelText("Payment draft"), {
+    fireEvent.change(screen.getByLabelText("Member's money"), {
       target: { value: "clear" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
