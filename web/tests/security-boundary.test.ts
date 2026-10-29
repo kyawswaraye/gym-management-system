@@ -533,6 +533,14 @@ describe("browser credential boundary", () => {
       (await authenticatedGet(request, `/api/v1/admin/gyms/${gymId}/owners/`))
         .status,
     ).toBe(200);
+    expect(
+      (
+        await authenticatedGet(
+          request,
+          `/api/v1/admin/gyms/${gymId}/login-accounts/`,
+        )
+      ).status,
+    ).toBe(200);
     expect((await authenticatedGet(request, "/api/v1/owners/")).status).toBe(
       200,
     );
@@ -545,7 +553,7 @@ describe("browser credential boundary", () => {
         )
       ).status,
     ).toBe(503);
-    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
   });
 
   it("allowlists exact dashboard and subscription detail routes", async () => {

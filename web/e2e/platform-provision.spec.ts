@@ -78,6 +78,12 @@ test("super admin provisions a gym through the browser", async ({ page }) => {
     page.getByText("E2E-PROVISION-GYM · ACTIVE", { exact: true }),
   ).toBeVisible();
   await expect(
+    page.getByRole("heading", { name: "Login emails", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("e2e-prov-owner@example.test", { exact: true }),
+  ).toBeVisible();
+  await expect(
     page.getByText("GYM_PROVISIONED", { exact: true }),
   ).toBeVisible();
   await expectNoBrowserSecrets(page, secrets);
