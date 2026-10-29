@@ -1,8 +1,14 @@
+import inspect
 from types import SimpleNamespace
 
 from apps.tenants.serializers import (
     AdminGymLifecycleInputSerializer,
     AdminGymPatchSerializer,
+)
+from apps.tenants.services import (
+    transition_gym_from_admin,
+    update_gym_from_admin,
+    update_subscription_plan_from_admin,
 )
 from apps.tenants.views import AdminGymDetailView
 
@@ -62,3 +68,17 @@ def test_lifecycle_reason_is_required_and_bounded() -> None:
     assert not AdminGymLifecycleInputSerializer(data={"reason": "  "}).is_valid()
     assert not AdminGymLifecycleInputSerializer(data={"reason": "x" * 501}).is_valid()
     assert AdminGymLifecycleInputSerializer(data={"reason": "Billing restored"}).is_valid()
+
+
+def test_platform_gym_mutations_set_runtime_admin_context() -> None:
+    """gym_runtime may write lifecycle columns only with app.platform_admin."""
+
+    for target in (
+        update_gym_from_admin,
+        transition_gym_from_admin,
+        update_subscription_plan_from_admin,
+    ):
+        source = inspect.getsource(target)
+        assert "set_platform_admin_context()" in source
+    assert "set_gym_context(gym_id=gym_id)" in inspect.getsource(update_gym_from_admin)
+    assert "set_gym_context(gym_id=gym_id)" in inspect.getsource(transition_gym_from_admin)
