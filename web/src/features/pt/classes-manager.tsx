@@ -1867,8 +1867,6 @@ export function ClassesManager({
                   ) : null}
                 </div>
                 <div className="grid gap-4 p-4 sm:p-5">
-                  {notice ? <NoticeBanner message={notice} /> : null}
-                  {error ? <Alert message={error} /> : null}
                   {bookings.pending && bookings.rows.length === 0 ? (
                     <LoadingRows label="Loading class bookings." />
                   ) : null}
