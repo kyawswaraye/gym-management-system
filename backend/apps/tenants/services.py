@@ -23,7 +23,7 @@ from apps.audit.models import Outcome
 from apps.audit.services import redact_audit_values, write_platform_audit, write_tenant_audit
 from apps.common.api.exceptions import AuthenticationFailed
 from apps.common.codes import GYM_CODE, resolve_code
-from apps.common.db.tenant_context import set_gym_context
+from apps.common.db.tenant_context import set_gym_context, set_platform_admin_context
 from apps.common.mail.invitations import render_invitation_email
 from apps.tenants.exceptions import (
     IdempotencyKeyReused,
@@ -1141,6 +1141,8 @@ def update_gym_from_admin(
     ip_address: str | None = None,
     user_agent: str = "",
 ) -> Gym:
+    set_platform_admin_context()
+    set_gym_context(gym_id=gym_id)
     gym = Gym.objects.select_for_update().get(id=gym_id)
     old_snapshot = admin_gym_detail(gym)
     plan = gym.subscription_plan
@@ -1236,6 +1238,8 @@ def transition_gym_from_admin(
     ip_address: str | None = None,
     user_agent: str = "",
 ) -> tuple[Gym, bool]:
+    set_platform_admin_context()
+    set_gym_context(gym_id=gym_id)
     gym = Gym.objects.select_for_update().get(id=gym_id)
     if gym.status == target_status:
         return gym, False
@@ -1255,7 +1259,6 @@ def transition_gym_from_admin(
             raise InvalidGymTransition(
                 "The gym requires an active eligible subscription before activation."
             )
-        set_gym_context(gym_id=gym.id)
         has_owner = GymMembership.objects.filter(
             gym=gym,
             is_owner=True,
@@ -1363,6 +1366,7 @@ def update_subscription_plan_from_admin(
 ) -> tuple[SubscriptionPlan, bool]:
     """Update safe plan metadata without touching tenant entitlements."""
 
+    set_platform_admin_context()
     plan = SubscriptionPlan.objects.select_for_update().get(id=plan_id)
     changes: dict[str, Any] = {}
     for field in PLAN_METADATA_FIELDS:

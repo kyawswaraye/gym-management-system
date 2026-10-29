@@ -29,6 +29,19 @@ def set_gym_context(*, gym_id: uuid.UUID) -> None:
         cursor.execute("SELECT set_config('app.gym_id', %s, true)", [str(gym_id)])
 
 
+def set_platform_admin_context() -> None:
+    """Allow gym_runtime to update platform-owned gym and plan columns.
+
+    Platform admin services share the runtime DB role with tenant traffic. The
+    gym profile trigger and subscription-plan guard only permit lifecycle and
+    subscription writes when this transaction-local flag is set.
+    """
+
+    _require_atomic()
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT set_config('app.platform_admin', '1', true)")
+
+
 def clear_gym_context() -> None:
     """Remove the transaction-local gym id before returning to a caller.
 

@@ -567,7 +567,9 @@ def test_runtime_role_cannot_cross_gyms_or_change_lifecycle() -> None:
               has_column_privilege('gym_runtime', 'tenants_gym', 'currency', 'UPDATE')
             """
         )
-        assert cursor.fetchone() == (True, False, False, True)
+        # status is granted for platform admin services; the trigger still
+        # blocks tenant sessions that lack app.platform_admin.
+        assert cursor.fetchone() == (True, True, False, True)
 
     with transaction.atomic(), connection.cursor() as cursor:
         cursor.execute("SET LOCAL ROLE gym_runtime")
@@ -602,6 +604,15 @@ def test_runtime_role_cannot_cross_gyms_or_change_lifecycle() -> None:
                 [gym_a.id],
             )
 
+    with transaction.atomic(), connection.cursor() as cursor:
+        cursor.execute("SET LOCAL ROLE gym_runtime")
+        cursor.execute("SELECT set_config('app.gym_id', %s, true)", [str(gym_a.id)])
+        cursor.execute("SELECT set_config('app.platform_admin', '1', true)")
+        cursor.execute(
+            "UPDATE tenants_gym SET status = 'SUSPENDED' WHERE id = %s",
+            [gym_a.id],
+        )
+
     with pytest.raises(DatabaseError):
         with transaction.atomic(), connection.cursor() as cursor:
             cursor.execute("SET LOCAL ROLE gym_runtime")
@@ -616,5 +627,5 @@ def test_runtime_role_cannot_cross_gyms_or_change_lifecycle() -> None:
     gym_a.refresh_from_db()
     gym_b.refresh_from_db()
     assert gym_a.name == "Runtime Renamed"
-    assert gym_a.status == Gym.Status.ACTIVE
+    assert gym_a.status == Gym.Status.SUSPENDED
     assert gym_b.name == "Runtime B"
