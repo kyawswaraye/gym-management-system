@@ -15,7 +15,7 @@ from apps.common.codes import OptionalPatternField
 from apps.expenses.serializers import ExpenseSerializer
 from apps.members.models import Member, Payment
 from apps.members.payment_serializers import PaymentSerializer, ReceiptSerializer, payment_payload
-from apps.tenants.models import StaffProfile
+from apps.tenants.models import GymMembership, StaffProfile
 from apps.trainers.models import (
     MemberServicePackage,
     PTBooking,
@@ -392,7 +392,9 @@ class PTSaleVoidSerializer(StrictSerializer):
 class PTSaleSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     member_id = serializers.UUIDField()
+    member_name = serializers.CharField()
     trainer_staff_profile_id = serializers.UUIDField()
+    trainer_display_name = serializers.CharField()
     service_date = serializers.DateField()
     description = serializers.CharField()
     gross_fee = serializers.CharField()
@@ -406,6 +408,7 @@ class PTSaleSerializer(serializers.Serializer):
     payment_id = serializers.UUIDField(allow_null=True)
     payment = PaymentSerializer(allow_null=True)
     service_package_id = serializers.UUIDField(allow_null=True)
+    package_name = serializers.CharField(allow_null=True)
     package_price_snapshot = serializers.CharField(allow_null=True)
     member_service_package_id = serializers.UUIDField(allow_null=True)
     submitted_at = serializers.DateTimeField(allow_null=True)
@@ -431,7 +434,9 @@ class PTSaleSerializer(serializers.Serializer):
 class PTCommissionSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     pt_sale_id = serializers.UUIDField()
+    pt_sale_description = serializers.CharField()
     trainer_staff_profile_id = serializers.UUIDField()
+    trainer_display_name = serializers.CharField()
     gross_fee_snapshot = serializers.CharField()
     commission_percent_snapshot = serializers.CharField()
     commission_amount = serializers.CharField()
@@ -442,6 +447,7 @@ class PTCommissionSerializer(serializers.Serializer):
     status = serializers.CharField()
     paid_at = serializers.DateTimeField(allow_null=True)
     created_by_membership_id = serializers.UUIDField()
+    created_by_display_name = serializers.CharField()
     created_at = serializers.DateTimeField()
 
 
@@ -554,6 +560,7 @@ class PTCommissionPaymentEnvelopeSerializer(serializers.Serializer):
 class MemberServicePackageSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     member_id = serializers.UUIDField()
+    member_name = serializers.CharField()
     service_package_id = serializers.UUIDField()
     source = serializers.CharField()
     pt_sale_id = serializers.UUIDField(allow_null=True)
@@ -731,11 +738,71 @@ class PTSaleListQuerySerializer(PageQuerySerializer):
         return attrs
 
 
-def commission_payload(row: PTCommission) -> dict[str, object]:
+def commission_display_labels(
+    rows: list[PTCommission],
+) -> dict[str, dict[str, str]]:
+    """Batch-load trainer, sale, and recorder labels for commission payloads."""
+
+    if not rows:
+        return {"trainers": {}, "sales": {}, "recorders": {}}
+    gym_ids = {row.gym_id for row in rows}
+    trainer_ids = {row.trainer_staff_profile_id for row in rows}
+    sale_ids = {row.pt_sale_id for row in rows}
+    recorder_ids = {row.created_by_membership_id for row in rows}
+    trainers = {
+        str(row.id): row.display_name
+        for row in StaffProfile.objects.filter(gym_id__in=gym_ids, id__in=trainer_ids).only(
+            "id", "display_name"
+        )
+    }
+    sales = {
+        str(row.id): row.description
+        for row in PTSale.objects.filter(gym_id__in=gym_ids, id__in=sale_ids).only(
+            "id", "description"
+        )
+    }
+    recorders = {
+        str(row.gym_membership_id): row.display_name
+        for row in StaffProfile.objects.filter(
+            gym_id__in=gym_ids, gym_membership_id__in=recorder_ids
+        ).only("gym_membership_id", "display_name")
+        if row.display_name
+    }
+    missing_recorders = {
+        membership_id for membership_id in recorder_ids if str(membership_id) not in recorders
+    }
+    if missing_recorders:
+        for membership in GymMembership.objects.filter(
+            gym_id__in=gym_ids, id__in=missing_recorders
+        ).select_related("user"):
+            user = membership.user
+            name = " ".join(
+                part for part in (user.first_name, user.last_name) if part
+            ).strip()
+            recorders[str(membership.id)] = name or user.email
+    return {"trainers": trainers, "sales": sales, "recorders": recorders}
+
+
+def commission_payloads(rows: list[PTCommission]) -> list[dict[str, object]]:
+    labels = commission_display_labels(rows)
+    return [commission_payload(row, labels=labels) for row in rows]
+
+
+def commission_payload(
+    row: PTCommission,
+    *,
+    labels: dict[str, dict[str, str]] | None = None,
+) -> dict[str, object]:
+    resolved = labels if labels is not None else commission_display_labels([row])
+    trainer_key = str(row.trainer_staff_profile_id)
+    sale_key = str(row.pt_sale_id)
+    recorder_key = str(row.created_by_membership_id)
     return {
         "id": row.id,
         "pt_sale_id": row.pt_sale_id,
+        "pt_sale_description": resolved["sales"].get(sale_key, ""),
         "trainer_staff_profile_id": row.trainer_staff_profile_id,
+        "trainer_display_name": resolved["trainers"].get(trainer_key, ""),
         "gross_fee_snapshot": f"{row.gross_fee_snapshot:.2f}",
         "commission_percent_snapshot": f"{row.commission_percent_snapshot:.2f}",
         "commission_amount": f"{row.commission_amount:.2f}",
@@ -746,6 +813,7 @@ def commission_payload(row: PTCommission) -> dict[str, object]:
         "status": row.status,
         "paid_at": row.paid_at,
         "created_by_membership_id": row.created_by_membership_id,
+        "created_by_display_name": resolved["recorders"].get(recorder_key, ""),
         "created_at": row.created_at,
     }
 
@@ -772,15 +840,67 @@ def commission_payment_payload(row: PTCommissionPayment) -> dict[str, object]:
     }
 
 
-def pt_sale_payload(row: PTSale) -> dict[str, object]:
+def _member_label(member: Member) -> str:
+    name = " ".join(part for part in (member.first_name, member.last_name) if part).strip()
+    if member.member_number and name:
+        return f"{member.member_number} · {name}"
+    return name or member.member_number or ""
+
+
+def sale_display_labels(rows: list[PTSale]) -> dict[str, dict[str, str]]:
+    """Batch-load member, trainer, and package labels for sale payloads."""
+
+    if not rows:
+        return {"members": {}, "trainers": {}, "packages": {}}
+    gym_ids = {row.gym_id for row in rows}
+    member_ids = {row.member_id for row in rows}
+    trainer_ids = {row.trainer_staff_profile_id for row in rows}
+    package_ids = {row.service_package_id for row in rows if row.service_package_id is not None}
+    members = {
+        str(row.id): _member_label(row)
+        for row in Member.objects.filter(gym_id__in=gym_ids, id__in=member_ids).only(
+            "id", "member_number", "first_name", "last_name"
+        )
+    }
+    trainers = {
+        str(row.id): row.display_name
+        for row in StaffProfile.objects.filter(gym_id__in=gym_ids, id__in=trainer_ids).only(
+            "id", "display_name"
+        )
+    }
+    packages = {
+        str(row.id): row.name
+        for row in ServicePackage.objects.filter(gym_id__in=gym_ids, id__in=package_ids).only(
+            "id", "name"
+        )
+    }
+    return {"members": members, "trainers": trainers, "packages": packages}
+
+
+def pt_sale_payloads(rows: list[PTSale]) -> list[dict[str, object]]:
+    labels = sale_display_labels(rows)
+    return [pt_sale_payload(row, labels=labels) for row in rows]
+
+
+def pt_sale_payload(
+    row: PTSale,
+    *,
+    labels: dict[str, dict[str, str]] | None = None,
+) -> dict[str, object]:
     commission, gym_share, paid, outstanding = preview_sale_amounts(
         gross_fee=row.gross_fee,
         percent=row.commission_percent_snapshot,
     )
+    resolved = labels if labels is not None else sale_display_labels([row])
+    member_key = str(row.member_id)
+    trainer_key = str(row.trainer_staff_profile_id)
+    package_key = None if row.service_package_id is None else str(row.service_package_id)
     return {
         "id": row.id,
         "member_id": row.member_id,
+        "member_name": resolved["members"].get(member_key, ""),
         "trainer_staff_profile_id": row.trainer_staff_profile_id,
+        "trainer_display_name": resolved["trainers"].get(trainer_key, ""),
         "service_date": row.service_date,
         "description": row.description,
         "gross_fee": f"{row.gross_fee:.2f}",
@@ -794,6 +914,7 @@ def pt_sale_payload(row: PTSale) -> dict[str, object]:
         "payment_id": row.payment_id,
         "payment": None if row.payment is None else payment_payload(row.payment),
         "service_package_id": row.service_package_id,
+        "package_name": None if package_key is None else resolved["packages"].get(package_key),
         "package_price_snapshot": _money(row.package_price_snapshot),
         "member_service_package_id": _granted_package_id(row),
         "submitted_at": row.submitted_at,
@@ -833,7 +954,34 @@ def _granted_package_id(row: PTSale) -> object:
     )
 
 
-def member_package_payload(row: MemberServicePackage) -> dict[str, object]:
+def member_package_labels(rows: list[MemberServicePackage]) -> dict[str, str]:
+    """Batch-load member labels for granted package payloads."""
+
+    if not rows:
+        return {}
+    gym_ids = {row.gym_id for row in rows}
+    member_ids = {row.member_id for row in rows}
+    return {
+        str(row.id): _member_label(row)
+        for row in Member.objects.filter(gym_id__in=gym_ids, id__in=member_ids).only(
+            "id", "member_number", "first_name", "last_name"
+        )
+    }
+
+
+def member_package_payloads(rows: list[MemberServicePackage]) -> list[dict[str, object]]:
+    labels = member_package_labels(rows)
+    return [
+        member_package_payload(row, member_name=labels.get(str(row.member_id), ""))
+        for row in rows
+    ]
+
+
+def member_package_payload(
+    row: MemberServicePackage,
+    *,
+    member_name: str | None = None,
+) -> dict[str, object]:
     if "remaining_sessions" in row.__dict__:
         remaining = int(row.__dict__["remaining_sessions"])
     else:
@@ -844,9 +992,13 @@ def member_package_payload(row: MemberServicePackage) -> dict[str, object]:
     else:
         status = _derived_package_status(row, remaining=remaining, today=gym_local_date(row.gym))
     granted = row.granted_sessions
+    if member_name is None:
+        labels = member_package_labels([row])
+        member_name = labels.get(str(row.member_id), "")
     return {
         "id": row.id,
         "member_id": row.member_id,
+        "member_name": member_name,
         "service_package_id": row.service_package_id,
         "source": row.source,
         "pt_sale_id": row.pt_sale_id,
@@ -904,7 +1056,9 @@ class PTBookingCancelSerializer(StrictSerializer):
 class PTBookingSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     trainer_staff_profile_id = serializers.UUIDField()
+    trainer_display_name = serializers.CharField()
     member_id = serializers.UUIDField()
+    member_name = serializers.CharField()
     member_service_package_id = serializers.UUIDField(allow_null=True)
     starts_at = serializers.DateTimeField()
     ends_at = serializers.DateTimeField()
@@ -953,11 +1107,50 @@ class PTBookingListQuerySerializer(StrictSerializer):
     view = serializers.ChoiceField(choices=["list", "calendar"], required=False, default="list")
 
 
-def pt_booking_payload(row: PTBooking) -> dict[str, object]:
+def pt_booking_display_labels(
+    rows: list[PTBooking],
+) -> dict[str, dict[str, str]]:
+    """Batch-load member and trainer labels for PT booking payloads."""
+
+    if not rows:
+        return {"members": {}, "trainers": {}}
+    gym_ids = {row.gym_id for row in rows}
+    member_ids = {row.member_id for row in rows}
+    trainer_ids = {row.trainer_staff_profile_id for row in rows}
+    members = {
+        str(row.id): _member_label(row)
+        for row in Member.objects.filter(gym_id__in=gym_ids, id__in=member_ids).only(
+            "id", "member_number", "first_name", "last_name"
+        )
+    }
+    trainers = {
+        str(row.id): row.display_name
+        for row in StaffProfile.objects.filter(gym_id__in=gym_ids, id__in=trainer_ids).only(
+            "id", "display_name"
+        )
+    }
+    return {"members": members, "trainers": trainers}
+
+
+def pt_booking_payloads(rows: list[PTBooking]) -> list[dict[str, object]]:
+    labels = pt_booking_display_labels(rows)
+    return [pt_booking_payload(row, labels=labels) for row in rows]
+
+
+def pt_booking_payload(
+    row: PTBooking,
+    *,
+    labels: dict[str, dict[str, str]] | None = None,
+) -> dict[str, object]:
+    resolved = labels if labels is not None else pt_booking_display_labels([row])
+    member_key = str(row.member_id)
+    trainer_key = str(row.trainer_staff_profile_id)
     return {
         "id": row.id,
         "trainer_staff_profile_id": row.trainer_staff_profile_id,
+        "trainer_display_name": resolved["trainers"].get(trainer_key, ""),
         "member_id": row.member_id,
+        "member_name": resolved["members"].get(member_key, ""),
         "member_service_package_id": row.member_service_package_id,
         "starts_at": row.starts_at,
         "ends_at": row.ends_at,

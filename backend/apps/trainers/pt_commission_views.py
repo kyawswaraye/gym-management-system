@@ -35,6 +35,7 @@ from apps.trainers.serializers import (
     PTCommissionPaymentEnvelopeSerializer,
     PTCommissionPaymentWriteSerializer,
     commission_payload,
+    commission_payloads,
     commission_payment_payload,
 )
 from apps.users.permissions import RequiresEntitlement, RequiresPermission
@@ -135,7 +136,8 @@ class PTCommissionListView(PTCommissionAPIView):
                 limit=int(payload["limit"]),
                 after=str(payload.get("after", "")),
             )
-        return success_response([commission_payload(row) for row in rows], meta=meta)
+            data = commission_payloads(rows)
+        return success_response(data, meta=meta)
 
 
 class PTCommissionDetailView(PTCommissionAPIView):
@@ -157,8 +159,8 @@ class PTCommissionDetailView(PTCommissionAPIView):
                 commission_id=id,
             )
             payments = commission_payments(row)
-        payload = commission_payload(row)
-        payload["payments"] = [commission_payment_payload(item) for item in payments]
+            payload = commission_payload(row)
+            payload["payments"] = [commission_payment_payload(item) for item in payments]
         return success_response(payload)
 
 

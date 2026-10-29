@@ -131,8 +131,8 @@ export const operationsEn = {
   "Directory view": "Directory view",
   "Discard note changes": "Discard note changes",
   "Display location": "Display location",
-  "Draft a sale, optionally attach a package and payment, then submit it for approval. An owner, or a combined manager and receptionist, may approve their own sale.":
-    "Draft a sale, optionally attach a package and payment, then submit it for approval. An owner, or a combined manager and receptionist, may approve their own sale.",
+  "1) Create a draft with the member's money. 2) Submit. 3) Approve. Then pay the trainer from Commissions.":
+    "1) Create a draft with the member's money. 2) Submit. 3) Approve. Then pay the trainer from Commissions.",
   Duration: "Duration",
   "e.g. Monthly membership": "e.g. Monthly membership",
   "Each new code uses this location. The code itself stays on this screen.":
@@ -288,6 +288,8 @@ export const operationsEn = {
   "Name, email, or code": "Name, email, or code",
   "Name, key, or permission": "Name, key, or permission",
   "Name, number, phone, or email": "Name, number, phone, or email",
+  "Name or member number": "Name or member number",
+  "Phone or email works too.": "Phone or email works too.",
   "Net paid": "Net paid",
   "New plan": "New plan",
   "Newest events are first. Open one to read the change.":
@@ -400,8 +402,8 @@ export const operationsEn = {
     "Review operational trends and trusted server-calculated financial totals for your selected gym. Operational reports do not include money.",
   "Review scoped commission balances and payouts. An owner, or a combined manager and receptionist, may record a payout on an accrual they created.":
     "Review scoped commission balances and payouts. An owner, or a combined manager and receptionist, may record a payout on an accrual they created.",
-  "Review your coaching team, current assignments, and members assigned today.":
-    "Review your coaching team, current assignments, and members assigned today.",
+  "For personal training only. Assign a member to a trainer before PT sales or bookings. Monthly gym members and class members do not need an assignment.":
+    "For personal training only. Assign a member to a trainer before PT sales or bookings. Monthly gym members and class members do not need an assignment.",
   Revoke: "Revoke",
   "Revoke owner": "Revoke owner",
   "Revoking…": "Revoking…",
@@ -701,8 +703,8 @@ export const operationsMm = {
   "Directory view": "အမည်စာရင်း",
   "Discard note changes": "မှတ်ချက်ပြင်ဆင်မှုများကို ပယ်ဖျက်ရန်",
   "Display location": "ပြသမည့်တည်နေရာ",
-  "Draft a sale, optionally attach a package and payment, then submit it for approval. An owner, or a combined manager and receptionist, may approve their own sale.":
-    "အရောင်းမူကြမ်း ရေးဆွဲပါ။ ဆန္ဒရှိပါက ပက်ကေ့ဂျ်နှင့် ငွေပေးချေမှုကို ပူးတွဲပြီး အတည်ပြုရန် တင်သွင်းပါ။ ပိုင်ရှင် သို့မဟုတ် မန်နေဂျာနှင့် ဧည့်ကြို ပေါင်းစပ်သူသည် ကိုယ်တိုင် အတည်ပြုနိုင်သည်။",
+  "1) Create a draft with the member's money. 2) Submit. 3) Approve. Then pay the trainer from Commissions.":
+    "၁) Member ငွေနဲ့ မူကြမ်းဖန်တီးပါ။ ၂) တင်သွင်းပါ။ ၃) အတည်ပြုပါ။ ပြီးရင် Commissions က Trainer ကို ပေးပါ။",
   Duration: "ကြာချိန်",
   "e.g. Monthly membership": "ဥပမာ၊ လစဉ်အသင်းဝင်မှု",
   "Each new code uses this location. The code itself stays on this screen.":
@@ -859,6 +861,8 @@ export const operationsMm = {
   "Name, email, or code": "အမည်၊ အီးမေးလ် သို့မဟုတ် ကုဒ်",
   "Name, key, or permission": "အမည်၊ သော့ သို့မဟုတ် ခွင့်ပြုချက်",
   "Name, number, phone, or email": "အမည်၊ နံပါတ်၊ ဖုန်း သို့မဟုတ် အီးမေးလ်",
+  "Name or member number": "အမည် သို့မဟုတ် member နံပါတ်",
+  "Phone or email works too.": "ဖုန်း သို့မဟုတ် အီးမေးလ်လည်း ရိုက်ရှာလို့ရပါတယ်။",
   "Net paid": "အသားတင် ပေးချေပြီး",
   "New plan": "အစီအစဉ် အသစ်",
   "Newest events are first. Open one to read the change.":
@@ -977,8 +981,8 @@ export const operationsMm = {
     "ရွေးထားသော Gym အတွက် လုပ်ငန်းလမ်းကြောင်းနှင့် စနစ်က တွက်ထားသော ယုံကြည်ရသည့် ဘဏ္ဍာရေး စုစုပေါင်းကို သုံးသပ်ပါ။ လုပ်ငန်းလည်ပတ်မှု အစီရင်ခံစာများတွင် ငွေကြေး မပါဝင်ပါ။",
   "Review scoped commission balances and payouts. An owner, or a combined manager and receptionist, may record a payout on an accrual they created.":
     "သင်မြင်နိုင်သော ကော်မရှင် လက်ကျန်နှင့် ထုတ်ပေးငွေများကို သုံးသပ်ပါ။ ပိုင်ရှင် သို့မဟုတ် မန်နေဂျာနှင့် ဧည့်ကြို ပေါင်းစပ်သူသည် ကိုယ်တိုင် ဖန်တီးခဲ့သော စုဆောင်းမှုအတွက် ထုတ်ပေးငွေ မှတ်တမ်းတင်နိုင်သည်။",
-  "Review your coaching team, current assignments, and members assigned today.":
-    "သင်၏ နည်းပြအဖွဲ့၊ လက်ရှိ တာဝန်များနှင့် ယနေ့ သတ်မှတ်ထားသော အဖွဲ့ဝင်များကို သုံးသပ်ပါ။",
+  "For personal training only. Assign a member to a trainer before PT sales or bookings. Monthly gym members and class members do not need an assignment.":
+    "Personal training အတွက်သာ။ PT အရောင်း သို့မဟုတ် ချိန်းဆိုမှု မတိုင်မီ Member ကို Trainer နှင့် ချိတ်ပါ။ လစဉ် Gym Member နှင့် Class Member အတွက် မလိုပါ။",
   Revoke: "ရုပ်သိမ်းရန်",
   "Revoke owner": "ပိုင်ရှင်ကို ရုပ်သိမ်းရန်",
   "Revoking…": "ရုပ်သိမ်းနေသည်…",

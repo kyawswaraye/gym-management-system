@@ -300,10 +300,10 @@ export function PackagesManager({
                   {" "}
                   {tx("Loading packages.")}{" "}
                 </p>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-3">
                   {[0, 1, 2].map((item) => (
                     <div
-                      className="h-36 animate-pulse rounded-xl bg-slate-100"
+                      className="h-24 animate-pulse rounded-xl bg-slate-100"
                       key={item}
                     />
                   ))}
@@ -349,86 +349,113 @@ export function PackagesManager({
               </div>
             ) : null}
             {packages.rows.length > 0 ? (
-              <ul
-                aria-label={tx("Package catalog")}
-                className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+              <div
+                className={`w-full overflow-x-auto ${packages.pending ? "opacity-60" : ""}`}
               >
-                {packages.rows.map((row) => {
-                  const classPackage = row.type === "CLASS";
-                  return (
-                    <li
-                      className={`flex h-full flex-col rounded-xl border border-slate-200 border-l-4 p-4 ${
-                        classPackage ? "border-l-sky-500" : "border-l-amber-400"
-                      } ${row.is_active ? "bg-white" : "bg-slate-50"}`}
-                      key={row.id}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="text-base font-bold break-words text-slate-900">
-                            {row.name}
-                          </h3>
-                          <p className="mt-1 text-xs font-semibold tracking-wide text-slate-500">
-                            {row.code}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1.5">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-bold ${
-                              classPackage
-                                ? "bg-sky-100 text-sky-800"
-                                : "bg-amber-100 text-amber-800"
-                            }`}
-                          >
-                            {row.type}
-                          </span>
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-bold ${
-                              row.is_active
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-slate-200 text-slate-600"
-                            }`}
-                          >
-                            {row.is_active ? tx("Active") : tx("Inactive")}
-                          </span>
-                        </div>
-                      </div>
-                      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
-                        <div>
-                          <dt className="text-xs text-slate-500">
-                            {tx("Sessions")}
-                          </dt>
-                          <dd className="mt-0.5 font-semibold text-slate-900 tabular-nums">
+                <table className="w-full min-w-[40rem] text-left text-sm">
+                  <caption className="sr-only">{tx("Package catalog")}</caption>
+                  <thead className="border-b border-slate-200 text-slate-500">
+                    <tr>
+                      <th
+                        className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                        scope="col"
+                      >
+                        {tx("Package")}
+                      </th>
+                      <th
+                        className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                        scope="col"
+                      >
+                        {tx("Type")}
+                      </th>
+                      <th
+                        className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                        scope="col"
+                      >
+                        {tx("Sessions")}
+                      </th>
+                      <th
+                        className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                        scope="col"
+                      >
+                        {tx("Validity")}
+                      </th>
+                      <th
+                        className="px-4 py-2.5 text-right text-xs font-semibold sm:px-5"
+                        scope="col"
+                      >
+                        {tx("Price")}
+                      </th>
+                      <th
+                        className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                        scope="col"
+                      >
+                        {tx("Status")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {packages.rows.map((row) => {
+                      const classPackage = row.type === "CLASS";
+                      return (
+                        <tr
+                          className={
+                            row.is_active ? "hover:bg-slate-50" : "bg-slate-50"
+                          }
+                          key={row.id}
+                        >
+                          <td className="max-w-[16rem] px-4 py-3 sm:px-5">
+                            <p className="font-semibold break-words text-slate-900">
+                              {row.name}
+                            </p>
+                            <p className="mt-0.5 text-xs font-semibold tracking-wide text-slate-500">
+                              {row.code}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 sm:px-5">
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                                classPackage
+                                  ? "bg-sky-100 text-sky-800"
+                                  : "bg-amber-100 text-amber-800"
+                              }`}
+                            >
+                              {row.type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-900 tabular-nums sm:px-5">
                             {row.session_count}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs text-slate-500">
-                            {tx("Validity")}
-                          </dt>
-                          <dd className="mt-0.5 font-semibold text-slate-900">
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-slate-800 sm:px-5">
                             {validityLabel(
                               row.validity_value,
                               row.validity_unit,
                               tx,
                             )}
-                          </dd>
-                        </div>
-                        <div className="col-span-2 sm:col-span-1">
-                          <dt className="text-xs text-slate-500">
-                            {tx("Price")}
-                          </dt>
-                          <dd className="mt-0.5 font-semibold break-words text-slate-900 tabular-nums">
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold whitespace-nowrap text-slate-900 tabular-nums sm:px-5">
                             {row.price}{" "}
                             <span className="text-xs font-medium text-slate-500">
                               {tx(row.currency)}
                             </span>
-                          </dd>
-                        </div>
-                      </dl>
-                    </li>
-                  );
-                })}
-              </ul>
+                          </td>
+                          <td className="px-4 py-3 sm:px-5">
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                                row.is_active
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-slate-200 text-slate-600"
+                              }`}
+                            >
+                              {row.is_active ? tx("Active") : tx("Inactive")}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             ) : null}
           </div>
           {showPaging ? (

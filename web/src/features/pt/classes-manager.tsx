@@ -10,6 +10,19 @@ import {
   type Ref,
 } from "react";
 
+function useMinWidth(px: number): boolean {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia(`(min-width: ${px}px)`);
+    const sync = () => setMatches(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, [px]);
+  return matches;
+}
+
 import {
   Alert,
   CursorControls,
@@ -257,22 +270,12 @@ function EmptyState({ title, body }: { title: string; body: string }) {
   );
 }
 
-function LoadingRows({
-  label,
-  cards = false,
-}: {
-  label: string;
-  cards?: boolean;
-}) {
+function LoadingRows({ label }: { label: string }) {
   const tx = useTx();
   return (
     <div className="grid gap-3" role="status">
       <p className="text-sm font-medium text-slate-600">{tx(label)}</p>
-      <div
-        className={
-          cards ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3" : "grid gap-3"
-        }
-      >
+      <div className="grid gap-3">
         {[0, 1, 2].map((item) => (
           <div
             className="h-28 animate-pulse rounded-xl bg-slate-100"
@@ -685,6 +688,7 @@ export function ClassesManager({
   timeZone?: string;
 }) {
   const tx = useTx();
+  const wide = useMinWidth(768);
   const defaultTo = shiftDate(today, 6);
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(defaultTo);
@@ -1065,18 +1069,32 @@ export function ClassesManager({
 
   function attend(row: ClassBooking) {
     if (pendingRef.current || !canAttend || row.status !== "BOOKED") return;
+    if (Date.now() < Date.parse(row.starts_at)) {
+      setNotice("");
+      setError(
+        "Too early. Wait until the class starts, then mark attended.",
+      );
+      return;
+    }
     void command(
       () => attendClassBooking(row.id, commandKey(`attend:${row.id}`)),
-      "Attendance recorded.",
+      "Marked attended. Status is ATTENDED now.",
       "page",
     );
   }
 
   function markNoShow(row: ClassBooking) {
     if (pendingRef.current || !canAttend || row.status !== "BOOKED") return;
+    if (Date.now() < Date.parse(row.ends_at)) {
+      setNotice("");
+      setError(
+        "Too early. Wait until the class ends, then mark no-show.",
+      );
+      return;
+    }
     void command(
       () => noShowClassBooking(row.id, commandKey(`noshow:${row.id}`)),
-      "No-show recorded.",
+      "Marked no-show. Status is NO_SHOW now.",
       "page",
     );
   }
@@ -1143,13 +1161,13 @@ export function ClassesManager({
                   </button>
                 ) : null
               }
-              description="Duration and capacity for new schedules."
+              description="Class kinds such as Yoga or HIIT. Set the usual length and how many people fit before you make a schedule."
               title={tx("Class types")}
               titleId="class-types-title"
             />
             <div className="grid gap-4 p-4 sm:p-5">
               {types.pending && types.rows.length === 0 ? (
-                <LoadingRows cards label="Loading class types." />
+                <LoadingRows label="Loading class types." />
               ) : null}
               {types.pending && types.rows.length > 0 ? (
                 <p className="sr-only" role="status">
@@ -1177,55 +1195,97 @@ export function ClassesManager({
                 />
               ) : null}
               {types.rows.length > 0 ? (
-                <ul
-                  aria-label={tx("Class types")}
-                  className="divide-y divide-slate-100"
+                <div
+                  className={`w-full overflow-x-auto ${types.pending ? "opacity-60" : ""}`}
                 >
-                  {types.rows.map((row) => (
-                    <li
-                      className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
-                      key={row.id}
-                    >
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-semibold break-words text-slate-900">
-                            {row.name}
-                          </h3>
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-bold ${
-                              row.is_active
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-slate-200 text-slate-600"
-                            }`}
-                          >
-                            {row.is_active ? tx("Active") : tx("Archived")}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm break-words text-slate-500">
-                          {row.code} · {row.default_duration_minutes}{" "}
-                          {tx("min ·")} {row.default_capacity} {tx("spots")}
-                          {row.description ? ` · ${row.description}` : ""}
-                        </p>
-                      </div>
-                      {canManage ? (
-                        <button
-                          className="button button-edit button-sm w-full shrink-0 sm:w-auto"
-                          disabled={pending}
-                          onClick={(event) =>
-                            openDialog(
-                              { kind: "edit-type", row },
-                              event.currentTarget,
-                            )
-                          }
-                          type="button"
+                  <table className="w-full min-w-[36rem] text-left text-sm">
+                    <caption className="sr-only">{tx("Class types")}</caption>
+                    <thead className="border-b border-slate-200 text-slate-500">
+                      <tr>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
                         >
-                          {" "}
-                          {tx("Edit class type")}{" "}
-                        </button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
+                          {tx("Class")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("Duration")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("Spots")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("Status")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          <span className="sr-only">{tx("Actions")}</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {types.rows.map((row) => (
+                        <tr className="align-top hover:bg-slate-50" key={row.id}>
+                          <td className="max-w-[18rem] px-4 py-3 sm:px-5">
+                            <p className="font-semibold break-words text-slate-900">
+                              {row.name}
+                            </p>
+                            <p className="mt-0.5 text-xs break-words text-slate-500">
+                              {row.code}
+                              {row.description ? ` · ${row.description}` : ""}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-slate-800 tabular-nums sm:px-5">
+                            {row.default_duration_minutes}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-900 tabular-nums sm:px-5">
+                            {row.default_capacity}
+                          </td>
+                          <td className="px-4 py-3 sm:px-5">
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                                row.is_active
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-slate-200 text-slate-600"
+                              }`}
+                            >
+                              {row.is_active ? tx("Active") : tx("Archived")}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right sm:px-5">
+                            {canManage ? (
+                              <button
+                                className="button button-edit button-sm"
+                                disabled={pending}
+                                onClick={(event) =>
+                                  openDialog(
+                                    { kind: "edit-type", row },
+                                    event.currentTarget,
+                                  )
+                                }
+                                type="button"
+                              >
+                                {" "}
+                                {tx("Edit class type")}{" "}
+                              </button>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : null}
             </div>
             <Paging
@@ -1306,66 +1366,122 @@ export function ClassesManager({
                 />
               ) : null}
               {schedules.rows.length > 0 ? (
-                <ul
-                  aria-label={tx("Weekly schedules")}
-                  className="divide-y divide-slate-100"
+                <div
+                  className={`w-full overflow-x-auto ${schedules.pending ? "opacity-60" : ""}`}
                 >
-                  {schedules.rows.map((row) => (
-                    <li
-                      className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
-                      key={row.id}
-                    >
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-semibold text-slate-900">
-                            {weekdaySummary(row.weekdays)}
-                            <span className="text-slate-400"> · </span>
-                            <span className="tabular-nums">
+                  <table className="w-full min-w-[44rem] text-left text-sm">
+                    <caption className="sr-only">
+                      {tx("Weekly schedules")}
+                    </caption>
+                    <thead className="border-b border-slate-200 text-slate-500">
+                      <tr>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("When")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("Class")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("Trainer")}
+                        </th>
+                        <th
+                          className="hidden px-4 py-2.5 text-xs font-semibold sm:px-5 lg:table-cell"
+                          scope="col"
+                        >
+                          {tx("Location")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("Spots")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("Status")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          <span className="sr-only">{tx("Actions")}</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {schedules.rows.map((row) => (
+                        <tr className="align-top hover:bg-slate-50" key={row.id}>
+                          <td className="px-4 py-3 whitespace-nowrap text-slate-900 sm:px-5">
+                            <p className="font-semibold">
+                              {weekdaySummary(row.weekdays)}
+                            </p>
+                            <p className="mt-0.5 tabular-nums text-slate-600">
                               {wallClock(row.local_start_time)} –{" "}
                               {wallClock(row.local_end_time)}
-                            </span>
-                          </h3>
-                          <StatusPill status={row.status} />
-                        </div>
-                        <p className="mt-1 text-sm break-words text-slate-500">
-                          {row.location}
-                          {row.location_is_exclusive
-                            ? tx("· Exclusive")
-                            : ""} ·{" "}
-                          <NamedId
-                            id={row.class_type_id}
-                            name={typeName(row.class_type_id)}
-                          />
-                          {" · "}
-                          <NamedId
-                            id={row.trainer_staff_profile_id}
-                            name={trainerName(row.trainer_staff_profile_id)}
-                          />
-                          {" · "}
-                          {row.capacity} {tx("spots ·")}{" "}
-                          {formatLocalDate(row.effective_from)} –{" "}
-                          {formatLocalDate(row.effective_until)}
-                        </p>
-                      </div>
-                      {canManage && row.status === "ACTIVE" ? (
-                        <button
-                          className="button button-edit button-sm w-full shrink-0 sm:w-auto"
-                          disabled={pending}
-                          onClick={(event) =>
-                            openDialog(
-                              { kind: "edit-schedule", row },
-                              event.currentTarget,
-                            )
-                          }
-                          type="button"
-                        >
-                          {" "}
-                          {tx("Update schedule")}{" "}
-                        </button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
+                            </p>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {formatLocalDate(row.effective_from)} –{" "}
+                              {formatLocalDate(row.effective_until)}
+                            </p>
+                          </td>
+                          <td className="max-w-[12rem] px-4 py-3 font-semibold break-words text-slate-900 sm:px-5">
+                            <NamedId
+                              id={row.class_type_id}
+                              name={typeName(row.class_type_id)}
+                            />
+                          </td>
+                          <td className="max-w-[10rem] px-4 py-3 break-words text-slate-700 sm:px-5">
+                            <NamedId
+                              id={row.trainer_staff_profile_id}
+                              name={trainerName(row.trainer_staff_profile_id)}
+                            />
+                          </td>
+                          <td className="hidden max-w-[10rem] px-4 py-3 break-words text-slate-700 lg:table-cell sm:px-5">
+                            {row.location}
+                            {row.location_is_exclusive
+                              ? ` ${tx("· Exclusive")}`
+                              : ""}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-900 tabular-nums sm:px-5">
+                            {row.capacity}
+                          </td>
+                          <td className="px-4 py-3 sm:px-5">
+                            <StatusPill status={row.status} />
+                          </td>
+                          <td className="px-4 py-3 text-right sm:px-5">
+                            {canManage && row.status === "ACTIVE" ? (
+                              <button
+                                className="button button-edit button-sm"
+                                disabled={pending}
+                                onClick={(event) =>
+                                  openDialog(
+                                    { kind: "edit-schedule", row },
+                                    event.currentTarget,
+                                  )
+                                }
+                                type="button"
+                              >
+                                {" "}
+                                {tx("Update schedule")}{" "}
+                              </button>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : null}
             </div>
             <Paging
@@ -1478,64 +1594,196 @@ export function ClassesManager({
                     />
                   ) : null}
                   {occurrences.rows.length > 0 ? (
-                    <ul
-                      aria-label={tx("Occurrences")}
-                      className="divide-y divide-slate-100"
+                    <div
+                      className={
+                        occurrences.pending ? "opacity-60" : undefined
+                      }
                     >
-                      {occurrences.rows.map((row) => (
-                        <li
-                          className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                          key={row.id}
+                      {!wide ? (
+                        <ul
+                          aria-label={tx("Occurrences")}
+                          className="grid gap-3"
                         >
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="text-base font-semibold text-slate-900">
-                                {formatLocalDate(row.local_date)}
-                                <span className="text-slate-400"> · </span>
-                                <span className="tabular-nums">
-                                  {occurrenceClock(row)}
-                                </span>
-                              </h4>
-                              <StatusPill status={row.status} />
-                            </div>
-                            <p className="mt-1 text-sm break-words text-slate-500">
-                              {row.location}
-                              {row.location_is_exclusive
-                                ? tx("· Exclusive")
-                                : ""}{" "}
-                              ·{" "}
-                              <NamedId
-                                id={row.class_type_id}
-                                name={typeName(row.class_type_id)}
-                              />
-                              {" · "}
-                              <NamedId
-                                id={row.trainer_staff_profile_id}
-                                name={trainerName(row.trainer_staff_profile_id)}
-                              />
-                              {" · "}
-                              {row.capacity} {tx("spots")}
-                            </p>
-                          </div>
-                          {canManage && row.status === "SCHEDULED" ? (
-                            <button
-                              className="button button-cancel button-sm w-full shrink-0 sm:w-auto"
-                              disabled={pending}
-                              onClick={(event) =>
-                                openDialog(
-                                  { kind: "cancel-occurrence", row },
-                                  event.currentTarget,
-                                )
-                              }
-                              type="button"
+                          {occurrences.rows.map((row) => (
+                            <li
+                              className="rounded-xl border border-slate-200 bg-white p-3"
+                              key={row.id}
                             >
-                              {" "}
-                              {tx("Cancel occurrence")}{" "}
-                            </button>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-slate-900">
+                                    {formatLocalDate(row.local_date)}
+                                    <span className="text-slate-400">
+                                      {" "}
+                                      ·{" "}
+                                    </span>
+                                    <span className="tabular-nums">
+                                      {occurrenceClock(row)}
+                                    </span>
+                                  </p>
+                                  <p className="mt-1 text-sm font-semibold break-words text-slate-800">
+                                    <NamedId
+                                      id={row.class_type_id}
+                                      name={typeName(row.class_type_id)}
+                                    />
+                                  </p>
+                                  <p className="mt-1 text-xs break-words text-slate-500">
+                                    <NamedId
+                                      id={row.trainer_staff_profile_id}
+                                      name={trainerName(
+                                        row.trainer_staff_profile_id,
+                                      )}
+                                    />
+                                    {" · "}
+                                    {row.location}
+                                    {row.location_is_exclusive
+                                      ? ` ${tx("· Exclusive")}`
+                                      : ""}
+                                    {" · "}
+                                    {row.capacity} {tx("spots")}
+                                  </p>
+                                </div>
+                                <StatusPill status={row.status} />
+                              </div>
+                              {canManage && row.status === "SCHEDULED" ? (
+                                <button
+                                  className="button button-cancel button-sm mt-3 w-full"
+                                  disabled={pending}
+                                  onClick={(event) =>
+                                    openDialog(
+                                      { kind: "cancel-occurrence", row },
+                                      event.currentTarget,
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  {" "}
+                                  {tx("Cancel occurrence")}{" "}
+                                </button>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="w-full overflow-x-auto">
+                          <table className="w-full min-w-[40rem] text-left text-sm">
+                            <caption className="sr-only">
+                              {tx("Occurrences")}
+                            </caption>
+                            <thead className="border-b border-slate-200 text-slate-500">
+                              <tr>
+                                <th
+                                  className="px-1 py-2.5 text-xs font-semibold"
+                                  scope="col"
+                                >
+                                  {tx("When")}
+                                </th>
+                                <th
+                                  className="px-3 py-2.5 text-xs font-semibold"
+                                  scope="col"
+                                >
+                                  {tx("Class")}
+                                </th>
+                                <th
+                                  className="px-3 py-2.5 text-xs font-semibold"
+                                  scope="col"
+                                >
+                                  {tx("Trainer")}
+                                </th>
+                                <th
+                                  className="hidden px-3 py-2.5 text-xs font-semibold lg:table-cell"
+                                  scope="col"
+                                >
+                                  {tx("Location")}
+                                </th>
+                                <th
+                                  className="px-3 py-2.5 text-xs font-semibold"
+                                  scope="col"
+                                >
+                                  {tx("Seats")}
+                                </th>
+                                <th
+                                  className="px-3 py-2.5 text-xs font-semibold"
+                                  scope="col"
+                                >
+                                  {tx("Status")}
+                                </th>
+                                <th
+                                  className="px-1 py-2.5 text-xs font-semibold"
+                                  scope="col"
+                                >
+                                  <span className="sr-only">
+                                    {tx("Actions")}
+                                  </span>
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {occurrences.rows.map((row) => (
+                                <tr className="align-top" key={row.id}>
+                                  <td className="px-1 py-3 whitespace-nowrap text-slate-900">
+                                    <p className="font-semibold">
+                                      {formatLocalDate(row.local_date)}
+                                    </p>
+                                    <p className="mt-0.5 tabular-nums text-slate-600">
+                                      {occurrenceClock(row)}
+                                    </p>
+                                  </td>
+                                  <td className="max-w-[12rem] px-3 py-3 font-semibold break-words text-slate-900">
+                                    <NamedId
+                                      id={row.class_type_id}
+                                      name={typeName(row.class_type_id)}
+                                    />
+                                  </td>
+                                  <td className="max-w-[10rem] px-3 py-3 break-words text-slate-700">
+                                    <NamedId
+                                      id={row.trainer_staff_profile_id}
+                                      name={trainerName(
+                                        row.trainer_staff_profile_id,
+                                      )}
+                                    />
+                                  </td>
+                                  <td className="hidden max-w-[10rem] px-3 py-3 break-words text-slate-700 lg:table-cell">
+                                    {row.location}
+                                    {row.location_is_exclusive
+                                      ? ` ${tx("· Exclusive")}`
+                                      : ""}
+                                  </td>
+                                  <td className="px-3 py-3 font-semibold tabular-nums text-slate-800">
+                                    {row.capacity}
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <StatusPill status={row.status} />
+                                  </td>
+                                  <td className="px-1 py-3 text-right">
+                                    {canManage &&
+                                    row.status === "SCHEDULED" ? (
+                                      <button
+                                        className="button button-cancel button-sm"
+                                        disabled={pending}
+                                        onClick={(event) =>
+                                          openDialog(
+                                            {
+                                              kind: "cancel-occurrence",
+                                              row,
+                                            },
+                                            event.currentTarget,
+                                          )
+                                        }
+                                        type="button"
+                                      >
+                                        {" "}
+                                        {tx("Cancel occurrence")}{" "}
+                                      </button>
+                                    ) : null}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
                   ) : null}
                 </div>
                 <Paging
@@ -1553,41 +1801,45 @@ export function ClassesManager({
                 aria-labelledby="class-bookings-title"
                 id="class-bookings"
               >
-                <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                  <div className="min-w-0">
-                    <h3
-                      className="text-sm font-semibold text-slate-900"
-                      id="class-bookings-title"
-                    >
-                      {" "}
-                      {tx("Bookings")}{" "}
-                    </h3>
-                    {canLateCancel ? (
-                      <p className="mt-1 text-sm text-slate-500">
+                <div className="flex flex-col gap-3 px-4 py-4 sm:px-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <h3
+                        className="text-sm font-semibold text-slate-900"
+                        id="class-bookings-title"
+                      >
                         {" "}
-                        {tx(
-                          "A manager can cancel inside the cutoff with a reason.",
-                        )}{" "}
-                      </p>
+                        {tx("Bookings")}{" "}
+                      </h3>
+                      {canLateCancel ? (
+                        <p className="mt-1 text-sm text-slate-500">
+                          {" "}
+                          {tx(
+                            "A manager can cancel inside the cutoff with a reason.",
+                          )}{" "}
+                        </p>
+                      ) : null}
+                    </div>
+                    {canCreateBooking ? (
+                      <button
+                        aria-controls={
+                          mode?.kind === "book"
+                            ? "book-class-dialog"
+                            : undefined
+                        }
+                        aria-expanded={mode?.kind === "book"}
+                        className="button button-create w-full shrink-0 sm:w-auto"
+                        disabled={pending}
+                        onClick={(event) =>
+                          openDialog({ kind: "book" }, event.currentTarget)
+                        }
+                        type="button"
+                      >
+                        <span aria-hidden="true">+</span>{" "}
+                        {tx("Book a class")}{" "}
+                      </button>
                     ) : null}
                   </div>
-                  {canCreateBooking ? (
-                    <button
-                      aria-controls={
-                        mode?.kind === "book" ? "book-class-dialog" : undefined
-                      }
-                      aria-expanded={mode?.kind === "book"}
-                      className="button button-create w-full shrink-0 xl:w-auto"
-                      disabled={pending}
-                      onClick={(event) =>
-                        openDialog({ kind: "book" }, event.currentTarget)
-                      }
-                      type="button"
-                    >
-                      <span aria-hidden="true">+</span>{" "}
-                      {tx("Book a class")}{" "}
-                    </button>
-                  ) : null}
                 </div>
                 <div className="border-y border-slate-100 bg-slate-50/70 px-4 py-4 sm:px-5">
                   <MemberSearch
@@ -1607,6 +1859,8 @@ export function ClassesManager({
                   ) : null}
                 </div>
                 <div className="grid gap-4 p-4 sm:p-5">
+                  {notice ? <NoticeBanner message={notice} /> : null}
+                  {error ? <Alert message={error} /> : null}
                   {bookings.pending && bookings.rows.length === 0 ? (
                     <LoadingRows label="Loading class bookings." />
                   ) : null}
@@ -1647,88 +1901,324 @@ export function ClassesManager({
                     />
                   ) : null}
                   {bookings.rows.length > 0 ? (
-                    <ul
-                      aria-label={tx("Class bookings")}
-                      className="divide-y divide-slate-100"
+                    <div
+                      className={
+                        bookings.pending || pending ? "opacity-60" : undefined
+                      }
                     >
-                      {bookings.rows.map((row) => (
-                        <li
-                          className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                          key={row.id}
-                        >
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="text-base font-semibold text-slate-900 tabular-nums">
-                                {bookingClock(row)}
-                              </h4>
-                              <StatusPill status={row.status} />
-                            </div>
-                            <p className="mt-1 text-sm break-words text-slate-500">
-                              {" "}
-                              {tx("Member")}{" "}
-                              <IdentifierValue value={row.member_id} />
-                              {" · "}
-                              {row.unmetered ? (
-                                `${tx("Unmetered")} · ${tx(row.unmetered_reason)}`
-                              ) : (
-                                <IdentifierValue
-                                  value={
-                                    row.member_service_package_id ?? "missing"
-                                  }
-                                />
-                              )}
-                            </p>
-                          </div>
-                          {row.status === "BOOKED" &&
-                          (canAttend || canCancelBooking) ? (
-                            <div
-                              aria-label={tx("Booking actions")}
-                              className="flex shrink-0 flex-col gap-2 sm:flex-row"
-                              role="group"
+                      {!wide ? (
+                      <ul
+                        aria-label={tx("Class bookings")}
+                        className="grid gap-3"
+                      >
+                        {bookings.rows.map((row) => {
+                          const occurrence = occurrences.rows.find(
+                            (item) => item.id === row.class_occurrence_id,
+                          );
+                          return (
+                            <li
+                              className="rounded-xl border border-slate-200 bg-white p-3"
+                              key={row.id}
                             >
-                              {canAttend ? (
-                                <>
-                                  <button
-                                    className="button button-success button-sm w-full sm:w-auto"
-                                    disabled={pending}
-                                    onClick={() => attend(row)}
-                                    type="button"
-                                  >
-                                    {" "}
-                                    {tx("Mark attended")}{" "}
-                                  </button>
-                                  <button
-                                    className="button button-warn button-sm w-full sm:w-auto"
-                                    disabled={pending}
-                                    onClick={() => markNoShow(row)}
-                                    type="button"
-                                  >
-                                    {" "}
-                                    {tx("Mark no-show")}{" "}
-                                  </button>
-                                </>
-                              ) : null}
-                              {canCancelBooking ? (
-                                <button
-                                  className="button button-cancel button-sm w-full sm:w-auto"
-                                  disabled={pending}
-                                  onClick={(event) =>
-                                    openDialog(
-                                      { kind: "cancel-booking", row },
-                                      event.currentTarget,
-                                    )
-                                  }
-                                  type="button"
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="font-semibold tabular-nums text-slate-900">
+                                    {bookingClock(row)}
+                                  </p>
+                                  <p className="mt-1 text-sm font-semibold break-words text-slate-800">
+                                    {row.member_name || (
+                                      <IdentifierValue value={row.member_id} />
+                                    )}
+                                  </p>
+                                  <p className="mt-1 text-xs break-words text-slate-500">
+                                    {occurrence ? (
+                                      <NamedId
+                                        id={occurrence.class_type_id}
+                                        name={typeName(
+                                          occurrence.class_type_id,
+                                        )}
+                                      />
+                                    ) : (
+                                      <IdentifierValue
+                                        value={row.class_occurrence_id}
+                                      />
+                                    )}
+                                    {" · "}
+                                    {row.unmetered ? (
+                                      <>
+                                        {tx("Unmetered")}
+                                        {row.unmetered_reason
+                                          ? ` · ${row.unmetered_reason}`
+                                          : ""}
+                                      </>
+                                    ) : (
+                                      <IdentifierValue
+                                        value={
+                                          row.member_service_package_id ??
+                                          "missing"
+                                        }
+                                      />
+                                    )}
+                                  </p>
+                                </div>
+                                <StatusPill status={row.status} />
+                              </div>
+                              {row.status === "BOOKED" &&
+                              (canAttend || canCancelBooking) ? (
+                                <div
+                                  aria-label={tx("Booking actions")}
+                                  className="mt-3 grid gap-2"
+                                  role="group"
                                 >
-                                  {" "}
-                                  {tx("Cancel booking")}{" "}
-                                </button>
+                                  {canAttend ? (
+                                    <>
+                                      <button
+                                        className="button button-success button-sm w-full"
+                                        disabled={
+                                          pending ||
+                                          Date.now() <
+                                            Date.parse(row.starts_at)
+                                        }
+                                        onClick={() => attend(row)}
+                                        title={
+                                          Date.now() <
+                                          Date.parse(row.starts_at)
+                                            ? tx(
+                                                "Available after the class starts.",
+                                              )
+                                            : undefined
+                                        }
+                                        type="button"
+                                      >
+                                        {" "}
+                                        {tx("Mark attended")}{" "}
+                                      </button>
+                                      <button
+                                        className="button button-warn button-sm w-full"
+                                        disabled={
+                                          pending ||
+                                          Date.now() < Date.parse(row.ends_at)
+                                        }
+                                        onClick={() => markNoShow(row)}
+                                        title={
+                                          Date.now() < Date.parse(row.ends_at)
+                                            ? tx(
+                                                "Available after the class ends.",
+                                              )
+                                            : undefined
+                                        }
+                                        type="button"
+                                      >
+                                        {" "}
+                                        {tx("Mark no-show")}{" "}
+                                      </button>
+                                    </>
+                                  ) : null}
+                                  {canCancelBooking ? (
+                                    <button
+                                      className="button button-cancel button-sm w-full"
+                                      disabled={pending}
+                                      onClick={(event) =>
+                                        openDialog(
+                                          { kind: "cancel-booking", row },
+                                          event.currentTarget,
+                                        )
+                                      }
+                                      type="button"
+                                    >
+                                      {" "}
+                                      {tx("Cancel booking")}{" "}
+                                    </button>
+                                  ) : null}
+                                </div>
                               ) : null}
-                            </div>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      ) : (
+                      <div className="w-full overflow-x-auto">
+                        <table className="w-full min-w-[44rem] text-left text-sm">
+                          <caption className="sr-only">
+                            {tx("Class bookings")}
+                          </caption>
+                          <thead className="border-b border-slate-200 text-slate-500">
+                            <tr>
+                              <th
+                                className="px-1 py-2.5 text-xs font-semibold"
+                                scope="col"
+                              >
+                                {tx("When")}
+                              </th>
+                              <th
+                                className="px-3 py-2.5 text-xs font-semibold"
+                                scope="col"
+                              >
+                                {tx("Member")}
+                              </th>
+                              <th
+                                className="px-3 py-2.5 text-xs font-semibold"
+                                scope="col"
+                              >
+                                {tx("Class")}
+                              </th>
+                              <th
+                                className="hidden px-3 py-2.5 text-xs font-semibold lg:table-cell"
+                                scope="col"
+                              >
+                                {tx("Pack")}
+                              </th>
+                              <th
+                                className="px-3 py-2.5 text-xs font-semibold"
+                                scope="col"
+                              >
+                                {tx("Status")}
+                              </th>
+                              <th
+                                className="px-1 py-2.5 text-xs font-semibold"
+                                scope="col"
+                              >
+                                <span className="sr-only">
+                                  {tx("Actions")}
+                                </span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {bookings.rows.map((row) => {
+                              const occurrence = occurrences.rows.find(
+                                (item) => item.id === row.class_occurrence_id,
+                              );
+                              return (
+                                <tr className="align-top" key={row.id}>
+                                  <td className="px-1 py-3 whitespace-nowrap font-semibold tabular-nums text-slate-900">
+                                    {bookingClock(row)}
+                                  </td>
+                                  <td className="max-w-[14rem] px-3 py-3 font-semibold break-words text-slate-900">
+                                    {row.member_name || (
+                                      <IdentifierValue
+                                        value={row.member_id}
+                                      />
+                                    )}
+                                  </td>
+                                  <td className="max-w-[12rem] px-3 py-3 break-words text-slate-700">
+                                    {occurrence ? (
+                                      <NamedId
+                                        id={occurrence.class_type_id}
+                                        name={typeName(
+                                          occurrence.class_type_id,
+                                        )}
+                                      />
+                                    ) : (
+                                      <IdentifierValue
+                                        value={row.class_occurrence_id}
+                                      />
+                                    )}
+                                  </td>
+                                  <td className="hidden max-w-[10rem] px-3 py-3 break-words text-slate-600 lg:table-cell">
+                                    {row.unmetered ? (
+                                      <>
+                                        {tx("Unmetered")}
+                                        {row.unmetered_reason
+                                          ? ` · ${row.unmetered_reason}`
+                                          : ""}
+                                      </>
+                                    ) : (
+                                      <IdentifierValue
+                                        value={
+                                          row.member_service_package_id ??
+                                          "missing"
+                                        }
+                                      />
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <StatusPill status={row.status} />
+                                  </td>
+                                  <td className="px-1 py-3">
+                                    {row.status === "BOOKED" &&
+                                    (canAttend || canCancelBooking) ? (
+                                      <div
+                                        aria-label={tx("Booking actions")}
+                                        className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:justify-end"
+                                        role="group"
+                                      >
+                                        {canAttend ? (
+                                          <>
+                                            <button
+                                              className="button button-success button-sm"
+                                              disabled={
+                                                pending ||
+                                                Date.now() <
+                                                  Date.parse(row.starts_at)
+                                              }
+                                              onClick={() => attend(row)}
+                                              title={
+                                                Date.now() <
+                                                Date.parse(row.starts_at)
+                                                  ? tx(
+                                                      "Available after the class starts.",
+                                                    )
+                                                  : undefined
+                                              }
+                                              type="button"
+                                            >
+                                              {" "}
+                                              {tx("Mark attended")}{" "}
+                                            </button>
+                                            <button
+                                              className="button button-warn button-sm"
+                                              disabled={
+                                                pending ||
+                                                Date.now() <
+                                                  Date.parse(row.ends_at)
+                                              }
+                                              onClick={() => markNoShow(row)}
+                                              title={
+                                                Date.now() <
+                                                Date.parse(row.ends_at)
+                                                  ? tx(
+                                                      "Available after the class ends.",
+                                                    )
+                                                  : undefined
+                                              }
+                                              type="button"
+                                            >
+                                              {" "}
+                                              {tx("Mark no-show")}{" "}
+                                            </button>
+                                          </>
+                                        ) : null}
+                                        {canCancelBooking ? (
+                                          <button
+                                            className="button button-cancel button-sm"
+                                            disabled={pending}
+                                            onClick={(event) =>
+                                              openDialog(
+                                                {
+                                                  kind: "cancel-booking",
+                                                  row,
+                                                },
+                                                event.currentTarget,
+                                              )
+                                            }
+                                            type="button"
+                                          >
+                                            {" "}
+                                            {tx("Cancel booking")}{" "}
+                                          </button>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      )}
+                    </div>
                   ) : null}
                 </div>
                 <Paging
@@ -1747,7 +2237,7 @@ export function ClassesManager({
 
       {mode?.kind === "create-type" && canManage ? (
         <ClassDialog
-          description="A code is assigned from the name and stays fixed."
+          description="Name the class kind (for example Yoga). Length and seat count become the usual values when you add schedules."
           descriptionId="create-class-type-description"
           dialogId="create-class-type-dialog"
           dialogRef={dialogRef}
@@ -1762,16 +2252,16 @@ export function ClassesManager({
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <Field label="Name">
+              <Field label="Class name">
                 <TextInput name="name" required />
               </Field>
             </div>
             <div className="sm:col-span-2">
-              <Field label="Description">
+              <Field label="Short note (optional)">
                 <TextInput name="description" />
               </Field>
             </div>
-            <Field label="Default duration minutes">
+            <Field label="Usual length (minutes)">
               <TextInput
                 min={1}
                 name="default_duration_minutes"
@@ -1779,7 +2269,7 @@ export function ClassesManager({
                 type="number"
               />
             </Field>
-            <Field label="Default capacity">
+            <Field label="Usual seats">
               <TextInput
                 min={1}
                 name="default_capacity"
@@ -1809,7 +2299,7 @@ export function ClassesManager({
           titleId="edit-class-type-title"
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Name">
+            <Field label="Class name">
               <TextInput defaultValue={mode.row.name} name="name" required />
             </Field>
             <Field label="Status">
@@ -1822,14 +2312,14 @@ export function ClassesManager({
               </SelectInput>
             </Field>
             <div className="sm:col-span-2">
-              <Field label="Description">
+              <Field label="Short note (optional)">
                 <TextInput
                   defaultValue={mode.row.description}
                   name="description"
                 />
               </Field>
             </div>
-            <Field label="Default duration minutes">
+            <Field label="Usual length (minutes)">
               <TextInput
                 defaultValue={mode.row.default_duration_minutes}
                 min={1}
@@ -1838,7 +2328,7 @@ export function ClassesManager({
                 type="number"
               />
             </Field>
-            <Field label="Default capacity">
+            <Field label="Usual seats">
               <TextInput
                 defaultValue={mode.row.default_capacity}
                 min={1}
@@ -1971,7 +2461,7 @@ export function ClassesManager({
 
       {mode?.kind === "book" && canCreateBooking ? (
         <ClassDialog
-          description="Choose a scheduled occurrence and an active class package."
+          description="1) Pick the class time. 2) Pick the member. 3) Pick their class pack. Save."
           descriptionId="book-class-description"
           dialogId="book-class-dialog"
           dialogRef={dialogRef}
@@ -1980,38 +2470,40 @@ export function ClassesManager({
           onSubmit={submitBook}
           pending={pending}
           submitClass="button-edit"
-          submitLabel="Save class booking"
-          title={tx("Book a class")}
+          submitLabel="Save booking"
+          title={tx("Sign up for a class")}
           titleId="book-class-title"
         >
           <div className="grid gap-3">
             <div>
               <h3 className="text-sm font-bold text-slate-800">
-                {tx("Occurrence")}
+                {tx("1. Class time")}
               </h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 {" "}
                 {tx(
-                  "Only scheduled occurrences in the current range are listed.",
+                  "These are class times from your schedule in the dates shown above.",
                 )}{" "}
               </p>
             </div>
             {scheduled.length === 0 ? (
               <p className="text-sm text-slate-500">
                 {" "}
-                {tx("No scheduled occurrences are in this range.")}{" "}
+                {tx(
+                  "No class times in this date range. Make a schedule first, or change the dates above.",
+                )}{" "}
               </p>
             ) : null}
-            <Field label="Occurrence">
+            <Field label="Which class time?">
               <SelectInput name="class_occurrence_id" required>
-                <option value="">{tx("Select an occurrence")}</option>
+                <option value="">{tx("Select a class time")}</option>
                 {scheduled.map((row) => (
                   <option key={row.id} title={row.class_type_id} value={row.id}>
                     {formatAppDate(row.local_date)} · {occurrenceClock(row)} ·{" "}
                     {row.location} ·{" "}
                     {typeName(row.class_type_id) ??
                       compactIdentifier(row.class_type_id)}{" "}
-                    {tx("· capacity")} {row.capacity}
+                    {tx("· seats")} {row.capacity}
                   </option>
                 ))}
               </SelectInput>
@@ -2020,11 +2512,11 @@ export function ClassesManager({
           <div className="grid gap-3 border-t border-slate-100 pt-5">
             <div>
               <h3 className="text-sm font-bold text-slate-800">
-                {tx("Member")}
+                {tx("2. Who is joining?")}
               </h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 {" "}
-                {tx("Search active members, then choose one.")}{" "}
+                {tx("Search by name, number, phone, or email.")}{" "}
               </p>
             </div>
             <MemberSearch
@@ -2036,31 +2528,35 @@ export function ClassesManager({
           <div className="grid gap-3 border-t border-slate-100 pt-5">
             <div>
               <h3 className="text-sm font-bold text-slate-800">
-                {tx("Package")}
+                {tx("3. Their class pack")}
               </h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                {canUnmetered
-                  ? tx(
-                      "Use an active class package, or record an unmetered manager reason.",
-                    )
-                  : tx("The booking uses one session from this class package.")}
+                {tx("One visit comes off this pack when they attend.")}
               </p>
             </div>
             {canUnmetered ? (
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <label className="flex items-start gap-2 text-sm text-slate-700">
                 <input
                   checked={unmetered}
+                  className="mt-1"
                   onChange={(event) => {
                     setUnmetered(event.target.checked);
                     setDialogError("");
                   }}
                   type="checkbox"
                 />{" "}
-                {tx("Unmetered manager booking")}{" "}
+                <span>
+                  <span className="font-semibold text-slate-800">
+                    {tx("Special case: no pack")}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-slate-500">
+                    {tx("Managers only. Write a reason instead of using a pack.")}
+                  </span>
+                </span>
               </label>
             ) : null}
             {canUnmetered && unmetered ? (
-              <ReasonField label="Unmetered reason" name="unmetered_reason" />
+              <ReasonField label="Why no pack?" name="unmetered_reason" />
             ) : (
               <>
                 {packagesPending ? (
@@ -2077,17 +2573,17 @@ export function ClassesManager({
                   <p className="text-sm text-slate-500">
                     {" "}
                     {tx(
-                      "No active class packages are available for this member.",
+                      "This member has no class pack yet. Give them a class package first.",
                     )}{" "}
                   </p>
                 ) : null}
-                <Field label="Class package">
+                <Field label="Which class pack?">
                   <SelectInput
                     key={member?.id ?? "none"}
                     name="member_service_package_id"
                     required
                   >
-                    <option value="">{tx("Select a package")}</option>
+                    <option value="">{tx("Select a class pack")}</option>
                     {packages.map((row) => (
                       <option key={row.id} value={row.id}>
                         {row.package_code} · {row.package_name} ·{" "}

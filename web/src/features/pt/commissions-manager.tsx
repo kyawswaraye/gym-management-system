@@ -103,7 +103,7 @@ function Fact({
           emphasis ? "text-lg font-black tabular-nums" : "font-semibold"
         }`}
       >
-        <IdentifierValue value={value} />
+        {value}
       </dd>
     </div>
   );
@@ -421,101 +421,113 @@ export function CommissionsManager({
               </div>
             ) : null}
             {rows.rows.length > 0 ? (
-              <ul aria-label={tx("Commission list")} className="grid gap-3">
-                {rows.rows.map((row) => {
-                  const active = selected?.id === row.id;
-                  return (
-                    <li key={row.id}>
-                      <button
-                        aria-label={rowLabel(row, tx)}
-                        aria-pressed={active}
-                        className={`w-full rounded-xl border border-l-4 p-4 text-left ${
-                          active
-                            ? "border-l-teal-700 bg-teal-50 ring-2 ring-teal-600"
-                            : "border-l-slate-300 bg-white hover:bg-slate-50"
-                        } border-slate-200`}
-                        onClick={() => void openRow(row.id)}
-                        type="button"
+              <div
+                className={`w-full overflow-x-auto ${rows.pending ? "opacity-60" : ""}`}
+              >
+                <table className="w-full min-w-[36rem] text-left text-sm">
+                  <caption className="sr-only">{tx("Commission list")}</caption>
+                  <thead className="border-b border-slate-200 text-slate-500">
+                    <tr>
+                      <th
+                        className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                        scope="col"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold tracking-wide text-slate-500">
-                              {" "}
-                              {tx("Outstanding")}{" "}
-                            </p>
-                            <p className="text-lg font-black text-slate-900 tabular-nums">
+                        {tx("Outstanding")}
+                      </th>
+                      <th
+                        className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                        scope="col"
+                      >
+                        {tx("Commission")}
+                      </th>
+                      <th
+                        className="hidden px-4 py-2.5 text-xs font-semibold sm:px-5 md:table-cell"
+                        scope="col"
+                      >
+                        {tx("Paid")}
+                      </th>
+                      <th
+                        className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                        scope="col"
+                      >
+                        {tx("Trainer")}
+                      </th>
+                      <th
+                        className="hidden px-4 py-2.5 text-xs font-semibold sm:px-5 lg:table-cell"
+                        scope="col"
+                      >
+                        {tx("Sale")}
+                      </th>
+                      <th
+                        className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                        scope="col"
+                      >
+                        {tx("Status")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {rows.rows.map((row) => {
+                      const active = selected?.id === row.id;
+                      return (
+                        <tr
+                          className={
+                            active
+                              ? "bg-teal-50 shadow-[inset_3px_0_0_#0f766e]"
+                              : "hover:bg-slate-50"
+                          }
+                          key={row.id}
+                        >
+                          <td className="px-4 py-3 whitespace-nowrap sm:px-5">
+                            <button
+                              aria-current={active ? "true" : undefined}
+                              aria-label={rowLabel(row, tx)}
+                              aria-pressed={active}
+                              className="text-left font-black text-slate-900 tabular-nums"
+                              onClick={() => void openRow(row.id)}
+                              type="button"
+                            >
                               {row.outstanding_amount}
                               {row.currency ? (
                                 <span className="text-xs font-semibold text-slate-500">{` ${tx(row.currency)}`}</span>
                               ) : null}
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 flex-col items-end gap-2">
-                            {row.status ? (
-                              <CommissionStatusBadge status={row.status} />
-                            ) : null}
-                            {active ? (
-                              <span className="inline-flex rounded-full bg-teal-700 px-2.5 py-1 text-xs font-bold text-white">
-                                {" "}
-                                {tx("Selected")}{" "}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                        <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
-                          {row.commission_amount ? (
-                            <div>
-                              <dt className="text-xs text-slate-500">
-                                {" "}
-                                {tx("Commission")}{" "}
-                              </dt>
-                              <dd className="mt-0.5 font-semibold text-slate-900 tabular-nums">
-                                {moneyLabel(
-                                  row.commission_amount,
-                                  row.currency,
-                                )}
-                              </dd>
-                            </div>
-                          ) : null}
-                          {row.paid_amount ? (
-                            <div>
-                              <dt className="text-xs text-slate-500">
-                                {tx("Paid")}
-                              </dt>
-                              <dd className="mt-0.5 font-semibold text-slate-900 tabular-nums">
-                                {moneyLabel(row.paid_amount, row.currency)}
-                              </dd>
-                            </div>
-                          ) : null}
-                          {row.trainer_staff_profile_id ? (
-                            <div>
-                              <dt className="text-xs text-slate-500">
-                                {" "}
-                                {tx("Trainer")}{" "}
-                              </dt>
-                              <dd className="mt-0.5 font-semibold text-slate-900">
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 font-semibold whitespace-nowrap text-slate-900 tabular-nums sm:px-5">
+                            {moneyLabel(row.commission_amount, row.currency)}
+                          </td>
+                          <td className="hidden px-4 py-3 font-semibold whitespace-nowrap text-slate-900 tabular-nums md:table-cell sm:px-5">
+                            {moneyLabel(row.paid_amount, row.currency)}
+                          </td>
+                          <td className="max-w-[10rem] px-4 py-3 break-words text-slate-800 sm:px-5">
+                            {row.trainer_display_name ||
+                              (row.trainer_staff_profile_id ? (
                                 <IdentifierValue
                                   value={row.trainer_staff_profile_id}
                                 />
-                              </dd>
-                            </div>
-                          ) : null}
-                          {row.pt_sale_id ? (
-                            <div>
-                              <dt className="text-xs text-slate-500">
-                                {tx("Sale")}
-                              </dt>
-                              <dd className="mt-0.5 font-semibold text-slate-900">
+                              ) : (
+                                "—"
+                              ))}
+                          </td>
+                          <td className="hidden max-w-[12rem] px-4 py-3 break-words text-slate-800 lg:table-cell sm:px-5">
+                            {row.pt_sale_description ||
+                              (row.pt_sale_id ? (
                                 <IdentifierValue value={row.pt_sale_id} />
-                              </dd>
-                            </div>
-                          ) : null}
-                        </dl>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+                              ) : (
+                                "—"
+                              ))}
+                          </td>
+                          <td className="px-4 py-3 sm:px-5">
+                            {row.status ? (
+                              <CommissionStatusBadge status={row.status} />
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             ) : null}
           </div>
           {showPaging ? (
@@ -764,14 +776,25 @@ function CommissionDetail({
               <dl className="mt-3 grid grid-cols-2 gap-3">
                 <Fact
                   label="Trainer"
-                  value={selected.trainer_staff_profile_id}
+                  value={
+                    selected.trainer_display_name ||
+                    selected.trainer_staff_profile_id
+                  }
                 />
-                <Fact label="Sale" value={selected.pt_sale_id} />
-                <Fact label="Commission" value={selected.id} />
-                {selected.created_by_membership_id ? (
+                <Fact
+                  label="Sale"
+                  value={
+                    selected.pt_sale_description || selected.pt_sale_id
+                  }
+                />
+                {selected.created_by_display_name ||
+                selected.created_by_membership_id ? (
                   <Fact
                     label="Recorded by"
-                    value={selected.created_by_membership_id}
+                    value={
+                      selected.created_by_display_name ||
+                      selected.created_by_membership_id
+                    }
                   />
                 ) : null}
                 {selected.paid_at ? (

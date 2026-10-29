@@ -33347,9 +33347,15 @@
                         "type": "string",
                         "format": "uuid"
                     },
+                    "member_name": {
+                        "type": "string"
+                    },
                     "trainer_staff_profile_id": {
                         "type": "string",
                         "format": "uuid"
+                    },
+                    "trainer_display_name": {
+                        "type": "string"
                     },
                     "service_date": {
                         "type": "string",
@@ -33398,6 +33404,10 @@
                     "service_package_id": {
                         "type": "string",
                         "format": "uuid",
+                        "nullable": true
+                    },
+                    "package_name": {
+                        "type": "string",
                         "nullable": true
                     },
                     "package_price_snapshot": {
@@ -33507,8 +33517,10 @@
                     "gym_share",
                     "id",
                     "member_id",
+                    "member_name",
                     "member_service_package_id",
                     "outstanding_amount",
+                    "package_name",
                     "package_price_snapshot",
                     "paid_amount",
                     "payment",
@@ -33524,6 +33536,7 @@
                     "status",
                     "submitted_at",
                     "submitted_by_membership_id",
+                    "trainer_display_name",
                     "trainer_staff_profile_id",
                     "updated_at",
                     "updated_by_membership_id",

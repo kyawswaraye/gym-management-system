@@ -659,7 +659,7 @@ describe("payments manager", () => {
     );
     expect(screen.getByText("No member selected.")).toBeVisible();
     fireEvent.change(
-      screen.getByPlaceholderText("Name, number, phone, or email"),
+      screen.getByPlaceholderText("Name or member number"),
       {
         target: { value: "Ada" },
       },

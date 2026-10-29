@@ -54,6 +54,7 @@ from apps.trainers.serializers import (
     ledger_entry_payload,
     member_package_payload,
     pt_sale_payload,
+    pt_sale_payloads,
 )
 from apps.users.permissions import RequiresEntitlement, RequiresPermission
 
@@ -165,7 +166,9 @@ class PTSaleListCreateView(PTSaleCommandView):
                 limit=int(payload["limit"]),
                 after=str(payload.get("after", "")),
             )
-        return success_response([pt_sale_payload(row) for row in rows], meta=meta)
+            # Labels need gym RLS context; set_config(..., true) ends with the txn.
+            data = pt_sale_payloads(rows)
+        return success_response(data, meta=meta)
 
     @extend_schema(
         operation_id="pt_sales_create",
@@ -252,7 +255,8 @@ class PTSaleDetailView(PTSaleCommandView):
         with transaction.atomic():
             set_gym_context(gym_id=request.gym.id)
             row = get_visible_pt_sale(gym=request.gym, actor=request.gym_membership, sale_id=id)
-        return success_response(pt_sale_payload(row))
+            data = pt_sale_payload(row)
+        return success_response(data)
 
     @extend_schema(
         operation_id="pt_sales_update",

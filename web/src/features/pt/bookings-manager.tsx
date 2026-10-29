@@ -43,6 +43,19 @@ const PAGE = "25";
 const cardClass =
   "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm";
 
+function useMinWidth(px: number): boolean {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia(`(min-width: ${px}px)`);
+    const sync = () => setMatches(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, [px]);
+  return matches;
+}
+
 function shiftDate(iso: string, days: number): string {
   const [year, month, day] = iso.split("-").map(Number);
   const date = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1));
@@ -78,6 +91,81 @@ function bookingBorderClass(status: string): string {
     default:
       return "border-l-slate-300";
   }
+}
+
+function BookingStatusBadge({ status }: { status: string }) {
+  const tx = useTx();
+  return (
+    <span
+      className={`rounded-full px-2.5 py-1 text-xs font-bold ${bookingStatusClass(status)}`}
+    >
+      {tx(status)}
+    </span>
+  );
+}
+
+function packageCell(row: PTBooking, tx: (text: string) => string) {
+  if (row.unmetered) {
+    return `${tx("Unmetered")} · ${tx(row.unmetered_reason)}`;
+  }
+  return (
+    <IdentifierValue value={row.member_service_package_id ?? "missing"} />
+  );
+}
+
+function BookingActions({
+  row,
+  selected,
+  pending,
+  onAttend,
+  onNoShow,
+  onCancel,
+}: {
+  row: PTBooking;
+  selected: boolean;
+  pending: boolean;
+  onAttend: (row: PTBooking) => void;
+  onNoShow: (row: PTBooking) => void;
+  onCancel: (row: PTBooking, opener: HTMLElement) => void;
+}) {
+  const tx = useTx();
+  return (
+    <div
+      aria-label={tx("Booking actions")}
+      className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"
+      role="group"
+    >
+      <button
+        className="button button-success button-sm w-full sm:w-auto"
+        disabled={pending}
+        onClick={() => onAttend(row)}
+        type="button"
+      >
+        {" "}
+        {tx("Mark attended")}{" "}
+      </button>
+      <button
+        className="button button-warn button-sm w-full sm:w-auto"
+        disabled={pending}
+        onClick={() => onNoShow(row)}
+        type="button"
+      >
+        {" "}
+        {tx("Mark no-show")}{" "}
+      </button>
+      <button
+        aria-controls={selected ? "cancel-pt-booking-dialog" : undefined}
+        aria-expanded={selected}
+        className="button button-cancel button-sm w-full sm:w-auto"
+        disabled={pending}
+        onClick={(event) => onCancel(row, event.currentTarget)}
+        type="button"
+      >
+        {" "}
+        {tx("Cancel booking")}{" "}
+      </button>
+    </div>
+  );
 }
 
 function NoticeBanner({ message }: { message: string }) {
@@ -270,6 +358,7 @@ export function BookingsManager({
   const rangeChanged = dateFrom !== today || dateTo !== defaultTo;
   const filtered = rangeChanged || memberFilter !== null;
   const showPaging = bookings.index > 0 || bookings.hasMore || bookings.bounded;
+  const wide = useMinWidth(768);
 
   useEffect(() => {
     if (dialogKey) {
@@ -670,128 +759,206 @@ export function BookingsManager({
               </div>
             ) : null}
             {bookings.rows.length > 0 ? (
-              <ul aria-label={tx("PT bookings")} className="grid gap-3">
-                {bookings.rows.map((row) => {
-                  const selected = cancelling?.id === row.id;
-                  return (
-                    <li
-                      className={`rounded-xl border border-l-4 border-slate-200 p-4 ${bookingBorderClass(row.status)} ${
-                        selected
-                          ? "bg-teal-50 ring-2 ring-teal-600"
-                          : row.status === "BOOKED"
-                            ? "bg-white"
-                            : "bg-slate-50"
-                      }`}
-                      key={row.id}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold tracking-wide text-slate-500">
-                            {" "}
-                            {tx("Session")}{" "}
-                          </p>
-                          <h3 className="text-base font-bold break-words text-slate-900">
-                            <time dateTime={row.starts_at}>
-                              {formatInstant(row.starts_at, timeZone)}
-                            </time>
-                            <span aria-hidden="true"> – </span>
-                            <time dateTime={row.ends_at}>
-                              {formatInstant(row.ends_at, timeZone)}
-                            </time>
-                          </h3>
-                        </div>
-                        <span
-                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${bookingStatusClass(row.status)}`}
+              <div
+                className={bookings.pending ? "opacity-60" : undefined}
+              >
+                {!wide ? (
+                  <ul aria-label={tx("PT bookings")} className="grid gap-3">
+                    {bookings.rows.map((row) => {
+                      const selected = cancelling?.id === row.id;
+                      return (
+                        <li
+                          className={`rounded-xl border border-l-4 border-slate-200 p-4 ${bookingBorderClass(row.status)} ${
+                            selected
+                              ? "bg-teal-50 ring-2 ring-teal-600"
+                              : row.status === "BOOKED"
+                                ? "bg-white"
+                                : "bg-slate-50"
+                          }`}
+                          key={row.id}
                         >
-                          {tx(row.status)}
-                        </span>
-                      </div>
-                      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
-                        <div className="min-w-0">
-                          <dt className="text-xs text-slate-500">
-                            {tx("Member")}
-                          </dt>
-                          <dd className="mt-0.5 font-semibold break-words text-slate-900">
-                            <IdentifierValue value={row.member_id} />
-                          </dd>
-                        </div>
-                        <div className="min-w-0">
-                          <dt className="text-xs text-slate-500">
-                            {tx("Trainer")}
-                          </dt>
-                          <dd className="mt-0.5 font-semibold break-words text-slate-900">
-                            <IdentifierValue
-                              value={row.trainer_staff_profile_id}
-                            />
-                          </dd>
-                        </div>
-                        <div className="col-span-2 min-w-0">
-                          <dt className="text-xs text-slate-500">
-                            {row.unmetered ? tx("Metering") : tx("Package")}
-                          </dt>
-                          <dd className="mt-0.5 font-semibold break-words text-slate-900">
-                            {row.unmetered ? (
-                              `${tx("Unmetered")} · ${tx(row.unmetered_reason)}`
-                            ) : (
-                              <IdentifierValue
-                                value={
-                                  row.member_service_package_id ?? "missing"
-                                }
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold tracking-wide text-slate-500">
+                                {" "}
+                                {tx("Session")}{" "}
+                              </p>
+                              <h3 className="text-base font-bold break-words text-slate-900">
+                                <time dateTime={row.starts_at}>
+                                  {formatInstant(row.starts_at, timeZone)}
+                                </time>
+                                <span aria-hidden="true"> – </span>
+                                <time dateTime={row.ends_at}>
+                                  {formatInstant(row.ends_at, timeZone)}
+                                </time>
+                              </h3>
+                            </div>
+                            <BookingStatusBadge status={row.status} />
+                          </div>
+                          <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                            <div className="min-w-0">
+                              <dt className="text-xs text-slate-500">
+                                {tx("Member")}
+                              </dt>
+                              <dd className="mt-0.5 font-semibold break-words text-slate-900">
+                                {row.member_name || (
+                                  <IdentifierValue value={row.member_id} />
+                                )}
+                              </dd>
+                            </div>
+                            <div className="min-w-0">
+                              <dt className="text-xs text-slate-500">
+                                {tx("Trainer")}
+                              </dt>
+                              <dd className="mt-0.5 font-semibold break-words text-slate-900">
+                                {row.trainer_display_name || (
+                                  <IdentifierValue
+                                    value={row.trainer_staff_profile_id}
+                                  />
+                                )}
+                              </dd>
+                            </div>
+                            <div className="col-span-2 min-w-0">
+                              <dt className="text-xs text-slate-500">
+                                {row.unmetered ? tx("Metering") : tx("Package")}
+                              </dt>
+                              <dd className="mt-0.5 font-semibold break-words text-slate-900">
+                                {packageCell(row, tx)}
+                              </dd>
+                            </div>
+                          </dl>
+                          {row.reason ? (
+                            <p className="mt-3 text-sm break-words text-slate-600">
+                              {tx("Reason:")} {row.reason}
+                            </p>
+                          ) : null}
+                          {canManage && row.status === "BOOKED" ? (
+                            <div className="mt-4 border-t border-slate-100 pt-4">
+                              <BookingActions
+                                onAttend={attend}
+                                onCancel={openCancel}
+                                onNoShow={markNoShow}
+                                pending={pending}
+                                row={row}
+                                selected={selected}
                               />
-                            )}
-                          </dd>
-                        </div>
-                      </dl>
-                      {row.reason ? (
-                        <p className="mt-3 text-sm break-words text-slate-600">
-                          {tx("Reason:")} {row.reason}
-                        </p>
-                      ) : null}
-                      {canManage && row.status === "BOOKED" ? (
-                        <div
-                          aria-label={tx("Booking actions")}
-                          className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:flex-wrap"
-                          role="group"
-                        >
-                          <button
-                            className="button button-success w-full sm:w-auto"
-                            disabled={pending}
-                            onClick={() => attend(row)}
-                            type="button"
+                            </div>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full min-w-[48rem] text-left text-sm">
+                      <caption className="sr-only">{tx("PT bookings")}</caption>
+                      <thead className="border-b border-slate-200 text-slate-500">
+                        <tr>
+                          <th
+                            className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                            scope="col"
                           >
-                            {" "}
-                            {tx("Mark attended")}{" "}
-                          </button>
-                          <button
-                            className="button button-warn w-full sm:w-auto"
-                            disabled={pending}
-                            onClick={() => markNoShow(row)}
-                            type="button"
+                            {tx("Session")}
+                          </th>
+                          <th
+                            className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                            scope="col"
                           >
-                            {" "}
-                            {tx("Mark no-show")}{" "}
-                          </button>
-                          <button
-                            aria-controls={
-                              selected ? "cancel-pt-booking-dialog" : undefined
-                            }
-                            aria-expanded={selected}
-                            className="button button-cancel w-full sm:w-auto"
-                            disabled={pending}
-                            onClick={(event) =>
-                              openCancel(row, event.currentTarget)
-                            }
-                            type="button"
+                            {tx("Member")}
+                          </th>
+                          <th
+                            className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                            scope="col"
                           >
-                            {" "}
-                            {tx("Cancel booking")}{" "}
-                          </button>
-                        </div>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
+                            {tx("Trainer")}
+                          </th>
+                          <th
+                            className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                            scope="col"
+                          >
+                            {tx("Package")}
+                          </th>
+                          <th
+                            className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                            scope="col"
+                          >
+                            {tx("Status")}
+                          </th>
+                          <th
+                            className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                            scope="col"
+                          >
+                            <span className="sr-only">{tx("Actions")}</span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {bookings.rows.map((row) => {
+                          const selected = cancelling?.id === row.id;
+                          return (
+                            <tr
+                              className={`align-top ${
+                                selected
+                                  ? "bg-teal-50 shadow-[inset_3px_0_0_#0f766e]"
+                                  : "hover:bg-slate-50"
+                              }`}
+                              key={row.id}
+                            >
+                              <td className="px-4 py-3 whitespace-nowrap text-slate-900 sm:px-5">
+                                <p className="font-semibold">
+                                  <time dateTime={row.starts_at}>
+                                    {formatInstant(row.starts_at, timeZone)}
+                                  </time>
+                                </p>
+                                <p className="mt-0.5 text-slate-600">
+                                  <time dateTime={row.ends_at}>
+                                    {formatInstant(row.ends_at, timeZone)}
+                                  </time>
+                                </p>
+                                {row.reason ? (
+                                  <p className="mt-1 max-w-[16rem] text-xs break-words text-slate-500">
+                                    {tx("Reason:")} {row.reason}
+                                  </p>
+                                ) : null}
+                              </td>
+                              <td className="max-w-[10rem] px-4 py-3 break-words text-slate-800 sm:px-5">
+                                {row.member_name || (
+                                  <IdentifierValue value={row.member_id} />
+                                )}
+                              </td>
+                              <td className="max-w-[10rem] px-4 py-3 break-words text-slate-800 sm:px-5">
+                                {row.trainer_display_name || (
+                                  <IdentifierValue
+                                    value={row.trainer_staff_profile_id}
+                                  />
+                                )}
+                              </td>
+                              <td className="max-w-[12rem] px-4 py-3 break-words text-slate-800 sm:px-5">
+                                {packageCell(row, tx)}
+                              </td>
+                              <td className="px-4 py-3 sm:px-5">
+                                <BookingStatusBadge status={row.status} />
+                              </td>
+                              <td className="px-4 py-3 sm:px-5">
+                                {canManage && row.status === "BOOKED" ? (
+                                  <BookingActions
+                                    onAttend={attend}
+                                    onCancel={openCancel}
+                                    onNoShow={markNoShow}
+                                    pending={pending}
+                                    row={row}
+                                    selected={selected}
+                                  />
+                                ) : null}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             ) : null}
           </div>
           {showPaging ? (
@@ -990,7 +1157,10 @@ export function BookingsManager({
           </p>
           <p className="text-sm text-slate-600">
             {" "}
-            {tx("Member")} <IdentifierValue value={cancelling.member_id} />
+            {tx("Member")}{" "}
+            {cancelling.member_name || (
+              <IdentifierValue value={cancelling.member_id} />
+            )}
           </p>
           <ReasonField label="Cancellation reason" required={false} />
         </BookingDialog>

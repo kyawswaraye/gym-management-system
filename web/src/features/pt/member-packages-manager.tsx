@@ -77,12 +77,6 @@ function typeBadgeClass(kind: "PT" | "CLASS"): string {
     : "bg-amber-100 text-amber-800";
 }
 
-function typeBorderClass(kind: "PT" | "CLASS" | ""): string {
-  if (kind === "CLASS") return "border-l-sky-500";
-  if (kind === "PT") return "border-l-amber-400";
-  return "border-l-slate-300";
-}
-
 function statusBadgeClass(status: string): string {
   switch (status) {
     case "ACTIVE":
@@ -102,10 +96,11 @@ function grantLabel(
   row: MemberServicePackage,
   tx: (text: string, vars?: Record<string, string | number>) => string,
 ): string {
-  return tx("{code} · {name} · member {id}", {
+  const member = row.member_name || row.member_id;
+  return tx("{code} · {name} · {member}", {
     code: row.package_code,
     name: row.package_name,
-    id: row.member_id,
+    member,
   });
 }
 
@@ -251,90 +246,24 @@ function ModalForm({
   );
 }
 
-function GrantRow({
-  row,
-  selected,
-  onSelect,
-}: {
-  row: MemberServicePackage;
-  selected: boolean;
-  onSelect: (row: MemberServicePackage) => void;
-}) {
-  const tx = useTx();
-  const kind = packageKind(row.package_type);
+function GrantTypeBadge({ kind }: { kind: "PT" | "CLASS" }) {
   return (
-    <li>
-      <button
-        aria-label={grantLabel(row, tx)}
-        aria-pressed={selected}
-        className={`w-full rounded-xl border border-l-4 border-slate-200 p-4 text-left ${typeBorderClass(kind)} ${
-          selected
-            ? "bg-teal-50 ring-2 ring-teal-600"
-            : "bg-white hover:bg-slate-50"
-        }`}
-        onClick={() => onSelect(row)}
-        type="button"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-wide text-slate-500">
-              {row.package_code}
-            </p>
-            <h3 className="text-base font-bold break-words text-slate-900">
-              {row.package_name}
-            </h3>
-          </div>
-          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-            {kind ? (
-              <span
-                className={`rounded-full px-2.5 py-1 text-xs font-bold ${typeBadgeClass(kind)}`}
-              >
-                {kind}
-              </span>
-            ) : null}
-            {selected ? (
-              <span className="rounded-full bg-teal-700 px-2.5 py-1 text-xs font-bold text-white">
-                {" "}
-                {tx("Selected")}{" "}
-              </span>
-            ) : null}
-          </div>
-        </div>
-        <p className="mt-3 flex flex-wrap items-center gap-2">
-          <span
-            className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClass(row.status)}`}
-          >
-            {tx(row.status)}
-          </span>
-          <span className="sr-only"> · </span>
-          <span className="text-sm font-semibold text-slate-700">
-            {tx("remaining")} {row.remaining_sessions} {tx("of")}{" "}
-            {row.granted_sessions}
-          </span>
-        </p>
-        <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
-          <div className="col-span-2 sm:col-span-1">
-            <dt className="text-xs text-slate-500">{tx("Validity")}</dt>
-            <dd className="mt-0.5 font-semibold text-slate-900">
-              {formatAppDate(row.valid_from)} {tx("to")}{" "}
-              {formatAppDate(row.valid_until)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">{tx("Member")}</dt>
-            <dd className="mt-0.5 font-semibold text-slate-900">
-              <IdentifierValue value={row.member_id} />
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">{tx("Package")}</dt>
-            <dd className="mt-0.5 font-semibold text-slate-900">
-              <IdentifierValue value={row.service_package_id} />
-            </dd>
-          </div>
-        </dl>
-      </button>
-    </li>
+    <span
+      className={`rounded-full px-2.5 py-1 text-xs font-bold ${typeBadgeClass(kind)}`}
+    >
+      {kind}
+    </span>
+  );
+}
+
+function GrantStatusBadge({ status }: { status: string }) {
+  const tx = useTx();
+  return (
+    <span
+      className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClass(status)}`}
+    >
+      {tx(status)}
+    </span>
   );
 }
 
@@ -406,6 +335,8 @@ export function MemberPackagesManager({
   const [correctError, setCorrectError] = useState("");
   const [reversesId, setReversesId] = useState("");
   const [pending, setPending] = useState(false);
+  const [grantFreePack, setGrantFreePack] = useState(true);
+  const [grantNote, setGrantNote] = useState("Free pack grant");
   const [mode, setMode] = useState<"grant" | "correct" | null>(null);
   const key = useRef<{ fingerprint: string; value: string } | null>(null);
   const pendingRef = useRef(false);
@@ -519,8 +450,15 @@ export function MemberPackagesManager({
   function openGrant() {
     if (pendingRef.current || mode !== null) return;
     setGrantError("");
+    setGrantFreePack(true);
+    setGrantNote("Free pack grant");
     setNotice((current) => (current?.scope === "grant" ? null : current));
     setMode("grant");
+  }
+
+  function chooseFreePack(next: boolean) {
+    setGrantFreePack(next);
+    setGrantNote(next ? "Free pack grant" : "Paid pack grant");
   }
 
   function openCorrect() {
@@ -616,7 +554,7 @@ export function MemberPackagesManager({
   return (
     <div className="grid gap-6">
       <div inert={mode !== null}>
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
+        <div className="grid gap-6">
           <section
             aria-busy={grants.pending}
             aria-labelledby="grant-catalog-title"
@@ -633,7 +571,9 @@ export function MemberPackagesManager({
                 </h2>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
                   {" "}
-                  {tx("Code, type, balance, and validity for each grant.")}{" "}
+                  {tx(
+                    "Member, package, remaining sessions, and validity.",
+                  )}{" "}
                 </p>
               </div>
               {canAdjust ? (
@@ -771,16 +711,106 @@ export function MemberPackagesManager({
                 </div>
               ) : null}
               {grants.rows.length > 0 ? (
-                <ul aria-label={tx("Granted packages")} className="grid gap-3">
-                  {grants.rows.map((row) => (
-                    <GrantRow
-                      key={row.id}
-                      onSelect={chooseGrant}
-                      row={row}
-                      selected={selected?.id === row.id}
-                    />
-                  ))}
-                </ul>
+                <div
+                  className={`w-full overflow-x-auto ${grants.pending ? "opacity-60" : ""}`}
+                >
+                  <table className="w-full min-w-[36rem] text-left text-sm">
+                    <caption className="sr-only">
+                      {tx("Granted packages")}
+                    </caption>
+                    <thead className="border-b border-slate-200 text-slate-500">
+                      <tr>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("Member")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("Package")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("Type")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("Left")}
+                        </th>
+                        <th
+                          className="px-4 py-2.5 text-xs font-semibold sm:px-5"
+                          scope="col"
+                        >
+                          {tx("Status")}
+                        </th>
+                        <th
+                          className="hidden px-4 py-2.5 text-xs font-semibold sm:px-5 md:table-cell"
+                          scope="col"
+                        >
+                          {tx("Validity")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {grants.rows.map((row) => {
+                        const active = selected?.id === row.id;
+                        const kind = packageKind(row.package_type);
+                        return (
+                          <tr
+                            className={
+                              active
+                                ? "bg-teal-50 shadow-[inset_3px_0_0_#0f766e]"
+                                : "hover:bg-slate-50"
+                            }
+                            key={row.id}
+                          >
+                            <td className="max-w-[14rem] px-4 py-3 sm:px-5">
+                              <button
+                                aria-current={active ? "true" : undefined}
+                                aria-label={grantLabel(row, tx)}
+                                className="text-left font-semibold break-words text-slate-900"
+                                onClick={() => chooseGrant(row)}
+                                type="button"
+                              >
+                                {row.member_name || (
+                                  <IdentifierValue value={row.member_id} />
+                                )}
+                              </button>
+                            </td>
+                            <td className="max-w-[14rem] px-4 py-3 sm:px-5">
+                              <p className="font-semibold break-words text-slate-900">
+                                {row.package_name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-slate-500">
+                                {row.package_code}
+                              </p>
+                            </td>
+                            <td className="px-4 py-3 sm:px-5">
+                              {kind ? <GrantTypeBadge kind={kind} /> : null}
+                            </td>
+                            <td className="px-4 py-3 font-semibold whitespace-nowrap text-slate-800 tabular-nums sm:px-5">
+                              {row.remaining_sessions}/{row.granted_sessions}
+                            </td>
+                            <td className="px-4 py-3 sm:px-5">
+                              <GrantStatusBadge status={row.status} />
+                            </td>
+                            <td className="hidden px-4 py-3 whitespace-nowrap text-slate-600 md:table-cell sm:px-5">
+                              {formatAppDate(row.valid_from)} –{" "}
+                              {formatAppDate(row.valid_until)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               ) : null}
             </div>
             {showGrantPaging ? (
@@ -847,7 +877,10 @@ export function MemberPackagesManager({
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
                   {" "}
-                  {tx("Member")} <IdentifierValue value={selected.member_id} />
+                  {tx("Member")}{" "}
+                  {selected.member_name || (
+                    <IdentifierValue value={selected.member_id} />
+                  )}
                 </p>
               </div>
             ) : null}
@@ -935,7 +968,7 @@ export function MemberPackagesManager({
 
       {mode === "grant" && canAdjust ? (
         <ModalForm
-          description="Choose an active member and package. A paid PT grant comes from sale approval."
+          description="Give this member their class or PT ticket pack so they can book."
           descriptionId="grant-package-description"
           dialogId="grant-package-dialog"
           dialogRef={dialogRef}
@@ -945,7 +978,7 @@ export function MemberPackagesManager({
           pending={pending}
           submitClass="button-create"
           submitLabel="Save grant"
-          title={tx("Grant package")}
+          title={tx("Give pack to member")}
           titleId="grant-title"
         >
           <MemberSearch
@@ -960,7 +993,7 @@ export function MemberPackagesManager({
             </p>
           ) : null}
           <Alert message={catalog.error} />
-          <Field label="Package">
+          <Field label="Which pack?">
             <SelectInput name="service_package_id" required>
               <option value="">{tx("Select a package")}</option>
               {catalog.items.map((row) => (
@@ -978,19 +1011,39 @@ export function MemberPackagesManager({
               type="date"
             />
           </Field>
-          <Field label="Complimentary">
-            <SelectInput defaultValue="true" name="complimentary">
+          <Field label="Free pack?">
+            <SelectInput
+              name="complimentary"
+              onChange={(event) =>
+                chooseFreePack(event.target.value === "true")
+              }
+              value={grantFreePack ? "true" : "false"}
+            >
               <option value="true">{tx("Yes")}</option>
               <option value="false">{tx("No")}</option>
             </SelectInput>
           </Field>
           <p className="text-sm text-slate-500">
             {" "}
-            {tx(
-              "A PT package must be complimentary. A paid PT grant comes from sale approval.",
-            )}{" "}
+            {grantFreePack
+              ? tx("Yes = give the pack for free.")
+              : tx(
+                  "No = member already paid. Record the payment in Payments first. Paid PT packs still come from a PT sale.",
+                )}{" "}
           </p>
-          <ReasonField label="Reason" />
+          <Field label="Short note" required>
+            <textarea
+              className="input min-h-24"
+              name="reason"
+              onChange={(event) => setGrantNote(event.target.value)}
+              required
+              value={grantNote}
+            />
+          </Field>
+          <p className="-mt-3 text-xs text-slate-500">
+            {" "}
+            {tx("Filled from Free pack. Edit only if you need a clearer note.")}{" "}
+          </p>
         </ModalForm>
       ) : null}
 
@@ -1023,7 +1076,10 @@ export function MemberPackagesManager({
             </p>
             <p className="mt-2 text-sm text-slate-600">
               {" "}
-              {tx("Member")} <IdentifierValue value={selected.member_id} />
+              {tx("Member")}{" "}
+              {selected.member_name || (
+                <IdentifierValue value={selected.member_id} />
+              )}
             </p>
             <p className="mt-1 text-sm text-slate-700">
               <span

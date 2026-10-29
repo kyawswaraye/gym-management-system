@@ -74,7 +74,9 @@ function booking(
   return {
     id: BOOKING,
     trainer_staff_profile_id: TRAINER,
+    trainer_display_name: "Ada Trainer",
     member_id: MEMBER,
+    member_name: "MEM-1 · Ada Member",
     member_service_package_id: GRANT,
     starts_at: "2026-10-19T09:00:00Z",
     ends_at: "2026-10-19T10:00:00Z",
@@ -155,7 +157,7 @@ beforeEach(() => {
 });
 
 describe("PT bookings calendar", () => {
-  it("loads the default gym-local week and shows compact identifiers", async () => {
+  it("loads the default gym-local week and shows member and trainer names", async () => {
     vi.mocked(listPtBookings).mockResolvedValue(page([booking()]));
     renderManager();
     await waitFor(() =>
@@ -166,10 +168,8 @@ describe("PT bookings calendar", () => {
         date_to: "2026-10-25",
       }),
     );
-    expect(await screen.findByTitle(MEMBER)).toHaveTextContent(
-      MEMBER.slice(-6),
-    );
-    expect(screen.getByTitle(TRAINER)).toHaveTextContent(TRAINER.slice(-6));
+    expect(await screen.findByText("MEM-1 · Ada Member")).toBeInTheDocument();
+    expect(screen.getByText("Ada Trainer")).toBeInTheDocument();
     expect(screen.getByTitle(GRANT)).toHaveTextContent(GRANT.slice(-6));
     expect(screen.getByText("BOOKED")).toBeInTheDocument();
     expect(
@@ -247,7 +247,7 @@ describe("PT bookings calendar", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Retry loading bookings" }),
     );
-    expect(await screen.findByTitle(MEMBER)).toBeInTheDocument();
+    expect(await screen.findByText("MEM-1 · Ada Member")).toBeInTheDocument();
   });
 
   it("applies the date range and member filter, then clears them", async () => {
@@ -343,17 +343,23 @@ describe("PT bookings calendar", () => {
     await waitFor(() => expect(calls).toBe(2));
     await act(async () => {
       second.resolve(
-        page([booking({ id: SECOND, member_id: OTHER })]) as never,
+        page([
+          booking({
+            id: SECOND,
+            member_id: OTHER,
+            member_name: "MEM-2 · Other Member",
+          }),
+        ]) as never,
       );
       await second.promise;
     });
-    expect(await screen.findByTitle(OTHER)).toBeInTheDocument();
+    expect(await screen.findByText("MEM-2 · Other Member")).toBeInTheDocument();
     await act(async () => {
       first.resolve(page([booking()]) as never);
       await first.promise;
     });
-    expect(screen.queryByTitle(MEMBER)).not.toBeInTheDocument();
-    expect(screen.getByTitle(OTHER)).toBeInTheDocument();
+    expect(screen.queryByText("MEM-1 · Ada Member")).not.toBeInTheDocument();
+    expect(screen.getByText("MEM-2 · Other Member")).toBeInTheDocument();
   });
 });
 

@@ -72,6 +72,7 @@ function deferred<T>() {
 const ptGrant = {
   id: GRANT,
   member_id: MEMBER,
+  member_name: "M-1 · Grace Hopper",
   service_package_id: PACKAGE,
   package_type: "PT",
   package_code: "PT10",
@@ -86,6 +87,7 @@ const ptGrant = {
 const classGrant = {
   id: OTHER_GRANT,
   member_id: OTHER,
+  member_name: "M-2 · Other Member",
   service_package_id: CLASS_PACKAGE,
   package_type: "CLASS",
   package_code: "YOGA8",
@@ -125,7 +127,7 @@ function compact(value: string | null): string {
   return (value ?? "").replace(/\s+/g, " ").trim();
 }
 
-async function selectGrant(name = /PT10 · Ten sessions · member/) {
+async function selectGrant(name = /PT10 · Ten sessions · M-1 · Grace Hopper/) {
   fireEvent.click(await screen.findByRole("button", { name }));
   const ledger = screen.getByRole("region", { name: "Session ledger" });
   await within(ledger).findByText("GRANT");
@@ -141,7 +143,7 @@ describe("member package catalog", () => {
     vi.mocked(listMembers).mockResolvedValue(empty);
   });
 
-  it("shows code, type, status, balance, validity, and compact ids", async () => {
+  it("shows member, package, type, balance, status, and validity in a table", async () => {
     vi.mocked(listMemberPackages).mockResolvedValue(
       page([ptGrant, classGrant]),
     );
@@ -150,47 +152,45 @@ describe("member package catalog", () => {
     const catalog = await screen.findByRole("region", {
       name: "Granted packages",
     });
-    const grants = await within(catalog).findAllByRole("listitem");
-    expect(grants).toHaveLength(2);
+    const table = within(catalog).getByRole("table", {
+      name: "Granted packages",
+    });
+    const rows = within(table).getAllByRole("row");
+    expect(rows).toHaveLength(3);
 
-    expect(compact(grants[0]?.textContent ?? "")).toContain("PT10");
-    expect(grants[0]).toHaveTextContent("Ten sessions");
-    expect(grants[0]).toHaveTextContent("PT");
-    expect(grants[0]).toHaveTextContent("ACTIVE");
-    expect(compact(grants[0]?.textContent ?? "")).toContain(
-      "ACTIVE · remaining 9 of 10",
-    );
-    expect(grants[0]).toHaveTextContent("01-10-2026 to 01-01-2027");
-    expect(within(grants[0]!).getByTitle(MEMBER)).toHaveTextContent(
-      MEMBER.slice(-6),
-    );
-    expect(within(grants[0]!).getByTitle(PACKAGE)).toHaveTextContent(
-      PACKAGE.slice(-6),
+    const ptRow = rows[1]!;
+    expect(ptRow).toHaveTextContent("M-1 · Grace Hopper");
+    expect(ptRow).toHaveTextContent("Ten sessions");
+    expect(ptRow).toHaveTextContent("PT10");
+    expect(ptRow).toHaveTextContent("PT");
+    expect(ptRow).toHaveTextContent("ACTIVE");
+    expect(ptRow).toHaveTextContent("9/10");
+    expect(compact(ptRow.textContent ?? "")).toContain(
+      "01-10-2026 – 01-01-2027",
     );
     expect(
-      within(grants[0]!).getByRole("button", {
-        name: /PT10 · Ten sessions · member/,
+      within(ptRow).getByRole("button", {
+        name: /PT10 · Ten sessions · M-1 · Grace Hopper/,
       }),
-    ).toHaveAttribute("aria-pressed", "false");
-    expect(within(grants[0]!).getByText("PT")).toHaveClass(
+    ).not.toHaveAttribute("aria-current");
+    expect(within(ptRow).getByText("PT")).toHaveClass(
       "bg-amber-100",
       "text-amber-800",
     );
-    expect(within(grants[0]!).getByText("ACTIVE")).toHaveClass(
+    expect(within(ptRow).getByText("ACTIVE")).toHaveClass(
       "bg-emerald-100",
       "text-emerald-800",
     );
 
-    expect(compact(grants[1]?.textContent ?? "")).toContain(
-      "VOID · remaining 0 of 8",
-    );
-    expect(grants[1]).toHaveTextContent("YOGA8");
-    expect(grants[1]).toHaveTextContent("CLASS");
-    expect(within(grants[1]!).getByText("CLASS")).toHaveClass(
+    const classRow = rows[2]!;
+    expect(classRow).toHaveTextContent("0/8");
+    expect(classRow).toHaveTextContent("YOGA8");
+    expect(classRow).toHaveTextContent("CLASS");
+    expect(within(classRow).getByText("CLASS")).toHaveClass(
       "bg-sky-100",
       "text-sky-800",
     );
-    expect(within(grants[1]!).getByText("VOID")).toHaveClass(
+    expect(within(classRow).getByText("VOID")).toHaveClass(
       "bg-red-100",
       "text-red-800",
     );
@@ -228,7 +228,7 @@ describe("member package catalog", () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /PT10 · Ten sessions · member/ }),
+      screen.getByRole("button", { name: /PT10 · Ten sessions · M-1 · Grace Hopper/ }),
     );
     expect(
       screen.queryByText("Choose a grant to read its ledger."),
@@ -363,14 +363,14 @@ describe("member package catalog", () => {
     expect(
       await within(catalog).findByText("Ten sessions"),
     ).toBeInTheDocument();
-    const list = within(catalog).getByRole("list", {
+    const table = within(catalog).getByRole("table", {
       name: "Granted packages",
     });
     const paging = within(catalog).getByRole("navigation", {
       name: "Pagination",
     });
     expect(
-      list.compareDocumentPosition(paging) & Node.DOCUMENT_POSITION_FOLLOWING,
+      table.compareDocumentPosition(paging) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     fireEvent.click(within(paging).getByRole("button", { name: "Next page" }));
     expect(await within(catalog).findByText("Yoga intro")).toBeInTheDocument();
@@ -410,10 +410,9 @@ describe("session ledger", () => {
     const ledger = await selectGrant();
     const catalog = screen.getByRole("region", { name: "Granted packages" });
     const selected = within(catalog).getByRole("button", {
-      name: /PT10 · Ten sessions · member/,
+      name: /PT10 · Ten sessions · M-1 · Grace Hopper/,
     });
-    expect(selected).toHaveAttribute("aria-pressed", "true");
-    expect(within(selected).getByText("Selected")).toBeInTheDocument();
+    expect(selected).toHaveAttribute("aria-current", "true");
     expect(ledger).toHaveTextContent("PT10");
     expect(ledger).toHaveTextContent("Ten sessions");
     expect(within(ledger).getByText("Viewing")).toBeInTheDocument();
@@ -441,14 +440,20 @@ describe("session ledger", () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /YOGA8 · Yoga intro · member/ }),
+      screen.getByRole("button", {
+        name: /YOGA8 · Yoga intro · M-2 · Other Member/,
+      }),
     );
     expect(
-      screen.getByRole("button", { name: /PT10 · Ten sessions · member/ }),
-    ).toHaveAttribute("aria-pressed", "false");
+      screen.getByRole("button", {
+        name: /PT10 · Ten sessions · M-1 · Grace Hopper/,
+      }),
+    ).not.toHaveAttribute("aria-current");
     expect(
-      screen.getByRole("button", { name: /YOGA8 · Yoga intro · member/ }),
-    ).toHaveAttribute("aria-pressed", "true");
+      screen.getByRole("button", {
+        name: /YOGA8 · Yoga intro · M-2 · Other Member/,
+      }),
+    ).toHaveAttribute("aria-current", "true");
     await waitFor(() =>
       expect(listPackageLedger).toHaveBeenLastCalledWith(OTHER_GRANT, {
         limit: "25",
@@ -515,7 +520,7 @@ describe("grant package dialog", () => {
 
   async function openGrantDialog() {
     fireEvent.click(screen.getByRole("button", { name: "Grant package" }));
-    return screen.findByRole("dialog", { name: "Grant package" });
+    return screen.findByRole("dialog", { name: "Give pack to member" });
   }
 
   async function fillGrant(dialog: HTMLElement, reason = "Courtesy") {
@@ -526,10 +531,10 @@ describe("grant package dialog", () => {
       await within(dialog).findByRole("button", { name: "Grace Hopper (M-1)" }),
     );
     await within(dialog).findByRole("option", { name: /PT · PT10/ });
-    fireEvent.change(within(dialog).getByLabelText("Package"), {
+    fireEvent.change(within(dialog).getByLabelText("Which pack?"), {
       target: { value: PACKAGE },
     });
-    fireEvent.change(within(dialog).getByLabelText("Reason"), {
+    fireEvent.change(within(dialog).getByLabelText("Short note"), {
       target: { value: reason },
     });
   }
@@ -553,7 +558,7 @@ describe("grant package dialog", () => {
     );
     expect(dialog).toHaveAttribute("id", "grant-package-dialog");
     expect(
-      within(dialog).getByRole("heading", { name: "Grant package" }),
+      within(dialog).getByRole("heading", { name: "Give pack to member" }),
     ).toHaveAttribute("id", "grant-title");
     expect(dialog).toHaveClass(
       "h-full",
@@ -566,7 +571,7 @@ describe("grant package dialog", () => {
     expect(dialog.className).toContain("sm:max-h-[min(90dvh,48rem)]");
     expect(dialog.querySelector(".sticky.top-0")).not.toBeNull();
     expect(dialog.querySelector(".sticky.bottom-0")).not.toBeNull();
-    expect(dialog).toHaveTextContent(/sale approval/);
+    expect(dialog).toHaveTextContent(/ticket pack so they can book/);
     expect(within(dialog).getByRole("button", { name: "Close" })).toBeEnabled();
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveClass(
       "w-full",
@@ -591,8 +596,8 @@ describe("grant package dialog", () => {
       screen.getByRole("button", { name: "Grant package", hidden: true }),
     ).toHaveAttribute("aria-controls", "grant-package-dialog");
 
-    fireEvent.mouseDown(within(dialog).getByLabelText("Reason"));
-    expect(screen.getByRole("dialog", { name: "Grant package" })).toBe(dialog);
+    fireEvent.mouseDown(within(dialog).getByLabelText("Short note"));
+    expect(screen.getByRole("dialog", { name: "Give pack to member" })).toBe(dialog);
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(
@@ -637,7 +642,7 @@ describe("grant package dialog", () => {
     expect(reasonError).toHaveTextContent("Enter a reason.");
     expect(grantMemberPackage).not.toHaveBeenCalled();
 
-    fireEvent.change(within(dialog).getByLabelText("Reason"), {
+    fireEvent.change(within(dialog).getByLabelText("Short note"), {
       target: { value: "Courtesy" },
     });
     vi.mocked(grantMemberPackage).mockRejectedValue(
@@ -651,7 +656,7 @@ describe("grant package dialog", () => {
     expect(dialog).toContainElement(failure);
     expect(screen.getAllByRole("alert")).toEqual([failure]);
     expect(screen.queryByText("Package granted.")).not.toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "Grant package" })).toBe(dialog);
+    expect(screen.getByRole("dialog", { name: "Give pack to member" })).toBe(dialog);
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -684,7 +689,7 @@ describe("grant package dialog", () => {
     await waitFor(() => expect(grantMemberPackage).toHaveBeenCalledTimes(2));
     expect(vi.mocked(grantMemberPackage).mock.calls[1]?.[1]).toBe(firstKey);
 
-    fireEvent.change(within(dialog).getByLabelText("Reason"), {
+    fireEvent.change(within(dialog).getByLabelText("Short note"), {
       target: { value: "Second courtesy" },
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save grant" }));
@@ -694,7 +699,7 @@ describe("grant package dialog", () => {
     expect(changedKey).not.toBe(firstKey);
 
     vi.mocked(grantMemberPackage).mockResolvedValue({} as never);
-    fireEvent.change(within(dialog).getByLabelText("Reason"), {
+    fireEvent.change(within(dialog).getByLabelText("Short note"), {
       target: { value: "Courtesy" },
     });
     const reloads = vi.mocked(listMemberPackages).mock.calls.length;
@@ -747,14 +752,14 @@ describe("grant package dialog", () => {
     expect(
       within(dialog).getByRole("button", { name: "Save grant" }),
     ).toBeDisabled();
-    expect(within(dialog).getByLabelText("Package")).toBeDisabled();
+    expect(within(dialog).getByLabelText("Which pack?")).toBeDisabled();
 
     fireEvent.keyDown(dialog, { key: "Escape" });
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     fireEvent.mouseDown(dialog.parentElement ?? dialog);
     fireEvent.click(within(dialog).getByRole("button", { name: "Save grant" }));
-    expect(screen.getByRole("dialog", { name: "Grant package" })).toBe(dialog);
+    expect(screen.getByRole("dialog", { name: "Give pack to member" })).toBe(dialog);
     expect(grantMemberPackage).toHaveBeenCalledTimes(1);
 
     await act(async () => {
@@ -801,9 +806,7 @@ describe("correct ledger dialog", () => {
     expect(within(dialog).getByText("Selected package")).toBeInTheDocument();
     expect(within(dialog).getByText("PT10")).toBeInTheDocument();
     expect(within(dialog).getByText("Ten sessions")).toBeInTheDocument();
-    expect(within(dialog).getByTitle(MEMBER)).toHaveTextContent(
-      MEMBER.slice(-6),
-    );
+    expect(compact(dialog.textContent ?? "")).toContain("M-1 · Grace Hopper");
     expect(compact(dialog.textContent ?? "")).toContain(
       "ACTIVE · remaining 9 of 10",
     );

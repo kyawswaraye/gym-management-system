@@ -1112,12 +1112,12 @@ async function bookClass(page: Page, occurrence: RegExp): Promise<void> {
   await page.getByRole("button", { name: "Book a class", exact: true }).click();
   const form = titledForm(page, "book-class-title");
   await expect(form).toBeVisible();
-  await selectByText(combo(form, "Occurrence"), occurrence.source);
+  await selectByText(combo(form, "Which class time?"), occurrence.source);
   await pickMember(form, "E2Escan", /E2Escan Visitor/);
-  await selectByText(combo(form, "Class package"), "E2E_CLASS_PACK");
+  await selectByText(combo(form, "Which class pack?"), "E2E_CLASS_PACK");
   await runCommand(page, /\/class-bookings\/?$/, () =>
     form
-      .getByRole("button", { name: "Save class booking", exact: true })
+      .getByRole("button", { name: "Save booking", exact: true })
       .click(),
   );
   await expect(form).toBeHidden();

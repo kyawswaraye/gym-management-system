@@ -1373,7 +1373,7 @@ describe("phase 5 command coverage", () => {
       await screen.findByRole("button", { name: "Edit class type" }),
     );
     const typeDialog = screen.getByRole("dialog", { name: "Edit class type" });
-    fireEvent.change(within(typeDialog).getByLabelText("Name"), {
+    fireEvent.change(within(typeDialog).getByLabelText("Class name"), {
       target: { value: "Power yoga" },
     });
     fireEvent.change(within(typeDialog).getByLabelText("Status"), {
@@ -1485,7 +1485,9 @@ describe("phase 5 command coverage", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Book a class" }),
     );
-    const bookDialog = screen.getByRole("dialog", { name: "Book a class" });
+    const bookDialog = screen.getByRole("dialog", {
+      name: "Sign up for a class",
+    });
     fireEvent.change(
       within(bookDialog).getByLabelText("Search active members"),
       {
@@ -1498,14 +1500,14 @@ describe("phase 5 command coverage", () => {
       }),
     );
     await within(bookDialog).findByRole("option", { name: /CLS/ });
-    fireEvent.change(within(bookDialog).getByLabelText("Occurrence"), {
+    fireEvent.change(within(bookDialog).getByLabelText("Which class time?"), {
       target: { value: OCCURRENCE },
     });
-    fireEvent.change(within(bookDialog).getByLabelText("Class package"), {
+    fireEvent.change(within(bookDialog).getByLabelText("Which class pack?"), {
       target: { value: GRANT },
     });
     fireEvent.click(
-      within(bookDialog).getByRole("button", { name: "Save class booking" }),
+      within(bookDialog).getByRole("button", { name: "Save booking" }),
     );
     await waitFor(() =>
       expect(createClassBooking).toHaveBeenCalledWith(

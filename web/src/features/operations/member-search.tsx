@@ -168,13 +168,21 @@ export function MemberSearch({
         <Field label={label}>
           <input
             autoComplete="off"
+            autoCorrect="off"
             className="input"
+            data-1p-ignore="true"
+            data-form-type="other"
+            data-lpignore="true"
             disabled={disabled}
+            enterKeyHint="search"
+            inputMode="search"
             maxLength={100}
-            name="member_search"
+            name="member_lookup"
             onChange={(event) => updateSearch(event.target.value)}
-            placeholder={tx("Name, number, phone, or email")}
+            placeholder={tx("Name or member number")}
             ref={inputRef}
+            spellCheck={false}
+            type="search"
             value={search}
           />
         </Field>

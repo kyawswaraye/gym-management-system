@@ -92,7 +92,9 @@ function sale(status: string, extra: Record<string, unknown> = {}): PTSale {
   return {
     id: SALE,
     member_id: MEMBER,
+    member_name: "M-1 · Ada Member",
     trainer_staff_profile_id: TRAINER,
+    trainer_display_name: "Trainer Ada",
     service_date: "2026-10-19",
     description: "Pack",
     gross_fee: "100.00",
@@ -106,6 +108,7 @@ function sale(status: string, extra: Record<string, unknown> = {}): PTSale {
     payment_id: null,
     payment: null,
     service_package_id: null,
+    package_name: null,
     package_price_snapshot: null,
     member_service_package_id: null,
     submitted_at: null,
@@ -212,7 +215,7 @@ async function openSaleRow() {
     await screen.findByRole("button", { name: /Pack|100.00 MMK/ }),
   );
   const detail = await screen.findByRole("region", { name: "Sale detail" });
-  await within(detail).findByText("Gross fee");
+  await within(detail).findByText("Sale total");
   return detail;
 }
 
@@ -276,9 +279,9 @@ describe("PT sales list and detail", () => {
       screen.getByRole("button", { name: "Retry loading sales" }),
     );
     const row = await screen.findByRole("button", { name: /100.00 MMK/ });
-    expect(row).toHaveAttribute("aria-pressed", "false");
-    expect(within(row).getByTitle(MEMBER)).toHaveTextContent("222222");
-    expect(within(row).getByTitle(TRAINER)).toHaveTextContent("111111");
+    expect(row).not.toHaveAttribute("aria-current");
+    expect(screen.getByText("M-1 · Ada Member")).toBeInTheDocument();
+    expect(screen.getByText("Trainer Ada")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create draft" })).toHaveClass(
       "button-create",
     );
@@ -324,12 +327,13 @@ describe("PT sales list and detail", () => {
     renderSales();
     expect(await screen.findByText("No PT sales match.")).toBeInTheDocument();
     expect(
-      screen.getByText(/Select a sale to see its fee/),
+      screen.getByText(/Select a sale to see the member/),
     ).toBeInTheDocument();
     cleanup();
 
     const posted = sale("POSTED", {
       service_package_id: PACKAGE,
+      package_name: "PT 10 pack",
       package_price_snapshot: "80.00",
       payment: {
         method: "CARD",
@@ -390,21 +394,21 @@ describe("PT sales list and detail", () => {
     } as never);
     renderSales();
     const row = await screen.findByRole("button", { name: /payment CARD/ });
-    expect(row).toHaveTextContent("Package");
-    expect(row).toHaveTextContent("CARD");
+    expect(screen.getByText("M-1 · Ada Member")).toBeInTheDocument();
+    expect(screen.getByText("Trainer Ada")).toBeInTheDocument();
     fireEvent.click(row);
     const detail = await screen.findByRole("region", { name: "Sale detail" });
-    expect(row).toHaveAttribute("aria-pressed", "true");
-    expect(row).toHaveTextContent("Selected");
-    expect(within(detail).getByText("Gross fee")).toBeInTheDocument();
+    expect(row).toHaveAttribute("aria-current", "true");
+    expect(within(detail).getByText("Sale total")).toBeInTheDocument();
     expect(within(detail).getAllByText("100.00 MMK").length).toBeGreaterThan(0);
-    expect(within(detail).getByText("Gym share")).toBeInTheDocument();
-    expect(within(detail).getByText("90.00")).toBeInTheDocument();
-    expect(within(detail).getByText("Outstanding")).toBeInTheDocument();
+    expect(within(detail).getByText("Gym keeps")).toBeInTheDocument();
+    expect(within(detail).getByText("90.00 MMK")).toBeInTheDocument();
+    expect(within(detail).getByText("PT 10 pack")).toBeInTheDocument();
     expect(within(detail).getByText("80.00")).toBeInTheDocument();
     expect(within(detail).getByText("REF-9")).toBeInTheDocument();
+    expect(within(detail).getByText("Open Commissions")).toBeInTheDocument();
     expect(
-      await within(detail).findByText("Commission outstanding"),
+      await within(detail).findByText("Still to pay trainer"),
     ).toBeInTheDocument();
     expect(within(detail).getAllByText("4.00").length).toBeGreaterThan(0);
     expect(
@@ -425,7 +429,7 @@ describe("PT sales list and detail", () => {
     fireEvent.click(
       within(detail).getByRole("button", { name: "Retry loading sale" }),
     );
-    expect(await within(detail).findByText("Gym share")).toBeInTheDocument();
+    expect(await within(detail).findByText("Gym keeps")).toBeInTheDocument();
   });
 });
 
@@ -589,7 +593,10 @@ describe("create and edit draft dialogs", () => {
     fireEvent.change(within(dialog).getByLabelText("Description"), {
       target: { value: description },
     });
-    fireEvent.change(within(dialog).getByLabelText("Gross fee"), {
+    fireEvent.change(within(dialog).getByLabelText("Member's money"), {
+      target: { value: "omit" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Sale total"), {
       target: { value: "100.00" },
     });
   }
@@ -661,6 +668,67 @@ describe("create and edit draft dialogs", () => {
     expect(failure).toHaveTextContent("Draft refused.");
     expect(dialog).toContainElement(failure);
     expect(screen.getByRole("dialog", { name: "Create draft" })).toBe(dialog);
+  });
+
+  it("fills payment fields from the package and hides them when money is skipped", async () => {
+    vi.mocked(listServicePackages).mockResolvedValue(
+      page([
+        {
+          id: PACKAGE,
+          code: "PT10",
+          name: "Ten sessions",
+          type: "PT",
+          session_count: 10,
+          validity_value: 3,
+          validity_unit: "MONTH",
+          price: "200000.00",
+          currency: "MMK",
+          is_active: true,
+          class_type_id: null,
+        },
+      ]),
+    );
+    const dialog = await openCreate();
+    await within(dialog).findByRole("option", { name: /PT10/ });
+    expect(
+      within(dialog).queryByLabelText("Sale total"),
+    ).not.toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText("PT package"), {
+      target: { value: PACKAGE },
+    });
+    expect(within(dialog).getByLabelText("Description")).toHaveValue(
+      "Ten sessions",
+    );
+    expect(within(dialog).getByLabelText("Payment description")).toHaveValue(
+      "Ten sessions",
+    );
+    expect(within(dialog).getByLabelText("Payment amount")).toHaveValue(
+      "200000.00",
+    );
+    fireEvent.change(within(dialog).getByLabelText("Payment description"), {
+      target: { value: "Cash for PT pack" },
+    });
+    expect(within(dialog).getByLabelText("Payment description")).toHaveValue(
+      "Cash for PT pack",
+    );
+
+    fireEvent.change(within(dialog).getByLabelText("Member's money"), {
+      target: { value: "omit" },
+    });
+    expect(
+      within(dialog).queryByLabelText("Payment amount"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByLabelText("Payment description"),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Sale total")).toHaveValue(
+      "200000.00",
+    );
+    expect(
+      within(dialog).queryByRole("option", {
+        name: "Remove member money from this draft",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("locks the create dialog while the save is pending and then shows success", async () => {
@@ -761,7 +829,7 @@ describe("create and edit draft dialogs", () => {
     fireEvent.change(within(editing).getByLabelText("Description"), {
       target: { value: "Updated" },
     });
-    fireEvent.change(within(editing).getByLabelText("Payment draft"), {
+    fireEvent.change(within(editing).getByLabelText("Member's money"), {
       target: { value: "clear" },
     });
     vi.mocked(updatePtSale).mockRejectedValueOnce(new Error("Edit refused."));

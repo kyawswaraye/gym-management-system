@@ -11,6 +11,9 @@ export function phase5Error(caught: unknown, fallback: string): string {
     if (caught.code === "CLASS_FULL") {
       return "CLASS_FULL: This class is at capacity.";
     }
+    if (caught.code === "BOOKING_STATE_CONFLICT") {
+      return "Too early. Mark attended after the class starts. Mark no-show after it ends.";
+    }
     if (caught.code) return `${caught.code}: ${caught.message || fallback}`;
     return caught.message || fallback;
   }

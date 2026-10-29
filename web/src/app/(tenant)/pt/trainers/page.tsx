@@ -22,7 +22,7 @@ export default async function TrainersPage() {
   return (
     <section aria-labelledby="trainers-title">
       <PageHeader
-        description="Review your coaching team, current assignments, and members assigned today."
+        description="For personal training only. Assign a member to a trainer before PT sales or bookings. Monthly gym members and class members do not need an assignment."
         eyebrow="Personal training"
         title="Trainers"
         titleId="trainers-title"

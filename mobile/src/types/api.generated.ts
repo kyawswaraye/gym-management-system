@@ -4197,6 +4197,7 @@ export interface components {
       class_occurrence_id: string;
       /** Format: uuid */
       member_id: string;
+      member_name: string;
       /** Format: uuid */
       member_service_package_id: string | null;
       unmetered: boolean;
@@ -5585,6 +5586,7 @@ export interface components {
       id: string;
       /** Format: uuid */
       member_id: string;
+      member_name: string;
       /** Format: uuid */
       service_package_id: string;
       source: string;
@@ -6121,8 +6123,10 @@ export interface components {
       id: string;
       /** Format: uuid */
       member_id: string;
+      member_name: string;
       /** Format: uuid */
       trainer_staff_profile_id: string;
+      trainer_display_name: string;
       /** Format: date */
       service_date: string;
       description: string;
@@ -6139,6 +6143,7 @@ export interface components {
       payment: components["schemas"]["Payment"] | null;
       /** Format: uuid */
       service_package_id: string | null;
+      package_name: string | null;
       package_price_snapshot: string | null;
       /** Format: uuid */
       member_service_package_id: string | null;
