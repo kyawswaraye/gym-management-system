@@ -21,6 +21,7 @@ from rest_framework.views import APIView
 from apps.common.api.exceptions import AuthenticationFailed
 from apps.common.api.responses import success_response
 from apps.common.api.schema import ErrorEnvelopeSerializer
+from apps.common.db.tenant_context import set_gym_context
 from apps.tenants.logo import clear_gym_logo, read_logo_upload, replace_gym_logo
 from apps.tenants.models import Gym, GymLogo, GymMembership, GymSettings, SubscriptionPlan
 from apps.tenants.serializers import (
@@ -626,6 +627,7 @@ class AdminGymLoginAccountsView(APIView):
     )
     def get(self, request: Request, gym_id: uuid.UUID) -> Response:
         gym = get_object_or_404(Gym, id=gym_id)
+        set_gym_context(gym_id=gym.id)
         accounts = visible_login_memberships(gym)
         return success_response([login_account_data(account) for account in accounts])
 
@@ -656,6 +658,7 @@ class AdminGymOwnerCreateView(APIView):
     )
     def get(self, request: Request, gym_id: uuid.UUID) -> Response:
         gym = get_object_or_404(Gym, id=gym_id)
+        set_gym_context(gym_id=gym.id)
         owners = visible_owner_memberships(gym)
         return success_response([owner_membership_data(owner) for owner in owners])
 
