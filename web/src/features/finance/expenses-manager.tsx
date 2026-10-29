@@ -555,7 +555,11 @@ export function ExpensesManager({
   const canSubmitDraft = detail?.status === "DRAFT" && canSubmit;
   const canDecide = detail?.status === "PENDING_APPROVAL" && canApprove;
   const canCancelDraft = detail?.status === "DRAFT" && canUpdate;
-  const canVoidPosted = detail?.status === "POSTED" && canVoid && !salaryLocked;
+  const canVoidPosted =
+    detail?.status === "POSTED" &&
+    canVoid &&
+    !salaryLocked &&
+    detail.original_expense_id === null;
   const hasRowActions = Boolean(
     canEditDraft ||
     canSubmitDraft ||

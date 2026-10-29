@@ -552,6 +552,38 @@ describe("payments manager", () => {
     ).not.toBeInTheDocument();
 
     view.unmount();
+    vi.mocked(listPayments).mockResolvedValue({
+      data: [
+        payment({
+          status: "POSTED",
+          entry_type: "REVERSAL",
+          original_payment_id: PAYMENT_ID,
+          description: "Reversal: Locker key",
+        }),
+      ],
+      meta: { has_more: false, next_after: null },
+    });
+    vi.mocked(getPayment).mockResolvedValue(
+      payment({
+        status: "POSTED",
+        entry_type: "REVERSAL",
+        original_payment_id: PAYMENT_ID,
+        description: "Reversal: Locker key",
+      }),
+    );
+    renderPayments({ canApprove: false, canVoid: true, canRefund: true });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Reversal: Locker key" }),
+    );
+    expect(await screen.findByText("Reversal")).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Void" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Refund" }),
+    ).not.toBeInTheDocument();
+
+    view.unmount();
     vi.mocked(getPayment).mockResolvedValue(
       payment({
         status: "POSTED",

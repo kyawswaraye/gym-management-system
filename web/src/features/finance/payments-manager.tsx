@@ -236,6 +236,12 @@ function productCorrection(payment: Payment): boolean {
   return payment.purpose === "PRODUCT" || payment.retail_sale_id !== null;
 }
 
+function chargePayment(payment: Payment): boolean {
+  return (
+    payment.entry_type === "CHARGE" && payment.original_payment_id === null
+  );
+}
+
 function legacyUnlinkedCash(payment: Payment): boolean {
   return (
     payment.status === "POSTED" &&
@@ -1204,6 +1210,7 @@ export function PaymentsManager({
                     )}
                     {payment.status === "POSTED" &&
                       canVoid &&
+                      chargePayment(payment) &&
                       !productCorrection(payment) && (
                         <button
                           className="button button-delete"
@@ -1219,6 +1226,7 @@ export function PaymentsManager({
                       )}
                     {payment.status === "POSTED" &&
                       canRefund &&
+                      chargePayment(payment) &&
                       !productCorrection(payment) && (
                         <button
                           className="button button-warn"
@@ -1515,7 +1523,9 @@ export function PaymentsManager({
                       />
                     </ActionPanel>
                   )}
-                  {action === "void" && !productCorrection(payment) && (
+                  {action === "void" &&
+                    chargePayment(payment) &&
+                    !productCorrection(payment) && (
                     <ActionPanel
                       confirmLabel="Confirm void"
                       error={formError}
@@ -1587,7 +1597,9 @@ export function PaymentsManager({
                       ) : null}
                     </ActionPanel>
                   )}
-                  {action === "refund" && !productCorrection(payment) && (
+                  {action === "refund" &&
+                    chargePayment(payment) &&
+                    !productCorrection(payment) && (
                     <ActionPanel
                       confirmLabel="Confirm refund"
                       error={formError}

@@ -205,6 +205,60 @@ describe("expenses", () => {
     });
   });
 
+  it("hides void on a posted reversal expense", async () => {
+    const reversalId = "66666666-6666-4666-8666-666666666666";
+    vi.mocked(listExpenses).mockResolvedValue({
+      data: [
+        expense({
+          id: reversalId,
+          status: "POSTED",
+          description: "Reversal: Cleaning supplies",
+          original_expense_id: EXPENSE_ID,
+        }),
+      ],
+      meta: { has_more: false, next_after: null },
+    });
+    vi.mocked(getExpense).mockResolvedValue(
+      expense({
+        id: reversalId,
+        status: "POSTED",
+        description: "Reversal: Cleaning supplies",
+        original_expense_id: EXPENSE_ID,
+      }),
+    );
+    render(
+      <ExpensesManager
+        canApprove={false}
+        canCreate={false}
+        canManageCategories={false}
+        canSubmit={false}
+        canUpdate={false}
+        canUploadReceipt={false}
+        canVoid
+        currency="THB"
+        gymId="99999999-9999-4999-8999-999999999999"
+        defaultDate="2026-10-18"
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Reversal: Cleaning supplies",
+      }),
+    );
+    expect(
+      await screen.findByText((value, element) => {
+        return (
+          element?.tagName.toLowerCase() === "p" &&
+          value === "Reversal: Cleaning supplies"
+        );
+      }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Void" }),
+    ).not.toBeInTheDocument();
+    expect(voidExpense).not.toHaveBeenCalled();
+  });
+
   it("explains a protected salary expense and hides its void", async () => {
     vi.mocked(listExpenses).mockResolvedValue({
       data: [expense({ category_id: SALARY_CATEGORY_ID, status: "POSTED" })],
