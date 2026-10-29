@@ -438,8 +438,7 @@ def class_booking_labels(rows: list[ClassBooking]) -> dict[str, str]:
 def class_booking_payloads(rows: list[ClassBooking]) -> list[dict[str, object]]:
     labels = class_booking_labels(rows)
     return [
-        class_booking_payload(row, member_name=labels.get(str(row.member_id), ""))
-        for row in rows
+        class_booking_payload(row, member_name=labels.get(str(row.member_id), "")) for row in rows
     ]
 
 

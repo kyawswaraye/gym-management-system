@@ -64,6 +64,7 @@ function booking(
   extra: Partial<{
     id: string;
     member_id: string;
+    member_name: string;
     status: string;
     unmetered: boolean;
     unmetered_reason: string;

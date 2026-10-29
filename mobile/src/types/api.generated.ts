@@ -5938,8 +5938,10 @@ export interface components {
       id: string;
       /** Format: uuid */
       trainer_staff_profile_id: string;
+      trainer_display_name: string;
       /** Format: uuid */
       member_id: string;
+      member_name: string;
       /** Format: uuid */
       member_service_package_id: string | null;
       /** Format: date-time */
@@ -6011,8 +6013,10 @@ export interface components {
       id: string;
       /** Format: uuid */
       pt_sale_id: string;
+      pt_sale_description: string;
       /** Format: uuid */
       trainer_staff_profile_id: string;
+      trainer_display_name: string;
       gross_fee_snapshot: string;
       commission_percent_snapshot: string;
       commission_amount: string;
@@ -6025,6 +6029,7 @@ export interface components {
       paid_at: string | null;
       /** Format: uuid */
       created_by_membership_id: string;
+      created_by_display_name: string;
       /** Format: date-time */
       created_at: string;
     };
@@ -6033,8 +6038,10 @@ export interface components {
       id: string;
       /** Format: uuid */
       pt_sale_id: string;
+      pt_sale_description: string;
       /** Format: uuid */
       trainer_staff_profile_id: string;
+      trainer_display_name: string;
       gross_fee_snapshot: string;
       commission_percent_snapshot: string;
       commission_amount: string;
@@ -6047,6 +6054,7 @@ export interface components {
       paid_at: string | null;
       /** Format: uuid */
       created_by_membership_id: string;
+      created_by_display_name: string;
       /** Format: date-time */
       created_at: string;
       payments: components["schemas"]["PTCommissionPayment"][];

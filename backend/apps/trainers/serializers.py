@@ -776,9 +776,7 @@ def commission_display_labels(
             gym_id__in=gym_ids, id__in=missing_recorders
         ).select_related("user"):
             user = membership.user
-            name = " ".join(
-                part for part in (user.first_name, user.last_name) if part
-            ).strip()
+            name = " ".join(part for part in (user.first_name, user.last_name) if part).strip()
             recorders[str(membership.id)] = name or user.email
     return {"trainers": trainers, "sales": sales, "recorders": recorders}
 
@@ -972,8 +970,7 @@ def member_package_labels(rows: list[MemberServicePackage]) -> dict[str, str]:
 def member_package_payloads(rows: list[MemberServicePackage]) -> list[dict[str, object]]:
     labels = member_package_labels(rows)
     return [
-        member_package_payload(row, member_name=labels.get(str(row.member_id), ""))
-        for row in rows
+        member_package_payload(row, member_name=labels.get(str(row.member_id), "")) for row in rows
     ]
 
 
