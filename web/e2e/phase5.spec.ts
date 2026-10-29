@@ -99,7 +99,7 @@ test("owner assigns trainers and prepares the catalogs", async ({ page }) => {
   await expect(grant).toBeVisible();
   await pickMember(grant, "E2Escan", /E2Escan Visitor/);
   await selectByText(combo(grant, "Which pack?"), "CLASS · E2E_CLASS_PACK");
-  await grant.getByLabel("Short note", { exact: true }).fill("E2E class grant");
+  await grant.locator('textarea[name="reason"]').fill("E2E class grant");
   await runCommand(page, /\/member-service-packages\/?$/, () =>
     grant.getByRole("button", { name: "Save grant", exact: true }).click(),
   );

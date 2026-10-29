@@ -23,6 +23,17 @@ function useMinWidth(px: number): boolean {
   return matches;
 }
 
+function useNowMs(intervalMs = 15_000): number {
+  const [nowMs, setNowMs] = useState(0);
+  useEffect(() => {
+    const tick = () => setNowMs(Date.now());
+    tick();
+    const id = window.setInterval(tick, intervalMs);
+    return () => window.clearInterval(id);
+  }, [intervalMs]);
+  return nowMs;
+}
+
 import {
   Alert,
   CursorControls,
@@ -689,6 +700,7 @@ export function ClassesManager({
 }) {
   const tx = useTx();
   const wide = useMinWidth(768);
+  const nowMs = useNowMs();
   const defaultTo = shiftDate(today, 6);
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(defaultTo);
@@ -1069,7 +1081,7 @@ export function ClassesManager({
 
   function attend(row: ClassBooking) {
     if (pendingRef.current || !canAttend || row.status !== "BOOKED") return;
-    if (Date.now() < Date.parse(row.starts_at)) {
+    if (nowMs < Date.parse(row.starts_at)) {
       setNotice("");
       setError("Too early. Wait until the class starts, then mark attended.");
       return;
@@ -1083,7 +1095,7 @@ export function ClassesManager({
 
   function markNoShow(row: ClassBooking) {
     if (pendingRef.current || !canAttend || row.status !== "BOOKED") return;
-    if (Date.now() < Date.parse(row.ends_at)) {
+    if (nowMs < Date.parse(row.ends_at)) {
       setNotice("");
       setError("Too early. Wait until the class ends, then mark no-show.");
       return;
@@ -1974,13 +1986,11 @@ export function ClassesManager({
                                           className="button button-success button-sm w-full"
                                           disabled={
                                             pending ||
-                                            Date.now() <
-                                              Date.parse(row.starts_at)
+                                            nowMs < Date.parse(row.starts_at)
                                           }
                                           onClick={() => attend(row)}
                                           title={
-                                            Date.now() <
-                                            Date.parse(row.starts_at)
+                                            nowMs < Date.parse(row.starts_at)
                                               ? tx(
                                                   "Available after the class starts.",
                                                 )
@@ -1995,11 +2005,11 @@ export function ClassesManager({
                                           className="button button-warn button-sm w-full"
                                           disabled={
                                             pending ||
-                                            Date.now() < Date.parse(row.ends_at)
+                                            nowMs < Date.parse(row.ends_at)
                                           }
                                           onClick={() => markNoShow(row)}
                                           title={
-                                            Date.now() < Date.parse(row.ends_at)
+                                            nowMs < Date.parse(row.ends_at)
                                               ? tx(
                                                   "Available after the class ends.",
                                                 )
@@ -2147,12 +2157,12 @@ export function ClassesManager({
                                                 className="button button-success button-sm"
                                                 disabled={
                                                   pending ||
-                                                  Date.now() <
+                                                  nowMs <
                                                     Date.parse(row.starts_at)
                                                 }
                                                 onClick={() => attend(row)}
                                                 title={
-                                                  Date.now() <
+                                                  nowMs <
                                                   Date.parse(row.starts_at)
                                                     ? tx(
                                                         "Available after the class starts.",
@@ -2168,12 +2178,12 @@ export function ClassesManager({
                                                 className="button button-warn button-sm"
                                                 disabled={
                                                   pending ||
-                                                  Date.now() <
+                                                  nowMs <
                                                     Date.parse(row.ends_at)
                                                 }
                                                 onClick={() => markNoShow(row)}
                                                 title={
-                                                  Date.now() <
+                                                  nowMs <
                                                   Date.parse(row.ends_at)
                                                     ? tx(
                                                         "Available after the class ends.",
