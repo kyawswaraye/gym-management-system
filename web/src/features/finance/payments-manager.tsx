@@ -236,6 +236,12 @@ function productCorrection(payment: Payment): boolean {
   return payment.purpose === "PRODUCT" || payment.retail_sale_id !== null;
 }
 
+function chargePayment(payment: Payment): boolean {
+  return (
+    payment.entry_type === "CHARGE" && payment.original_payment_id === null
+  );
+}
+
 function legacyUnlinkedCash(payment: Payment): boolean {
   return (
     payment.status === "POSTED" &&
@@ -1204,6 +1210,7 @@ export function PaymentsManager({
                     )}
                     {payment.status === "POSTED" &&
                       canVoid &&
+                      chargePayment(payment) &&
                       !productCorrection(payment) && (
                         <button
                           className="button button-delete"
@@ -1219,6 +1226,7 @@ export function PaymentsManager({
                       )}
                     {payment.status === "POSTED" &&
                       canRefund &&
+                      chargePayment(payment) &&
                       !productCorrection(payment) && (
                         <button
                           className="button button-warn"
@@ -1515,213 +1523,226 @@ export function PaymentsManager({
                       />
                     </ActionPanel>
                   )}
-                  {action === "void" && !productCorrection(payment) && (
-                    <ActionPanel
-                      confirmLabel="Confirm void"
-                      error={formError}
-                      onCancel={() => setAction(null)}
-                      onSubmit={(form) => {
-                        const reason = text(form, "reason");
-                        if (!reason) return;
-                        const date = text(form, "business_date");
-                        const body: VoidPaymentRequest = { reason };
-                        if (date) body.business_date = date;
-                        if (
-                          payment.method === "CASH" &&
-                          !legacyUnlinkedCash(payment)
-                        ) {
-                          const sessionId = text(form, "cash_session_id");
-                          if (!sessionId) {
-                            setFields({
-                              cash_session_id:
-                                "Select the destination open session.",
-                            });
-                            return;
-                          }
-                          body.cash_session_id = sessionId;
-                        }
-                        setPending(true);
-                        void voidPayment(payment.id, body)
-                          .then(async (result) => {
-                            setCorrection(result);
-                            await afterChange(payment.id);
-                          })
-                          .catch((caught: unknown) =>
-                            fail(caught, "The payment could not be voided."),
-                          )
-                          .finally(() => setPending(false));
-                      }}
-                      pending={pending}
-                      title={tx("Void payment")}
-                    >
-                      <ReasonField error={fields.reason} label="Void reason" />
-                      <Field
-                        error={fields.business_date}
-                        label="Correction date"
-                      >
-                        <TextInput
-                          defaultValue={defaultDate}
-                          name="business_date"
-                          onChange={(event) =>
-                            setCorrectionDate(event.target.value)
-                          }
-                          type="date"
-                        />
-                      </Field>
-                      {legacyUnlinkedCash(payment) ? (
-                        <p className="text-sm text-slate-600">
-                          {" "}
-                          {tx(
-                            "This posted cash payment has no linked movement, so the void does not name a destination session.",
-                          )}{" "}
-                        </p>
-                      ) : payment.method === "CASH" ? (
-                        <CashSessionSelect
-                          collectionError={sessions.error}
-                          currency={payment.currency}
-                          error={fields.cash_session_id}
-                          label="Destination open session"
-                          pending={sessions.pending}
-                          sessions={sessions.sessions}
-                        />
-                      ) : null}
-                    </ActionPanel>
-                  )}
-                  {action === "refund" && !productCorrection(payment) && (
-                    <ActionPanel
-                      confirmLabel="Confirm refund"
-                      error={formError}
-                      onCancel={() => setAction(null)}
-                      onSubmit={(form) => {
-                        const amount = canonicalMoney(text(form, "amount"));
-                        const reason = text(form, "reason");
-                        const refundedMethod = text(
-                          form,
-                          "method",
-                        ) as PaymentMethod;
-                        const date = text(form, "business_date");
-                        if (!amount || !reason || !date) {
-                          setFields({
-                            amount:
-                              "Enter an exact refund amount such as 1.00.",
-                          });
-                          return;
-                        }
-                        const reference = text(form, "reference_number");
-                        const body: RefundPaymentRequest = {
-                          amount,
-                          reason,
-                          method: refundedMethod,
-                          business_date: date,
-                          ...(reference ? { reference_number: reference } : {}),
-                        };
-                        if (refundedMethod === "CASH") {
-                          const sessionId = text(form, "cash_session_id");
-                          if (!sessionId) {
-                            setFields({
-                              cash_session_id:
-                                "Select the destination open session.",
-                            });
-                            return;
-                          }
-                          body.cash_session_id = sessionId;
-                        }
-                        setPending(true);
-                        void refundPayment(payment.id, body)
-                          .then(async (result) => {
-                            setCorrection(result);
-                            await afterChange(payment.id);
-                          })
-                          .catch((caught: unknown) =>
-                            fail(caught, "The refund could not be recorded."),
-                          )
-                          .finally(() => setPending(false));
-                      }}
-                      pending={pending}
-                      title={tx("Refund payment")}
-                    >
-                      {correction && (
-                        <p>
-                          {" "}
-                          {tx("Refundable amount returned by the server:")}{" "}
-                          {correction.refundable_amount}.
-                        </p>
-                      )}
-                      <Field
-                        error={fields.amount}
-                        label="Refund amount"
-                        required
-                      >
-                        <TextInput
-                          autoComplete="off"
-                          inputMode="decimal"
-                          lang="en"
-                          name="amount"
-                          onChange={(event) => {
-                            const cleaned = englishMoneyInput(
-                              event.currentTarget.value,
-                            );
-                            if (cleaned !== event.currentTarget.value) {
-                              event.currentTarget.value = cleaned;
+                  {action === "void" &&
+                    chargePayment(payment) &&
+                    !productCorrection(payment) && (
+                      <ActionPanel
+                        confirmLabel="Confirm void"
+                        error={formError}
+                        onCancel={() => setAction(null)}
+                        onSubmit={(form) => {
+                          const reason = text(form, "reason");
+                          if (!reason) return;
+                          const date = text(form, "business_date");
+                          const body: VoidPaymentRequest = { reason };
+                          if (date) body.business_date = date;
+                          if (
+                            payment.method === "CASH" &&
+                            !legacyUnlinkedCash(payment)
+                          ) {
+                            const sessionId = text(form, "cash_session_id");
+                            if (!sessionId) {
+                              setFields({
+                                cash_session_id:
+                                  "Select the destination open session.",
+                              });
+                              return;
                             }
-                          }}
-                          required
-                        />
-                      </Field>
-                      <ReasonField
-                        error={fields.reason}
-                        label="Refund reason"
-                      />
-                      <Field
-                        error={fields.method}
-                        label="Refund method"
-                        required
-                      >
-                        <SelectInput
-                          name="method"
-                          onChange={(event) =>
-                            setRefundMethod(event.target.value as PaymentMethod)
+                            body.cash_session_id = sessionId;
                           }
-                          required
-                          value={refundMethod}
+                          setPending(true);
+                          void voidPayment(payment.id, body)
+                            .then(async (result) => {
+                              setCorrection(result);
+                              await afterChange(payment.id);
+                            })
+                            .catch((caught: unknown) =>
+                              fail(caught, "The payment could not be voided."),
+                            )
+                            .finally(() => setPending(false));
+                        }}
+                        pending={pending}
+                        title={tx("Void payment")}
+                      >
+                        <ReasonField
+                          error={fields.reason}
+                          label="Void reason"
+                        />
+                        <Field
+                          error={fields.business_date}
+                          label="Correction date"
                         >
-                          {METHODS.map((item) => (
-                            <option key={item} value={item}>
-                              {tx(pretty(item))}
-                            </option>
-                          ))}
-                        </SelectInput>
-                      </Field>
-                      <Field
-                        error={fields.business_date}
-                        label="Business date"
-                        required
-                      >
-                        <TextInput
-                          defaultValue={defaultDate}
-                          name="business_date"
-                          onChange={(event) =>
-                            setCorrectionDate(event.target.value)
+                          <TextInput
+                            defaultValue={defaultDate}
+                            name="business_date"
+                            onChange={(event) =>
+                              setCorrectionDate(event.target.value)
+                            }
+                            type="date"
+                          />
+                        </Field>
+                        {legacyUnlinkedCash(payment) ? (
+                          <p className="text-sm text-slate-600">
+                            {" "}
+                            {tx(
+                              "This posted cash payment has no linked movement, so the void does not name a destination session.",
+                            )}{" "}
+                          </p>
+                        ) : payment.method === "CASH" ? (
+                          <CashSessionSelect
+                            collectionError={sessions.error}
+                            currency={payment.currency}
+                            error={fields.cash_session_id}
+                            label="Destination open session"
+                            pending={sessions.pending}
+                            sessions={sessions.sessions}
+                          />
+                        ) : null}
+                      </ActionPanel>
+                    )}
+                  {action === "refund" &&
+                    chargePayment(payment) &&
+                    !productCorrection(payment) && (
+                      <ActionPanel
+                        confirmLabel="Confirm refund"
+                        error={formError}
+                        onCancel={() => setAction(null)}
+                        onSubmit={(form) => {
+                          const amount = canonicalMoney(text(form, "amount"));
+                          const reason = text(form, "reason");
+                          const refundedMethod = text(
+                            form,
+                            "method",
+                          ) as PaymentMethod;
+                          const date = text(form, "business_date");
+                          if (!amount || !reason || !date) {
+                            setFields({
+                              amount:
+                                "Enter an exact refund amount such as 1.00.",
+                            });
+                            return;
                           }
+                          const reference = text(form, "reference_number");
+                          const body: RefundPaymentRequest = {
+                            amount,
+                            reason,
+                            method: refundedMethod,
+                            business_date: date,
+                            ...(reference
+                              ? { reference_number: reference }
+                              : {}),
+                          };
+                          if (refundedMethod === "CASH") {
+                            const sessionId = text(form, "cash_session_id");
+                            if (!sessionId) {
+                              setFields({
+                                cash_session_id:
+                                  "Select the destination open session.",
+                              });
+                              return;
+                            }
+                            body.cash_session_id = sessionId;
+                          }
+                          setPending(true);
+                          void refundPayment(payment.id, body)
+                            .then(async (result) => {
+                              setCorrection(result);
+                              await afterChange(payment.id);
+                            })
+                            .catch((caught: unknown) =>
+                              fail(caught, "The refund could not be recorded."),
+                            )
+                            .finally(() => setPending(false));
+                        }}
+                        pending={pending}
+                        title={tx("Refund payment")}
+                      >
+                        {correction && (
+                          <p>
+                            {" "}
+                            {tx(
+                              "Refundable amount returned by the server:",
+                            )}{" "}
+                            {correction.refundable_amount}.
+                          </p>
+                        )}
+                        <Field
+                          error={fields.amount}
+                          label="Refund amount"
                           required
-                          type="date"
+                        >
+                          <TextInput
+                            autoComplete="off"
+                            inputMode="decimal"
+                            lang="en"
+                            name="amount"
+                            onChange={(event) => {
+                              const cleaned = englishMoneyInput(
+                                event.currentTarget.value,
+                              );
+                              if (cleaned !== event.currentTarget.value) {
+                                event.currentTarget.value = cleaned;
+                              }
+                            }}
+                            required
+                          />
+                        </Field>
+                        <ReasonField
+                          error={fields.reason}
+                          label="Refund reason"
                         />
-                      </Field>
-                      <Field label="Reference">
-                        <TextInput name="reference_number" />
-                      </Field>
-                      {refundMethod === "CASH" && (
-                        <CashSessionSelect
-                          collectionError={sessions.error}
-                          currency={payment.currency}
-                          error={fields.cash_session_id}
-                          label="Destination open session"
-                          pending={sessions.pending}
-                          sessions={sessions.sessions}
-                        />
-                      )}
-                    </ActionPanel>
-                  )}
+                        <Field
+                          error={fields.method}
+                          label="Refund method"
+                          required
+                        >
+                          <SelectInput
+                            name="method"
+                            onChange={(event) =>
+                              setRefundMethod(
+                                event.target.value as PaymentMethod,
+                              )
+                            }
+                            required
+                            value={refundMethod}
+                          >
+                            {METHODS.map((item) => (
+                              <option key={item} value={item}>
+                                {tx(pretty(item))}
+                              </option>
+                            ))}
+                          </SelectInput>
+                        </Field>
+                        <Field
+                          error={fields.business_date}
+                          label="Business date"
+                          required
+                        >
+                          <TextInput
+                            defaultValue={defaultDate}
+                            name="business_date"
+                            onChange={(event) =>
+                              setCorrectionDate(event.target.value)
+                            }
+                            required
+                            type="date"
+                          />
+                        </Field>
+                        <Field label="Reference">
+                          <TextInput name="reference_number" />
+                        </Field>
+                        {refundMethod === "CASH" && (
+                          <CashSessionSelect
+                            collectionError={sessions.error}
+                            currency={payment.currency}
+                            error={fields.cash_session_id}
+                            label="Destination open session"
+                            pending={sessions.pending}
+                            sessions={sessions.sessions}
+                          />
+                        )}
+                      </ActionPanel>
+                    )}
                 </div>
               </section>
             )}

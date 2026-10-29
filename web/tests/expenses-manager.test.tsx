@@ -10,6 +10,7 @@ import {
   voidExpense,
 } from "@/features/finance/client";
 import { ExpensesManager } from "@/features/finance/expenses-manager";
+import { getFileDownloadUrl } from "@/features/operations/client";
 import type { CashSession, Expense, ExpenseCategory } from "@/types/api";
 
 vi.mock("@/features/finance/client", () => ({
@@ -32,10 +33,16 @@ vi.mock("@/features/finance/receipt-file", () => ({
   uploadExpenseReceipt: vi.fn(),
 }));
 
+vi.mock("@/features/operations/client", () => ({
+  getFileDownloadUrl: vi.fn(),
+}));
+
 const EXPENSE_ID = "11111111-1111-4111-8111-111111111111";
 const CATEGORY_ID = "22222222-2222-4222-8222-222222222222";
 const SALARY_CATEGORY_ID = "33333333-3333-4333-8333-333333333333";
 const SESSION_ID = "44444444-4444-4444-8444-444444444444";
+const RECEIPT_ID = "55555555-5555-4555-8555-555555555555";
+const RECEIPT_URL = "https://files.example.com/expense-receipt.png";
 
 function category(overrides: Partial<ExpenseCategory> = {}): ExpenseCategory {
   return {
@@ -117,6 +124,11 @@ function till(): CashSession {
 describe("expenses", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn(() => "blob:expense-receipt"),
+      revokeObjectURL: vi.fn(),
+    });
     vi.mocked(listCashSessions).mockResolvedValue({
       data: [till()],
       meta: { has_more: false, next_after: null },
@@ -134,6 +146,10 @@ describe("expenses", () => {
       meta: { has_more: false, next_after: null },
     });
     vi.mocked(getExpense).mockResolvedValue(expense());
+    vi.mocked(getFileDownloadUrl).mockResolvedValue({
+      url: RECEIPT_URL,
+      contentType: "image/png",
+    });
   });
 
   it("keeps protected categories immutable and requires a cash session", async () => {
@@ -189,6 +205,60 @@ describe("expenses", () => {
     });
   });
 
+  it("hides void on a posted reversal expense", async () => {
+    const reversalId = "66666666-6666-4666-8666-666666666666";
+    vi.mocked(listExpenses).mockResolvedValue({
+      data: [
+        expense({
+          id: reversalId,
+          status: "POSTED",
+          description: "Reversal: Cleaning supplies",
+          original_expense_id: EXPENSE_ID,
+        }),
+      ],
+      meta: { has_more: false, next_after: null },
+    });
+    vi.mocked(getExpense).mockResolvedValue(
+      expense({
+        id: reversalId,
+        status: "POSTED",
+        description: "Reversal: Cleaning supplies",
+        original_expense_id: EXPENSE_ID,
+      }),
+    );
+    render(
+      <ExpensesManager
+        canApprove={false}
+        canCreate={false}
+        canManageCategories={false}
+        canSubmit={false}
+        canUpdate={false}
+        canUploadReceipt={false}
+        canVoid
+        currency="THB"
+        gymId="99999999-9999-4999-8999-999999999999"
+        defaultDate="2026-10-18"
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Reversal: Cleaning supplies",
+      }),
+    );
+    expect(
+      await screen.findByText((value, element) => {
+        return (
+          element?.tagName.toLowerCase() === "p" &&
+          value === "Reversal: Cleaning supplies"
+        );
+      }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Void" }),
+    ).not.toBeInTheDocument();
+    expect(voidExpense).not.toHaveBeenCalled();
+  });
+
   it("explains a protected salary expense and hides its void", async () => {
     vi.mocked(listExpenses).mockResolvedValue({
       data: [expense({ category_id: SALARY_CATEGORY_ID, status: "POSTED" })],
@@ -219,5 +289,105 @@ describe("expenses", () => {
       screen.queryByRole("button", { name: "Void" }),
     ).not.toBeInTheDocument();
     expect(voidExpense).not.toHaveBeenCalled();
+  });
+
+  it("previews an attached receipt on the expense detail", async () => {
+    const draft = expense({
+      status: "DRAFT",
+      receipt_file_asset_id: RECEIPT_ID,
+      submitted_at: null,
+      submitted_by_membership_id: null,
+    });
+    vi.mocked(listExpenses).mockResolvedValue({
+      data: [draft],
+      meta: { has_more: false, next_after: null },
+    });
+    vi.mocked(getExpense).mockResolvedValue(draft);
+    let releaseDownload: (value: {
+      url: string;
+      contentType: "image/png";
+    }) => void = () => undefined;
+    vi.mocked(getFileDownloadUrl).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseDownload = resolve;
+        }),
+    );
+    render(
+      <ExpensesManager
+        canApprove={false}
+        canCreate={false}
+        canManageCategories={false}
+        canSubmit={false}
+        canUpdate
+        canUploadReceipt
+        canVoid={false}
+        currency="THB"
+        gymId="99999999-9999-4999-8999-999999999999"
+        defaultDate="2026-10-18"
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Cleaning supplies" }),
+    );
+    expect(
+      await screen.findByText("Loading the receipt evidence."),
+    ).toBeVisible();
+    releaseDownload({ url: RECEIPT_URL, contentType: "image/png" });
+    expect(
+      await screen.findByRole("img", { name: "Receipt evidence" }),
+    ).toHaveAttribute("src", RECEIPT_URL);
+    expect(screen.getByText("Loading the receipt evidence.")).toBeVisible();
+    fireEvent.load(screen.getByRole("img", { name: "Receipt evidence" }));
+    expect(getFileDownloadUrl).toHaveBeenCalledWith(RECEIPT_ID);
+    expect(
+      screen.queryByText("Loading the receipt evidence."),
+    ).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Edit draft" }));
+    expect(
+      await screen.findAllByRole("img", { name: "Receipt evidence" }),
+    ).not.toHaveLength(0);
+  });
+
+  it("previews a newly chosen receipt file before upload", async () => {
+    vi.mocked(listExpenses).mockResolvedValue({
+      data: [],
+      meta: { has_more: false, next_after: null },
+    });
+    render(
+      <ExpensesManager
+        canApprove={false}
+        canCreate
+        canManageCategories={false}
+        canSubmit={false}
+        canUpdate={false}
+        canUploadReceipt
+        canVoid={false}
+        currency="THB"
+        gymId="99999999-9999-4999-8999-999999999999"
+        defaultDate="2026-10-18"
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Record an expense" }),
+    );
+    const input = document.querySelector(
+      'input[name="receipt"]',
+    ) as HTMLInputElement;
+    expect(input).toBeTruthy();
+    fireEvent.change(input, {
+      target: {
+        files: [new File(["receipt"], "receipt.png", { type: "image/png" })],
+      },
+    });
+    expect(
+      await screen.findByRole("img", { name: "Receipt evidence" }),
+    ).toHaveAttribute("src", "blob:expense-receipt");
+    expect(screen.getByText("Loading the receipt evidence.")).toBeVisible();
+    fireEvent.load(screen.getByRole("img", { name: "Receipt evidence" }));
+    expect(
+      screen.queryByText("Loading the receipt evidence."),
+    ).not.toBeInTheDocument();
+    expect(getFileDownloadUrl).not.toHaveBeenCalled();
   });
 });

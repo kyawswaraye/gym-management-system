@@ -97,6 +97,7 @@ export function FormDialog({
   title,
   description,
   pending = false,
+  pendingLabel = "Saving…",
   onClose,
   onSubmit,
   children,
@@ -108,6 +109,7 @@ export function FormDialog({
   title: string;
   description?: string | undefined;
   pending?: boolean;
+  pendingLabel?: string;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
   children: ReactNode;
@@ -181,7 +183,17 @@ export function FormDialog({
             {tx("Close")}{" "}
           </button>
         </div>
-        <div className="grid gap-4 px-5 py-4 sm:px-6">{children}</div>
+        <div className="grid gap-4 px-5 py-4 sm:px-6">
+          {pending ? (
+            <p
+              aria-live="polite"
+              className="text-sm font-medium text-slate-600"
+            >
+              {tx(pendingLabel)}
+            </p>
+          ) : null}
+          {children}
+        </div>
       </form>
     </div>
   );

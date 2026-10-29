@@ -102,6 +102,7 @@ export const financeEn = {
   "Loading the printer test.": "Loading the printer test.",
   "Loading the product.": "Loading the product.",
   "Loading the receipt.": "Loading the receipt.",
+  "Loading the receipt evidence.": "Loading the receipt evidence.",
   "Loading the receipt preview.": "Loading the receipt preview.",
   "Loading the salary period.": "Loading the salary period.",
   "Loading the sale.": "Loading the sale.",
@@ -335,6 +336,8 @@ export const financeEn = {
   "Try another status, register, or date.":
     "Try another status, register, or date.",
   "Try another status.": "Try another status.",
+  "Unable to display the receipt evidence.":
+    "Unable to display the receipt evidence.",
   "Unable to search products.": "Unable to search products.",
   "Unable to upload the receipt.": "Unable to upload the receipt.",
   "Unit cost": "Unit cost",
@@ -463,6 +466,7 @@ export const financeMm = {
   "Loading the printer test.": "ပရင်တာစမ်းသပ်ချက်ကို ရယူနေပါသည်။",
   "Loading the product.": "ကုန်ပစ္စည်းကို ရယူနေပါသည်။",
   "Loading the receipt.": "ပြေစာကို ရယူနေပါသည်။",
+  "Loading the receipt evidence.": "ပြေစာအထောက်အထားကို ရယူနေပါသည်။",
   "Loading the receipt preview.": "ပြေစာနမူနာကို ရယူနေပါသည်။",
   "Loading the salary period.": "လစာကာလကို ရယူနေပါသည်။",
   "Loading the sale.": "အရောင်းကို ရယူနေပါသည်။",
@@ -695,6 +699,7 @@ export const financeMm = {
   "Try another status, register, or date.":
     "အခြားအခြေအနေ၊ အရောင်းကောင်တာ သို့မဟုတ် ရက်စွဲဖြင့် ပြန်စစ်ကြည့်ပါ။",
   "Try another status.": "အခြားအခြေအနေဖြင့် ပြန်စစ်ကြည့်ပါ။",
+  "Unable to display the receipt evidence.": "ပြေစာအထောက်အထားကို ပြ၍မရပါ။",
   "Unable to search products.": "ကုန်ပစ္စည်းများကို ရှာ၍ မရပါ။",
   "Unable to upload the receipt.": "ပြေစာပုံကို တင်၍ မရပါ။",
   "Unit cost": "တစ်ခုလျှင် ကုန်ကျစရိတ်",
