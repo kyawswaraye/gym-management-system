@@ -17,7 +17,7 @@ import {
 } from "@/features/operations/myanmar-place-fields";
 import { formatAppDateTime } from "@/lib/date";
 import type {
-  OwnerItem,
+  LoginAccountItem,
   PlatformAuditItem,
   PlatformGymDetail,
   PlatformSubscription,
@@ -70,7 +70,7 @@ export function GymDetailManager({
   const locale = useLocale();
   const [gym, setGym] = useState<PlatformGymDetail | null>(null);
   const [plans, setPlans] = useState<PlatformSubscription[]>([]);
-  const [owners, setOwners] = useState<OwnerItem[]>([]);
+  const [accounts, setAccounts] = useState<LoginAccountItem[]>([]);
   const [audits, setAudits] = useState<PlatformAuditItem[]>([]);
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -83,13 +83,13 @@ export function GymDetailManager({
   const [success, setSuccess] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    const [detail, subscriptions, ownerRows, auditCollection] =
+    const [detail, subscriptions, loginAccounts, auditCollection] =
       await Promise.all([
         platformGet<PlatformGymDetail>(`admin/gyms/${gymId}`),
         capabilities.canManageSubscriptions
           ? platformGet<PlatformSubscription[]>("admin/subscriptions")
           : Promise.resolve([]),
-        platformGet<OwnerItem[]>(`admin/gyms/${gymId}/owners`),
+        platformGet<LoginAccountItem[]>(`admin/gyms/${gymId}/login-accounts`),
         capabilities.canViewAudit
           ? platformGetCollection<PlatformAuditItem>(
               `admin/audit-logs?target_gym_id=${encodeURIComponent(gymId)}`,
@@ -99,7 +99,7 @@ export function GymDetailManager({
     return {
       detail,
       subscriptions,
-      owners: ownerRows,
+      accounts: loginAccounts,
       audits: auditCollection?.data ?? [],
     };
   }, [capabilities.canManageSubscriptions, capabilities.canViewAudit, gymId]);
@@ -111,7 +111,7 @@ export function GymDetailManager({
         if (active) {
           setGym(data.detail);
           setPlans([...data.subscriptions].sort(compareSubscriptionPlans));
-          setOwners(data.owners);
+          setAccounts(data.accounts);
           setAudits(data.audits);
         }
       })
@@ -197,7 +197,7 @@ export function GymDetailManager({
       const data = await fetchData();
       setGym(data.detail);
       setPlans([...data.subscriptions].sort(compareSubscriptionPlans));
-      setOwners(data.owners);
+      setAccounts(data.accounts);
       setAudits(data.audits);
     } catch (reason) {
       setError(
@@ -234,7 +234,7 @@ export function GymDetailManager({
       const data = await fetchData();
       setGym(data.detail);
       setPlans([...data.subscriptions].sort(compareSubscriptionPlans));
-      setOwners(data.owners);
+      setAccounts(data.accounts);
       setAudits(data.audits);
     } catch (failure) {
       setError(
@@ -268,7 +268,7 @@ export function GymDetailManager({
       );
       form.reset();
       const data = await fetchData();
-      setOwners(data.owners);
+      setAccounts(data.accounts);
       setAudits(data.audits);
     } catch (failure) {
       setError(
@@ -279,9 +279,15 @@ export function GymDetailManager({
     }
   }
 
-  function ownerName(owner: OwnerItem): string {
-    const name = `${owner.first_name} ${owner.last_name}`.trim();
-    return name || owner.email;
+  function accountName(account: LoginAccountItem): string {
+    const name = `${account.first_name} ${account.last_name}`.trim();
+    return name || account.email;
+  }
+
+  function accountRoles(account: LoginAccountItem): string {
+    if (account.is_owner) return tx("Owner");
+    if (account.role_keys.length === 0) return tx("Staff");
+    return account.role_keys.map((key) => tx(key)).join(" · ");
   }
 
   if (!gym && !error) return <p className="muted">{tx("Loading gym…")}</p>;
@@ -329,7 +335,7 @@ export function GymDetailManager({
               </span>
             </div>
             <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Fact label="Email" value={gym.email} />
+              <Fact label="Gym contact email" value={gym.email} />
               <Fact label="Phone" value={gym.phone} />
               <Fact label="Plan" value={gym.subscription_plan_name ?? ""} />
               <Fact label="Timezone" value={gym.timezone} />
@@ -342,33 +348,38 @@ export function GymDetailManager({
             </dl>
           </section>
 
-          <section className={panelClass} aria-labelledby="gym-owners-title">
-            <h2 id="gym-owners-title" className="text-xl font-bold">
-              {tx("Owners")}
+          <section
+            className={panelClass}
+            aria-labelledby="gym-login-accounts-title"
+          >
+            <h2 id="gym-login-accounts-title" className="text-xl font-bold">
+              {tx("Login emails")}
             </h2>
             <p className="muted mt-2 text-sm">
-              {tx("Active and pending owners for this gym.")}
+              {tx(
+                "Owner and staff login emails for this gym. Passwords are never shown.",
+              )}
             </p>
-            {owners.length === 0 ? (
+            {accounts.length === 0 ? (
               <p className="mt-4 text-sm text-slate-600">
-                {tx("No owners are listed.")}
+                {tx("No login emails are listed.")}
               </p>
             ) : (
-              <ul className="mt-4 grid gap-3" aria-label={tx("Owners")}>
-                {owners.map((owner) => (
+              <ul className="mt-4 grid gap-3" aria-label={tx("Login emails")}>
+                {accounts.map((account) => (
                   <li
                     className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-                    key={owner.gym_membership_id}
+                    key={account.gym_membership_id}
                   >
                     <p className="font-semibold text-slate-900">
-                      {ownerName(owner)}
+                      {accountName(account)}
                     </p>
-                    <p className="mt-1 break-all text-sm text-slate-700">
-                      {owner.email}
+                    <p className="mt-1 break-all text-base font-semibold text-slate-900">
+                      {account.email}
                     </p>
                     <p className="mt-1 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                      {tx(owner.status)}
-                      {owner.phone ? ` · ${owner.phone}` : ""}
+                      {accountRoles(account)} · {tx(account.status)}
+                      {account.phone ? ` · ${account.phone}` : ""}
                     </p>
                   </li>
                 ))}

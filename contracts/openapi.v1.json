@@ -636,6 +636,72 @@
                 }
             }
         },
+        "/api/v1/admin/gyms/{gym_id}/login-accounts/": {
+            "get": {
+                "operationId": "admin_gym_login_accounts_list",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "gym_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "security": [
+                    {
+                        "platformBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LoginAccountListEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/admin/gyms/{gym_id}/owners/": {
             "get": {
                 "operationId": "admin_gym_owners_list",
@@ -29655,6 +29721,93 @@
                 "required": [
                     "has_more",
                     "next_after"
+                ]
+            },
+            "LoginAccountItem": {
+                "type": "object",
+                "properties": {
+                    "gym_membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "first_name": {
+                        "type": "string"
+                    },
+                    "last_name": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "is_owner": {
+                        "type": "boolean"
+                    },
+                    "authz_version": {
+                        "type": "integer"
+                    },
+                    "invited_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "activated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "role_keys": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "activated_at",
+                    "authz_version",
+                    "email",
+                    "first_name",
+                    "gym_membership_id",
+                    "invited_at",
+                    "is_owner",
+                    "last_name",
+                    "phone",
+                    "role_keys",
+                    "status",
+                    "user_id"
+                ]
+            },
+            "LoginAccountListEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/LoginAccountItem"
+                        }
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message"
                 ]
             },
             "LoginEnvelope": {

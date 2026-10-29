@@ -21,6 +21,7 @@ from apps.tenants.views import (
     AdminGymActivateView,
     AdminGymDetailView,
     AdminGymListCreateView,
+    AdminGymLoginAccountsView,
     AdminGymOwnerCreateView,
     AdminGymSuspendView,
     AdminSubscriptionDetailView,
@@ -55,6 +56,11 @@ urlpatterns = [
         "admin/gyms/<uuid:gym_id>/suspend/",
         AdminGymSuspendView.as_view(),
         name="admin-gym-suspend",
+    ),
+    path(
+        "admin/gyms/<uuid:gym_id>/login-accounts/",
+        AdminGymLoginAccountsView.as_view(),
+        name="admin-gym-login-accounts",
     ),
     path(
         "admin/gyms/<uuid:gym_id>/owners/",

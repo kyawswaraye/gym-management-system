@@ -227,6 +227,16 @@ class OwnerItemSerializer(serializers.Serializer):
     activated_at = serializers.DateTimeField(allow_null=True)
 
 
+class LoginAccountItemSerializer(OwnerItemSerializer):
+    role_keys = serializers.ListField(child=serializers.CharField())
+
+
+class LoginAccountListEnvelopeSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    data = LoginAccountItemSerializer(many=True)
+    message = serializers.CharField()
+
+
 class OwnerInvitationSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     gym_membership_id = serializers.UUIDField()

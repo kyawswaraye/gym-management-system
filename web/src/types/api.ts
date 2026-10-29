@@ -43,6 +43,7 @@ export type GymSettings = components["schemas"]["GymSettings"];
 export type GymSettingsUpdate =
   components["schemas"]["PatchedGymSettingsUpdateRequest"];
 export type OwnerItem = components["schemas"]["OwnerItem"];
+export type LoginAccountItem = components["schemas"]["LoginAccountItem"];
 export type OwnerInvitation = components["schemas"]["OwnerInvitation"];
 export type PlatformSubscription = components["schemas"]["AdminSubscription"];
 export type GymProvisionRequest =

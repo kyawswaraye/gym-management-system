@@ -84,6 +84,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/admin/gyms/{gym_id}/login-accounts/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["admin_gym_login_accounts_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/admin/gyms/{gym_id}/owners/": {
     parameters: {
       query?: never;
@@ -4996,6 +5012,31 @@ export interface components {
       has_more: boolean;
       next_after: string | null;
     };
+    LoginAccountItem: {
+      /** Format: uuid */
+      gym_membership_id: string;
+      /** Format: uuid */
+      user_id: string;
+      /** Format: email */
+      email: string;
+      first_name: string;
+      last_name: string;
+      phone: string;
+      status: string;
+      is_owner: boolean;
+      authz_version: number;
+      /** Format: date-time */
+      invited_at: string | null;
+      /** Format: date-time */
+      activated_at: string | null;
+      role_keys: string[];
+    };
+    LoginAccountListEnvelope: {
+      /** @default true */
+      success: boolean;
+      data: components["schemas"]["LoginAccountItem"][];
+      message: string;
+    };
     LoginEnvelope:
       | components["schemas"]["DirectLoginEnvelope"]
       | components["schemas"]["SelectionLoginEnvelope"]
@@ -8610,6 +8651,51 @@ export interface operations {
         };
       };
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  admin_gym_login_accounts_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        gym_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LoginAccountListEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
         headers: {
           [name: string]: unknown;
         };

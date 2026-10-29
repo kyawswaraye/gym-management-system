@@ -46,6 +46,7 @@ from apps.tenants.serializers import (
     GymSettingsEnvelopeSerializer,
     GymSettingsSerializer,
     GymSettingsUpdateSerializer,
+    LoginAccountListEnvelopeSerializer,
     OwnerAcceptInputSerializer,
     OwnerInvitationEnvelopeSerializer,
     OwnerInviteInputSerializer,
@@ -60,6 +61,7 @@ from apps.tenants.services import (
     cancel_owner_invitation,
     canonical_provisioning_hash,
     invite_owner,
+    login_account_data,
     owner_invitation_data,
     owner_membership_data,
     platform_dashboard_counts,
@@ -70,6 +72,7 @@ from apps.tenants.services import (
     update_gym_profile,
     update_gym_settings,
     update_subscription_plan_from_admin,
+    visible_login_memberships,
     visible_owner_memberships,
 )
 from apps.users.authentication import PlatformJWTAuthentication, StaffJWTAuthentication
@@ -605,6 +608,26 @@ class OwnerInvitationCancelView(APIView):
         except GymMembership.DoesNotExist:
             raise Http404 from None
         return success_response(owner_membership_data(owner), message="Owner invitation removed")
+
+
+class AdminGymLoginAccountsView(APIView):
+    authentication_classes = [PlatformJWTAuthentication]
+    permission_classes = [IsAuthenticated, RequiresPlatformPermissions]
+    required_permissions: tuple[str, ...] = ("platform.gyms.view",)
+
+    @extend_schema(
+        operation_id="admin_gym_login_accounts_list",
+        responses={
+            200: LoginAccountListEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def get(self, request: Request, gym_id: uuid.UUID) -> Response:
+        gym = get_object_or_404(Gym, id=gym_id)
+        accounts = visible_login_memberships(gym)
+        return success_response([login_account_data(account) for account in accounts])
 
 
 class AdminGymOwnerCreateView(APIView):

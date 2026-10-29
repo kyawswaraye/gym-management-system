@@ -7,6 +7,12 @@ export const platformEn = {
   "Active and pending owners for this gym.":
     "Active and pending owners for this gym.",
   "Add Owner": "Add Owner",
+  "Gym contact email": "Gym contact email",
+  "Login emails": "Login emails",
+  "No login emails are listed.": "No login emails are listed.",
+  "Owner and staff login emails for this gym. Passwords are never shown.":
+    "Owner and staff login emails for this gym. Passwords are never shown.",
+  Staff: "Staff",
   "Any gym": "Any gym",
   "Audit timeline": "Audit timeline",
   "Billing interval for": "Billing interval for",
@@ -127,6 +133,12 @@ export const platformMm = {
   "Active and pending owners for this gym.":
     "ဤ Gym အတွက် အသုံးပြုနေသောနှင့် ဆိုင်းငံ့ထားသော ပိုင်ရှင်များ။",
   "Add Owner": "ပိုင်ရှင် ထည့်ရန်",
+  "Gym contact email": "Gym ဆက်သွယ်ရန် အီးမေးလ်",
+  "Login emails": "Login အီးမေးလ်များ",
+  "No login emails are listed.": "Login အီးမေးလ် မဖော်ပြထားပါ။",
+  "Owner and staff login emails for this gym. Passwords are never shown.":
+    "ဤ Gym အတွက် ပိုင်ရှင်နှင့် staff login အီးမေးလ်များ။ စကားဝှက်ကို ဘယ်တော့မှ မပြပါ။",
+  Staff: "Staff",
   "Any gym": "မည်သည့် Gym မဆို",
   "Audit timeline": "စာရင်းစစ် အချိန်စဉ်",
   "Billing interval for": "ဤကုဒ်အတွက် ငွေတောင်းခံကာလ",

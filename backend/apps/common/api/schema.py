@@ -27,6 +27,7 @@ def phase_1a_endpoints(endpoints: list[Endpoint]) -> list[Endpoint]:
             "/api/v1/admin/gyms/",
             "/api/v1/admin/gyms/{gym_id}/",
             "/api/v1/admin/gyms/{gym_id}/activate/",
+            "/api/v1/admin/gyms/{gym_id}/login-accounts/",
             "/api/v1/admin/gyms/{gym_id}/owners/",
             "/api/v1/admin/gyms/{gym_id}/suspend/",
             "/api/v1/admin/subscriptions/",

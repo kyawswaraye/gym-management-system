@@ -229,19 +229,41 @@ def owner_invitation_data(invitation: StaffInvitation) -> dict[str, object]:
     }
 
 
-def visible_owner_memberships(gym: Gym) -> list[GymMembership]:
-    """List owners, keeping an invite only while its link can still be accepted."""
-
-    pending_membership_ids = StaffInvitation.objects.filter(
+def _pending_invitation_membership_ids(gym: Gym):
+    return StaffInvitation.objects.filter(
         gym=gym,
         status=StaffInvitation.Status.PENDING,
         expires_at__gt=timezone.now(),
     ).values("gym_membership_id")
+
+
+def visible_owner_memberships(gym: Gym) -> list[GymMembership]:
+    """List owners, keeping an invite only while its link can still be accepted."""
+
+    pending_membership_ids = _pending_invitation_membership_ids(gym)
     return list(
         GymMembership.objects.filter(gym=gym, is_owner=True)
         .select_related("user")
         .filter(~Q(status=GymMembership.Status.INVITED) | Q(id__in=pending_membership_ids))
         .order_by("user__normalized_email", "id")
+    )
+
+
+def visible_login_memberships(gym: Gym) -> list[GymMembership]:
+    """List Owner and staff login accounts for Super Admin assistance.
+
+    Shows login emails only. Member customer records stay outside this read.
+    Expired invites leave the list; live pending invites remain.
+    """
+
+    pending_membership_ids = _pending_invitation_membership_ids(gym)
+    return list(
+        GymMembership.objects.filter(gym=gym)
+        .exclude(status=GymMembership.Status.REVOKED)
+        .select_related("user")
+        .prefetch_related("gymmembershiprole_set__role")
+        .filter(~Q(status=GymMembership.Status.INVITED) | Q(id__in=pending_membership_ids))
+        .order_by("-is_owner", "user__normalized_email", "id")
     )
 
 
@@ -258,6 +280,20 @@ def owner_membership_data(membership: GymMembership) -> dict[str, object]:
         "authz_version": membership.authz_version,
         "invited_at": membership.invited_at,
         "activated_at": membership.activated_at,
+    }
+
+
+def login_account_data(membership: GymMembership) -> dict[str, object]:
+    role_keys = sorted(
+        {
+            assignment.role.key
+            for assignment in membership.gymmembershiprole_set.all()
+            if assignment.role.is_active
+        }
+    )
+    return {
+        **owner_membership_data(membership),
+        "role_keys": role_keys,
     }
 
 

@@ -55,7 +55,7 @@ describe("Super Admin gym detail manager", () => {
     vi.clearAllMocks();
     getItem.mockImplementation(async (path: string) => {
       if (path === `admin/gyms/${gym.id}`) return gym;
-      if (path === `admin/gyms/${gym.id}/owners`) {
+      if (path === `admin/gyms/${gym.id}/login-accounts`) {
         return [
           {
             gym_membership_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -69,6 +69,21 @@ describe("Super Admin gym detail manager", () => {
             authz_version: 1,
             invited_at: null,
             activated_at: "2026-09-30T00:00:00Z",
+            role_keys: ["OWNER"],
+          },
+          {
+            gym_membership_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            user_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            email: "trainer@example.test",
+            first_name: "Tim",
+            last_name: "Trainer",
+            phone: "",
+            status: "ACTIVE",
+            is_owner: false,
+            authz_version: 1,
+            invited_at: null,
+            activated_at: "2026-09-30T00:00:00Z",
+            role_keys: ["TRAINER"],
           },
         ];
       }
@@ -119,10 +134,12 @@ describe("Super Admin gym detail manager", () => {
     expect(await screen.findByText("Yangon Fitness")).toBeInTheDocument();
     expect(screen.getByText("Ada Owner")).toBeInTheDocument();
     expect(screen.getByText("owner@example.test")).toBeInTheDocument();
+    expect(screen.getByText("trainer@example.test")).toBeInTheDocument();
+    expect(screen.getByText("Login emails")).toBeInTheDocument();
     expect(screen.getByText("GYM_UPDATED")).toBeInTheDocument();
     expect(screen.queryByText("Gym settings")).not.toBeInTheDocument();
     expect(screen.queryByText("Lifecycle")).not.toBeInTheDocument();
-    expect(getItem).toHaveBeenCalledWith(`admin/gyms/${gym.id}/owners`);
+    expect(getItem).toHaveBeenCalledWith(`admin/gyms/${gym.id}/login-accounts`);
     expect(getCollection).toHaveBeenCalledWith(
       `admin/audit-logs?target_gym_id=${gym.id}`,
     );

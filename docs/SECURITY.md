@@ -181,7 +181,7 @@ Platform permissions use the `platform.*` namespace and are evaluated outside or
 | Stable permission code          | SUPER_ADMIN | Scope and condition                                                                                                 |
 | ------------------------------- | ----------: | ------------------------------------------------------------------------------------------------------------------- |
 | `platform.dashboard.view`       |           A | View bounded platform operational summaries; not tenant business records.                                           |
-| `platform.gyms.view`            |           A | View gym identity, lifecycle, and subscription metadata; not tenant business records.                               |
+| `platform.gyms.view`            |           A | View gym identity, lifecycle, subscription metadata, and Owner/staff login emails for assistance; not member customers or other tenant business records. |
 | `platform.gyms.create`          |           A | Create a gym through the audited provisioning workflow.                                                             |
 | `platform.gyms.update`          |           A | Update gym identity and approved lifecycle metadata.                                                                |
 | `platform.gyms.activate`        |           A | Activate an eligible gym with reason and policy checks.                                                             |
