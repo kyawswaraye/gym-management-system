@@ -1608,18 +1608,16 @@ def test_platform_assisted_owner_creation_requires_mfa_and_permission() -> None:
     platform_headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
     listed = client.get(f"/api/v1/admin/gyms/{gym_id}/owners/", **platform_headers)
     assert listed.status_code == 200, listed.content
-    assert {
-        row["email"] for row in listed.json()["data"]
-    } == {"assisted-initial-owner@example.test"}
+    assert {row["email"] for row in listed.json()["data"]} == {
+        "assisted-initial-owner@example.test"
+    }
     login_accounts = client.get(
         f"/api/v1/admin/gyms/{gym_id}/login-accounts/",
         **platform_headers,
     )
     assert login_accounts.status_code == 200, login_accounts.content
     account_rows = login_accounts.json()["data"]
-    assert {
-        row["email"] for row in account_rows
-    } == {"assisted-initial-owner@example.test"}
+    assert {row["email"] for row in account_rows} == {"assisted-initial-owner@example.test"}
     assert account_rows[0]["is_owner"] is True
     assert "OWNER" in account_rows[0]["role_keys"]
     blocked = client.post(
