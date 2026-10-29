@@ -33,6 +33,10 @@ import { FormDialog } from "@/components/form-dialog";
 import { fieldMap, financeError } from "@/features/finance/errors";
 import { canonicalMoney } from "@/features/finance/money";
 import { useCursorPages } from "@/features/finance/paging";
+import {
+  ReceiptEvidenceField,
+  ReceiptEvidencePreview,
+} from "@/features/finance/receipt-evidence-field";
 import { uploadExpenseReceipt } from "@/features/finance/receipt-file";
 import {
   Alert,
@@ -370,14 +374,9 @@ function ExpenseFields({
       </div>
       {canUploadReceipt ? (
         <div className={span}>
-          <Field label="Receipt evidence">
-            <input
-              accept="image/jpeg,image/png,image/webp"
-              className="input"
-              name="receipt"
-              type="file"
-            />
-          </Field>
+          <ReceiptEvidenceField
+            attachedFileId={expense?.receipt_file_asset_id}
+          />
         </div>
       ) : null}
     </div>
@@ -940,6 +939,16 @@ export function ExpensesManager({
                         ]}
                       />
                     </div>
+                    {detail.receipt_file_asset_id ? (
+                      <div className="px-5 pb-4">
+                        <p className="mb-2 text-xs font-medium text-slate-500">
+                          {tx("Receipt evidence")}
+                        </p>
+                        <ReceiptEvidencePreview
+                          fileId={detail.receipt_file_asset_id}
+                        />
+                      </div>
+                    ) : null}
                     {detail.policy_note ? (
                       <div className="px-5 pb-4">
                         <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-200/80">
