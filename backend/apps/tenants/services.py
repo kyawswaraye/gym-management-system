@@ -229,7 +229,7 @@ def owner_invitation_data(invitation: StaffInvitation) -> dict[str, object]:
     }
 
 
-def _pending_invitation_membership_ids(gym: Gym):
+def _pending_invitation_membership_ids(gym: Gym) -> Any:
     return StaffInvitation.objects.filter(
         gym=gym,
         status=StaffInvitation.Status.PENDING,
