@@ -152,7 +152,9 @@ describe("Super Admin gym detail manager", () => {
     fireEvent.change(within(dialog).getByLabelText("Name *"), {
       target: { value: "" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Save changes" }),
+    );
     expect(within(dialog).getByRole("alert")).toHaveTextContent(
       "Enter a gym name.",
     );
