@@ -134,11 +134,13 @@ function rowLabel(
 
 export function CommissionsManager({
   canPay,
+  canPayOwn = false,
   currency,
   today,
   membershipId,
 }: {
   canPay: boolean;
+  canPayOwn?: boolean;
   currency: string;
   today: string;
   membershipId: string;
@@ -180,8 +182,9 @@ export function CommissionsManager({
     selected.status !== "PAID" &&
     selected.status !== "VOID" &&
     selected.outstanding_amount !== "0.00";
-  const payerDiffers = selected?.created_by_membership_id !== membershipId;
-  const showPayout = canPay && outstanding && payerDiffers;
+  const ownAccrual = selected?.created_by_membership_id === membershipId;
+  const showPayout = canPay && outstanding && (canPayOwn || !ownAccrual);
+  const blockOwnPayout = canPay && outstanding && ownAccrual && !canPayOwn;
   const balanceCurrency = selected?.currency || currency;
 
   useEffect(() => {
@@ -531,7 +534,7 @@ export function CommissionsManager({
 
         <CommissionDetail
           balanceCurrency={balanceCurrency}
-          canPay={canPay}
+          blockOwnPayout={blockOwnPayout}
           detailPending={detailPending}
           loadError={loadError}
           notice={notice}
@@ -539,9 +542,7 @@ export function CommissionsManager({
           onRetry={() => {
             if (requestedId) void openRow(requestedId);
           }}
-          outstanding={outstanding}
           payButtonRef={payButtonRef}
-          payerDiffers={payerDiffers}
           paying={paying}
           selected={selected}
           showPayout={showPayout}
@@ -652,9 +653,7 @@ function CommissionDetail({
   notice,
   detailPending,
   loadError,
-  canPay,
-  outstanding,
-  payerDiffers,
+  blockOwnPayout,
   showPayout,
   paying,
   payButtonRef,
@@ -666,9 +665,7 @@ function CommissionDetail({
   notice: string;
   detailPending: boolean;
   loadError: string;
-  canPay: boolean;
-  outstanding: boolean;
-  payerDiffers: boolean;
+  blockOwnPayout: boolean;
   showPayout: boolean;
   paying: boolean;
   payButtonRef: RefObject<HTMLButtonElement | null>;
@@ -823,7 +820,7 @@ function CommissionDetail({
                 </button>
               </div>
             ) : null}
-            {canPay && outstanding && !payerDiffers ? (
+            {blockOwnPayout ? (
               <p className="border-t border-slate-100 pt-4 text-sm text-slate-600">
                 {" "}
                 {tx("A different person must record this payout.")}{" "}

@@ -9,6 +9,7 @@ import {
   gymSettingsAccess,
   hasFeature,
   hasTenantCapability,
+  maySelfCloseOwnFinance,
   memberPhotoAccess,
   platformHomePath,
   sessionHomePath,
@@ -323,6 +324,22 @@ describe("tenant authorization helpers", () => {
     expect(platformHomePath(platform(["platform.gyms.update"]))).not.toBe(
       "/super-admin/dashboard",
     );
+  });
+
+  it("lets the owner, or a combined manager and receptionist, close their own finance", () => {
+    const withRoles = (roles: string[], isOwner = false) =>
+      ({
+        ...session([], []),
+        gym_membership: { is_owner: isOwner, roles },
+      }) as CurrentUser;
+
+    expect(maySelfCloseOwnFinance(withRoles(["OWNER"], true))).toBe(true);
+    expect(maySelfCloseOwnFinance(withRoles(["OWNER"]))).toBe(true);
+    expect(maySelfCloseOwnFinance(withRoles(["MANAGER", "RECEPTIONIST"]))).toBe(
+      true,
+    );
+    expect(maySelfCloseOwnFinance(withRoles(["MANAGER"]))).toBe(false);
+    expect(maySelfCloseOwnFinance(withRoles(["RECEPTIONIST"]))).toBe(false);
   });
 
   it("sends a restricted trainer to the trainer dashboard before the owner dashboard", () => {

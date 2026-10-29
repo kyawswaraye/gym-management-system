@@ -7,6 +7,7 @@ import {
   canOpenPtSales,
   hasPermission,
   hasTenantCapability,
+  maySelfCloseOwnFinance,
   tenantHomePath,
 } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -19,13 +20,14 @@ export default async function PtSalesPage() {
   return (
     <section aria-labelledby="pt-sales-title">
       <PageHeader
-        description="Draft a sale, optionally attach a package and payment, then submit it for a different owner or manager to approve."
+        description="Draft a sale, optionally attach a package and payment, then submit it for approval. An owner, or a combined manager and receptionist, may approve their own sale."
         eyebrow="Personal training"
         title="PT sales"
         titleId="pt-sales-title"
       />
       <SalesManager
         canApprove={canApprovePtSale(session)}
+        canApproveOwn={maySelfCloseOwnFinance(session)}
         canCreate={hasPermission(session, "pt.sales.create")}
         canSubmit={hasPermission(session, "pt.sales.submit")}
         canUpdate={hasPermission(session, "pt.sales.update")}

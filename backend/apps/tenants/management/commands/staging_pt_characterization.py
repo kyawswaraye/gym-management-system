@@ -610,7 +610,8 @@ class Runner:
         if scenario == "pt_sale_submit":
             return self._sale_action(scenario, state, other, "submit", state.owner_jar, "submit")
         if scenario == "pt_sale_self_approve":
-            return self._sale_action(scenario, state, other, "approve", state.owner_jar, "self")
+            # Manager without reception still cannot close a sale they created.
+            return self._manager_self_approve(state, other)
         if scenario in {"pt_sale_approve", "pt_sale_approve_replay"}:
             return self._sale_action(
                 scenario, state, other, "approve", state.approver_jar, "approve"
@@ -697,6 +698,59 @@ class Runner:
         if status == 201:
             state.sale_id = _nested_id(payload, ("data", "id"))
         return status, payload, leak, credential
+
+    def _manager_self_approve(self, state: GymPt, other: GymPt) -> tuple[object, bytes, bool, bool]:
+        body = _json_body(
+            {
+                "member_id": state.member_id,
+                "trainer_staff_profile_id": state.trainer_id,
+                "service_package_id": state.package_id,
+                "service_date": state.business_date,
+                "description": "Manager own draft",
+                "gross_fee": GROSS_FEE,
+                "currency": "THB",
+            }
+        )
+        created, payload, leak, credential = self._call(
+            "pt_sale_self_approve",
+            "POST",
+            "/api/operations/pt-sales",
+            jar=state.approver_jar,
+            body=body,
+            csrf=True,
+            idempotency=make_key("sale", state.index, 1),
+            state=state,
+            other=other,
+        )
+        sale_id = _nested_id(payload, ("data", "id")) if created == 201 else ""
+        if not sale_id:
+            return created, payload, leak, credential
+        submitted, payload, leak2, credential2 = self._call(
+            "pt_sale_self_approve",
+            "POST",
+            f"/api/operations/pt-sales/{sale_id}/submit",
+            jar=state.approver_jar,
+            body=b"{}",
+            csrf=True,
+            idempotency=make_key("submit", state.index, 1),
+            state=state,
+            other=other,
+        )
+        leak = leak or leak2
+        credential = credential or credential2
+        if submitted != 200:
+            return submitted, payload, leak, credential
+        return self._call(
+            "pt_sale_self_approve",
+            "POST",
+            f"/api/operations/pt-sales/{sale_id}/approve",
+            jar=state.approver_jar,
+            body=b"{}",
+            csrf=True,
+            idempotency=make_key("self", state.index, 0),
+            state=state,
+            other=other,
+        )
 
     def _sale_action(
         self,

@@ -131,8 +131,8 @@ export const operationsEn = {
   "Directory view": "Directory view",
   "Discard note changes": "Discard note changes",
   "Display location": "Display location",
-  "Draft a sale, optionally attach a package and payment, then submit it for a different owner or manager to approve.":
-    "Draft a sale, optionally attach a package and payment, then submit it for a different owner or manager to approve.",
+  "Draft a sale, optionally attach a package and payment, then submit it for approval. An owner, or a combined manager and receptionist, may approve their own sale.":
+    "Draft a sale, optionally attach a package and payment, then submit it for approval. An owner, or a combined manager and receptionist, may approve their own sale.",
   Duration: "Duration",
   "e.g. Monthly membership": "e.g. Monthly membership",
   "Each new code uses this location. The code itself stays on this screen.":
@@ -398,8 +398,8 @@ export const operationsEn = {
   "Revenue sources": "Revenue sources",
   "Review operational trends and trusted server-calculated financial totals for your selected gym. Operational reports do not include money.":
     "Review operational trends and trusted server-calculated financial totals for your selected gym. Operational reports do not include money.",
-  "Review scoped commission balances and payouts. Recording a payout stays with a protected owner or manager who does not also hold trainer or reception, and who did not create the accrual.":
-    "Review scoped commission balances and payouts. Recording a payout stays with a protected owner or manager who does not also hold trainer or reception, and who did not create the accrual.",
+  "Review scoped commission balances and payouts. An owner, or a combined manager and receptionist, may record a payout on an accrual they created.":
+    "Review scoped commission balances and payouts. An owner, or a combined manager and receptionist, may record a payout on an accrual they created.",
   "Review your coaching team, current assignments, and members assigned today.":
     "Review your coaching team, current assignments, and members assigned today.",
   Revoke: "Revoke",
@@ -701,8 +701,8 @@ export const operationsMm = {
   "Directory view": "အမည်စာရင်း",
   "Discard note changes": "မှတ်ချက်ပြင်ဆင်မှုများကို ပယ်ဖျက်ရန်",
   "Display location": "ပြသမည့်တည်နေရာ",
-  "Draft a sale, optionally attach a package and payment, then submit it for a different owner or manager to approve.":
-    "အရောင်းမူကြမ်း ရေးဆွဲပါ။ ဆန္ဒရှိပါက ပက်ကေ့ဂျ်နှင့် ငွေပေးချေမှုကို ပူးတွဲပြီး အခြားပိုင်ရှင် သို့မဟုတ် မန်နေဂျာထံ အတည်ပြုရန် တင်သွင်းပါ။",
+  "Draft a sale, optionally attach a package and payment, then submit it for approval. An owner, or a combined manager and receptionist, may approve their own sale.":
+    "အရောင်းမူကြမ်း ရေးဆွဲပါ။ ဆန္ဒရှိပါက ပက်ကေ့ဂျ်နှင့် ငွေပေးချေမှုကို ပူးတွဲပြီး အတည်ပြုရန် တင်သွင်းပါ။ ပိုင်ရှင် သို့မဟုတ် မန်နေဂျာနှင့် ဧည့်ကြို ပေါင်းစပ်သူသည် ကိုယ်တိုင် အတည်ပြုနိုင်သည်။",
   Duration: "ကြာချိန်",
   "e.g. Monthly membership": "ဥပမာ၊ လစဉ်အသင်းဝင်မှု",
   "Each new code uses this location. The code itself stays on this screen.":
@@ -975,8 +975,8 @@ export const operationsMm = {
   "Revenue sources": "ဝင်ငွေ ရင်းမြစ်များ",
   "Review operational trends and trusted server-calculated financial totals for your selected gym. Operational reports do not include money.":
     "ရွေးထားသော Gym အတွက် လုပ်ငန်းလမ်းကြောင်းနှင့် စနစ်က တွက်ထားသော ယုံကြည်ရသည့် ဘဏ္ဍာရေး စုစုပေါင်းကို သုံးသပ်ပါ။ လုပ်ငန်းလည်ပတ်မှု အစီရင်ခံစာများတွင် ငွေကြေး မပါဝင်ပါ။",
-  "Review scoped commission balances and payouts. Recording a payout stays with a protected owner or manager who does not also hold trainer or reception, and who did not create the accrual.":
-    "သင်မြင်နိုင်သော ကော်မရှင် လက်ကျန်နှင့် ထုတ်ပေးငွေများကို သုံးသပ်ပါ။ ထုတ်ပေးငွေ မှတ်တမ်းတင်ခြင်းကို နည်းပြ အခန်း သို့မဟုတ် ဧည့်ကြို အခန်း မကိုင်ထားဘဲ ထိုကော်မရှင် စုဆောင်းမှုကို မဖန်တီးခဲ့သော ကာကွယ်ထားသည့် ပိုင်ရှင် သို့မဟုတ် စီမံခန့်ခွဲသူသာ လုပ်ဆောင်နိုင်ပါသည်။",
+  "Review scoped commission balances and payouts. An owner, or a combined manager and receptionist, may record a payout on an accrual they created.":
+    "သင်မြင်နိုင်သော ကော်မရှင် လက်ကျန်နှင့် ထုတ်ပေးငွေများကို သုံးသပ်ပါ။ ပိုင်ရှင် သို့မဟုတ် မန်နေဂျာနှင့် ဧည့်ကြို ပေါင်းစပ်သူသည် ကိုယ်တိုင် ဖန်တီးခဲ့သော စုဆောင်းမှုအတွက် ထုတ်ပေးငွေ မှတ်တမ်းတင်နိုင်သည်။",
   "Review your coaching team, current assignments, and members assigned today.":
     "သင်၏ နည်းပြအဖွဲ့၊ လက်ရှိ တာဝန်များနှင့် ယနေ့ သတ်မှတ်ထားသော အဖွဲ့ဝင်များကို သုံးသပ်ပါ။",
   Revoke: "ရုပ်သိမ်းရန်",

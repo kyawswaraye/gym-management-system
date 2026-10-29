@@ -215,7 +215,8 @@ def test_pt_sale_approval_posts_one_commission_and_optional_payment() -> None:
         **owner_headers,
         **_key("ptapp-self"),
     )
-    assert self_approve.status_code == 403
+    assert self_approve.status_code == 200, self_approve.json()
+    assert self_approve.json()["data"]["sale"]["status"] == "POSTED"
     reception_approve = api.post(
         f"/api/v1/pt-sales/{sale['id']}/approve/",
         {},

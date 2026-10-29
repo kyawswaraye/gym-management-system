@@ -74,7 +74,7 @@ def test_class_catalog_migrations_round_trip_and_stay_acyclic() -> None:
         loader.graph.ensure_not_cyclic()
         assert loader.graph.leaf_nodes("classes") == [("classes", "0008_member_self_actors")]
         assert loader.graph.leaf_nodes("trainers") == [
-            ("trainers", "0021_pt_commission_payout_window")
+            ("trainers", "0022_owner_or_desk_may_approve_own_pt_sale")
         ]
         assert ("classes", "0004_class_schedule_guards") not in loader.graph.forwards_plan(
             ("trainers", "0017_class_schedule_catalog")

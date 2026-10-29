@@ -167,6 +167,7 @@ export function SalesManager({
   canApprove,
   canVoid,
   canViewReceipts = false,
+  canApproveOwn = false,
   currency,
   today,
   membershipId,
@@ -177,6 +178,7 @@ export function SalesManager({
   canApprove: boolean;
   canVoid: boolean;
   canViewReceipts?: boolean;
+  canApproveOwn?: boolean;
   currency: string;
   today: string;
   membershipId: string;
@@ -255,8 +257,9 @@ export function SalesManager({
   const showPaging = sales.index > 0 || sales.hasMore || sales.bounded;
   const separateActor =
     selected !== null &&
-    selected.created_by_membership_id !== membershipId &&
-    selected.submitted_by_membership_id !== membershipId;
+    (canApproveOwn ||
+      (selected.created_by_membership_id !== membershipId &&
+        selected.submitted_by_membership_id !== membershipId));
 
   useEffect(() => {
     if (!canViewReceipts) return undefined;

@@ -44,6 +44,14 @@ function protectedAdjuster(session: CurrentUser): boolean {
   );
 }
 
+/** Owner, or one person who is both manager and receptionist. */
+export function maySelfCloseOwnFinance(session: CurrentUser): boolean {
+  if (session.gym_membership?.is_owner || holdsRole(session, "OWNER")) {
+    return true;
+  }
+  return holdsRole(session, "MANAGER") && holdsRole(session, "RECEPTIONIST");
+}
+
 export function canOpenPtTrainers(session: CurrentUser): boolean {
   return hasTenantCapability(session, "pt.assignments.view", "pt");
 }
@@ -84,7 +92,8 @@ export function canPayPtCommission(session: CurrentUser): boolean {
   return (
     hasFeature(session, "pt") &&
     hasPermission(session, "pt.commissions.pay") &&
-    protectedAdjuster(session)
+    holdsProtectedManagement(session) &&
+    !holdsRole(session, "TRAINER")
   );
 }
 
@@ -93,7 +102,7 @@ export function canApprovePtSale(session: CurrentUser): boolean {
     hasFeature(session, "pt") &&
     hasPermission(session, "pt.sales.approve") &&
     holdsProtectedManagement(session) &&
-    !holdsRole(session, "RECEPTIONIST")
+    !holdsRole(session, "TRAINER")
   );
 }
 

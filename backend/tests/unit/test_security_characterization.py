@@ -132,7 +132,8 @@ def test_plan_is_fixed_and_probes_follow_both_gyms() -> None:
     assert probe_at == 9 + 22
     assert RULES["idor_member_read"].rejection == frozenset({404})
     assert RULES["mass_expense"].rejection == frozenset({400})
-    assert RULES["self_expense_approve"].rejection == frozenset({403})
+    assert RULES["self_expense_approve"].success == frozenset({200})
+    assert RULES["self_pt_approve"].success == frozenset({200})
     assert RULES["role_escalation"].rejection == frozenset({403})
     with pytest.raises(SecuritySpecError):
         resolve_profile("load")

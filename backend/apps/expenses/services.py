@@ -1024,16 +1024,24 @@ def _assert_pt_commission_approver(
     created_by_membership_id: UUID,
     submitted_by_membership_id: UUID,
 ) -> None:
-    """Require a different protected manager or owner to post the payout expense."""
+    """Require a protected manager or owner to post the payout expense.
+
+    The accrual creator may post only when they are the owner, or both manager
+    and receptionist. A receptionist or trainer alone cannot post.
+    """
 
     if approver.id in {created_by_membership_id, submitted_by_membership_id}:
-        raise PermissionDenied()
-    if holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="RECEPTIONIST"):
-        raise PermissionDenied()
+        if not _may_close_own_expense(gym_id=gym_id, membership_id=approver.id):
+            raise PermissionDenied()
     if holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="TRAINER"):
         raise PermissionDenied()
     manager = holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="MANAGER")
     owner = holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="OWNER")
+    receptionist = holds_protected_role(
+        gym_id=gym_id, membership_id=approver.id, role_key="RECEPTIONIST"
+    )
+    if receptionist and not manager and not owner:
+        raise PermissionDenied()
     if not manager and not owner:
         raise PermissionDenied()
 

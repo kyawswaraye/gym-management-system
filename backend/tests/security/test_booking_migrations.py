@@ -29,7 +29,7 @@ CLASSES_GUARDS = ("classes", "0006_class_booking_guards")
 CLASSES_TERMINAL = ("classes", "0008_member_self_actors")
 TRAINERS_LINKS = ("trainers", "0019_booking_ledger_links")
 TRAINERS_TERMINAL = ("trainers", "0020_pt_booking_terminal_time")
-TRAINERS_PAYOUT = ("trainers", "0021_pt_commission_payout_window")
+TRAINERS_PAYOUT = ("trainers", "0022_owner_or_desk_may_approve_own_pt_sale")
 
 BLOCKS = "app_class_occurrence_blocks_regeneration(uuid, uuid)"
 TERMINAL = "app_class_occurrence_has_terminal_booking(uuid, uuid)"

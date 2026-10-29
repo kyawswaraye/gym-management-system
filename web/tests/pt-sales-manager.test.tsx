@@ -492,6 +492,31 @@ describe("PT sales permissions", () => {
     view.rerender(
       <SalesManager
         canApprove
+        canApproveOwn
+        canCreate={false}
+        canSubmit={false}
+        canUpdate={false}
+        canVoid={false}
+        currency="MMK"
+        membershipId="creator"
+        today="2026-10-19"
+      />,
+    );
+    expect(
+      await screen.findByRole("button", { name: "Approve sale" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Reject sale" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "A different person must approve or reject this sale.",
+      ),
+    ).toBeNull();
+
+    view.rerender(
+      <SalesManager
+        canApprove
         canCreate={false}
         canSubmit={false}
         canUpdate={false}

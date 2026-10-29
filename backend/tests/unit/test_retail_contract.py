@@ -67,7 +67,7 @@ def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     trainers_class_link = ("trainers", "0017_class_schedule_catalog")
     trainers_pt_booking = ("trainers", "0018_booking_foundation")
     trainers_booking_link = ("trainers", "0019_booking_ledger_links")
-    trainers_payout_window = ("trainers", "0021_pt_commission_payout_window")
+    trainers_payout_window = ("trainers", "0022_owner_or_desk_may_approve_own_pt_sale")
     classes_type_rls = ("classes", "0002_class_type_rls_and_grants")
     classes_guards = ("classes", "0004_class_schedule_guards")
     classes_booking = ("classes", "0006_class_booking_guards")

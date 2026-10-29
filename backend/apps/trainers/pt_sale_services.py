@@ -364,8 +364,12 @@ def approve_pt_sale(
     _assert_approver(gym=gym, actor=actor)
     if row.status != PTSale.Status.PENDING_APPROVAL:
         raise PTSaleStateConflict()
-    if actor.id in {row.created_by_membership_id, row.submitted_by_membership_id}:
-        raise PermissionDenied()
+    _deny_self_close(
+        gym_id=gym.id,
+        actor=actor,
+        created_by=row.created_by_membership_id,
+        submitted_by=row.submitted_by_membership_id,
+    )
     _revalidate_sale(gym=gym, actor=actor, row=row)
     linked = _lock_sale_payment(row) if row.payment_id is not None else None
     if linked is None and cash_session_id is not None:
@@ -459,8 +463,12 @@ def reject_pt_sale(
     _assert_approver(gym=gym, actor=actor)
     if row.status != PTSale.Status.PENDING_APPROVAL:
         raise PTSaleStateConflict()
-    if actor.id in {row.created_by_membership_id, row.submitted_by_membership_id}:
-        raise PermissionDenied()
+    _deny_self_close(
+        gym_id=gym.id,
+        actor=actor,
+        created_by=row.created_by_membership_id,
+        submitted_by=row.submitted_by_membership_id,
+    )
     stored_reason = _required_text(rejection_reason, field="rejection_reason")
     previous = _audit_values(row)
     now = timezone.now()
@@ -596,11 +604,41 @@ def _revalidate_sale(*, gym: Gym, actor: GymMembership, row: PTSale) -> None:
             raise PackageNotEligible()
 
 
+def _may_close_own_sale(*, gym_id: UUID, membership_id: UUID) -> bool:
+    """The owner, or one person who is both manager and receptionist, can.
+
+    A manager who does not also work the desk still needs another approver.
+    """
+
+    if holds_protected_role(gym_id=gym_id, membership_id=membership_id, role_key="OWNER"):
+        return True
+    return holds_protected_role(
+        gym_id=gym_id, membership_id=membership_id, role_key="MANAGER"
+    ) and holds_protected_role(gym_id=gym_id, membership_id=membership_id, role_key="RECEPTIONIST")
+
+
+def _deny_self_close(
+    *,
+    gym_id: UUID,
+    actor: GymMembership,
+    created_by: UUID | None,
+    submitted_by: UUID | None,
+) -> None:
+    if actor.id not in {created_by, submitted_by}:
+        return
+    if _may_close_own_sale(gym_id=gym_id, membership_id=actor.id):
+        return
+    raise PermissionDenied()
+
+
 def _assert_approver(*, gym: Gym, actor: GymMembership) -> None:
-    if holds_protected_role(gym_id=gym.id, membership_id=actor.id, role_key="RECEPTIONIST"):
-        raise PermissionDenied()
     manager = holds_protected_role(gym_id=gym.id, membership_id=actor.id, role_key="MANAGER")
     owner = holds_protected_role(gym_id=gym.id, membership_id=actor.id, role_key="OWNER")
+    receptionist = holds_protected_role(
+        gym_id=gym.id, membership_id=actor.id, role_key="RECEPTIONIST"
+    )
+    if receptionist and not manager and not owner:
+        raise PermissionDenied()
     if not manager and not owner:
         raise PermissionDenied()
     if not membership_has_permission(membership=actor, code="pt.sales.approve"):

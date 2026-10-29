@@ -169,6 +169,8 @@ _POSITIVE = frozenset(
         "pt_sale_create",
         "pt_sale_submit",
         "report_read",
+        "self_expense_approve",
+        "self_pt_approve",
     }
 )
 
@@ -231,10 +233,10 @@ RULES: dict[str, ScenarioRule] = {
     "idor_pt_approve": _rule(frozenset(), frozenset({404}), "bff", "probe"),
     "mass_expense": _rule(frozenset(), frozenset({400}), "bff", "probe"),
     "mass_member": _rule(frozenset(), frozenset({400}), "bff", "probe"),
-    "self_expense_approve": _rule(frozenset(), frozenset({403}), "bff", "probe"),
+    "self_expense_approve": _rule(frozenset({200}), frozenset(), "bff", "probe"),
     "manager_self_approve": _rule(frozenset(), frozenset({403}), "bff", "probe"),
     "trainer_expense_approve": _rule(frozenset(), frozenset({403}), "bff", "probe"),
-    "self_pt_approve": _rule(frozenset(), frozenset({403}), "bff", "probe"),
+    "self_pt_approve": _rule(frozenset({200}), frozenset(), "bff", "probe"),
     "role_escalation": _rule(frozenset(), frozenset({403}), "bff", "probe"),
 }
 

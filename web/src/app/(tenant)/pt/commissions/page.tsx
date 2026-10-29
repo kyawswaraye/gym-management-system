@@ -5,6 +5,7 @@ import { CommissionsManager } from "@/features/pt/commissions-manager";
 import {
   canOpenPtCommissions,
   canPayPtCommission,
+  maySelfCloseOwnFinance,
   tenantHomePath,
 } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
@@ -17,13 +18,14 @@ export default async function CommissionsPage() {
   return (
     <section aria-labelledby="commissions-title">
       <PageHeader
-        description="Review scoped commission balances and payouts. Recording a payout stays with a protected owner or manager who does not also hold trainer or reception, and who did not create the accrual."
+        description="Review scoped commission balances and payouts. An owner, or a combined manager and receptionist, may record a payout on an accrual they created."
         eyebrow="Personal training"
         title="Commissions"
         titleId="commissions-title"
       />
       <CommissionsManager
         canPay={canPayPtCommission(session)}
+        canPayOwn={maySelfCloseOwnFinance(session)}
         currency={session.gym?.currency ?? ""}
         membershipId={session.gym_membership?.id ?? ""}
         today={todayInTimezone(session.gym?.timezone ?? "UTC")}

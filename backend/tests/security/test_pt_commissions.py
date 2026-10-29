@@ -619,7 +619,7 @@ def test_commission_payouts_visibility_reversal_and_guards() -> None:
         commission_id,
         {"amount": "1.00", "business_date": day, "payment_method": "OTHER"},
     )
-    assert owner_reception.status_code == 403
+    assert owner_reception.status_code == 200, owner_reception.content
 
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)

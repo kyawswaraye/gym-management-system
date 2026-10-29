@@ -25,7 +25,7 @@ MEMBERS_BEFORE = ("members", "0023_pt_payment_guard")
 TRAINERS_VOID = "0016_pt_sale_refund_reversal_link"
 MEMBERS_VOID = "0024_pt_sale_payment_void"
 MEMBERS_HEAD = ("members", "0028_desk_may_approve_own_payment")
-TRAINERS_HEAD = ("trainers", "0021_pt_commission_payout_window")
+TRAINERS_HEAD = ("trainers", "0022_owner_or_desk_may_approve_own_pt_sale")
 CLASSES_HEAD = ("classes", "0008_member_self_actors")
 VOID_FUNCTIONS = (
     "app_guard_pt_sale",

@@ -1,12 +1,13 @@
 """Commission payout and the internal payout reversal used by a future sale void.
 
-Record-payment requires a protected owner or manager other than the accrual
-creator, locks the commission, posts one protected expense in that creator's
-name, inserts one child, and recomputes the parent. Reversal is not a public
-route. It must run
-inside the caller's transaction, locks the commission before the child, voids
-the linked expense, marks the child ``VOID``, and recomputes the parent from
-the remaining posted children. Parent ``VOID`` stays reserved for sale void.
+Record-payment requires a protected owner or manager. The accrual creator may
+pay only when they are the owner, or both manager and receptionist. Otherwise
+another actor must pay. The command locks the commission, posts one protected
+expense in that creator's name, inserts one child, and recomputes the parent.
+Reversal is not a public route. It must run inside the caller's transaction,
+locks the commission before the child, voids the linked expense, marks the
+child ``VOID``, and recomputes the parent from the remaining posted children.
+Parent ``VOID`` stays reserved for sale void.
 """
 
 from __future__ import annotations
@@ -89,7 +90,9 @@ def record_pt_commission_payment(
         raise CommissionOverpay()
     if commission.status not in _PAYABLE:
         raise CommissionPayoutConflict()
-    if actor.id == commission.created_by_membership_id:
+    if actor.id == commission.created_by_membership_id and not _may_pay_own_commission(
+        gym_id=gym.id, membership_id=actor.id
+    ):
         raise PermissionDenied()
     before = copy.copy(commission)
     sale = _lock_sale(commission)
@@ -228,13 +231,26 @@ def reverse_pt_commission_payment(
     return locked
 
 
+def _may_pay_own_commission(*, gym_id: UUID, membership_id: UUID) -> bool:
+    """The owner, or one person who is both manager and receptionist, can."""
+
+    if holds_protected_role(gym_id=gym_id, membership_id=membership_id, role_key=_OWNER_ROLE):
+        return True
+    return holds_protected_role(
+        gym_id=gym_id, membership_id=membership_id, role_key=_MANAGER_ROLE
+    ) and holds_protected_role(gym_id=gym_id, membership_id=membership_id, role_key=_RECEPTION_ROLE)
+
+
 def _assert_payer(*, gym_id: UUID, actor: GymMembership) -> None:
-    if holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key=_RECEPTION_ROLE):
-        raise PermissionDenied()
     if holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key=_TRAINER_ROLE):
         raise PermissionDenied()
     manager = holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key=_MANAGER_ROLE)
     owner = holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key=_OWNER_ROLE)
+    receptionist = holds_protected_role(
+        gym_id=gym_id, membership_id=actor.id, role_key=_RECEPTION_ROLE
+    )
+    if receptionist and not manager and not owner:
+        raise PermissionDenied()
     if not manager and not owner:
         raise PermissionDenied()
 

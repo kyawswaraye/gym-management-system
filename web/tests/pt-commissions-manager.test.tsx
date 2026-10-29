@@ -103,6 +103,7 @@ function commission(extra: Record<string, unknown> = {}): PTCommissionDetail {
 function renderCommissions(
   props: Partial<{
     canPay: boolean;
+    canPayOwn: boolean;
     membershipId: string;
     currency: string;
     today: string;
@@ -111,6 +112,7 @@ function renderCommissions(
   return render(
     <CommissionsManager
       canPay={props.canPay ?? false}
+      canPayOwn={props.canPayOwn ?? false}
       currency={props.currency ?? "MMK"}
       membershipId={props.membershipId ?? "payer"}
       today={props.today ?? "2026-10-19"}
@@ -610,6 +612,18 @@ describe("payout permission and cash sessions", () => {
     expect(
       screen.getByText("A different person must record this payout."),
     ).toBeInTheDocument();
+    cleanup();
+
+    renderCommissions({
+      canPay: true,
+      canPayOwn: true,
+      membershipId: "creator",
+    });
+    await openCommission();
+    expect(
+      screen.getByRole("button", { name: "Record payout" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/different person/)).not.toBeInTheDocument();
     cleanup();
 
     vi.mocked(getPtCommission).mockResolvedValue(
