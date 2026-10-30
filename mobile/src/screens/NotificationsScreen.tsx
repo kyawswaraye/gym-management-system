@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { useMemberApi } from "../app/providers";
 import { formatGymDateTime } from "../dates/gymLocal";
+import { useGymTimezone } from "../dates/useGymTimezone";
 import { queryKeys } from "../query/keys";
 import { Button } from "../ui/Button";
 import { PagedScreen } from "../ui/PagedScreen";
@@ -14,6 +15,7 @@ export function NotificationsScreen() {
   const tx = useTx();
   const api = useMemberApi();
   const queryClient = useQueryClient();
+  const timeZone = useGymTimezone();
   const [pendingId, setPendingId] = useState<string | null>(null);
   return (
     <PagedScreen
@@ -21,6 +23,13 @@ export function NotificationsScreen() {
       queryKey={queryKeys.notifications}
       load={(after) => api.notifications(after)}
       empty="No messages yet. Push permission is not required to read messages here."
+      lead={
+        <Text style={{ color: colors.muted }}>
+          {tx(
+            "Messages from your gym: membership expiry reminders and announcements sent by the gym owner or manager. You do not send messages from here.",
+          )}
+        </Text>
+      }
       renderItem={(item) => (
         <>
           <Text
@@ -33,11 +42,11 @@ export function NotificationsScreen() {
             {tx(item.type)}
             {item.announcement_type
               ? ` · ${tx(item.announcement_type)}`
-              : ""} · {formatGymDateTime(item.created_at)}
+              : ""} · {formatGymDateTime(item.created_at, timeZone)}
           </Text>
           {item.read_at ? (
             <Text>
-              {tx("Read")} {formatGymDateTime(item.read_at)}
+              {tx("Read")} {formatGymDateTime(item.read_at, timeZone)}
             </Text>
           ) : (
             <Button

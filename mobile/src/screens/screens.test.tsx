@@ -92,6 +92,7 @@ const dashboardData = {
   },
   gym: {
     name: "North Gym",
+    timezone: "Asia/Yangon",
     has_logo: false,
   },
 };
@@ -153,7 +154,7 @@ describe("member screens", () => {
     const view = await renderSignedIn(<DashboardScreen />, {
       dashboard: async () => ({
         ...dashboardData,
-        gym: { name: "North Gym", has_logo: true },
+        gym: { name: "North Gym", timezone: "Asia/Yangon", has_logo: true },
       }),
       gymLogo,
     });
@@ -167,7 +168,7 @@ describe("member screens", () => {
     const view = await renderSignedIn(<DashboardScreen />, {
       dashboard: async () => ({
         ...dashboardData,
-        gym: { name: "North Gym", has_logo: true },
+        gym: { name: "North Gym", timezone: "Asia/Yangon", has_logo: true },
       }),
       gymLogo: async () => {
         throw new Error("logo failed");
@@ -182,9 +183,28 @@ describe("member screens", () => {
   it("explains desk check-in when the camera is denied", async () => {
     cameraPermission().hasPermission = false;
     cameraPermission().canRequestPermission = false;
-    const view = await renderSignedIn(<ScanScreen />, {});
+    const view = await renderSignedIn(<ScanScreen />, {
+      dashboard: async () => dashboardData,
+    });
     expect(view.getAllByText(/front desk/i).length).toBeGreaterThan(0);
     expect(view.getAllByText(/system settings/i).length).toBeGreaterThan(0);
+  });
+
+  it("offers checkout when the member is already checked in", async () => {
+    const view = await renderSignedIn(<ScanScreen />, {
+      dashboard: async () => ({
+        ...dashboardData,
+        check_in_summary: {
+          available: true,
+          currently_checked_in: true,
+          open_check_in_id: "visit-1",
+          last_check_in_at: "2026-10-28T02:30:00.000Z",
+          last_check_out_at: null,
+        },
+      }),
+    });
+    expect(await view.findByRole("button", { name: "Check out" })).toBeTruthy();
+    expect(view.getByText(/Check out when you leave/i)).toBeTruthy();
   });
 
   it("shows inbox content and a read action", async () => {

@@ -142,6 +142,7 @@ class MemberSelfGymSerializer(serializers.Serializer):
     """Brand shown on the signed-in member's home screen. No other gym is included."""
 
     name = serializers.CharField()
+    timezone = serializers.CharField()
     has_logo = serializers.BooleanField()
 
 

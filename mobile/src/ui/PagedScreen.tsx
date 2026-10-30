@@ -23,6 +23,7 @@ export function PagedScreen<T extends { id: string }>({
   empty,
   renderItem,
   onBack,
+  lead,
 }: {
   title: string;
   queryKey: readonly unknown[];
@@ -30,6 +31,7 @@ export function PagedScreen<T extends { id: string }>({
   empty: string;
   renderItem: (item: T) => ReactNode;
   onBack?: () => void;
+  lead?: ReactNode;
 }) {
   const tx = useTx();
   const online = useOnline();
@@ -48,6 +50,7 @@ export function PagedScreen<T extends { id: string }>({
       }
     >
       <OfflineBanner visible={!online} />
+      {lead ?? null}
       {query.isLoading ? <LoadingState label={tx("Loading…")} /> : null}
       {query.isError ? (
         <ErrorState

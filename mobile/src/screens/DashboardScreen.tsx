@@ -346,7 +346,7 @@ function DashboardBody({
               ? tx("You are checked in.")
               : tx("You are not checked in.")}
             {data.check_in_summary.last_check_in_at
-              ? ` ${tx("Last visit {time}.", { time: formatGymDateTime(data.check_in_summary.last_check_in_at) })}`
+              ? ` ${tx("Last visit {time}.", { time: formatGymDateTime(data.check_in_summary.last_check_in_at, data.gym.timezone) })}`
               : ""}
           </Text>
         ) : (

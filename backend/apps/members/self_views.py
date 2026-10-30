@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
+from uuid import UUID
 
 from django.db import transaction
 from django.http import Http404, HttpResponse
@@ -23,6 +24,7 @@ from apps.classes.views import IDEMPOTENCY_HEADER, _stored_response, require_ide
 from apps.common.api.responses import success_response
 from apps.common.api.schema import ErrorEnvelopeSerializer
 from apps.common.finance.idempotency import IdempotentResponse, run_idempotent
+from apps.members.checkin_services import check_out_self_check_in
 from apps.members.self_serializers import (
     MemberClassBookingEnvelopeSerializer,
     MemberClassBookingWriteSerializer,
@@ -56,7 +58,11 @@ from apps.members.self_services import (
     member_self_schedule,
     update_self_profile,
 )
-from apps.members.serializers import CheckInSerializer, MemberPaymentHistoryItemSerializer
+from apps.members.serializers import (
+    CheckInEnvelopeSerializer,
+    CheckInSerializer,
+    MemberPaymentHistoryItemSerializer,
+)
 from apps.tenants.logo import logo_bytes_are_safe
 from apps.tenants.models import GymLogo
 from apps.users.authentication import MemberJWTAuthentication
@@ -282,6 +288,40 @@ class MemberCheckInsView(MemberSelfView):
             after=str(query.validated_data.get("after", "")),
         )
         return success_response(CheckInSerializer(rows, many=True).data, meta=meta)
+
+
+class MemberCheckOutView(MemberSelfView):
+    """Member closes their own open visit. Empty body; no backdating."""
+
+    required_features = ("members", "memberships")
+    throttle_classes = [MemberSelfWriteThrottle]
+
+    @extend_schema(
+        operation_id="member_check_ins_check_out",
+        request=None,
+        responses={
+            200: CheckInEnvelopeSerializer,
+            400: ErrorEnvelopeSerializer,
+            401: ErrorEnvelopeSerializer,
+            403: ErrorEnvelopeSerializer,
+            404: ErrorEnvelopeSerializer,
+        },
+    )
+    def post(self, request: Request, id: UUID) -> Response:
+        MemberSelfEmptyQuerySerializer(data=request.query_params).is_valid(raise_exception=True)
+        if bool(request.data):
+            raise ValidationError({"non_field_errors": ["This route accepts an empty body."]})
+        member = load_self_member(gym=request.gym, member_id=request.member.id)
+        check_in = check_out_self_check_in(
+            gym=request.gym,
+            member=member,
+            check_in_id=id,
+            user=request.user,
+            request_id=_request_id(request),
+            ip_address=_client_address(request),
+            user_agent=_user_agent(request),
+        )
+        return success_response(CheckInSerializer(check_in).data, message="Checked out")
 
 
 class MemberServicePackagesView(MemberSelfView):

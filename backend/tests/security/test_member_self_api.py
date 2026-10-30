@@ -25,7 +25,7 @@ from apps.common.db.tenant_context import set_gym_context
 from apps.files.models import FileAsset
 from apps.files.storage import StoredObject
 from apps.members.models import Member, Payment
-from apps.tenants.models import Gym, GymFeatureEntitlement, GymLogo, GymMembership
+from apps.tenants.models import Gym, GymFeatureEntitlement, GymLogo, GymMembership, GymSettings
 from apps.users.models import User
 from tests.file_fakes import CURRENT, MemoryStore, use_fakes
 from tests.security.test_bookings import _grant, _key, _package
@@ -227,10 +227,18 @@ def test_member_home_brand_follows_the_signed_in_gym() -> None:
     client = APIClient()
     dashboard = client.get("/api/v1/member/dashboard/", **_auth(token))
     assert dashboard.status_code == 200, dashboard.json()
-    assert dashboard.json()["data"]["gym"] == {"name": "North Gym", "has_logo": True}
+    assert dashboard.json()["data"]["gym"] == {
+        "name": "North Gym",
+        "timezone": gym.timezone,
+        "has_logo": True,
+    }
     other_dashboard = client.get("/api/v1/member/dashboard/", **_auth(other_token))
     assert other_dashboard.status_code == 200, other_dashboard.json()
-    assert other_dashboard.json()["data"]["gym"] == {"name": "South Gym", "has_logo": False}
+    assert other_dashboard.json()["data"]["gym"] == {
+        "name": "South Gym",
+        "timezone": other_gym.timezone,
+        "has_logo": False,
+    }
     assert b"North Gym" not in other_dashboard.content
     assert png not in other_dashboard.content
 
@@ -657,3 +665,117 @@ def test_member_profile_photo_stays_on_the_token_member() -> None:
     removed = client.delete(f"/api/v1/member/files/{file_id}/", **_auth(token))
     assert removed.status_code == 200, removed.json()
     assert _load_member(gym, member_id).profile_photo_asset_id is None
+
+
+@override_settings(**jwt_settings())
+def test_member_can_check_out_own_open_visit_and_stale_visits_auto_close() -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from django.utils import timezone
+
+    from apps.members.models import CheckIn, Membership
+
+    api, headers, gym, owner = _tenant("cout")
+    member_id = _member(api, headers, first_name="Ada")
+    plan_id = _plan(api, headers, code="C30", duration_value=30, duration_unit="DAY")
+    _sell(api, headers, member_id=member_id, plan_id=plan_id)
+    user, token = _link(gym, member_id, f"cout-{uuid4().hex[:8]}@example.test")
+    other_id = _member(api, headers, first_name="Other")
+    _sell(api, headers, member_id=other_id, plan_id=plan_id)
+    _other_user, other_token = _link(gym, other_id, f"coutb-{uuid4().hex[:8]}@example.test")
+
+    opened = api.post(
+        "/api/v1/check-ins/",
+        {"member_id": member_id, "note": "desk"},
+        format="json",
+        **headers,
+        **_key("cout-open"),
+    )
+    assert opened.status_code == 201, opened.json()
+    visit_id = opened.json()["data"]["id"]
+    client = APIClient()
+
+    denied = client.post(
+        f"/api/v1/member/check-ins/{visit_id}/check-out/",
+        {"occurred_at": timezone.now().isoformat()},
+        format="json",
+        **_auth(token),
+    )
+    assert denied.status_code == 400
+
+    stolen = client.post(
+        f"/api/v1/member/check-ins/{visit_id}/check-out/",
+        {},
+        format="json",
+        **_auth(other_token),
+    )
+    assert stolen.status_code == 404
+
+    closed = client.post(
+        f"/api/v1/member/check-ins/{visit_id}/check-out/",
+        {},
+        format="json",
+        **_auth(token),
+    )
+    assert closed.status_code == 200, closed.json()
+    assert closed.json()["data"]["status"] == "CHECKED_OUT"
+    assert closed.json()["data"]["check_out_at"] is not None
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        audit = AuditLog.objects.get(
+            gym=gym, action="MEMBER_CHECK_IN_CHECKED_OUT", target_id=visit_id
+        )
+    assert audit.actor_user_id == user.id
+    assert audit.actor_membership_id is None
+
+    zone = ZoneInfo(gym.timezone)
+    yesterday = timezone.now().astimezone(zone).date() - timedelta(days=1)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        membership = Membership.objects.filter(gym=gym, member_id=member_id).first()
+        stale = CheckIn.objects.create(
+            gym=gym,
+            member_id=member_id,
+            membership=membership,
+            check_in_at=datetime(
+                yesterday.year,
+                yesterday.month,
+                yesterday.day,
+                10,
+                0,
+                tzinfo=zone,
+            ),
+            method=CheckIn.Method.MANUAL,
+            recorded_by_membership_id=owner.id,
+            created_by_membership_id=owner.id,
+            note="stale",
+            eligibility_snapshot={
+                "eligible": True,
+                "backdated": False,
+                "membership_id": str(membership.id),
+                "membership_status": membership.status,
+                "plan_code": membership.plan_code,
+                "plan_name": membership.plan_name,
+                "start_date": membership.start_date.isoformat(),
+                "expiry_date": membership.expiry_date.isoformat(),
+                "evaluated_on": yesterday.isoformat(),
+            },
+        )
+        # Same-day checked-out visits still enforce the duplicate window; clear it
+        # so this assertion only covers stale overnight auto-close → next check-in.
+        GymSettings.objects.filter(gym=gym).update(check_in_duplicate_window_seconds=0)
+    again = api.post(
+        "/api/v1/check-ins/",
+        {"member_id": member_id, "note": "next day"},
+        format="json",
+        **headers,
+        **_key("cout-next"),
+    )
+    assert again.status_code == 201, again.json()
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        stale.refresh_from_db()
+        auto = AuditLog.objects.get(gym=gym, action="CHECK_IN_AUTO_CLOSED", target_id=stale.id)
+    assert stale.check_out_at is not None
+    assert auto.new_values["reason"] == "previous_gym_day"

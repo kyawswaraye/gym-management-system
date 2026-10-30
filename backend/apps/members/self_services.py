@@ -131,6 +131,7 @@ def member_gym_brand(*, gym: Gym) -> dict[str, object]:
     content_type = GymLogo.objects.filter(pk=gym.id).values_list("content_type", flat=True).first()
     return {
         "name": gym.name,
+        "timezone": gym.timezone,
         "has_logo": content_type in LOGO_CONTENT_TYPES,
     }
 

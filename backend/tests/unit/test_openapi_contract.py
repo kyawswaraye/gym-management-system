@@ -68,6 +68,7 @@ PUBLISHED_PATHS = {
     "/api/v1/member/membership/",
     "/api/v1/member/payments/",
     "/api/v1/member/check-ins/",
+    "/api/v1/member/check-ins/{id}/check-out/",
     "/api/v1/member/service-packages/",
     "/api/v1/member/schedule/",
     "/api/v1/member/class-bookings/",

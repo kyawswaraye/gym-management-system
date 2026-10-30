@@ -9233,6 +9233,83 @@
                 }
             }
         },
+        "/api/v1/member/check-ins/{id}/check-out/": {
+            "post": {
+                "operationId": "member_check_ins_check_out",
+                "description": "Member closes their own open visit. Empty body; no backdating.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "member"
+                ],
+                "security": [
+                    {
+                        "memberBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CheckInEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/member/check-ins/scan/": {
             "post": {
                 "operationId": "member_check_in_scan",
@@ -31227,13 +31304,17 @@
                     "name": {
                         "type": "string"
                     },
+                    "timezone": {
+                        "type": "string"
+                    },
                     "has_logo": {
                         "type": "boolean"
                     }
                 },
                 "required": [
                     "has_logo",
-                    "name"
+                    "name",
+                    "timezone"
                 ]
             },
             "MemberSelfMembership": {

@@ -138,6 +138,36 @@ export const messages: Record<string, string> = {
   Scan: "စကန်ဖတ်ရန်",
   "Scan the code on the gym screen. If the camera is unavailable, the front desk can check you in.":
     "Gym ဖန်သားပြင်ပေါ်ရှိ ကုဒ်ကို စကန်ဖတ်ပါ။ ကင်မရာ မရနိုင်ပါက ဧည့်ကြိုကောင်တာက သင့်ကို ဝင်ရောက်မှတ်ပေးနိုင်ပါသည်။",
+  "Scan the live code on the gym screen. The code changes often, so wait for the current one if a scan fails. If the camera is unavailable, the front desk can check you in.":
+    "Gym ဖန်သားပြင်ပေါ်ရှိ လက်ရှိကုဒ်ကို စကန်ဖတ်ပါ။ ကုဒ်သည် မကြာခဏ ပြောင်းသောကြောင့် မအောင်မြင်ရင် ကုဒ်အသစ်ကို စောင့်ပြီး ထပ်ဖတ်ပါ။ ကင်မရာ မရနိုင်ပါက ဧည့်ကြိုကောင်တာက သင့်ကို ဝင်ရောက်မှတ်ပေးနိုင်ပါသည်။",
+  "Check out": "ထွက်ခွာမှတ်ရန်",
+  "Checking out…": "ထွက်ခွာမှတ်နေသည်…",
+  "Closes your open gym visit": "သင်၏ ဖွင့်ထားသော Gym လာရောက်မှုကို ပိတ်သည်",
+  "Check-out failed.": "ထွက်ခွာမှတ်ခြင်း မအောင်မြင်ပါ။",
+  "Checked out at {time}.": "{time} တွင် ထွက်ခွာမှတ်ပြီးပါပြီ။",
+  "Check out when you leave. If you forget, yesterday's open visit closes automatically when you check in again the next gym day.":
+    "ထွက်မည့်အခါ ထွက်ခွာမှတ်ပါ။ မေ့သွားရင် ယခင်နေ့၏ ဖွင့်ထားသော လာရောက်မှုကို နောက် Gym နေ့တွင် ထပ်ဝင်မှတ်သည့်အခါ အလိုအလျောက် ပိတ်ပေးပါမည်။",
+  "Messages from your gym: membership expiry reminders and announcements sent by the gym owner or manager. You do not send messages from here.":
+    "သင်၏ Gym မှ ပို့သော စာများဖြစ်သည် — အသင်းဝင်မှု သက်တမ်းကုန် သတိပေးချက်နှင့် Owner/Manager ပို့သော ကြေညာချက်များ။ ဤနေရာမှ စာပို့၍ မရပါ။",
+  "These are payments your gym recorded for you. Paid means the gym posted the payment. Waiting means staff still need to approve it.":
+    "သင်၏ Gym က သင့်အတွက် မှတ်ထားသော ငွေပေးချေမှုများဖြစ်သည်။ ပေးချေပြီး ဆိုသည်မှာ Gym က အတည်ပြုတင်ပြီးဖြစ်သည်။ စောင့်ဆိုင်းနေသည် ဆိုသည်မှာ ဝန်ထမ်း အတည်ပြုရန် ကျန်သေးသည်။",
+  "Draft — not finished": "မူကြမ်း — မပြီးသေး",
+  "Waiting for gym approval": "Gym အတည်ပြုရန် စောင့်ဆိုင်းနေသည်",
+  Paid: "ပေးချေပြီး",
+  "Rejected by gym": "Gym က ငြင်းပယ်ထားသည်",
+  Cancelled: "ပယ်ဖျက်ထားသည်",
+  Voided: "ပယ်ဖျက်ပြီး",
+  "Shop purchase": "ဆိုင်မှ ဝယ်ယူမှု",
+  "Class package": "အတန်းပက်ကေ့ဂျ်",
+  "Other payment": "အခြားငွေပေးချေမှု",
+  Cash: "ငွေသား",
+  "Bank transfer": "ဘဏ်လွှဲ",
+  Card: "ကတ်",
+  "Mobile payment": "မိုဘိုင်းငွေပေးချေမှု",
+  "Other method": "အခြားနည်းလမ်း",
+  Charge: "ကျသင့်ငွေ",
+  Refund: "ပြန်အမ်းငွေ",
+  Reversal: "ပြန်လည်ပယ်ဖျက်မှု",
   Schedule: "အချိန်ဇယား",
   "Selects this package for the next class booking":
     "နောက်ထပ် အတန်းကြိုတင်စာရင်းအတွက် ဤပက်ကေ့ဂျ်ကို ရွေးချယ်သည်",
@@ -285,10 +315,14 @@ export const messages: Record<string, string> = {
   "Checked in at {time}.": "{time} တွင် ဝင်ရောက်ပြီးပါပြီ။",
   "That check-in code is not valid. Ask the front desk to show a new code.":
     "ထိုဝင်ရောက်မှုကုဒ် မမှန်ပါ။ ကောင်တာကို ကုဒ်အသစ် ပြခိုင်းပါ။",
+  "That code expired or changed. Wait for the new code on the gym screen, then scan again.":
+    "ထိုကုဒ် သက်တမ်းကုန်သွားသည် သို့မဟုတ် ပြောင်းသွားသည်။ Gym ဖန်သားပြင်ပေါ်ရှိ ကုဒ်အသစ်ကို စောင့်ပြီး ထပ်မံ စကန်ဖတ်ပါ။",
   "You were already checked in during this visit window.":
     "ဤဝင်ရောက်ချိန်အတွင်း သင်ဝင်ရောက်ပြီးသားဖြစ်ပါသည်။",
   "You are already checked in. Check out at the desk before scanning again.":
     "သင်ဝင်ရောက်ပြီးသားဖြစ်ပါသည်။ ထပ်မံ စကန်မဖတ်မီ ကောင်တာတွင် ထွက်မှတ်ပါ။",
+  "You are already checked in. Check out in the app before scanning again.":
+    "သင်ဝင်ရောက်ပြီးသားဖြစ်ပါသည်။ ထပ်မံ စကန်မဖတ်မီ အက်ပ်ထဲတွင် ထွက်ခွာမှတ်ပါ။",
   "Your membership is not eligible for check-in.":
     "သင်၏ အသင်းဝင်မှုသည် ဝင်ရောက်ရန် အရည်အချင်း မပြည့်ပါ။",
   Language: "ဘာသာစကား",
