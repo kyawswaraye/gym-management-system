@@ -25,7 +25,7 @@ from apps.common.db.tenant_context import set_gym_context
 from apps.files.models import FileAsset
 from apps.files.storage import StoredObject
 from apps.members.models import Member, Payment
-from apps.tenants.models import Gym, GymFeatureEntitlement, GymLogo, GymMembership
+from apps.tenants.models import Gym, GymFeatureEntitlement, GymLogo, GymMembership, GymSettings
 from apps.users.models import User
 from tests.file_fakes import CURRENT, MemoryStore, use_fakes
 from tests.security.test_bookings import _grant, _key, _package
@@ -762,6 +762,9 @@ def test_member_can_check_out_own_open_visit_and_stale_visits_auto_close() -> No
                 "evaluated_on": yesterday.isoformat(),
             },
         )
+        # Same-day checked-out visits still enforce the duplicate window; clear it
+        # so this assertion only covers stale overnight auto-close → next check-in.
+        GymSettings.objects.filter(gym=gym).update(check_in_duplicate_window_seconds=0)
     again = api.post(
         "/api/v1/check-ins/",
         {"member_id": member_id, "note": "next day"},
