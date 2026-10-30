@@ -35,6 +35,7 @@ from apps.members.checkin_services import (
     _locked_member,
     _reject_conflicts,
     _snapshot,
+    close_stale_open_visits,
 )
 from apps.members.exceptions import CheckInCodeInvalid, CheckInDuplicate, CheckInIneligible
 from apps.members.models import CheckIn, CheckInChallenge, Member
@@ -106,6 +107,10 @@ def redeem_member_check_in_challenge(
         payload=payload,
         prepare_member=prepare,
         record_visit=record,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        audit_actor=lambda: (linked_user[0], None),
     )
 
 
@@ -148,6 +153,10 @@ def redeem_trainer_check_in_challenge(
         payload=payload,
         prepare_member=prepare,
         record_visit=record,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        audit_actor=lambda: (actor.user, actor.id),
     )
 
 
@@ -183,6 +192,10 @@ def _redeem_onsite_challenge(
     payload: str,
     prepare_member: _MemberReady,
     record_visit: _RecordVisit,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+    audit_actor: Callable[[], tuple[User | None, UUID | None]],
 ) -> CheckIn:
     if not payload_is_well_formed(payload):
         raise CheckInCodeInvalid()
@@ -199,6 +212,17 @@ def _redeem_onsite_challenge(
     evaluated_on = now.astimezone(ZoneInfo(gym.timezone)).date()
     prepare_member(member, evaluated_on)
     membership = _eligible_membership(gym=gym, member=member, evaluated_on=evaluated_on)
+    actor_user, actor_membership_id = audit_actor()
+    close_stale_open_visits(
+        gym=gym,
+        member=member,
+        now=now,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        actor_user=actor_user,
+        actor_membership_id=actor_membership_id,
+    )
     _reject_conflicts(
         gym=gym,
         member=member,

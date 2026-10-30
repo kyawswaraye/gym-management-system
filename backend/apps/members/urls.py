@@ -37,6 +37,7 @@ from apps.members.payment_views import (
 from apps.members.scan_views import MemberCheckInScanView, TrainerCheckInScanView
 from apps.members.self_views import (
     MemberCheckInsView,
+    MemberCheckOutView,
     MemberClassBookingView,
     MemberDashboardView,
     MemberGymLogoView,
@@ -109,6 +110,11 @@ urlpatterns = [
     path("member/membership/", MemberMembershipView.as_view(), name="member-membership"),
     path("member/payments/", MemberPaymentsView.as_view(), name="member-payments"),
     path("member/check-ins/", MemberCheckInsView.as_view(), name="member-check-ins"),
+    path(
+        "member/check-ins/<uuid:id>/check-out/",
+        MemberCheckOutView.as_view(),
+        name="member-check-ins-check-out",
+    ),
     path(
         "member/service-packages/",
         MemberServicePackagesView.as_view(),

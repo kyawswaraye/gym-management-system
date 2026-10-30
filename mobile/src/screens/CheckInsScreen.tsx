@@ -3,6 +3,7 @@ import { useNavigation } from "@react-navigation/native";
 
 import { useMemberApi } from "../app/providers";
 import { formatGymDateTime } from "../dates/gymLocal";
+import { useGymTimezone } from "../dates/useGymTimezone";
 import { queryKeys } from "../query/keys";
 import { displayText } from "../ui/display";
 import { PagedScreen } from "../ui/PagedScreen";
@@ -13,6 +14,7 @@ export function CheckInsScreen() {
   const tx = useTx();
   const api = useMemberApi();
   const navigation = useNavigation();
+  const timeZone = useGymTimezone();
   return (
     <PagedScreen
       onBack={() => navigation.goBack()}
@@ -23,8 +25,14 @@ export function CheckInsScreen() {
       renderItem={(item) => {
         const status = displayText(item?.status);
         const method = displayText(item?.method);
-        const arrived = formatGymDateTime(displayText(item?.check_in_at));
-        const left = formatGymDateTime(displayText(item?.check_out_at));
+        const arrived = formatGymDateTime(
+          displayText(item?.check_in_at),
+          timeZone,
+        );
+        const left = formatGymDateTime(
+          displayText(item?.check_out_at),
+          timeZone,
+        );
         return (
           <>
             <Text style={{ fontWeight: "700" }}>

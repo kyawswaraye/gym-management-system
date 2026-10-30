@@ -11,8 +11,10 @@ import {
   calendarDateFromLocal,
   formatGymDate,
   formatGymTime,
+  gymLocalCalendarDate,
   scheduleWindow,
 } from "../dates/gymLocal";
+import { useGymTimezone } from "../dates/useGymTimezone";
 import { queryKeys } from "../query/keys";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
@@ -31,6 +33,7 @@ export function ScheduleScreen() {
   const api = useMemberApi();
   const online = useOnline();
   const queryClient = useQueryClient();
+  const timeZone = useGymTimezone();
   const range = scheduleWindow(calendarDateFromLocal(new Date()));
   const schedule = useQuery({
     queryKey: queryKeys.schedule(range.date_from, range.date_to),
@@ -134,13 +137,17 @@ export function ScheduleScreen() {
       {schedule.data && schedule.data.bookings.length === 0 ? (
         <EmptyState message={tx("No bookings in this window.")} />
       ) : null}
-      {groupByStart(schedule.data?.bookings ?? []).map((group) => (
+      {groupByStart(schedule.data?.bookings ?? [], timeZone).map((group) => (
         <View key={`booking-${group.date}`} style={{ gap: space.sm }}>
           <Text style={{ color: colors.primary, fontWeight: "700" }}>
             {formatGymDate(group.date)}
           </Text>
           {group.items.map((booking) => (
-            <BookingRow key={booking.id} booking={booking} />
+            <BookingRow
+              key={booking.id}
+              booking={booking}
+              timeZone={timeZone}
+            />
           ))}
         </View>
       ))}
@@ -212,100 +219,104 @@ export function ScheduleScreen() {
       {schedule.data && schedule.data.occurrences.length === 0 ? (
         <EmptyState message={tx("No classes are scheduled in this window.")} />
       ) : null}
-      {groupByStart(schedule.data?.occurrences ?? []).map((group) => (
-        <View key={`class-${group.date}`} style={{ gap: space.sm }}>
-          <Text style={{ color: colors.primary, fontWeight: "700" }}>
-            {formatGymDate(group.date)}
-          </Text>
-          {group.items.map((occurrence) => {
-            const full = occurrence.booked_count >= occurrence.capacity;
-            const width =
-              occurrence.capacity > 0
-                ? Math.min(
-                    100,
-                    (occurrence.booked_count / occurrence.capacity) * 100,
-                  )
-                : 0;
-            return (
-              <Card key={occurrence.id}>
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  <View style={{ width: 58 }}>
-                    <Text style={{ color: colors.primary, fontWeight: "700" }}>
-                      {formatGymTime(occurrence.starts_at)}
-                    </Text>
-                    <Text style={{ color: colors.muted, fontSize: 13 }}>
-                      {formatGymTime(occurrence.ends_at)}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1, gap: 6 }}>
-                    <Text style={{ fontSize: 17, fontWeight: "700" }}>
-                      {occurrence.class_name}
-                    </Text>
-                    <Text style={{ color: colors.muted }}>
-                      {occurrence.trainer_display_name}
-                      {occurrence.location ? ` · ${occurrence.location}` : ""}
-                    </Text>
-                    <View
-                      style={{
-                        backgroundColor: colors.border,
-                        borderRadius: 4,
-                        height: 6,
-                        overflow: "hidden",
-                      }}
-                    >
+      {groupByStart(schedule.data?.occurrences ?? [], timeZone).map(
+        (group) => (
+          <View key={`class-${group.date}`} style={{ gap: space.sm }}>
+            <Text style={{ color: colors.primary, fontWeight: "700" }}>
+              {formatGymDate(group.date)}
+            </Text>
+            {group.items.map((occurrence) => {
+              const full = occurrence.booked_count >= occurrence.capacity;
+              const width =
+                occurrence.capacity > 0
+                  ? Math.min(
+                      100,
+                      (occurrence.booked_count / occurrence.capacity) * 100,
+                    )
+                  : 0;
+              return (
+                <Card key={occurrence.id}>
+                  <View style={{ flexDirection: "row", gap: 12 }}>
+                    <View style={{ width: 58 }}>
+                      <Text style={{ color: colors.primary, fontWeight: "700" }}>
+                        {formatGymTime(occurrence.starts_at, timeZone)}
+                      </Text>
+                      <Text style={{ color: colors.muted, fontSize: 13 }}>
+                        {formatGymTime(occurrence.ends_at, timeZone)}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <Text style={{ fontSize: 17, fontWeight: "700" }}>
+                        {occurrence.class_name}
+                      </Text>
+                      <Text style={{ color: colors.muted }}>
+                        {occurrence.trainer_display_name}
+                        {occurrence.location ? ` · ${occurrence.location}` : ""}
+                      </Text>
                       <View
                         style={{
-                          backgroundColor: full
-                            ? colors.danger
-                            : colors.primary,
+                          backgroundColor: colors.border,
+                          borderRadius: 4,
                           height: 6,
-                          width: `${width}%`,
+                          overflow: "hidden",
                         }}
-                      />
-                    </View>
-                    <Text style={{ color: colors.muted, fontSize: 13 }}>
-                      {tx("{booked} of {capacity}", {
-                        booked: occurrence.booked_count,
-                        capacity: occurrence.capacity,
-                      })}
-                      {full ? ` · ${tx("Full")}` : ""}
-                    </Text>
-                    {occurrence.member_booking_id ? (
-                      <Text
-                        style={{ color: colors.primary, fontWeight: "700" }}
                       >
-                        {tx("You are booked.")}
-                      </Text>
-                    ) : (
-                      <Button
-                        label={tx("Book class")}
-                        hint={tx("Books {name}", {
-                          name: occurrence.class_name,
+                        <View
+                          style={{
+                            backgroundColor: full
+                              ? colors.danger
+                              : colors.primary,
+                            height: 6,
+                            width: `${width}%`,
+                          }}
+                        />
+                      </View>
+                      <Text style={{ color: colors.muted, fontSize: 13 }}>
+                        {tx("{booked} of {capacity}", {
+                          booked: occurrence.booked_count,
+                          capacity: occurrence.capacity,
                         })}
-                        disabled={
-                          !selectedPackage ||
-                          bookingId === occurrence.id ||
-                          !online ||
-                          full
-                        }
-                        onPress={() => book(occurrence.id)}
-                      />
-                    )}
+                        {full ? ` · ${tx("Full")}` : ""}
+                      </Text>
+                      {occurrence.member_booking_id ? (
+                        <Text
+                          style={{ color: colors.primary, fontWeight: "700" }}
+                        >
+                          {tx("You are booked.")}
+                        </Text>
+                      ) : (
+                        <Button
+                          label={tx("Book class")}
+                          hint={tx("Books {name}", {
+                            name: occurrence.class_name,
+                          })}
+                          disabled={
+                            !selectedPackage ||
+                            bookingId === occurrence.id ||
+                            !online ||
+                            full
+                          }
+                          onPress={() => book(occurrence.id)}
+                        />
+                      )}
+                    </View>
                   </View>
-                </View>
-              </Card>
-            );
-          })}
-        </View>
-      ))}
+                </Card>
+              );
+            })}
+          </View>
+        ),
+      )}
     </Screen>
   );
 }
 
 function BookingRow({
   booking,
+  timeZone,
 }: {
   booking: Schemas["MemberScheduleBooking"];
+  timeZone: string;
 }) {
   const tx = useTx();
   const title =
@@ -317,10 +328,10 @@ function BookingRow({
       <View style={{ flexDirection: "row", gap: 12 }}>
         <View style={{ width: 58 }}>
           <Text style={{ color: colors.primary, fontWeight: "700" }}>
-            {formatGymTime(booking.starts_at)}
+            {formatGymTime(booking.starts_at, timeZone)}
           </Text>
           <Text style={{ color: colors.muted, fontSize: 13 }}>
-            {formatGymTime(booking.ends_at)}
+            {formatGymTime(booking.ends_at, timeZone)}
           </Text>
         </View>
         <View style={{ flex: 1, gap: 4 }}>
@@ -349,12 +360,14 @@ function BookingRow({
   );
 }
 
-function groupByStart<T extends { starts_at: string }>(items: readonly T[]) {
+function groupByStart<T extends { starts_at: string }>(
+  items: readonly T[],
+  timeZone: string,
+) {
   const order: string[] = [];
   const groups = new Map<string, T[]>();
   for (const item of items) {
-    const date =
-      typeof item.starts_at === "string" ? item.starts_at.slice(0, 10) : "";
+    const date = gymLocalCalendarDate(item.starts_at, timeZone);
     const list = groups.get(date);
     if (list) {
       list.push(item);

@@ -33,6 +33,7 @@ export type MemberApi = {
   membership(): Promise<Schemas["MemberSelfMembership"] | null>;
   payments(after?: string): Promise<Page<Schemas["MemberPaymentHistoryItem"]>>;
   checkIns(after?: string): Promise<Page<Schemas["CheckIn"]>>;
+  checkOut(checkInId: string): Promise<Schemas["CheckIn"]>;
   servicePackages(after?: string): Promise<Page<Schemas["MemberSelfPackage"]>>;
   schedule(
     dateFrom: string,
@@ -110,6 +111,13 @@ export function createMemberApi(client: ApiClient): MemberApi {
         },
       );
       return pageOf(envelope);
+    },
+    async checkOut(checkInId) {
+      const envelope = await client.request<Schemas["CheckIn"]>(
+        `/api/v1/member/check-ins/${checkInId}/check-out/`,
+        { method: "POST", body: {} },
+      );
+      return required(envelope);
     },
     async servicePackages(after) {
       const envelope = await client.request<Schemas["MemberSelfPackage"][]>(

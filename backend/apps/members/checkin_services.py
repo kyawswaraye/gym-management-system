@@ -8,7 +8,7 @@ or source metadata.
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Any, NamedTuple
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -30,6 +30,7 @@ from apps.members.exceptions import (
 from apps.members.models import CheckIn, Member, Membership
 from apps.tenants.exceptions import IdempotencyKeyReused
 from apps.tenants.models import Gym, GymMembership, GymSettings
+from apps.users.models import User
 
 CHECK_IN_BACKDATE_LIMIT = timedelta(hours=24)
 CHECK_IN_CLOCK_SKEW = timedelta(seconds=60)
@@ -252,6 +253,16 @@ def create_manual_check_in(
     check_in_at = occurred_at if occurred_at is not None else now
     evaluated_on = check_in_at.astimezone(ZoneInfo(gym.timezone)).date()
     membership = _eligible_membership(gym=gym, member=member, evaluated_on=evaluated_on)
+    close_stale_open_visits(
+        gym=gym,
+        member=member,
+        now=check_in_at,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        actor_user=actor.user,
+        actor_membership_id=actor.id,
+    )
     _reject_conflicts(
         gym=gym,
         member=member,
@@ -304,6 +315,121 @@ def create_manual_check_in(
         backdated=occurred_at is not None,
     )
     return CheckInWrite(check_in, created=True)
+
+
+def close_stale_open_visits(
+    *,
+    gym: Gym,
+    member: Member,
+    now: datetime,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+    actor_user: User | None,
+    actor_membership_id: UUID | None,
+) -> list[CheckIn]:
+    """Close open visits whose gym-local check-in day is before today.
+
+    Same-day open visits stay open and still block a new check-in. Checkout is
+    the start of the next gym-local day so the visit ends with that day.
+    """
+
+    zone = ZoneInfo(gym.timezone)
+    today = now.astimezone(zone).date()
+    closed: list[CheckIn] = []
+    open_visits = list(
+        CheckIn.objects.select_for_update()
+        .filter(gym=gym, member=member, check_out_at__isnull=True)
+        .order_by("check_in_at", "id")
+    )
+    for visit in open_visits:
+        visit_day = visit.check_in_at.astimezone(zone).date()
+        if visit_day >= today:
+            continue
+        checkout_at = datetime.combine(visit_day + timedelta(days=1), time.min, tzinfo=zone)
+        if checkout_at <= visit.check_in_at:
+            checkout_at = now
+        visit.check_out_at = checkout_at
+        visit.save(update_fields=["check_out_at", "updated_at"])
+        write_tenant_audit(
+            gym=gym,
+            actor_user=actor_user,
+            actor_membership_id=actor_membership_id,
+            action="CHECK_IN_AUTO_CLOSED",
+            module="checkins",
+            target_type="CheckIn",
+            target_id=visit.id,
+            request_id=request_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            new_values={
+                "member_id": str(visit.member_id),
+                "membership_id": (
+                    None if visit.membership_id is None else str(visit.membership_id)
+                ),
+                "method": visit.method,
+                "check_in_at": visit.check_in_at.isoformat(),
+                "check_out_at": checkout_at.isoformat(),
+                "backdated": False,
+                "reason": "previous_gym_day",
+            },
+        )
+        closed.append(visit)
+    return closed
+
+
+@transaction.atomic
+def check_out_self_check_in(
+    *,
+    gym: Gym,
+    member: Member,
+    check_in_id: UUID,
+    user: User,
+    request_id: str,
+    ip_address: str | None,
+    user_agent: str,
+) -> CheckIn:
+    """Close the token member's own open visit. No backdating."""
+
+    now = timezone.now()
+    _locked_member(gym, member.id)
+    check_in = (
+        CheckIn.objects.select_for_update()
+        .select_related("member")
+        .filter(gym=gym, id=check_in_id, member_id=member.id)
+        .first()
+    )
+    if check_in is None:
+        raise Http404
+    if check_in.check_out_at is not None:
+        return check_in
+    if now <= check_in.check_in_at:
+        raise ValidationError({"detail": ["Check-out must be after check-in."]})
+    check_in.check_out_at = now
+    check_in.save(update_fields=["check_out_at", "updated_at"])
+    write_tenant_audit(
+        gym=gym,
+        actor_user=user,
+        actor_membership_id=None,
+        action="MEMBER_CHECK_IN_CHECKED_OUT",
+        module="checkins",
+        target_type="CheckIn",
+        target_id=check_in.id,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        new_values={
+            "member_id": str(check_in.member_id),
+            "membership_id": (
+                None if check_in.membership_id is None else str(check_in.membership_id)
+            ),
+            "method": check_in.method,
+            "check_in_at": check_in.check_in_at.isoformat(),
+            "check_out_at": check_in.check_out_at.isoformat(),
+            "backdated": False,
+        },
+    )
+    return check_in
 
 
 @transaction.atomic

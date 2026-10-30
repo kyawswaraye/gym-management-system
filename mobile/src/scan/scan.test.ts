@@ -23,7 +23,7 @@ describe("check-in QR handling", () => {
       /already checked in/i,
     );
     expect(scanErrorMessage("CHECK_IN_CODE_INVALID", "fallback")).toMatch(
-      /not valid/i,
+      /expired or changed/i,
     );
     expect(scanErrorMessage("CHECK_IN_OPEN", "fallback")).toMatch(
       /already checked in/i,

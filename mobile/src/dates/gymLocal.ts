@@ -22,6 +22,7 @@ const MONTHS = [
 ] as const;
 
 export const SCHEDULE_WINDOW_DAYS = 42;
+export const FALLBACK_GYM_TIMEZONE = "Asia/Yangon";
 
 export function calendarDateFromLocal(now: Date): CalendarDate {
   return {
@@ -85,26 +86,77 @@ export function formatGymDate(value: string): string {
   return `${match[3]}-${match[2]}-${match[1]}`;
 }
 
-export function formatGymTime(value: string): string {
-  if (typeof value !== "string") {
-    return "";
+function gymWallParts(
+  value: string,
+  timeZone: string,
+): { date: string; time: string } | null {
+  const instant = new Date(value);
+  if (Number.isNaN(instant.getTime())) {
+    return null;
   }
-  const match = /T(\d{2}:\d{2})/.exec(value);
-  return match?.[1] ?? "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(instant);
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  const hour = values.hour === "24" ? "00" : values.hour;
+  if (
+    !values.year ||
+    !values.month ||
+    !values.day ||
+    !hour ||
+    !values.minute
+  ) {
+    return null;
+  }
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    time: `${hour}:${values.minute}`,
+  };
 }
 
-export function formatGymDateTime(value: string): string {
-  if (typeof value !== "string") {
+export function formatGymTime(
+  value: string,
+  timeZone: string = FALLBACK_GYM_TIMEZONE,
+): string {
+  if (typeof value !== "string" || !value) {
     return "";
   }
-  const match =
-    /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.exec(
-      value,
-    );
-  if (!match || !match[1] || !match[2] || !match[3]) {
+  const wall = gymWallParts(value, timeZone);
+  return wall?.time ?? "";
+}
+
+export function formatGymDateTime(
+  value: string,
+  timeZone: string = FALLBACK_GYM_TIMEZONE,
+): string {
+  if (typeof value !== "string" || !value) {
+    return "";
+  }
+  const wall = gymWallParts(value, timeZone);
+  if (!wall) {
     return value;
   }
-  return `${formatGymDate(match[1])} ${match[2]}`;
+  return `${formatGymDate(wall.date)} ${wall.time}`;
+}
+
+export function gymLocalCalendarDate(
+  value: string,
+  timeZone: string = FALLBACK_GYM_TIMEZONE,
+): string {
+  if (typeof value !== "string" || !value) {
+    return "";
+  }
+  return gymWallParts(value, timeZone)?.date ?? "";
 }
 
 export function formatServerMoney(
