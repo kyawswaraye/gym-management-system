@@ -666,6 +666,7 @@ def test_member_profile_photo_stays_on_the_token_member() -> None:
     assert removed.status_code == 200, removed.json()
     assert _load_member(gym, member_id).profile_photo_asset_id is None
 
+
 @override_settings(**jwt_settings())
 def test_member_can_check_out_own_open_visit_and_stale_visits_auto_close() -> None:
     from datetime import datetime

@@ -219,94 +219,92 @@ export function ScheduleScreen() {
       {schedule.data && schedule.data.occurrences.length === 0 ? (
         <EmptyState message={tx("No classes are scheduled in this window.")} />
       ) : null}
-      {groupByStart(schedule.data?.occurrences ?? [], timeZone).map(
-        (group) => (
-          <View key={`class-${group.date}`} style={{ gap: space.sm }}>
-            <Text style={{ color: colors.primary, fontWeight: "700" }}>
-              {formatGymDate(group.date)}
-            </Text>
-            {group.items.map((occurrence) => {
-              const full = occurrence.booked_count >= occurrence.capacity;
-              const width =
-                occurrence.capacity > 0
-                  ? Math.min(
-                      100,
-                      (occurrence.booked_count / occurrence.capacity) * 100,
-                    )
-                  : 0;
-              return (
-                <Card key={occurrence.id}>
-                  <View style={{ flexDirection: "row", gap: 12 }}>
-                    <View style={{ width: 58 }}>
-                      <Text style={{ color: colors.primary, fontWeight: "700" }}>
-                        {formatGymTime(occurrence.starts_at, timeZone)}
-                      </Text>
-                      <Text style={{ color: colors.muted, fontSize: 13 }}>
-                        {formatGymTime(occurrence.ends_at, timeZone)}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 17, fontWeight: "700" }}>
-                        {occurrence.class_name}
-                      </Text>
-                      <Text style={{ color: colors.muted }}>
-                        {occurrence.trainer_display_name}
-                        {occurrence.location ? ` · ${occurrence.location}` : ""}
-                      </Text>
+      {groupByStart(schedule.data?.occurrences ?? [], timeZone).map((group) => (
+        <View key={`class-${group.date}`} style={{ gap: space.sm }}>
+          <Text style={{ color: colors.primary, fontWeight: "700" }}>
+            {formatGymDate(group.date)}
+          </Text>
+          {group.items.map((occurrence) => {
+            const full = occurrence.booked_count >= occurrence.capacity;
+            const width =
+              occurrence.capacity > 0
+                ? Math.min(
+                    100,
+                    (occurrence.booked_count / occurrence.capacity) * 100,
+                  )
+                : 0;
+            return (
+              <Card key={occurrence.id}>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <View style={{ width: 58 }}>
+                    <Text style={{ color: colors.primary, fontWeight: "700" }}>
+                      {formatGymTime(occurrence.starts_at, timeZone)}
+                    </Text>
+                    <Text style={{ color: colors.muted, fontSize: 13 }}>
+                      {formatGymTime(occurrence.ends_at, timeZone)}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <Text style={{ fontSize: 17, fontWeight: "700" }}>
+                      {occurrence.class_name}
+                    </Text>
+                    <Text style={{ color: colors.muted }}>
+                      {occurrence.trainer_display_name}
+                      {occurrence.location ? ` · ${occurrence.location}` : ""}
+                    </Text>
+                    <View
+                      style={{
+                        backgroundColor: colors.border,
+                        borderRadius: 4,
+                        height: 6,
+                        overflow: "hidden",
+                      }}
+                    >
                       <View
                         style={{
-                          backgroundColor: colors.border,
-                          borderRadius: 4,
+                          backgroundColor: full
+                            ? colors.danger
+                            : colors.primary,
                           height: 6,
-                          overflow: "hidden",
+                          width: `${width}%`,
                         }}
-                      >
-                        <View
-                          style={{
-                            backgroundColor: full
-                              ? colors.danger
-                              : colors.primary,
-                            height: 6,
-                            width: `${width}%`,
-                          }}
-                        />
-                      </View>
-                      <Text style={{ color: colors.muted, fontSize: 13 }}>
-                        {tx("{booked} of {capacity}", {
-                          booked: occurrence.booked_count,
-                          capacity: occurrence.capacity,
-                        })}
-                        {full ? ` · ${tx("Full")}` : ""}
-                      </Text>
-                      {occurrence.member_booking_id ? (
-                        <Text
-                          style={{ color: colors.primary, fontWeight: "700" }}
-                        >
-                          {tx("You are booked.")}
-                        </Text>
-                      ) : (
-                        <Button
-                          label={tx("Book class")}
-                          hint={tx("Books {name}", {
-                            name: occurrence.class_name,
-                          })}
-                          disabled={
-                            !selectedPackage ||
-                            bookingId === occurrence.id ||
-                            !online ||
-                            full
-                          }
-                          onPress={() => book(occurrence.id)}
-                        />
-                      )}
+                      />
                     </View>
+                    <Text style={{ color: colors.muted, fontSize: 13 }}>
+                      {tx("{booked} of {capacity}", {
+                        booked: occurrence.booked_count,
+                        capacity: occurrence.capacity,
+                      })}
+                      {full ? ` · ${tx("Full")}` : ""}
+                    </Text>
+                    {occurrence.member_booking_id ? (
+                      <Text
+                        style={{ color: colors.primary, fontWeight: "700" }}
+                      >
+                        {tx("You are booked.")}
+                      </Text>
+                    ) : (
+                      <Button
+                        label={tx("Book class")}
+                        hint={tx("Books {name}", {
+                          name: occurrence.class_name,
+                        })}
+                        disabled={
+                          !selectedPackage ||
+                          bookingId === occurrence.id ||
+                          !online ||
+                          full
+                        }
+                        onPress={() => book(occurrence.id)}
+                      />
+                    )}
                   </View>
-                </Card>
-              );
-            })}
-          </View>
-        ),
-      )}
+                </View>
+              </Card>
+            );
+          })}
+        </View>
+      ))}
     </Screen>
   );
 }

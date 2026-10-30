@@ -109,13 +109,7 @@ function gymWallParts(
       .map((part) => [part.type, part.value]),
   );
   const hour = values.hour === "24" ? "00" : values.hour;
-  if (
-    !values.year ||
-    !values.month ||
-    !values.day ||
-    !hour ||
-    !values.minute
-  ) {
+  if (!values.year || !values.month || !values.day || !hour || !values.minute) {
     return null;
   }
   return {

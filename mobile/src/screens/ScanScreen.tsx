@@ -110,9 +110,7 @@ export function ScanScreen() {
       await refreshVisit();
     } catch (error) {
       setResult(
-        error instanceof Error
-          ? tx(error.message)
-          : tx("Check-out failed."),
+        error instanceof Error ? tx(error.message) : tx("Check-out failed."),
       );
     } finally {
       setCheckingOut(false);
@@ -140,9 +138,7 @@ export function ScanScreen() {
             )}
           </Text>
           <Button
-            label={
-              checkingOut ? tx("Checking out…") : tx("Check out")
-            }
+            label={checkingOut ? tx("Checking out…") : tx("Check out")}
             hint={tx("Closes your open gym visit")}
             disabled={!online || checkingOut}
             onPress={() => {
