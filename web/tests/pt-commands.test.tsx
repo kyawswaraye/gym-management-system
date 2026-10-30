@@ -452,17 +452,26 @@ describe("phase 5 command coverage", () => {
       await screen.findByRole("button", { name: /Pack|100.00 MMK/ }),
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit draft" }));
-    await screen.findByRole("option", { name: /Ada|Current trainer/ });
-    fireEvent.change(screen.getByLabelText("Trainer"), {
+    const editDialog = await screen.findByRole("dialog", {
+      name: "Edit draft",
+    });
+    await within(editDialog).findByRole("option", {
+      name: /Ada|Current trainer/,
+    });
+    fireEvent.change(within(editDialog).getByLabelText("Trainer"), {
       target: { value: TRAINER },
     });
-    fireEvent.change(screen.getByLabelText("Description"), {
+    fireEvent.change(within(editDialog).getByLabelText("Description"), {
       target: { value: "Updated" },
     });
-    fireEvent.change(screen.getByLabelText("Member's money"), {
+    fireEvent.change(within(editDialog).getByLabelText("Member's money"), {
       target: { value: "clear" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    const saveDraft = within(editDialog).getByRole("button", {
+      name: "Save draft",
+    });
+    await waitFor(() => expect(saveDraft).toBeEnabled());
+    fireEvent.click(saveDraft);
     await waitFor(() =>
       expect(updatePtSale).toHaveBeenCalledWith(
         SALE,
