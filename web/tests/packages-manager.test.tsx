@@ -115,7 +115,7 @@ describe("package catalog", () => {
     ).toBeInTheDocument();
     expect(within(catalog).getByText(/stay unchanged/)).toBeInTheDocument();
 
-    const table = within(catalog).getByRole("table", {
+    const table = await within(catalog).findByRole("table", {
       name: "Package catalog",
     });
     const packages = within(table).getAllByRole("row").slice(1);
