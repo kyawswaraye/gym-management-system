@@ -18,7 +18,8 @@ function failure(message: string, fileId: string | null = null): never {
 }
 
 async function sha256Hex(bytes: BufferSource): Promise<string> {
-  if (!globalThis.crypto?.subtle) failure("Unable to upload the product image.");
+  if (!globalThis.crypto?.subtle)
+    failure("Unable to upload the product image.");
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   let hex = "";
   for (const byte of new Uint8Array(digest)) {
@@ -82,7 +83,10 @@ export async function uploadProductImage(
     failure("The file service is unavailable.", intent.file_id);
   }
   if (posted.status !== 204) {
-    failure("The file service did not accept the product image.", intent.file_id);
+    failure(
+      "The file service did not accept the product image.",
+      intent.file_id,
+    );
   }
   const completed = await operationMutation<CompletedFile>(
     `files/${intent.file_id}/complete/`,

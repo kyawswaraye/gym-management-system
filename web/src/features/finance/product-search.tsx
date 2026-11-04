@@ -1,7 +1,12 @@
 "use client";
 import { useTx } from "@/i18n/use-tx";
 
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 
 import { listProducts } from "@/features/finance/client";
 import { financeError } from "@/features/finance/errors";

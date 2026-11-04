@@ -791,9 +791,7 @@ export function RetailSalesManager({
               ?.focus();
           })
           .catch((caught: unknown) => {
-            setFormError(
-              financeError(caught, "Unable to search products."),
-            );
+            setFormError(financeError(caught, "Unable to search products."));
           });
         return;
       }
@@ -1009,7 +1007,9 @@ export function RetailSalesManager({
             </div>
           </div>
           <aside className="flex min-h-0 flex-col bg-slate-50">
-            <div className={`min-h-0 flex-1 space-y-4 overflow-y-auto p-4 ${fieldTone}`}>
+            <div
+              className={`min-h-0 flex-1 space-y-4 overflow-y-auto p-4 ${fieldTone}`}
+            >
               <Alert message={formError} />
               {ticketLines.length > 0 ? (
                 <ul className="grid gap-3">
