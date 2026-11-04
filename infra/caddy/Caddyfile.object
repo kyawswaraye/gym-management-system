@@ -27,7 +27,9 @@ http://{$OBJECT_PUBLIC_HOST:files.localhost} {
 		respond "" 204
 	}
 
-	@object method GET POST
+	# GET and POST are the browser. HEAD and PUT are the host API, which reaches
+	# MinIO only through this loopback proxy.
+	@object method GET POST HEAD PUT
 	handle @object {
 		reverse_proxy minio:9000 {
 			# {http.request.host} drops a non-default port. SigV4 signed the

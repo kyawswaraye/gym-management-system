@@ -23,6 +23,8 @@ from apps.files.constants import (
     EXPENSE_RECEIPT_PURPOSE,
     GYM_OWNER,
     MEMBER_OWNER,
+    PRODUCT_IMAGE_NAMES,
+    PRODUCT_IMAGE_PURPOSE,
     PROFILE_PHOTO_PURPOSE,
     QUARANTINE_HOURS,
 )
@@ -131,6 +133,20 @@ def create_upload_intent(
             stored_owner_id = gym.id
             stored_owner_type = GYM_OWNER
             stored_purpose = EXPENSE_RECEIPT_PURPOSE
+        elif purpose == PRODUCT_IMAGE_PURPOSE:
+            _require_finance_entitlement(gym)
+            if owner_type != GYM_OWNER or owner_id != gym.id:
+                raise FileRequestError(
+                    code="UNSUPPORTED_FILE_OWNER",
+                    message="This file owner is not supported.",
+                    status_code=422,
+                    fields={"owner_id": ["This file owner is not supported."]},
+                )
+            if not membership_has_permission(membership=actor, code="inventory.manage"):
+                raise PermissionDenied()
+            stored_owner_id = gym.id
+            stored_owner_type = GYM_OWNER
+            stored_purpose = PRODUCT_IMAGE_PURPOSE
         else:
             raise FileRequestError(
                 code="UNSUPPORTED_FILE_PURPOSE",
@@ -401,11 +417,12 @@ def issue_download_url(
                 "sha256": digest,
             },
         )
-    filename = (
-        EXPENSE_RECEIPT_NAMES[content_type]
-        if asset.purpose == EXPENSE_RECEIPT_PURPOSE
-        else ATTACHMENT_NAMES[content_type]
-    )
+    if asset.purpose == EXPENSE_RECEIPT_PURPOSE:
+        filename = EXPENSE_RECEIPT_NAMES[content_type]
+    elif asset.purpose == PRODUCT_IMAGE_PURPOSE:
+        filename = PRODUCT_IMAGE_NAMES[content_type]
+    else:
+        filename = ATTACHMENT_NAMES[content_type]
     signed_at = moment or utc_now()
     try:
         download = store.presign_get(
@@ -446,6 +463,13 @@ def delete_upload(
         _require_caller_asset(gym, actor, member, asset, member_self=member_self, held=False)
         if asset.purpose == EXPENSE_RECEIPT_PURPOSE and _expense_receipt_referenced(gym, asset.id):
             raise _state_conflict()
+        if asset.purpose == PRODUCT_IMAGE_PURPOSE:
+            if actor is None or not membership_has_permission(
+                membership=actor, code="inventory.manage"
+            ):
+                raise PermissionDenied()
+            if _product_image_referenced(gym, asset.id):
+                raise _state_conflict()
         if asset.retention_status == FileAsset.RetentionStatus.DELETED:
             _detach_photo(member, asset.id, gym=gym, audit=audit, member_self=member_self)
             return _delete_result(asset)
@@ -511,7 +535,9 @@ def expire_quarantined_uploads(
         set_gym_context(gym_id=gym.id)
         cutoff = timezone.now() - timedelta(hours=QUARANTINE_HOURS)
         referenced = Member.objects.filter(gym=gym, profile_photo_asset_id=OuterRef("id"))
-        private_purpose = Q(purpose__in=[PROFILE_PHOTO_PURPOSE, EXPENSE_RECEIPT_PURPOSE])
+        private_purpose = Q(
+            purpose__in=[PROFILE_PHOTO_PURPOSE, EXPENSE_RECEIPT_PURPOSE, PRODUCT_IMAGE_PURPOSE]
+        )
         cutoff_ids = list(
             FileAsset.objects.filter(gym=gym)
             .filter(
@@ -999,6 +1025,32 @@ def _expense_receipt_referenced(gym: Gym, asset_id: UUID) -> bool:
     return Expense.objects.filter(gym=gym, receipt_file_asset_id=asset_id).exists()
 
 
+def _product_image_referenced(gym: Gym, asset_id: UUID) -> bool:
+    from apps.inventory.models import Product
+
+    return Product.objects.filter(gym=gym, image_asset_id=asset_id).exists()
+
+
+def _require_product_image_access(
+    gym: Gym, actor: GymMembership, asset: FileAsset, *, manage: bool
+) -> None:
+    _require_finance_entitlement(gym)
+    if manage:
+        allowed = membership_has_permission(membership=actor, code="inventory.manage")
+    else:
+        allowed = membership_has_permission(
+            membership=actor, code="inventory.view"
+        ) or membership_has_permission(membership=actor, code="inventory.manage")
+    if not allowed:
+        raise PermissionDenied()
+    if (
+        asset.purpose != PRODUCT_IMAGE_PURPOSE
+        or asset.owner_type != GYM_OWNER
+        or asset.owner_id != gym.id
+    ):
+        raise Http404
+
+
 def _reject_expired(gym: Gym, asset: FileAsset, *, attempt_id: UUID | None) -> bool:
     updated = FileAsset.objects.filter(
         pk=asset.pk,
@@ -1153,13 +1205,13 @@ def _lock_owned_asset(gym: Gym, asset_id: UUID) -> tuple[Member | None, FileAsse
         if asset is None or asset.owner_type != MEMBER_OWNER or asset.owner_id != member.id:
             raise Http404
         return member, asset
-    if preview.purpose == EXPENSE_RECEIPT_PURPOSE:
+    if preview.purpose in {EXPENSE_RECEIPT_PURPOSE, PRODUCT_IMAGE_PURPOSE}:
         asset = FileAsset.objects.select_for_update().filter(gym=gym, id=asset_id).first()
         if (
             asset is None
             or asset.owner_type != GYM_OWNER
             or asset.owner_id != gym.id
-            or asset.purpose != EXPENSE_RECEIPT_PURPOSE
+            or asset.purpose != preview.purpose
         ):
             raise Http404
         return None, asset
@@ -1313,6 +1365,9 @@ def _require_held_asset(
     if asset.purpose == EXPENSE_RECEIPT_PURPOSE:
         _require_expense_receipt_access(gym, actor, asset)
         return
+    if asset.purpose == PRODUCT_IMAGE_PURPOSE:
+        _require_product_image_access(gym, actor, asset, manage=True)
+        return
     raise Http404
 
 
@@ -1327,6 +1382,9 @@ def _require_asset_access(
         return
     if asset.purpose == EXPENSE_RECEIPT_PURPOSE:
         _require_expense_receipt_access(gym, actor, asset)
+        return
+    if asset.purpose == PRODUCT_IMAGE_PURPOSE:
+        _require_product_image_access(gym, actor, asset, manage=False)
         return
     raise Http404
 

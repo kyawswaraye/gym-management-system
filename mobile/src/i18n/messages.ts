@@ -51,6 +51,7 @@ export const messages: Record<string, string> = {
   "Google sign-in is not configured.": "Google ဝင်ရောက်မှုကို မပြင်ဆင်ရသေးပါ။",
   "Google sign-in was cancelled.": "Google ဝင်ရောက်မှုကို ပယ်ဖျက်လိုက်သည်။",
   "Gym logo": "Gym လိုဂို",
+  "Gym studio": "Gym စတူဒီယို",
   "GymPilot MM": "GymPilot MM",
   "GymPilot MM signs you in to one linked membership, shows your profile, membership, payments, check-ins, packages, and schedule, and can scan an onsite check-in code. The camera is used only when you scan that code or choose a profile photo. Push is optional. The app does not include advertising or an analytics SDK. Refresh credentials stay in the device keystore. Access credentials stay in memory for the current session.":
     "GymPilot MM သည် ချိတ်ဆက်ထားသော အသင်းဝင်မှုတစ်ခုသို့ သင့်ကို ဝင်ရောက်စေသည်။ ကိုယ်ရေးအချက်အလက်၊ အသင်းဝင်မှု၊ ငွေပေးချေမှုများ၊ ဝင်ရောက်မှုများ၊ ပက်ကေ့ဂျ်များနှင့် အချိန်ဇယားကို ပြသပြီး Gym ရှိ ဝင်ရောက်မှုကုဒ်ကို စကန်ဖတ်နိုင်သည်။ ကင်မရာကို ထိုကုဒ် စကန်ဖတ်ချိန်နှင့် ကိုယ်ရေးဓာတ်ပုံ ရွေးချိန်တွင်သာ အသုံးပြုသည်။ Push အကြောင်းကြားချက်ကို မဖြစ်မနေ မလိုပါ။ ဤအက်ပ်တွင် ကြော်ငြာနှင့် အသုံးပြုမှုခွဲခြမ်းစနစ် မပါဝင်ပါ။ ပြန်လည်သက်တမ်းတိုးအထောက်အထားများကို စက်၏ လုံခြုံသော့သိုလှောင်ခန်းတွင် သိမ်းထားသည်။ အကောင့်ဝင်အထောက်အထားများကို လက်ရှိ ဝင်ရောက်ချိန်အတွက် မှတ်ဉာဏ်ထဲတွင်သာ ထားသည်။",

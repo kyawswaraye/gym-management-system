@@ -72,7 +72,7 @@ def test_retail_migration_graph_is_acyclic_and_explicit() -> None:
     classes_guards = ("classes", "0004_class_schedule_guards")
     classes_booking = ("classes", "0006_class_booking_guards")
     classes_terminal = ("classes", "0008_member_self_actors")
-    assert loader.graph.leaf_nodes("inventory") == [inventory_return]
+    assert loader.graph.leaf_nodes("inventory") == [("inventory", "0006_product_image")]
     assert loader.graph.leaf_nodes("members") == [members_desk_approval]
     assert loader.graph.leaf_nodes("trainers") == [trainers_payout_window]
     assert loader.graph.leaf_nodes("classes") == [classes_terminal]

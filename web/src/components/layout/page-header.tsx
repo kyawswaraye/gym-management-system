@@ -14,6 +14,7 @@ type PageHeaderProps = {
   description?: ReactNode;
   actions?: ReactNode;
   children?: ReactNode;
+  compact?: boolean;
 };
 
 export function PageHeader({
@@ -23,9 +24,14 @@ export function PageHeader({
   description,
   actions,
   children,
+  compact = false,
 }: PageHeaderProps) {
   const tx = useTx();
-  const copy = (
+  const copy = compact ? (
+    <h1 className="text-lg font-bold text-slate-900" id={titleId}>
+      {tx(title)}
+    </h1>
+  ) : (
     <>
       {eyebrow ? (
         <p className="text-xs font-bold tracking-[0.18em] text-[#0866ff] uppercase">
@@ -47,7 +53,9 @@ export function PageHeader({
   );
 
   return (
-    <header className="mb-7 border-b border-slate-200 pb-6">
+    <header
+      className={compact ? "mb-3" : "mb-7 border-b border-slate-200 pb-6"}
+    >
       {actions ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>{copy}</div>

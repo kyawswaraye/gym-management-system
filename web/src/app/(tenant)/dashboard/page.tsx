@@ -41,14 +41,13 @@ export default async function DashboardPage() {
         actions={
           <div className="flex items-center gap-2 self-start rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 sm:self-auto">
             <span
-              className="size-2 rounded-full bg-emerald-500"
               aria-hidden="true"
-            />{" "}
-            <Tx text="Live overview" />{" "}
+              className="size-2 rounded-full bg-emerald-500"
+            />
+            <Tx text="Live overview" />
           </div>
         }
         description="Monitor member activity, revenue, expenses, and the health of your gym from one place."
-        eyebrow="Business overview"
         title="Owner dashboard"
         titleId="dashboard-title"
       />

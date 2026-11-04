@@ -20,6 +20,7 @@ export function Card({
         gap: padded ? space.md : 0,
         padding: padded ? 18 : 0,
         ...elevation,
+        shadowOpacity: 0.04,
       }}
     >
       {children}

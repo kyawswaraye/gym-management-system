@@ -23,6 +23,8 @@ import {
   createRetailSale,
   getRetailSale,
   getProduct,
+  listProductCategories,
+  listProducts,
   listRetailSales,
   rejectRetailSale,
   returnRetailSale,
@@ -40,7 +42,10 @@ import {
   previewLineAmount,
 } from "@/features/finance/money";
 import { useCursorPages } from "@/features/finance/paging";
-import { ProductSearch } from "@/features/finance/product-search";
+import {
+  findScannedProduct,
+  ProductSearch,
+} from "@/features/finance/product-search";
 import {
   Alert,
   CursorControls,
@@ -49,7 +54,7 @@ import {
   SelectInput,
   TextInput,
 } from "@/features/finance/ui";
-import { operationGet } from "@/features/operations/client";
+import { getFileDownloadUrl, operationGet } from "@/features/operations/client";
 import { MemberSearch } from "@/features/operations/member-search";
 import { actionButtonClass } from "@/lib/ui/action-button";
 import { IdentifierValue } from "@/lib/ui/identifier";
@@ -57,6 +62,7 @@ import type {
   Member,
   PaymentMethod,
   Product,
+  ProductCategory,
   RetailSale,
   RetailSaleApproval,
   RetailSaleLineWriteRequest,
@@ -144,6 +150,12 @@ function quantityScale(value: string): bigint | null {
   const canonical = canonicalQuantity(value, { allowZero: true });
   if (!canonical || canonical.startsWith("-")) return null;
   return BigInt(canonical.replace(".", ""));
+}
+
+function formatMilli(scale: bigint): string {
+  const whole = scale / 1000n;
+  const fraction = (scale % 1000n).toString().padStart(3, "0");
+  return `${whole}.${fraction}`;
 }
 
 function blankLine(): LineDraft {
@@ -365,6 +377,62 @@ function LoadingRows({ label }: { label: string }) {
   );
 }
 
+function SaleThumb({
+  assetId,
+  className,
+}: {
+  assetId: string | null;
+  className: string;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!assetId) return undefined;
+    let cancelled = false;
+    void getFileDownloadUrl(assetId)
+      .then((download) => {
+        if (!cancelled) setUrl(download.url);
+      })
+      .catch(() => {
+        if (!cancelled) setUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [assetId]);
+  return (
+    <span
+      aria-hidden
+      className={`${className} inline-grid aspect-square shrink-0 place-items-center overflow-hidden bg-[#eef3f9] align-middle text-[#8ea0b8]`}
+    >
+      {url ? (
+        <img
+          alt=""
+          className="block size-full min-h-0 min-w-0 object-cover"
+          src={url}
+        />
+      ) : (
+        <svg
+          className="h-1/2 w-1/2"
+          fill="none"
+          height="24"
+          preserveAspectRatio="xMidYMid meet"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.6"
+          viewBox="0 0 24 24"
+          width="24"
+        >
+          <path d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5z" />
+          <path d="M12 12 4 8.5" />
+          <path d="m12 12 8-3.5" />
+          <path d="M12 12v8" />
+        </svg>
+      )}
+    </span>
+  );
+}
+
 function EmptyState({ title, detail }: { title: string; detail: string }) {
   const tx = useTx();
   return (
@@ -408,7 +476,15 @@ export function RetailSalesManager({
   const [businessDate, setBusinessDate] = useState(defaultDate);
   const [reference, setReference] = useState("");
   const [editing, setEditing] = useState(false);
-  const [creatingSale, setCreatingSale] = useState(false);
+  const [creatingSale, setCreatingSale] = useState(canCreate);
+  const [catalog, setCatalog] = useState<Product[]>([]);
+  const [catalogCategories, setCatalogCategories] = useState<ProductCategory[]>(
+    [],
+  );
+  const [categoryId, setCategoryId] = useState("");
+  const [catalogError, setCatalogError] = useState("");
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
+  const [activeProductId, setActiveProductId] = useState("");
   const [action, setAction] = useState<SaleAction>(null);
   const [correctionDate, setCorrectionDate] = useState(defaultDate);
   const [approval, setApproval] = useState<RetailSaleApproval | null>(null);
@@ -541,7 +617,61 @@ export function RetailSalesManager({
     setReference("");
     setSelectedId("");
     setSale(null);
+    setActiveProductId("");
     clearOutcome();
+  }
+
+  function closeEditor() {
+    if (pending) return;
+    setCreatingSale(false);
+    setEditing(false);
+    setFormError("");
+  }
+
+  function addProduct(product: Product) {
+    rememberProduct(product);
+    setActiveProductId(product.id);
+    setLines((current) => {
+      const existing = current.find((line) => line.productId === product.id);
+      if (existing) {
+        const scale = quantityScale(existing.quantity) ?? 0n;
+        return current.map((line) =>
+          line.productId === product.id
+            ? { ...line, quantity: formatMilli(scale + 1000n) }
+            : line,
+        );
+      }
+      const empty = current.find((line) => !line.productId);
+      if (empty) {
+        return current.map((line) =>
+          line.key === empty.key ? { ...line, productId: product.id } : line,
+        );
+      }
+      if (current.length >= 100) return current;
+      return [...current, { ...blankLine(), productId: product.id }];
+    });
+  }
+
+  function stepLine(key: string, delta: bigint) {
+    setLines((current) => {
+      const line = current.find((item) => item.key === key);
+      if (!line) return current;
+      const next = (quantityScale(line.quantity) ?? 0n) + delta;
+      if (next <= 0n) {
+        const rest = current.filter((item) => item.key !== key);
+        return rest.length > 0 ? rest : [blankLine()];
+      }
+      return current.map((item) =>
+        item.key === key ? { ...item, quantity: formatMilli(next) } : item,
+      );
+    });
+  }
+
+  function removeLine(key: string) {
+    setLines((current) => {
+      const rest = current.filter((line) => line.key !== key);
+      return rest.length > 0 ? rest : [blankLine()];
+    });
   }
 
   function linePayload(): RetailSaleLineWriteRequest[] | null {
@@ -573,6 +703,117 @@ export function RetailSalesManager({
   const editorOpen =
     (canCreate && creatingSale && !editing) ||
     (editing && canUpdate && sale?.status === "DRAFT");
+  const shelf = categoryId
+    ? catalog.filter((item) => item.category_id === categoryId)
+    : catalog;
+  const ticketLines = lines.filter((line) => line.productId);
+
+  useEffect(() => {
+    if (!editorOpen) return undefined;
+    let active = true;
+    void (async () => {
+      try {
+        const productsPage = await listProducts({
+          is_active: "true",
+          limit: "100",
+        });
+        let categories: ProductCategory[] = [];
+        try {
+          categories = (await listProductCategories({ limit: "100" })).data;
+        } catch {
+          categories = [];
+        }
+        if (!active) return;
+        setCatalog(productsPage.data);
+        setCatalogCategories(categories);
+        setCatalogError("");
+        setProductsById((current) => {
+          const next = new Map(current);
+          for (const product of productsPage.data) {
+            next.set(product.id, product);
+          }
+          return next;
+        });
+      } catch (caught) {
+        if (!active) return;
+        setCatalogError(financeError(caught, tx("Unable to search products.")));
+      } finally {
+        if (active) setCatalogLoaded(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [editorOpen, tx]);
+
+  const addProductRef = useRef(addProduct);
+  useEffect(() => {
+    addProductRef.current = addProduct;
+  });
+
+  useEffect(() => {
+    if (!editorOpen) return undefined;
+    let buffer = "";
+    let last = 0;
+    function onScanKey(event: globalThis.KeyboardEvent) {
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement &&
+        target.name === "product_search"
+      ) {
+        return;
+      }
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      ) {
+        buffer = "";
+        return;
+      }
+      if (event.key === "Enter") {
+        const code = buffer;
+        const recent = Date.now() - last < 100;
+        buffer = "";
+        if (!recent || code.length < 3) return;
+        event.preventDefault();
+        event.stopPropagation();
+        void findScannedProduct(code)
+          .then((product) => {
+            if (product) {
+              addProductRef.current(product);
+              setFormError("");
+            } else {
+              setFormError("No matching products.");
+            }
+            document
+              .querySelector<HTMLInputElement>('input[name="product_search"]')
+              ?.focus();
+          })
+          .catch((caught: unknown) => {
+            setFormError(
+              financeError(caught, "Unable to search products."),
+            );
+          });
+        return;
+      }
+      if (
+        event.key.length !== 1 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      const now = Date.now();
+      if (now - last > 50) buffer = "";
+      buffer += event.key;
+      last = now;
+    }
+    window.addEventListener("keydown", onScanKey, true);
+    return () => window.removeEventListener("keydown", onScanKey, true);
+  }, [editorOpen]);
+
   const showPaging = sales.index > 0 || sales.hasMore || sales.bounded;
   const estimate = previewTotal(lines, productsById);
   const canEditDraft = sale?.status === "DRAFT" && canUpdate;
@@ -594,19 +835,17 @@ export function RetailSalesManager({
   return (
     <div className="grid gap-6">
       {editorOpen ? (
-        <FormDialog
-          description={
-            editing
-              ? tx("Changes stay on this draft until you submit it.")
-              : tx(
-                  "Save a draft first. Prices and totals are calculated by the server.",
-                )
-          }
-          onClose={() => {
-            if (pending) return;
-            setCreatingSale(false);
-            setEditing(false);
-            setFormError("");
+        <form
+          className="grid rounded-2xl border border-slate-200 bg-white shadow-sm lg:h-[calc(100dvh-8.5rem)] lg:grid-cols-[minmax(0,1.15fr)_23rem]"
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            const target = event.target;
+            if (
+              target instanceof HTMLInputElement &&
+              target.name === "product_search"
+            ) {
+              event.preventDefault();
+            }
           }}
           onSubmit={(event) => {
             event.preventDefault();
@@ -644,41 +883,286 @@ export function RetailSalesManager({
               )
               .finally(() => setPending(false));
           }}
-          pending={pending}
-          title={editing ? tx("Edit draft sale") : tx("New retail sale")}
-          wide
         >
-          <div className={`grid gap-4 ${fieldTone}`}>
-            <Alert message={formError} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2 grid gap-2">
-                <MemberSearch
-                  activeOnly={false}
+          <div className="flex min-h-[28rem] flex-col border-b border-slate-200 lg:min-h-0 lg:border-r lg:border-b-0">
+            <div className="relative z-20 border-b border-slate-100 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-slate-900">
+                  {editing ? tx("Edit draft sale") : tx("New retail sale")}
+                </h2>
+                <button
+                  className="button button-cancel button-sm"
                   disabled={pending}
-                  emptySelectedLabel="Walk-in"
-                  formatMember={memberChoiceLabel}
-                  label="Member"
-                  onSelect={(member) => {
-                    setSelectedMember(member);
-                    setMemberId(member.id);
-                  }}
-                  selected={selectedMember}
-                  showEmptySelected
-                />
-                {selectedMember ? (
+                  onClick={closeEditor}
+                  type="button"
+                >
+                  {tx("Close")}
+                </button>
+              </div>
+              <ProductSearch
+                autoFocus
+                disabled={pending}
+                label="Product"
+                onSelect={addProduct}
+                selected={productsById.get(activeProductId) ?? null}
+                showEmptySelected={false}
+              />
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                <button
+                  aria-pressed={categoryId === ""}
+                  className={
+                    categoryId === ""
+                      ? "shrink-0 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-bold text-white"
+                      : "shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200"
+                  }
+                  onClick={() => setCategoryId("")}
+                  type="button"
+                >
+                  {tx("All categories")}
+                </button>
+                {catalogCategories.map((category) => (
                   <button
-                    className="button button-cancel w-fit"
-                    disabled={pending}
-                    onClick={() => {
-                      setSelectedMember(null);
-                      setMemberId("");
-                    }}
+                    aria-pressed={categoryId === category.id}
+                    className={
+                      categoryId === category.id
+                        ? "shrink-0 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-bold text-white"
+                        : "shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200"
+                    }
+                    key={category.id}
+                    onClick={() => setCategoryId(category.id)}
                     type="button"
                   >
-                    {tx("Clear to walk-in")}
+                    {category.name}
                   </button>
-                ) : null}
+                ))}
               </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {!catalogLoaded && !catalogError ? (
+                <p className="text-sm font-medium text-slate-600" role="status">
+                  {tx("Searching products.")}
+                </p>
+              ) : null}
+              {catalogError ? <Alert message={catalogError} /> : null}
+              {catalogLoaded && shelf.length === 0 ? (
+                <div className="px-2 py-16 text-center">
+                  <p className="font-semibold text-slate-800">
+                    {tx("No products to sell yet.")}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {tx("Tap a product to add it.")}
+                  </p>
+                </div>
+              ) : catalogLoaded ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                  {shelf.map((item) => {
+                    const inCart = lines.find(
+                      (line) => line.productId === item.id,
+                    );
+                    const badge = inCart
+                      ? (quantityScale(inCart.quantity) ?? 0n) % 1000n === 0n
+                        ? (
+                            (quantityScale(inCart.quantity) ?? 0n) / 1000n
+                          ).toString()
+                        : inCart.quantity
+                      : "";
+                    return (
+                      <button
+                        className={`relative overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                          inCart
+                            ? "border-[#0866ff] ring-2 ring-[#0866ff]"
+                            : "border-slate-200"
+                        }`}
+                        disabled={pending}
+                        key={item.id}
+                        onClick={() => addProduct(item)}
+                        type="button"
+                      >
+                        <SaleThumb
+                          assetId={item.image_asset_id}
+                          className="w-full rounded-none"
+                        />
+                        {badge ? (
+                          <span className="absolute top-2 right-2 grid size-7 place-items-center rounded-full bg-[#0866ff] text-xs font-bold text-white">
+                            {badge}
+                          </span>
+                        ) : null}
+                        <span className="block p-3">
+                          <span className="line-clamp-2 block text-sm font-semibold text-slate-900">
+                            {item.name}
+                          </span>
+                          <span className="mt-1 block text-sm font-bold text-slate-900 tabular-nums">
+                            {item.sale_price}{" "}
+                            <span className="font-medium text-slate-400">
+                              {tx(currency)}
+                            </span>
+                          </span>
+                          <span className="mt-0.5 block text-xs text-slate-500">
+                            {tx("On hand")} {item.quantity_on_hand}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <aside className="flex min-h-0 flex-col bg-slate-50">
+            <div className={`min-h-0 flex-1 space-y-4 overflow-y-auto p-4 ${fieldTone}`}>
+              <Alert message={formError} />
+              {ticketLines.length > 0 ? (
+                <ul className="grid gap-3">
+                  {ticketLines.map((line) => {
+                    const product = productsById.get(line.productId) ?? null;
+                    const preview = product
+                      ? previewLineAmount(
+                          line.quantity,
+                          product.sale_price,
+                          line.discount,
+                        )
+                      : null;
+                    return (
+                      <li
+                        className="rounded-2xl bg-white p-3 ring-1 ring-slate-200"
+                        key={line.key}
+                      >
+                        <div className="flex items-start gap-3">
+                          <SaleThumb
+                            assetId={product?.image_asset_id ?? null}
+                            className="size-14 rounded-xl"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-semibold text-slate-900">
+                                {product?.name ?? tx("Product")}
+                              </p>
+                              <button
+                                className="text-xs font-semibold text-slate-500 hover:text-red-700"
+                                onClick={() => removeLine(line.key)}
+                                type="button"
+                              >
+                                {tx("Remove line")}
+                              </button>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                              {product
+                                ? `${product.sale_price} ${currency}`
+                                : line.productId}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <label
+                            className="mb-1.5 block text-sm font-medium text-slate-600"
+                            htmlFor={`quantity-${line.key}`}
+                          >
+                            {tx("Quantity")}
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <button
+                              aria-label={tx("Remove one")}
+                              className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-100 text-lg font-bold text-slate-800 ring-1 ring-slate-200"
+                              onClick={() => stepLine(line.key, -1000n)}
+                              type="button"
+                            >
+                              −
+                            </button>
+                            <div className="min-w-0 flex-1">
+                              <TextInput
+                                decimalPlaces={3}
+                                id={`quantity-${line.key}`}
+                                inputMode="decimal"
+                                onChange={(event) =>
+                                  setLines((current) =>
+                                    current.map((item) =>
+                                      item.key === line.key
+                                        ? {
+                                            ...item,
+                                            quantity: event.target.value,
+                                          }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                                value={line.quantity}
+                              />
+                            </div>
+                            <button
+                              aria-label={tx("Add one")}
+                              className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-900 text-lg font-bold text-white"
+                              onClick={() => stepLine(line.key, 1000n)}
+                              type="button"
+                            >
+                              +
+                            </button>
+                          </div>
+                          {fields.quantity ? (
+                            <p className="mt-1.5 text-sm text-red-700">
+                              {tx(fields.quantity)}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="mt-3">
+                          <Field
+                            label={tx("Discount ({currency})", {
+                              currency: tx(currency),
+                            })}
+                          >
+                            <TextInput
+                              inputMode="decimal"
+                              onChange={(event) =>
+                                setLines((current) =>
+                                  current.map((item) =>
+                                    item.key === line.key
+                                      ? {
+                                          ...item,
+                                          discount: event.target.value,
+                                        }
+                                      : item,
+                                  ),
+                                )
+                              }
+                              value={line.discount}
+                            />
+                          </Field>
+                        </div>
+                        {preview ? (
+                          <p className="mt-2 text-right text-sm font-semibold text-slate-900 tabular-nums">
+                            {preview}
+                          </p>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+              <MemberSearch
+                activeOnly={false}
+                disabled={pending}
+                emptySelectedLabel="Walk-in"
+                formatMember={memberChoiceLabel}
+                label="Member"
+                onSelect={(member) => {
+                  setSelectedMember(member);
+                  setMemberId(member.id);
+                }}
+                selected={selectedMember}
+                showEmptySelected
+              />
+              {selectedMember ? (
+                <button
+                  className="button button-cancel w-fit"
+                  disabled={pending}
+                  onClick={() => {
+                    setSelectedMember(null);
+                    setMemberId("");
+                  }}
+                  type="button"
+                >
+                  {tx("Clear to walk-in")}
+                </button>
+              ) : null}
               <Field label="Business date">
                 <TextInput
                   onChange={(event) => setBusinessDate(event.target.value)}
@@ -686,184 +1170,67 @@ export function RetailSalesManager({
                   value={businessDate}
                 />
               </Field>
-              <Field label="Payment method">
-                <SelectInput
-                  onChange={(event) =>
-                    setMethod(event.target.value as PaymentMethod)
-                  }
-                  value={method}
-                >
-                  {METHODS.map((item) => (
-                    <option key={item} value={item}>
-                      {tx(pretty(item))}
-                    </option>
-                  ))}
-                </SelectInput>
-              </Field>
-              <div className="sm:col-span-2">
-                <Field label="Reference">
-                  <TextInput
-                    onChange={(event) => setReference(event.target.value)}
-                    value={reference}
-                  />
-                </Field>
-              </div>
-            </div>
-            <div className="grid gap-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase">
-                  {" "}
-                  {tx("Products")}{" "}
-                </p>
-                <button
-                  className="button button-cancel button-sm"
-                  disabled={lines.length >= 100}
-                  onClick={() =>
-                    setLines((current) => [...current, blankLine()])
-                  }
-                  type="button"
-                >
-                  {" "}
-                  {tx("Add product line")}{" "}
-                </button>
-              </div>
-              {lines.map((line, index) => {
-                const product = productsById.get(line.productId) ?? null;
-                const preview = product
-                  ? previewLineAmount(
-                      line.quantity,
-                      product.sale_price,
-                      line.discount,
-                    )
-                  : null;
-                const usedElsewhere = lines
-                  .filter(
-                    (item) =>
-                      item.key !== line.key && item.productId.length > 0,
-                  )
-                  .map((item) => item.productId);
-                return (
-                  <div
-                    className="rounded-xl border border-slate-200 bg-slate-50/80 p-3"
-                    key={line.key}
-                  >
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <p className="text-xs font-bold tracking-wide text-slate-400 uppercase">
-                        {" "}
-                        {tx("Line")} {index + 1}
-                      </p>
-                      <button
-                        className="button button-delete button-sm"
-                        disabled={lines.length === 1}
-                        onClick={() =>
-                          setLines((current) =>
-                            current.filter((item) => item.key !== line.key),
-                          )
-                        }
-                        type="button"
-                      >
-                        {" "}
-                        {tx("Remove line")}{" "}
-                      </button>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="sm:col-span-2">
-                        <ProductSearch
-                          disabled={pending}
-                          excludeIds={usedElsewhere}
-                          onSelect={(picked) => {
-                            rememberProduct(picked);
-                            setLines((current) =>
-                              current.map((item) =>
-                                item.key === line.key
-                                  ? { ...item, productId: picked.id }
-                                  : item,
-                              ),
-                            );
-                          }}
-                          selected={product}
-                        />
-                      </div>
-                      <Field error={fields.quantity} label="Quantity">
-                        <TextInput
-                          decimalPlaces={3}
-                          inputMode="decimal"
-                          onChange={(event) =>
-                            setLines((current) =>
-                              current.map((item) =>
-                                item.key === line.key
-                                  ? { ...item, quantity: event.target.value }
-                                  : item,
-                              ),
-                            )
-                          }
-                          value={line.quantity}
-                        />
-                      </Field>
-                      <Field
-                        label={tx("Discount ({currency})", {
-                          currency: tx(currency),
-                        })}
-                      >
-                        <TextInput
-                          inputMode="decimal"
-                          onChange={(event) =>
-                            setLines((current) =>
-                              current.map((item) =>
-                                item.key === line.key
-                                  ? { ...item, discount: event.target.value }
-                                  : item,
-                              ),
-                            )
-                          }
-                          value={line.discount}
-                        />
-                      </Field>
-                    </div>
-                    {preview ? (
-                      <p className="mt-3 text-sm text-slate-600">
-                        {product ? (
-                          <span className="mr-2 font-medium text-slate-500">
-                            {product.sale_price} {currency} {tx("each.")}
-                          </span>
-                        ) : null}{" "}
-                        {tx("Preview only:")} {preview}
-                        {tx(
-                          ". The server calculates the line snapshots and sale totals.",
-                        )}{" "}
-                      </p>
-                    ) : null}
-                  </div>
-                );
-              })}
-              {estimate ? (
-                <div className="flex items-end justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/80">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">
-                      {" "}
-                      {tx("Estimated total")}{" "}
-                    </p>
-                    <p className="mt-1 text-2xl font-black tracking-tight text-slate-900 tabular-nums">
-                      {estimate}
-                    </p>
-                  </div>
-                  <p className="pb-1 text-sm font-semibold text-slate-500">
-                    {currency}
-                  </p>
+              <details className="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
+                <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+                  {tx("Reference")}
+                </summary>
+                <div className="pt-3">
+                  <Field label="Reference">
+                    <TextInput
+                      onChange={(event) => setReference(event.target.value)}
+                      value={reference}
+                    />
+                  </Field>
                 </div>
-              ) : null}
+              </details>
             </div>
-          </div>
-          <div>
-            <button
-              className="button button-edit"
-              disabled={pending}
-              type="submit"
-            >
-              {editing ? tx("Save sale changes") : tx("Save draft")}
-            </button>
-          </div>
-        </FormDialog>
+            <div className="border-t border-slate-200 bg-white p-4">
+              <div
+                aria-label={tx("Payment method")}
+                className="grid grid-cols-2 gap-2"
+                role="group"
+              >
+                {METHODS.map((item) => {
+                  const selected = method === item;
+                  return (
+                    <button
+                      aria-pressed={selected}
+                      className={
+                        selected
+                          ? "min-h-11 rounded-xl bg-slate-900 px-3 text-sm font-bold text-white"
+                          : "min-h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                      }
+                      key={item}
+                      onClick={() => setMethod(item)}
+                      type="button"
+                    >
+                      {tx(pretty(item))}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 flex items-end justify-between gap-3">
+                <p className="text-sm font-medium text-slate-500">
+                  {tx("Estimated total")}
+                </p>
+                <p className="text-3xl font-black tracking-tight text-slate-900 tabular-nums">
+                  {estimate ?? "0.00"}
+                  <span className="ml-2 text-sm font-semibold text-slate-400">
+                    {tx(currency)}
+                  </span>
+                </p>
+              </div>
+              <button
+                className="button button-create mt-3 min-h-12 w-full text-base"
+                disabled={pending}
+                type="submit"
+              >
+                {editing ? tx("Save sale changes") : tx("Save draft")}
+              </button>
+            </div>
+          </aside>
+        </form>
       ) : null}
 
       <div

@@ -24,6 +24,7 @@ export default async function InventoryPage() {
         canAdjust={session.permissions.includes("inventory.adjust")}
         canManage={session.permissions.includes("inventory.manage")}
         defaultDate={todayInTimezone(session.gym?.timezone ?? "UTC")}
+        gymId={session.gym?.id ?? ""}
       />
     </section>
   );

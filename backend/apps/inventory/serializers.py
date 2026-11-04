@@ -84,6 +84,7 @@ class ProductWriteSerializer(StrictSerializer):
     current_unit_cost = ExactMoneyField(minimum=Decimal("0"))
     default_unit_cost = ExactMoneyField(minimum=Decimal("0"))
     low_stock_threshold = ExactQuantityField(min_value=Decimal("0"))
+    image_asset_id = serializers.UUIDField(required=False, allow_null=True)
     is_active = serializers.BooleanField(required=False, default=True)
 
     def validate_name(self, value: str) -> str:
@@ -103,6 +104,7 @@ class ProductUpdateSerializer(StrictSerializer):
     current_unit_cost = ExactMoneyField(minimum=Decimal("0"), required=False)
     default_unit_cost = ExactMoneyField(minimum=Decimal("0"), required=False)
     low_stock_threshold = ExactQuantityField(required=False, min_value=Decimal("0"))
+    image_asset_id = serializers.UUIDField(required=False, allow_null=True)
     is_active = serializers.BooleanField(required=False)
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
@@ -230,6 +232,7 @@ class ProductSerializer(serializers.Serializer):
     current_unit_cost = serializers.CharField()
     default_unit_cost = serializers.CharField()
     low_stock_threshold = serializers.CharField()
+    image_asset_id = serializers.UUIDField(allow_null=True)
     quantity_on_hand = serializers.CharField()
     sold_quantity = serializers.CharField()
     revenue = serializers.CharField()
@@ -332,6 +335,7 @@ def product_payload(product: Product) -> dict[str, object]:
         "current_unit_cost": money_text(product.current_unit_cost),
         "default_unit_cost": money_text(product.default_unit_cost),
         "low_stock_threshold": format_quantity(product.low_stock_threshold),
+        "image_asset_id": product.image_asset_id,
         "quantity_on_hand": format_quantity(on_hand),
         "sold_quantity": format_quantity(sold),
         "revenue": money_text(revenue),

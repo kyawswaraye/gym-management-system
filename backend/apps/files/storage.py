@@ -18,6 +18,7 @@ from apps.files.constants import (
     GET_TTL_SECONDS,
     MAX_UPLOAD_BYTES,
     POST_TTL_SECONDS,
+    PRODUCT_IMAGE_NAMES,
 )
 from apps.files.exceptions import (
     ObjectMissing,
@@ -40,8 +41,10 @@ from apps.files.signing import (
 logger = logging.getLogger(__name__)
 
 _EMPTY_PAYLOAD = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-_PROFILE_PHOTO_FILENAMES = frozenset(ATTACHMENT_NAMES.values()) | frozenset(
-    EXPENSE_RECEIPT_NAMES.values()
+_PROFILE_PHOTO_FILENAMES = (
+    frozenset(ATTACHMENT_NAMES.values())
+    | frozenset(EXPENSE_RECEIPT_NAMES.values())
+    | frozenset(PRODUCT_IMAGE_NAMES.values())
 )
 _META_SHA = "x-amz-meta-gms-sha256"
 _META_TYPE = "x-amz-meta-gms-content-type"
