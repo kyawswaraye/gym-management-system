@@ -1,8 +1,9 @@
 import { useLocale, useTx } from "../i18n/useTx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Image, RefreshControl, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Image, RefreshControl, View } from "react-native";
 
+import { useReducedMotion } from "../a11y/motion";
 import { useMemberApi, useOnline } from "../app/providers";
 import {
   formatGymDate,
@@ -14,6 +15,7 @@ import { BrandMark } from "../ui/BrandMark";
 import { GymLogoImage } from "../ui/GymLogoImage";
 import { Card } from "../ui/Card";
 import { Fact } from "../ui/Fact";
+import { PhotoBand } from "../ui/PhotoBand";
 import { Screen } from "../ui/Screen";
 import {
   EmptyState,
@@ -22,9 +24,10 @@ import {
   OfflineBanner,
 } from "../ui/StateView";
 import { Text } from "../ui/Text";
-import { colors, elevation, radius } from "../ui/theme";
+import { colors, radius, space } from "../ui/theme";
 
-const logoSize = 64;
+const logoSize = 56;
+const stripHeight = 148;
 
 export function DashboardScreen() {
   const tx = useTx();
@@ -92,46 +95,38 @@ function GymBrand({
   const media = hasLogo && logo.isSuccess ? logo.data : null;
   const waiting = pending || (hasLogo && logo.isLoading);
   return (
-    <View
-      style={{
-        alignSelf: "stretch",
-        backgroundColor: colors.surface,
-        borderRadius: radius.md,
-        ...elevation,
-      }}
-    >
-      <View
-        style={{
-          alignItems: "center",
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          borderRadius: radius.md,
-          borderWidth: 1,
-          flexDirection: "row",
-          justifyContent: "center",
-          minHeight: 88,
-          overflow: "hidden",
-          paddingHorizontal: 16,
-          paddingVertical: 14,
-        }}
+    <View style={{ alignSelf: "stretch", gap: space.sm }}>
+      <PhotoBand
+        accessibilityLabel={tx("Gym studio")}
+        animate
+        height={stripHeight}
+        rounded
+        scrim="bottom"
+        source={require("../assets/studio-strip.jpg")}
       >
         <View
           style={{
             alignItems: "center",
             flexDirection: "row",
-            flexShrink: 1,
-            gap: 8,
-            justifyContent: "center",
+            gap: 12,
             maxWidth: "100%",
           }}
         >
           {media ? (
-            <GymLogoImage
-              fallback={<DefaultMark />}
-              label={tx("Gym logo")}
-              media={media}
-              size={logoSize}
-            />
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderRadius: 16,
+                padding: 4,
+              }}
+            >
+              <GymLogoImage
+                fallback={<DefaultMark />}
+                label={tx("Gym logo")}
+                media={media}
+                size={logoSize}
+              />
+            </View>
           ) : waiting ? (
             <View
               style={{
@@ -142,16 +137,25 @@ function GymBrand({
               }}
             />
           ) : (
-            <DefaultMark />
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderRadius: 16,
+                padding: 4,
+              }}
+            >
+              <DefaultMark />
+            </View>
           )}
           {name ? (
             <Text
               accessibilityRole="header"
               numberOfLines={3}
               style={{
+                color: colors.onPrimary,
                 flexShrink: 1,
                 fontSize: 22,
-                fontWeight: "700",
+                fontWeight: "800",
                 letterSpacing: locale === "mm" ? 0 : -0.3,
                 lineHeight: locale === "mm" ? 34 : 28,
               }}
@@ -160,7 +164,7 @@ function GymBrand({
             </Text>
           ) : null}
         </View>
-      </View>
+      </PhotoBand>
     </View>
   );
 }
@@ -220,6 +224,62 @@ function MemberAvatar({
   );
 }
 
+function DaysCallout({ days }: { days: string }) {
+  const tx = useTx();
+  const reduced = useReducedMotion();
+  const scale = useRef(new Animated.Value(reduced ? 1 : 0.92)).current;
+  const opacity = useRef(new Animated.Value(reduced ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (reduced) {
+      scale.setValue(1);
+      opacity.setValue(1);
+      return;
+    }
+    Animated.parallel([
+      Animated.spring(scale, {
+        friction: 7,
+        tension: 80,
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 320,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [opacity, reduced, scale]);
+
+  return (
+    <Animated.View
+      style={{
+        backgroundColor: colors.primarySoft,
+        borderRadius: radius.sm,
+        gap: 2,
+        opacity,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        transform: [{ scale }],
+      }}
+    >
+      <Text
+        style={{
+          color: colors.primary,
+          fontSize: 32,
+          fontWeight: "700",
+          lineHeight: 38,
+        }}
+      >
+        {days}
+      </Text>
+      <Text style={{ color: colors.primary, fontWeight: "600" }}>
+        {tx("Days remaining:")}
+      </Text>
+    </Animated.View>
+  );
+}
+
 function DashboardBody({
   data,
 }: {
@@ -268,29 +328,7 @@ function DashboardBody({
         ) : (
           <EmptyState message={tx("No current membership is on file.")} />
         )}
-        <View
-          style={{
-            backgroundColor: colors.primarySoft,
-            borderRadius: radius.sm,
-            gap: 2,
-            paddingHorizontal: 16,
-            paddingVertical: 14,
-          }}
-        >
-          <Text
-            style={{
-              color: colors.primary,
-              fontSize: 32,
-              fontWeight: "700",
-              lineHeight: 38,
-            }}
-          >
-            {days}
-          </Text>
-          <Text style={{ color: colors.primary, fontWeight: "600" }}>
-            {tx("Days remaining:")}
-          </Text>
-        </View>
+        <DaysCallout days={days} />
         <Text style={{ color: colors.muted }}>
           {data.is_pt_client
             ? tx("Personal training client")

@@ -28,6 +28,7 @@ EXPECTED_CONSTRAINTS = {
     "fileasset_scan_claim_ck",
     "fileasset_profile_photo_ck",
     "fileasset_expense_receipt_ck",
+    "fileasset_product_image_ck",
     "fileasset_uploader_ck",
 }
 EXPECTED_INDEXES = {
@@ -129,7 +130,8 @@ def test_file_migrations_are_linear_and_follow_the_tenants_leaf() -> None:
         ("members", "0024_pt_sale_payment_void"),
         ("tenants", "0029_member_self_actors"),
     ]
-    assert _leaves(nodes)["files"] == [("files", "0005_member_self_actors")]
+    assert ("files", "0005_member_self_actors") in nodes[("files", "0006_product_image")]
+    assert _leaves(nodes)["files"] == [("files", "0006_product_image")]
     assert _leaves(nodes)["tenants"] == [("tenants", "0038_platform_admin_gym_updates")]
     assert nodes[("tenants", "0022_check_in_challenge_permission")] == [
         ("tenants", "0021_security_definer_least_privilege")

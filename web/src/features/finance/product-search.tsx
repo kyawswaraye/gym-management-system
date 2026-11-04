@@ -1,7 +1,7 @@
 "use client";
 import { useTx } from "@/i18n/use-tx";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { listProducts } from "@/features/finance/client";
 import { financeError } from "@/features/finance/errors";
@@ -10,6 +10,8 @@ import type { Product } from "@/types/api";
 
 const SEARCH_LIMIT = 10;
 const SEARCH_DEBOUNCE_MS = 250;
+const BARCODE = /^[0-9A-Z]{1,64}$/;
+const SKU = /^[A-Z0-9][A-Z0-9_-]{0,31}$/;
 
 export function productChoiceLabel(product: Product): string {
   const barcode = product.barcode ? ` · ${product.barcode}` : "";
@@ -18,6 +20,30 @@ export function productChoiceLabel(product: Product): string {
 
 function compactToken(value: string): string {
   return value.replace(/\s+/g, "").toUpperCase();
+}
+
+export async function findScannedProduct(
+  code: string,
+  activeOnly = true,
+): Promise<Product | null> {
+  const compact = compactToken(code);
+  if (!compact) return null;
+  const scope = {
+    ...(activeOnly ? { is_active: "true" } : {}),
+    limit: "5",
+  };
+  if (BARCODE.test(compact)) {
+    try {
+      const page = await listProducts({ ...scope, barcode: compact });
+      const match = page.data.find((product) => product.barcode === compact);
+      if (match) return match;
+    } catch (caught) {
+      if (!SKU.test(compact)) throw caught;
+    }
+  }
+  if (!SKU.test(compact)) return null;
+  const page = await listProducts({ ...scope, sku: compact });
+  return page.data.find((product) => product.sku === compact) ?? null;
 }
 
 export function ProductSearch({
@@ -29,6 +55,7 @@ export function ProductSearch({
   excludeIds = [],
   showEmptySelected = true,
   emptySelectedLabel = "Select a product",
+  autoFocus = false,
 }: {
   selected: Product | null;
   onSelect: (product: Product) => void;
@@ -38,6 +65,7 @@ export function ProductSearch({
   excludeIds?: readonly string[];
   showEmptySelected?: boolean;
   emptySelectedLabel?: string;
+  autoFocus?: boolean;
 }) {
   const tx = useTx();
   const [search, setSearch] = useState("");
@@ -45,8 +73,10 @@ export function ProductSearch({
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [notice, setNotice] = useState("");
   const searchVersion = useRef(0);
   const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const onSelectRef = useRef(onSelect);
   const excludeKey = excludeIds.join("\0");
 
@@ -60,6 +90,11 @@ export function ProductSearch({
   useEffect(() => {
     onSelectRef.current = onSelect;
   }, [onSelect]);
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    inputRef.current?.focus();
+  }, [autoFocus]);
 
   useEffect(() => {
     if (!trimmed) return undefined;
@@ -151,6 +186,7 @@ export function ProductSearch({
   }, [panelOpen]);
 
   function updateSearch(value: string) {
+    setNotice("");
     setSearch(value);
     if (!value.trim()) {
       setResults([]);
@@ -164,8 +200,52 @@ export function ProductSearch({
     setError("");
   }
 
+  async function commitScan(raw: string) {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const excluded = new Set(excludeKey ? excludeKey.split("\0") : []);
+    searchVersion.current += 1;
+    setPending(true);
+    setNotice("");
+    setError("");
+    try {
+      const match = await findScannedProduct(trimmed, activeOnly);
+      if (!match || excluded.has(match.id)) {
+        setSearch("");
+        setResults([]);
+        setHasMore(false);
+        setNotice("No matching products.");
+        return;
+      }
+      onSelectRef.current(match);
+      setSearch("");
+      setResults([]);
+      setHasMore(false);
+      setError("");
+      setNotice("");
+    } catch (caught) {
+      setNotice(financeError(caught, tx("Unable to search products.")));
+    } finally {
+      setPending(false);
+      inputRef.current?.focus();
+    }
+  }
+
+  function onScanKey(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    event.stopPropagation();
+    const raw = event.currentTarget.value;
+    event.currentTarget.value = "";
+    setSearch("");
+    setResults([]);
+    setHasMore(false);
+    void commitScan(raw);
+  }
+
   function choose(product: Product) {
     onSelect(product);
+    setNotice("");
     setSearch("");
     setResults([]);
     setHasMore(false);
@@ -180,12 +260,15 @@ export function ProductSearch({
         <Field label={label}>
           <input
             autoComplete="off"
+            autoFocus={autoFocus}
             className="input"
             disabled={disabled}
             maxLength={100}
             name="product_search"
             onChange={(event) => updateSearch(event.target.value)}
+            onKeyDown={onScanKey}
             placeholder={tx("Name, SKU, barcode, or category")}
+            ref={inputRef}
             value={search}
           />
         </Field>
@@ -232,6 +315,11 @@ export function ProductSearch({
           </div>
         ) : null}
       </div>
+      {notice ? (
+        <p className="error" role="alert">
+          {tx(notice)}
+        </p>
+      ) : null}
       {selected ? (
         <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
           {tx("Selected product: {name}", {

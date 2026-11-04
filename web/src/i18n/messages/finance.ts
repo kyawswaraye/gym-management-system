@@ -13,6 +13,7 @@ export const financeEn = {
   "Add a category before creating a product.":
     "Add a category before creating a product.",
   "Add or remove?": "Add or remove?",
+  "Add one": "Add one",
   "Add product line": "Add product line",
   "Add staff line": "Add staff line",
   "Add stock": "Add stock",
@@ -53,6 +54,7 @@ export const financeEn = {
   "Correction date": "Correction date",
   "Correction receipt": "Correction receipt",
   "Cost of goods sold": "Cost of goods sold",
+  "Current sale": "Current sale",
   "Create category": "Create category",
   "Create product": "Create product",
   "Current member": "Current member",
@@ -86,6 +88,8 @@ export const financeEn = {
   "Issued receipt": "Issued receipt",
   "Last receipt {number}.": "Last receipt {number}.",
   Issuer: "Issuer",
+  "JPEG, PNG, or WebP. 5 MB or smaller.":
+    "JPEG, PNG, or WebP. 5 MB or smaller.",
   Line: "Line",
   "Loading cash sessions.": "Loading cash sessions.",
   "Loading categories.": "Loading categories.",
@@ -145,6 +149,7 @@ export const financeEn = {
     "No movements were returned for this session.",
   "No payments were returned.": "No payments were returned.",
   "No products in this category.": "No products in this category.",
+  "No products to sell yet.": "No products to sell yet.",
   "No products yet.": "No products yet.",
   "No receipts were returned.": "No receipts were returned.",
   "No retail sales yet.": "No retail sales yet.",
@@ -171,6 +176,7 @@ export const financeEn = {
   Pagination: "Pagination",
   "Partial return": "Partial return",
   "Payment detail": "Payment detail",
+  "Payment method": "Payment method",
   "Payment ledger": "Payment ledger",
   "Payment sections": "Payment sections",
   Period: "Period",
@@ -189,6 +195,7 @@ export const financeEn = {
   "Print test slip": "Print test slip",
   Product: "Product",
   "Product categories": "Product categories",
+  "Product image": "Product image",
   "Protected salary and commission categories stay fixed. Custom categories can be renamed or archived here.":
     "Protected salary and commission categories stay fixed. Custom categories can be renamed or archived here.",
   "Purchases, sales, and adjustments will show up here.":
@@ -208,6 +215,7 @@ export const financeEn = {
   "Record payment": "Record payment",
   "Record this payment": "Record this payment",
   "Record this payment?": "Record this payment?",
+  "Remove product image": "Remove product image",
   "Recorded drafts and posted payments will show up here.":
     "Recorded drafts and posted payments will show up here.",
   "Refine the filters to see older rows.":
@@ -227,6 +235,7 @@ export const financeEn = {
   "Reject payment": "Reject payment",
   "Reject salary period": "Reject salary period",
   "Remove line": "Remove line",
+  "Remove one": "Remove one",
   "Remove stock": "Remove stock",
   "Fill each line, then press Save staff lines. Closing without saving discards the form.":
     "Fill each line, then press Save staff lines. Closing without saving discards the form.",
@@ -288,6 +297,9 @@ export const financeEn = {
   "Submit this draft for approval?": "Submit this draft for approval?",
   "Submit this expense?": "Submit this expense?",
   "Submit this salary period?": "Submit this salary period?",
+  "Tap a product to add it.": "Tap a product to add it.",
+  "Tap a product to build the sale, then save the draft. Submit it for approval before the sale posts.":
+    "Tap a product to build the sale, then save the draft. Submit it for approval before the sale posts.",
   "Submit this sale?": "Submit this sale?",
   Subtotal: "Subtotal",
   "TEST — not a receipt": "TEST — not a receipt",
@@ -375,6 +387,7 @@ export const financeMm = {
   "Add a category before creating a product.":
     "ကုန်ပစ္စည်း မဖန်တီးမီ အမျိုးအစားတစ်ခု ထည့်ပါ။",
   "Add or remove?": "တိုးမည်လား၊ လျှော့မည်လား။",
+  "Add one": "တစ်ခုတိုး",
   "Add product line": "ကုန်ပစ္စည်းစာရင်း ထည့်ရန်",
   "Add staff line": "ဝန်ထမ်းစာရင်း ထည့်ရန်",
   "Add stock": "လက်ကျန်တိုးမည်",
@@ -416,6 +429,7 @@ export const financeMm = {
   "Correction date": "ပြင်ဆင်သည့်ရက်",
   "Correction receipt": "ပြင်ဆင်ချက် ပြေစာ",
   "Cost of goods sold": "ရောင်းကုန်ကုန်ကျစရိတ်",
+  "Current sale": "ယခုအရောင်း",
   "Create category": "အမျိုးအစား ဖန်တီးရန်",
   "Create product": "ကုန်ပစ္စည်း ဖန်တီးရန်",
   "Current member": "လက်ရှိအဖွဲ့ဝင်",
@@ -450,6 +464,8 @@ export const financeMm = {
   "Issued receipt": "ထုတ်ပေးထားသော ပြေစာ",
   "Last receipt {number}.": "နောက်ဆုံးပြေစာ {number}။",
   Issuer: "ထုတ်ပေးသူ",
+  "JPEG, PNG, or WebP. 5 MB or smaller.":
+    "JPEG၊ PNG သို့မဟုတ် WebP။ 5 MB သို့မဟုတ် ပိုသေးရမည်။",
   Line: "စာရင်း",
   "Loading cash sessions.": "ငွေသားကာလများ ရယူနေပါသည်။",
   "Loading categories.": "အမျိုးအစားများ ရယူနေပါသည်။",
@@ -511,6 +527,7 @@ export const financeMm = {
   "No matching products.": "ကိုက်ညီသော ကုန်ပစ္စည်း မရှိပါ။",
   "No payments were returned.": "ငွေပေးချေမှု မတွေ့ပါ။",
   "No products in this category.": "ဤအမျိုးအစားတွင် ကုန်ပစ္စည်း မရှိပါ။",
+  "No products to sell yet.": "ရောင်းရန် ကုန်ပစ္စည်း မရှိသေးပါ။",
   "No products yet.": "ကုန်ပစ္စည်း မရှိသေးပါ။",
   "No receipts were returned.": "ပြေစာ မတွေ့ပါ။",
   "No retail sales yet.": "လက်လီအရောင်း မရှိသေးပါ။",
@@ -537,6 +554,7 @@ export const financeMm = {
   Pagination: "စာမျက်နှာခွဲခြင်း",
   "Partial return": "တစ်စိတ်တစ်ပိုင်း ပြန်အပ်",
   "Payment detail": "ငွေပေးချေမှု အသေးစိတ်",
+  "Payment method": "ငွေပေးချေနည်း",
   "Payment ledger": "ငွေပေးချေမှုစာရင်း",
   "Payment sections": "ငွေပေးချေမှုကဏ္ဍများ",
   Period: "ကာလ",
@@ -555,6 +573,7 @@ export const financeMm = {
   "Print test slip": "စမ်းသပ်စာရွက် ပုံနှိပ်ရန်",
   Product: "ကုန်ပစ္စည်း",
   "Product categories": "ကုန်ပစ္စည်းအမျိုးအစားများ",
+  "Product image": "ကုန်ပစ္စည်းပုံ",
   "Protected salary and commission categories stay fixed. Custom categories can be renamed or archived here.":
     "ကာကွယ်ထားသော လစာနှင့် ကော်မရှင် အမျိုးအစားများ ပုံသေထားရှိပြီး ပြင်၍ မရပါ။ စိတ်ကြိုက်အမျိုးအစားများကို ဤနေရာတွင် အမည်ပြောင်းနိုင်သည် သို့မဟုတ် မှတ်တမ်းသိမ်းနိုင်ပါသည်။",
   "Purchases, sales, and adjustments will show up here.":
@@ -574,6 +593,7 @@ export const financeMm = {
   "Record payment": "ငွေပေးချေမှု မှတ်တမ်းတင်ရန်",
   "Record this payment": "ဤငွေကို မှတ်ရန်",
   "Record this payment?": "ဤငွေကို မှတ်မည်လား။",
+  "Remove product image": "ကုန်ပစ္စည်းပုံ ဖယ်ရန်",
   "Recorded drafts and posted payments will show up here.":
     "မှတ်တမ်းတင်ထားသော မူကြမ်းများနှင့် စာရင်းသွင်းပြီး ငွေပေးချေမှုများ ဤနေရာတွင် ပေါ်လာပါမည်။",
   "Refine the filters to see older rows.":
@@ -593,6 +613,7 @@ export const financeMm = {
   "Reject payment": "ငွေပေးချေမှု ငြင်းပယ်",
   "Reject salary period": "လစာကာလ ငြင်းပယ်",
   "Remove line": "စာရင်း ဖယ်ရှားရန်",
+  "Remove one": "တစ်ခုလျှော့",
   "Remove stock": "လက်ကျန်လျှော့မည်",
   "Fill each line, then press Save staff lines. Closing without saving discards the form.":
     "စာကြောင်းများ ဖြည့်ပြီး Save staff lines နှိပ်ပါ။ မသိမ်းဘဲ ပိတ်လျှင် ပုံစံ ပျက်သွားမည်။",
@@ -654,6 +675,9 @@ export const financeMm = {
   "Submit this draft for approval?": "ဤမူကြမ်းကို အတည်ပြုရန် တင်သွင်းမည်လား။",
   "Submit this expense?": "ဤကုန်ကျစရိတ်ကို တင်သွင်းမည်လား။",
   "Submit this salary period?": "ဤလစာကာလကို တင်သွင်းမည်လား။",
+  "Tap a product to add it.": "ကုန်ပစ္စည်းကို နှိပ်ပြီး ထည့်ပါ။",
+  "Tap a product to build the sale, then save the draft. Submit it for approval before the sale posts.":
+    "ကုန်ပစ္စည်းကို နှိပ်ပြီး အရောင်းလုပ်ပါ။ ပြီးရင် မူကြမ်းသိမ်းပါ။ အရောင်းမှတ်တမ်းမတင်မီ အတည်ပြုချက် လိုအပ်ပါသည်။",
   "Submit this sale?": "ဤအရောင်းကို တင်သွင်းမည်လား။",
   Subtotal: "စုစုပေါင်းခွဲ",
   "TEST — not a receipt": "စမ်းသပ်ချက် — ပြေစာ မဟုတ်ပါ",

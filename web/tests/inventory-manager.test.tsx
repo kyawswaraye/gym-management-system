@@ -61,6 +61,7 @@ function product(overrides: Partial<Product> = {}): Product {
     current_unit_cost: "0.40",
     default_unit_cost: "0.40",
     low_stock_threshold: "5.000",
+    image_asset_id: null,
     quantity_on_hand: "8.000",
     sold_quantity: "0.000",
     revenue: "0.00",
@@ -120,7 +121,12 @@ describe("inventory", () => {
       product: product({ quantity_on_hand: "9.250" }),
     });
     render(
-      <InventoryManager canAdjust canManage={false} defaultDate="2026-10-18" />,
+      <InventoryManager
+        canAdjust
+        canManage={false}
+        defaultDate="2026-10-18"
+        gymId="33333333-3333-4333-8333-333333333333"
+      />,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Next page" }));
     await screen.findByRole("button", { name: "TOWEL" });
@@ -153,7 +159,12 @@ describe("inventory", () => {
       product: product(),
     });
     render(
-      <InventoryManager canAdjust canManage={false} defaultDate="2026-10-18" />,
+      <InventoryManager
+        canAdjust
+        canManage={false}
+        defaultDate="2026-10-18"
+        gymId="33333333-3333-4333-8333-333333333333"
+      />,
     );
     fireEvent.click(await screen.findByRole("button", { name: "WATER" }));
     fireEvent.click(
@@ -208,7 +219,12 @@ describe("inventory", () => {
       product: product(),
     });
     render(
-      <InventoryManager canAdjust canManage={false} defaultDate="2026-10-18" />,
+      <InventoryManager
+        canAdjust
+        canManage={false}
+        defaultDate="2026-10-18"
+        gymId="33333333-3333-4333-8333-333333333333"
+      />,
     );
     fireEvent.click(await screen.findByRole("button", { name: "WATER" }));
     fireEvent.click(
@@ -274,6 +290,7 @@ describe("inventory", () => {
         canAdjust={false}
         canManage={false}
         defaultDate="2026-10-18"
+        gymId="33333333-3333-4333-8333-333333333333"
       />,
     );
     fireEvent.click(await screen.findByRole("button", { name: "WATER" }));
@@ -291,7 +308,14 @@ describe("inventory", () => {
       data: [product()],
       meta: { has_more: false, next_after: null },
     });
-    render(<InventoryManager canAdjust canManage defaultDate="2026-10-18" />);
+    render(
+      <InventoryManager
+        canAdjust
+        canManage
+        defaultDate="2026-10-18"
+        gymId="33333333-3333-4333-8333-333333333333"
+      />,
+    );
 
     fireEvent.click(await screen.findByRole("button", { name: "New product" }));
     expect(
@@ -339,7 +363,14 @@ describe("inventory", () => {
       data: [product()],
       meta: { has_more: false, next_after: null },
     });
-    render(<InventoryManager canAdjust canManage defaultDate="2026-10-18" />);
+    render(
+      <InventoryManager
+        canAdjust
+        canManage
+        defaultDate="2026-10-18"
+        gymId="33333333-3333-4333-8333-333333333333"
+      />,
+    );
     fireEvent.click(
       await screen.findByRole("tab", { name: "Stock movements" }),
     );
@@ -421,7 +452,14 @@ describe("inventory", () => {
       ],
       meta: { has_more: false, next_after: null },
     });
-    render(<InventoryManager canAdjust canManage defaultDate="2026-10-18" />);
+    render(
+      <InventoryManager
+        canAdjust
+        canManage
+        defaultDate="2026-10-18"
+        gymId="33333333-3333-4333-8333-333333333333"
+      />,
+    );
     fireEvent.click(
       await screen.findByRole("tab", { name: "Stock movements" }),
     );
@@ -458,10 +496,18 @@ describe("inventory", () => {
         default_unit_cost: body.default_unit_cost ?? "0.40",
       }),
     );
-    render(<InventoryManager canAdjust canManage defaultDate="2026-10-18" />);
+    render(
+      <InventoryManager
+        canAdjust
+        canManage
+        defaultDate="2026-10-18"
+        gymId="33333333-3333-4333-8333-333333333333"
+      />,
+    );
 
     fireEvent.click(await screen.findByRole("button", { name: "New product" }));
     const dialog = screen.getByRole("dialog", { name: "New product" });
+    expect(within(dialog).getByLabelText("Product image")).toBeInTheDocument();
     expect(
       within(dialog).queryByRole("textbox", { name: "Default unit cost" }),
     ).not.toBeInTheDocument();
@@ -491,6 +537,9 @@ describe("inventory", () => {
           current_unit_cost: "0.75",
           default_unit_cost: "0.75",
         }),
+      );
+      expect(createProduct.mock.calls[0]?.[0]).not.toHaveProperty(
+        "image_asset_id",
       );
     });
 

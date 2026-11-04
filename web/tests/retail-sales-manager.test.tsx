@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   approveRetailSale,
+  createRetailSale,
   getProduct,
   getRetailSale,
   listCashSessions,
+  listProductCategories,
   listProducts,
   listRetailSales,
   returnRetailSale,
@@ -22,6 +24,7 @@ vi.mock("@/features/finance/client", () => ({
   getProduct: vi.fn(),
   getRetailSale: vi.fn(),
   listCashSessions: vi.fn(),
+  listProductCategories: vi.fn(),
   listProducts: vi.fn(),
   listRetailSales: vi.fn(),
   rejectRetailSale: vi.fn(),
@@ -53,6 +56,7 @@ function product(): Product {
     current_unit_cost: "0.04",
     default_unit_cost: "0.04",
     low_stock_threshold: "1.000",
+    image_asset_id: null,
     quantity_on_hand: "10.000",
     sold_quantity: "0.000",
     revenue: "0.00",
@@ -152,6 +156,10 @@ describe("retail sales", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listMembers).mockResolvedValue({
+      data: [],
+      meta: { has_more: false, next_after: null },
+    });
+    vi.mocked(listProductCategories).mockResolvedValue({
       data: [],
       meta: { has_more: false, next_after: null },
     });
@@ -261,7 +269,7 @@ describe("retail sales", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Quantity" }), {
       target: { value: "1.25" },
     });
-    expect(await screen.findByText(/Preview only: 0.13/)).toBeVisible();
+    expect(await screen.findAllByText("0.13")).not.toHaveLength(0);
     fireEvent.click(await screen.findByRole("button", { name: "18-10-2026" }));
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm approval" }));
@@ -280,6 +288,45 @@ describe("retail sales", () => {
       });
     });
     expect(await screen.findByText("R-9")).toBeVisible();
+  });
+
+  it("adds a scanned barcode without saving the draft", async () => {
+    vi.mocked(listProducts).mockImplementation(async (values) => {
+      if (values.barcode === "0123456") {
+        return {
+          data: [{ ...product(), barcode: "0123456", name: "Royal-D" }],
+          meta: { has_more: false, next_after: null },
+        };
+      }
+      return {
+        data: [product()],
+        meta: { has_more: false, next_after: null },
+      };
+    });
+    render(
+      <RetailSalesManager
+        canApprove={false}
+        canCreate
+        canSubmit={false}
+        canUpdate={false}
+        canVoid={false}
+        currency="THB"
+        defaultDate="2026-10-18"
+      />,
+    );
+    const search = screen.getByPlaceholderText(
+      "Name, SKU, barcode, or category",
+    );
+    fireEvent.change(search, { target: { value: "0123456" } });
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(
+      await screen.findByText(/Selected product: WATER — Royal-D/),
+    ).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Quantity" })).toHaveValue(
+      "1.000",
+    );
+    expect(createRetailSale).not.toHaveBeenCalled();
+    expect(search).toHaveValue("");
   });
 
   it("sends a destination session only for a cash void", async () => {

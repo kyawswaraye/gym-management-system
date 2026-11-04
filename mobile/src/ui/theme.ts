@@ -1,23 +1,25 @@
 export const colors = {
-  background: "#F4F1EB",
-  surface: "#FFFcf8",
-  text: "#1A1714",
-  muted: "#6E675F",
-  primary: "#1B3A34",
-  primarySoft: "#E6EFEA",
-  accent: "#A68456",
-  onPrimary: "#FFFcf8",
+  background: "#F7FAFA",
+  surface: "#FFFFFF",
+  text: "#12201F",
+  muted: "#5B6B6A",
+  primary: "#0B6E6A",
+  primarySoft: "#E7F4F3",
+  accent: "#2BBBAD",
+  onPrimary: "#FFFFFF",
   danger: "#8F3535",
   dangerSurface: "#FBF4F4",
-  border: "#E6E0D6",
-  infoSurface: "#F3F0EA",
+  border: "#D7E4E2",
+  infoSurface: "#EEF5F4",
+  scrim: "rgba(8, 32, 30, 0.42)",
+  photoWash: "rgba(11, 110, 106, 0.22)",
 };
 
 export const elevation = {
-  shadowColor: "#1A1714",
-  shadowOffset: { width: 0, height: 8 },
+  shadowColor: "#0B6E6A",
+  shadowOffset: { width: 0, height: 6 },
   shadowOpacity: 0.06,
-  shadowRadius: 18,
+  shadowRadius: 14,
   elevation: 2,
 } as const;
 

@@ -12,6 +12,7 @@ from apps.files.constants import (
     GYM_OWNER,
     MAX_UPLOAD_BYTES,
     MEMBER_OWNER,
+    PRODUCT_IMAGE_PURPOSE,
     PROFILE_PHOTO_PURPOSE,
 )
 from apps.files.exceptions import FileRequestError
@@ -85,7 +86,7 @@ class UploadIntentSerializer(StrictSerializer):
         return value
 
     def validate_purpose(self, value: str) -> str:
-        if value not in {PROFILE_PHOTO_PURPOSE, EXPENSE_RECEIPT_PURPOSE}:
+        if value not in {PROFILE_PHOTO_PURPOSE, EXPENSE_RECEIPT_PURPOSE, PRODUCT_IMAGE_PURPOSE}:
             raise serializers.ValidationError(
                 "This file purpose is not supported.", code="UNSUPPORTED_FILE_PURPOSE"
             )
@@ -112,7 +113,7 @@ class UploadIntentSerializer(StrictSerializer):
                     ]
                 }
             )
-        if purpose == EXPENSE_RECEIPT_PURPOSE and owner_type != GYM_OWNER:
+        if purpose in {EXPENSE_RECEIPT_PURPOSE, PRODUCT_IMAGE_PURPOSE} and owner_type != GYM_OWNER:
             raise serializers.ValidationError(
                 {
                     "owner_type": [

@@ -14,6 +14,8 @@ import {
   listStockMovements,
   updateProduct,
 } from "@/features/finance/client";
+import { uploadProductImage } from "@/features/finance/product-image";
+import { getFileDownloadUrl } from "@/features/operations/client";
 import { FormDialog } from "@/components/form-dialog";
 import { fieldMap, financeError } from "@/features/finance/errors";
 import { canonicalMoney, canonicalQuantity } from "@/features/finance/money";
@@ -182,18 +184,152 @@ function EmptyState({ title, detail }: { title: string; detail: string }) {
   );
 }
 
+function ProductPlaceholder({ className }: { className: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`${className} inline-grid aspect-square shrink-0 place-items-center overflow-hidden bg-[#eef3f9] align-middle text-[#8ea0b8]`}
+    >
+      <svg
+        className="h-1/2 w-1/2"
+        fill="none"
+        height="24"
+        preserveAspectRatio="xMidYMid meet"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.6"
+        viewBox="0 0 24 24"
+        width="24"
+      >
+        <path d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5z" />
+        <path d="M12 12 4 8.5" />
+        <path d="m12 12 8-3.5" />
+        <path d="M12 12v8" />
+      </svg>
+    </span>
+  );
+}
+
+function ProductPhoto({
+  assetId,
+  alt,
+  className,
+}: {
+  assetId: string;
+  alt: string;
+  className: string;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void getFileDownloadUrl(assetId)
+      .then((download) => {
+        if (!cancelled) setUrl(download.url);
+      })
+      .catch(() => {
+        if (!cancelled) setUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [assetId]);
+  if (!url) return <ProductPlaceholder className={className} />;
+  return (
+    <span
+      className={`${className} inline-block aspect-square shrink-0 overflow-hidden align-middle`}
+    >
+      <img
+        alt={alt}
+        className="block size-full min-h-0 min-w-0 object-cover"
+        onError={() => setUrl(null)}
+        src={url}
+      />
+    </span>
+  );
+}
+
 function ProductFields({
   product,
   categories,
   fields,
+  imageFile,
+  imagePreview,
+  clearImage,
+  onImageFile,
+  onClearImage,
 }: {
   product: Product | null;
   categories: ProductCategory[];
   fields: Record<string, string>;
+  imageFile: File | null;
+  imagePreview: string | null;
+  clearImage: boolean;
+  onImageFile: (file: File | null) => void;
+  onClearImage: (clear: boolean) => void;
 }) {
   const tx = useTx();
+  const existingId = product?.image_asset_id ?? null;
+  const showExisting = Boolean(existingId) && !imageFile && !clearImage;
   return (
     <div className="grid gap-4 sm:grid-cols-2">
+      <div className="sm:col-span-2">
+        <Field error={fields.image_asset_id} label="Product image">
+          <div className="flex flex-wrap items-center gap-3">
+            {imagePreview ? (
+              <span className="inline-block size-16 shrink-0 overflow-hidden rounded-xl ring-1 ring-slate-200 align-middle">
+                <img
+                  alt=""
+                  className="block size-full min-h-0 min-w-0 object-cover"
+                  src={imagePreview}
+                />
+              </span>
+            ) : showExisting && existingId ? (
+              <ProductPhoto
+                alt={product?.name ?? ""}
+                assetId={existingId}
+                className="size-16 rounded-xl ring-1 ring-slate-200"
+              />
+            ) : (
+              <ProductPlaceholder className="size-16 rounded-xl ring-1 ring-slate-200" />
+            )}
+            <div className="grid gap-2">
+              <input
+                accept="image/jpeg,image/png,image/webp"
+                className="block max-w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-[#e7f3ff] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[#0866ff]"
+                key={
+                  imageFile
+                    ? `${imageFile.name}:${imageFile.size}`
+                    : clearImage
+                      ? "cleared"
+                      : "empty"
+                }
+                onChange={(event) => {
+                  const next = event.target.files?.[0] ?? null;
+                  onImageFile(next);
+                  if (next) onClearImage(false);
+                }}
+                type="file"
+              />
+            </div>
+          </div>
+        </Field>
+        <p className="mt-2 text-xs text-slate-500">
+          {tx("JPEG, PNG, or WebP. 5 MB or smaller.")}
+        </p>
+        {product && (existingId || imageFile) && !clearImage ? (
+          <button
+            className="mt-2 text-sm font-semibold text-slate-600 underline-offset-2 hover:underline"
+            onClick={() => {
+              onImageFile(null);
+              onClearImage(true);
+            }}
+            type="button"
+          >
+            {tx("Remove product image")}
+          </button>
+        ) : null}
+      </div>
       <Field error={fields.barcode} label="Barcode">
         <TextInput defaultValue={product?.barcode ?? ""} name="barcode" />
       </Field>
@@ -264,10 +400,12 @@ function ProductFields({
 }
 
 export function InventoryManager({
+  gymId,
   canManage,
   canAdjust,
   defaultDate,
 }: {
+  gymId: string;
   canManage: boolean;
   canAdjust: boolean;
   defaultDate: string;
@@ -283,6 +421,15 @@ export function InventoryManager({
   const [selectedId, setSelectedId] = useState("");
   const [product, setProduct] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [clearImage, setClearImage] = useState(false);
+  const imagePreviewRef = useRef<string | null>(null);
+  useEffect(() => {
+    return () => {
+      if (imagePreviewRef.current) URL.revokeObjectURL(imagePreviewRef.current);
+    };
+  }, []);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [editing, setEditing] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
@@ -367,9 +514,24 @@ export function InventoryManager({
     setFields({});
   }
 
+  function replaceImage(file: File | null) {
+    if (imagePreviewRef.current) URL.revokeObjectURL(imagePreviewRef.current);
+    const next = file ? URL.createObjectURL(file) : null;
+    imagePreviewRef.current = next;
+    setImageFile(file);
+    setImagePreview(next);
+    if (file) setClearImage(false);
+  }
+
+  function resetImage() {
+    replaceImage(null);
+    setClearImage(false);
+  }
+
   function closeCreate() {
     if (pending) return;
     setCreating(false);
+    resetImage();
     clearFeedback();
   }
 
@@ -389,6 +551,7 @@ export function InventoryManager({
     setSelectedId(id);
     setEditing(false);
     setAdjusting(false);
+    resetImage();
     clearFeedback();
   }
 
@@ -417,27 +580,37 @@ export function InventoryManager({
       default_unit_cost: current,
       low_stock_threshold: threshold,
     };
-    const save =
-      editing && product
-        ? updateProduct(product.id, {
-            ...shared,
-            is_active: form.get("is_active") === "on",
-            barcode: barcode || null,
-          })
-        : createProduct({
-            ...shared,
-            is_active: true,
-            ...(barcode ? { barcode } : {}),
-          });
-    void save
-      .then((saved) => {
-        setProduct(saved);
-        setSelectedId(saved.id);
-        setEditing(false);
-        setCreating(false);
-        clearFeedback();
-        products.reload();
-      })
+    void (async () => {
+      let imageAssetId: string | null | undefined;
+      if (imageFile) {
+        imageAssetId = await uploadProductImage(gymId, imageFile);
+      } else if (clearImage) {
+        imageAssetId = null;
+      }
+      const saved =
+        editing && product
+          ? await updateProduct(product.id, {
+              ...shared,
+              is_active: form.get("is_active") === "on",
+              barcode: barcode || null,
+              ...(imageAssetId !== undefined
+                ? { image_asset_id: imageAssetId }
+                : {}),
+            })
+          : await createProduct({
+              ...shared,
+              is_active: true,
+              ...(barcode ? { barcode } : {}),
+              ...(imageAssetId ? { image_asset_id: imageAssetId } : {}),
+            });
+      setProduct(saved);
+      setSelectedId(saved.id);
+      setEditing(false);
+      setCreating(false);
+      resetImage();
+      clearFeedback();
+      products.reload();
+    })()
       .catch((caught: unknown) =>
         fail(caught, "The product could not be saved."),
       )
@@ -730,7 +903,12 @@ export function InventoryManager({
                   ) : null}
                   <ProductFields
                     categories={categories.rows}
+                    clearImage={clearImage}
                     fields={fields}
+                    imageFile={imageFile}
+                    imagePreview={imagePreview}
+                    onClearImage={setClearImage}
+                    onImageFile={replaceImage}
                     product={null}
                   />
                 </div>
@@ -782,6 +960,7 @@ export function InventoryManager({
                         setCreating(true);
                         setEditing(false);
                         setAdjusting(false);
+                        resetImage();
                         clearFeedback();
                       }}
                       ref={createButtonRef}
@@ -852,8 +1031,11 @@ export function InventoryManager({
                     </caption>
                     <thead className="border-b border-slate-200 text-slate-500">
                       <tr>
+                        <th className="w-12 py-2.5 pl-4" scope="col">
+                          <span className="sr-only">{tx("Product image")}</span>
+                        </th>
                         <th
-                          className="px-5 py-2.5 text-xs font-semibold"
+                          className="px-4 py-2.5 text-xs font-semibold"
                           scope="col"
                         >
                           {tx("SKU")}
@@ -912,7 +1094,18 @@ export function InventoryManager({
                             onClick={() => selectProduct(row.id)}
                             key={row.id}
                           >
-                            <td className="px-5 py-3">
+                            <td className="py-2 pl-4">
+                              {row.image_asset_id ? (
+                                <ProductPhoto
+                                  alt=""
+                                  assetId={row.image_asset_id}
+                                  className="size-10 rounded-md"
+                                />
+                              ) : (
+                                <ProductPlaceholder className="size-10 rounded-md" />
+                              )}
+                            </td>
+                            <td className="px-4 py-2">
                               <button
                                 aria-current={selected ? "true" : undefined}
                                 className="font-mono text-sm font-semibold"
@@ -922,7 +1115,7 @@ export function InventoryManager({
                                 {row.sku}
                               </button>
                             </td>
-                            <td className="px-5 py-3">
+                            <td className="px-5 py-2">
                               <p className="font-medium text-slate-900">
                                 {row.name}
                               </p>
@@ -930,7 +1123,7 @@ export function InventoryManager({
                                 {categoryById.get(row.category_id) ?? "—"}
                               </p>
                             </td>
-                            <td className="px-5 py-3 text-right">
+                            <td className="px-5 py-2 text-right">
                               <span
                                 className={`font-semibold tabular-nums ${
                                   low ? "text-amber-800" : "text-slate-900"
@@ -946,15 +1139,15 @@ export function InventoryManager({
                               ) : null}
                             </td>
                             {view === "low" ? (
-                              <td className="hidden px-5 py-3 text-right text-slate-600 tabular-nums sm:table-cell">
+                              <td className="hidden px-5 py-2 text-right text-slate-600 tabular-nums sm:table-cell">
                                 {row.low_stock_threshold}
                               </td>
                             ) : (
-                              <td className="hidden px-5 py-3 text-right font-medium text-slate-700 tabular-nums md:table-cell">
+                              <td className="hidden px-5 py-2 text-right font-medium text-slate-700 tabular-nums md:table-cell">
                                 {row.sale_price}
                               </td>
                             )}
-                            <td className="px-5 py-3">
+                            <td className="px-5 py-2">
                               <StatusPill
                                 status={
                                   row.is_active ? tx("Active") : tx("Inactive")
@@ -1029,6 +1222,15 @@ export function InventoryManager({
                           >
                             {product.name}
                           </h2>
+                          {product.image_asset_id ? (
+                            <ProductPhoto
+                              alt={product.name}
+                              assetId={product.image_asset_id}
+                              className="mt-4 size-40 rounded-2xl ring-1 ring-slate-200"
+                            />
+                          ) : (
+                            <ProductPlaceholder className="mt-4 size-40 rounded-2xl ring-1 ring-slate-200" />
+                          )}
                           <p className="mt-0.5 font-mono text-sm text-slate-500">
                             {product.sku}
                           </p>
@@ -1142,6 +1344,7 @@ export function InventoryManager({
                             onClick={() => {
                               setEditing(true);
                               setCreating(false);
+                              resetImage();
                               setAdjusting(false);
                               clearFeedback();
                             }}
@@ -1189,7 +1392,12 @@ export function InventoryManager({
                         <div className={fieldTone}>
                           <ProductFields
                             categories={categories.rows}
+                            clearImage={clearImage}
                             fields={fields}
+                            imageFile={imageFile}
+                            imagePreview={imagePreview}
+                            onClearImage={setClearImage}
+                            onImageFile={replaceImage}
                             product={product}
                           />
 

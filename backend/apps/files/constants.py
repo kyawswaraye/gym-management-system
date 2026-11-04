@@ -2,6 +2,7 @@ from __future__ import annotations
 
 PROFILE_PHOTO_PURPOSE = "PROFILE_PHOTO"
 EXPENSE_RECEIPT_PURPOSE = "EXPENSE_RECEIPT"
+PRODUCT_IMAGE_PURPOSE = "PRODUCT_IMAGE"
 MEMBER_OWNER = "MEMBER"
 GYM_OWNER = "GYM"
 ALLOWED_CONTENT_TYPES = ("image/jpeg", "image/png", "image/webp")
@@ -23,4 +24,9 @@ EXPENSE_RECEIPT_NAMES = {
     "image/jpeg": "expense-receipt.jpg",
     "image/png": "expense-receipt.png",
     "image/webp": "expense-receipt.webp",
+}
+PRODUCT_IMAGE_NAMES = {
+    "image/jpeg": "product-image.jpg",
+    "image/png": "product-image.png",
+    "image/webp": "product-image.webp",
 }

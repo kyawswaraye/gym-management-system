@@ -35077,6 +35077,11 @@
                         "format": "decimal",
                         "pattern": "^-?\\d{0,15}(?:\\.\\d{0,3})?$"
                     },
+                    "image_asset_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
                     "is_active": {
                         "type": "boolean"
                     }
@@ -35983,6 +35988,11 @@
                     "low_stock_threshold": {
                         "type": "string"
                     },
+                    "image_asset_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
                     "quantity_on_hand": {
                         "type": "string"
                     },
@@ -36034,6 +36044,7 @@
                     "default_unit_cost",
                     "gross_profit",
                     "id",
+                    "image_asset_id",
                     "is_active",
                     "low_stock_threshold",
                     "name",
@@ -36412,6 +36423,11 @@
                         "type": "string",
                         "format": "decimal",
                         "pattern": "^-?\\d{0,15}(?:\\.\\d{0,3})?$"
+                    },
+                    "image_asset_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
                     },
                     "is_active": {
                         "type": "boolean",

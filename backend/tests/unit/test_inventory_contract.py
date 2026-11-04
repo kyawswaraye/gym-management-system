@@ -22,7 +22,7 @@ from apps.inventory.views import (
 )
 
 INVENTORY_INITIAL = ("inventory", "0001_product_catalog_and_stock")
-INVENTORY_LEAF = ("inventory", "0005_retail_return_foundation")
+INVENTORY_LEAF = ("inventory", "0006_product_image")
 
 
 def test_inventory_leaf_depends_on_the_finance_permission_catalog() -> None:
@@ -41,6 +41,17 @@ def test_inventory_leaf_depends_on_the_finance_permission_catalog() -> None:
     )
     assert loader.graph.leaf_nodes("inventory") == [INVENTORY_LEAF]
     loader.graph.ensure_not_cyclic()
+
+
+def test_product_image_is_an_unlinked_identifier() -> None:
+    from django.db import models
+
+    from apps.inventory.models import Product
+
+    photo = Product._meta.get_field("image_asset_id")
+    assert isinstance(photo, models.UUIDField)
+    assert photo.null is True
+    assert not photo.is_relation
 
 
 def test_quantity_scale_rejects_float_exponent_and_overprecision() -> None:
@@ -137,6 +148,13 @@ def test_manual_adjustment_accepts_exact_signed_quantity() -> None:
     assert created.validated_data["barcode"] == "5901234"
     assert created.validated_data["name"] == "Spring Water"
     assert created.validated_data["low_stock_threshold"] == Decimal("2.000")
+    image_id = uuid4()
+    imaged = ProductWriteSerializer(data={**body, "image_asset_id": str(image_id)})
+    assert imaged.is_valid(), imaged.errors
+    assert imaged.validated_data["image_asset_id"] == image_id
+    cleared = ProductUpdateSerializer(data={"image_asset_id": None})
+    assert cleared.is_valid(), cleared.errors
+    assert cleared.validated_data["image_asset_id"] is None
 
     adjusted = StockAdjustSerializer(
         data={

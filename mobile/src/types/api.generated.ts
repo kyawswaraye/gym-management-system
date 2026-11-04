@@ -6598,6 +6598,8 @@ export interface components {
       default_unit_cost?: string;
       /** Format: decimal */
       low_stock_threshold?: string;
+      /** Format: uuid */
+      image_asset_id?: string | null;
       is_active?: boolean;
     };
     PatchedRetailSaleUpdateRequest: {
@@ -6884,6 +6886,8 @@ export interface components {
       current_unit_cost: string;
       default_unit_cost: string;
       low_stock_threshold: string;
+      /** Format: uuid */
+      image_asset_id: string | null;
       quantity_on_hand: string;
       sold_quantity: string;
       revenue: string;
@@ -6997,6 +7001,8 @@ export interface components {
       default_unit_cost: string;
       /** Format: decimal */
       low_stock_threshold: string;
+      /** Format: uuid */
+      image_asset_id?: string | null;
       /** @default true */
       is_active: boolean;
     };

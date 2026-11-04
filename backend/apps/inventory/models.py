@@ -85,7 +85,11 @@ class ProductCategory(TenantModel):
 
 
 class Product(TenantModel):
-    """Sellable catalog row. Stock is derived from movements, not this row."""
+    """Sellable catalog row. Stock is derived from movements, not this row.
+
+    ``image_asset_id`` is an unlinked ``FileAsset`` id. The asset purpose is
+    ``PRODUCT_IMAGE`` and the owner is the gym. There is no database foreign key.
+    """
 
     category = models.ForeignKey(
         ProductCategory,
@@ -100,6 +104,7 @@ class Product(TenantModel):
     current_unit_cost = models.DecimalField(max_digits=18, decimal_places=2)
     default_unit_cost = models.DecimalField(max_digits=18, decimal_places=2)
     low_stock_threshold = models.DecimalField(max_digits=18, decimal_places=3)
+    image_asset_id = models.UUIDField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     archived_at = models.DateTimeField(null=True, blank=True)
     archived_by_membership_id = models.UUIDField(null=True, blank=True)
@@ -115,6 +120,11 @@ class Product(TenantModel):
                 fields=["gym", "barcode"],
                 condition=models.Q(barcode__isnull=False),
                 name="product_gym_barcode_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["gym", "image_asset_id"],
+                condition=models.Q(image_asset_id__isnull=False),
+                name="product_gym_image_uniq",
             ),
             models.CheckConstraint(condition=models.Q(sku__regex=_SKU), name="product_sku_ck"),
             models.CheckConstraint(

@@ -133,6 +133,7 @@ def create_product(
         membership_id=actor.id,
         permission_code="inventory.manage",
     )
+    image_asset_id = _product_image_id(gym, fields.get("image_asset_id"))
     category = _category(gym_id=gym.id, category_id=fields["category_id"])
     name = canonical_display_name(str(fields["name"]))
     sku = resolve_code(
@@ -155,6 +156,7 @@ def create_product(
             current_unit_cost=parse_money(fields["current_unit_cost"]),
             default_unit_cost=parse_money(fields["default_unit_cost"]),
             low_stock_threshold=parse_quantity(fields["low_stock_threshold"]),
+            image_asset_id=image_asset_id,
             is_active=active,
             archived_at=None if active else timezone.now(),
             archived_by_membership_id=None if active else actor.id,
@@ -214,6 +216,10 @@ def update_product(
         product.default_unit_cost = parse_money(fields["default_unit_cost"])
     if "low_stock_threshold" in fields:
         product.low_stock_threshold = parse_quantity(fields["low_stock_threshold"])
+    if "image_asset_id" in fields:
+        product.image_asset_id = _product_image_id(
+            gym, fields["image_asset_id"], product_id=product.id
+        )
     if "is_active" in fields:
         _apply_active(product, active=bool(fields["is_active"]), actor_id=actor.id)
     product.updated_by_membership_id = actor.id
@@ -454,6 +460,9 @@ def _product_audit(product: Product) -> dict[str, object]:
         "current_unit_cost": format(parse_money(product.current_unit_cost), "f"),
         "default_unit_cost": format(parse_money(product.default_unit_cost), "f"),
         "low_stock_threshold": format(parse_quantity(product.low_stock_threshold), "f"),
+        "image_asset_id": (
+            None if product.image_asset_id is None else str(product.image_asset_id)
+        ),
         "is_active": product.is_active,
     }
 
@@ -472,8 +481,41 @@ def _category_conflict(exc: IntegrityError) -> ValidationError:
 
 
 def _product_conflict(exc: IntegrityError) -> ValidationError:
-    field = "barcode" if "barcode" in _constraint_name(exc) else "sku"
+    name = _constraint_name(exc)
+    if "image" in name:
+        return ValidationError({"image_asset_id": ["This image is already on another product."]})
+    field = "barcode" if "barcode" in name else "sku"
     return ValidationError({field: ["A product with this SKU or barcode already exists."]})
+
+
+def _product_image_id(gym: Gym, asset_id: object, *, product_id: UUID | None = None) -> UUID | None:
+    if asset_id is None:
+        return None
+    if not isinstance(asset_id, UUID):
+        raise ValidationError(
+            {"image_asset_id": ["Choose a product image that finished uploading."]}
+        )
+    from apps.files.constants import GYM_OWNER, PRODUCT_IMAGE_PURPOSE
+    from apps.files.models import FileAsset
+
+    asset = FileAsset.objects.filter(gym_id=gym.id, id=asset_id).first()
+    if (
+        asset is None
+        or asset.purpose != PRODUCT_IMAGE_PURPOSE
+        or asset.owner_type != GYM_OWNER
+        or asset.owner_id != gym.id
+        or asset.scan_status != FileAsset.ScanStatus.CLEAN
+        or asset.retention_status != FileAsset.RetentionStatus.ACTIVE
+    ):
+        raise ValidationError(
+            {"image_asset_id": ["Choose a product image that finished uploading."]}
+        )
+    taken = Product.objects.filter(gym_id=gym.id, image_asset_id=asset.id)
+    if product_id is not None:
+        taken = taken.exclude(id=product_id)
+    if taken.exists():
+        raise ValidationError({"image_asset_id": ["This image is already on another product."]})
+    return asset.id
 
 
 def _audit(

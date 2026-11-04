@@ -1,6 +1,6 @@
-import { useTx } from "../i18n/useTx";
+import { useLocale, useTx } from "../i18n/useTx";
 import { useEffect, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { Dimensions, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ApiError, NetworkError } from "../api/errors";
@@ -10,10 +10,10 @@ import { useAuth, useOnline, useSetLocale } from "../app/providers";
 import { setScreenSecure } from "../native/screenSecurity";
 import { BrandMark } from "../ui/BrandMark";
 import { Button } from "../ui/Button";
-import { Card } from "../ui/Card";
+import { PhotoBand } from "../ui/PhotoBand";
 import { ErrorState, OfflineBanner } from "../ui/StateView";
 import { Text } from "../ui/Text";
-import { colors, elevation, space } from "../ui/theme";
+import { colors, space } from "../ui/theme";
 
 const GOOGLE_ERRORS: Record<string, string> = {
   MEMBER_NOT_FOUND: "No member account uses this Google email.",
@@ -29,8 +29,11 @@ const GOOGLE_ERRORS: Record<string, string> = {
     "This Google account cannot sign in to the member app.",
 };
 
+const heroHeight = Math.round(Dimensions.get("window").height * 0.42);
+
 export function LoginScreen() {
   const tx = useTx();
+  const locale = useLocale();
   const setLocale = useSetLocale();
   const auth = useAuth();
   const online = useOnline();
@@ -43,42 +46,33 @@ export function LoginScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView
+      edges={["left", "right", "bottom"]}
+      style={{ flex: 1, backgroundColor: colors.surface }}
+    >
       <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          gap: space.md,
-          paddingBottom: space.lg,
-          paddingHorizontal: space.lg,
-          paddingTop: space.md,
-        }}
+        bounces={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
       >
-        <LanguageSwitch onChange={(value) => void setLocale(value)} />
-        <View
-          style={{
-            alignItems: "center",
-            flexGrow: 1,
-            gap: space.md,
-            justifyContent: "center",
-          }}
+        <PhotoBand
+          accessibilityLabel={tx("Gym studio")}
+          animate
+          height={heroHeight}
+          source={require("../assets/studio-hero.jpg")}
+          scrim="bottom"
         >
-          <View
-            style={{
-              alignItems: "center",
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              borderRadius: 32,
-              borderWidth: 1,
-              gap: 10,
-              paddingHorizontal: 28,
-              paddingVertical: 22,
-              ...elevation,
-            }}
-          >
-            <BrandMark size={88} />
+          <View style={{ gap: 10 }}>
+            <BrandMark size={72} />
             <Text
               accessibilityRole="header"
-              style={{ fontSize: 22, fontWeight: "700", letterSpacing: 0.3 }}
+              style={{
+                color: colors.onPrimary,
+                fontSize: 32,
+                fontWeight: "800",
+                letterSpacing: locale === "mm" ? 0 : -0.4,
+                lineHeight: locale === "mm" ? 44 : 40,
+              }}
             >
               {tx("GymPilot MM")}
             </Text>
@@ -87,13 +81,33 @@ export function LoginScreen() {
                 backgroundColor: colors.accent,
                 borderRadius: 2,
                 height: 3,
-                width: 32,
+                width: 40,
               }}
             />
           </View>
-        </View>
-        <Card>
-          <Text style={{ color: colors.muted, textAlign: "center" }}>
+        </PhotoBand>
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            flexGrow: 1,
+            gap: space.md,
+            marginTop: -18,
+            paddingBottom: space.lg,
+            paddingHorizontal: space.lg,
+            paddingTop: space.lg,
+          }}
+        >
+          <View style={{ alignItems: "flex-end" }}>
+            <LanguageSwitch onChange={(value) => void setLocale(value)} />
+          </View>
+          <Text
+            style={{
+              color: colors.muted,
+              fontSize: 16,
+              lineHeight: 24,
+              textAlign: "left",
+            }}
+          >
             {tx("Sign in with the Google account that uses your member email.")}
           </Text>
           <OfflineBanner visible={!online} />
@@ -146,7 +160,7 @@ export function LoginScreen() {
               })();
             }}
           />
-        </Card>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

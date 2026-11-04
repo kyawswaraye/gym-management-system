@@ -17,7 +17,11 @@ from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
-from apps.files.constants import EXPENSE_RECEIPT_PURPOSE, PROFILE_PHOTO_PURPOSE
+from apps.files.constants import (
+    EXPENSE_RECEIPT_PURPOSE,
+    PRODUCT_IMAGE_PURPOSE,
+    PROFILE_PHOTO_PURPOSE,
+)
 from apps.files.models import FileAsset
 
 _OPERATIONS = frozenset({"upload", "complete", "download", "delete"})
@@ -52,6 +56,16 @@ def _expense_file_gate(granted: frozenset[str] | set[str], operation: str) -> bo
     if operation == "download":
         return "files.view" in granted
     return operation == "delete"
+
+
+def _product_image_file_gate(granted: frozenset[str] | set[str], operation: str) -> bool:
+    if operation in {"upload", "complete"}:
+        return "files.upload" in granted and "inventory.manage" in granted
+    if operation == "download":
+        return "files.view" in granted and (
+            "inventory.view" in granted or "inventory.manage" in granted
+        )
+    return operation == "delete" and "inventory.manage" in granted
 
 
 def _declared_purpose(request: Request) -> str | None:
@@ -125,7 +139,7 @@ def _trainer_only_profile_delete_hidden(
     scope = trainer_member_scope(gym_id=gym_id, actor=actor)
     if not scope.restricted:
         return False
-    if purpose == EXPENSE_RECEIPT_PURPOSE:
+    if purpose in {EXPENSE_RECEIPT_PURPOSE, PRODUCT_IMAGE_PURPOSE}:
         return False
     if purpose != PROFILE_PHOTO_PURPOSE or gym is None:
         return True
@@ -178,11 +192,15 @@ class PurposeAwareFilePermission(BasePermission):
         if operation == "upload":
             if "files.upload" not in granted:
                 return False
-            if _declared_purpose(request) == EXPENSE_RECEIPT_PURPOSE and _has_expense_capability(
-                granted
-            ):
+            declared = _declared_purpose(request)
+            if declared == EXPENSE_RECEIPT_PURPOSE and _has_expense_capability(granted):
                 _close_trainer_finance(request)
-            if _declared_purpose(request) == EXPENSE_RECEIPT_PURPOSE:
+            if declared == EXPENSE_RECEIPT_PURPOSE:
+                return True
+            if declared == PRODUCT_IMAGE_PURPOSE:
+                if "inventory.manage" not in granted:
+                    return False
+                _close_trainer_finance(request)
                 return True
             return all(code in granted for code in profile)
         purpose = _stored_purpose(request, view)
@@ -195,6 +213,11 @@ class PurposeAwareFilePermission(BasePermission):
                 return False
             if _has_expense_capability(granted):
                 _close_trainer_finance(request)
+            return True
+        if purpose == PRODUCT_IMAGE_PURPOSE:
+            if not _product_image_file_gate(granted, operation):
+                return False
+            _close_trainer_finance(request)
             return True
         if _has_expense_capability(granted) and (
             all(code in granted for code in profile) or _expense_file_gate(granted, operation)

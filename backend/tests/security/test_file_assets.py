@@ -44,6 +44,7 @@ EXPECTED_CONSTRAINTS = {
     "fileasset_scan_claim_ck",
     "fileasset_profile_photo_ck",
     "fileasset_expense_receipt_ck",
+    "fileasset_product_image_ck",
 }
 
 
@@ -114,6 +115,7 @@ def test_file_asset_migration_state_constraints_indexes_rls_and_grants() -> None
         "0003_profile_photo_contract",
         "0004_expense_receipt_and_expense",
         "0005_member_self_actors",
+        "0006_product_image",
     ]
     assert (enabled, forced) == (True, True)
     assert owner != "gym_runtime"

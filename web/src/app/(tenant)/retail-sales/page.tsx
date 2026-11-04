@@ -14,12 +14,7 @@ export default async function RetailSalesPage() {
 
   return (
     <section aria-labelledby="retail-sales-title">
-      <PageHeader
-        description="Save a draft and submit it for approval. A posted sale can be returned in part, or voided in full before anything is returned."
-        eyebrow="Finance"
-        title="Retail sales"
-        titleId="retail-sales-title"
-      />
+      <PageHeader compact title="Retail sales" titleId="retail-sales-title" />
       <RetailSalesManager
         canApprove={session.permissions.includes("retail.approve")}
         canCreate={session.permissions.includes("retail.create")}
