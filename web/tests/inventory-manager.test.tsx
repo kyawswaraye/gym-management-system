@@ -538,7 +538,7 @@ describe("inventory", () => {
           default_unit_cost: "0.75",
         }),
       );
-      expect(createProduct.mock.calls[0]?.[0]).not.toHaveProperty(
+      expect(vi.mocked(createProduct).mock.calls[0]?.[0]).not.toHaveProperty(
         "image_asset_id",
       );
     });
