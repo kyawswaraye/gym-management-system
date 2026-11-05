@@ -44,6 +44,8 @@ RUN set -eu; \
       /var/lib/pgbackrest /var/lib/gym-backup-metrics; \
     chmod 0750 /var/spool/pgbackrest /var/log/pgbackrest /var/lib/pgbackrest; \
     chmod 0755 /var/lib/gym-backup-metrics; \
+    # CVE-2026-109518: release gate fails on apt < 3.0.4 (fixed 2026-11-04).
+    apt-get install -y --no-install-recommends --only-upgrade apt libapt-pkg7.0; \
     apt-get purge -y \
       curl \
       gcc \
