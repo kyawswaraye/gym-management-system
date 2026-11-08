@@ -168,7 +168,8 @@ export async function signIn(page: Page, account: E2EAccount): Promise<void> {
   await expect
     .poll(async () => {
       if (await code.isVisible()) outcome = "mfa";
-      else if (!/\/login\/?$/.test(new URL(page.url()).pathname)) outcome = "in";
+      else if (!/\/login\/?$/.test(new URL(page.url()).pathname))
+        outcome = "in";
       return outcome;
     })
     .not.toBe("");

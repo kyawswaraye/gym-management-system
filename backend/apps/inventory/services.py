@@ -460,9 +460,7 @@ def _product_audit(product: Product) -> dict[str, object]:
         "current_unit_cost": format(parse_money(product.current_unit_cost), "f"),
         "default_unit_cost": format(parse_money(product.default_unit_cost), "f"),
         "low_stock_threshold": format(parse_quantity(product.low_stock_threshold), "f"),
-        "image_asset_id": (
-            None if product.image_asset_id is None else str(product.image_asset_id)
-        ),
+        "image_asset_id": (None if product.image_asset_id is None else str(product.image_asset_id)),
         "is_active": product.is_active,
     }
 

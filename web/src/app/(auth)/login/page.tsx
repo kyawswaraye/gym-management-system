@@ -15,7 +15,10 @@ export default async function LoginPage({
 }) {
   const { reason } = await searchParams;
   return (
-    <main aria-labelledby="login-title" className="login-panel w-full bg-surface text-center">
+    <main
+      aria-labelledby="login-title"
+      className="login-panel w-full bg-surface text-center"
+    >
       <div className="login-panel__brand px-8 pt-10 pb-6 sm:px-10">
         <BrandLogo />
         <div
@@ -33,7 +36,11 @@ export default async function LoginPage({
         </p>
       </div>
       <div aria-hidden="true" className="login-wave">
-        <svg className="h-10 w-full" preserveAspectRatio="none" viewBox="0 0 480 48">
+        <svg
+          className="h-10 w-full"
+          preserveAspectRatio="none"
+          viewBox="0 0 480 48"
+        >
           <path
             d="M0 24 C80 8 140 40 240 24 C340 8 400 40 480 24 L480 48 L0 48 Z"
             fill="#f4f7fb"

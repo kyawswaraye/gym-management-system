@@ -348,7 +348,9 @@ export function OwnerDashboard() {
     return (
       <div className="grid w-full gap-4 py-8" role="status">
         <LoadingMark className="mx-auto" />
-        <p className="text-center text-sm font-medium text-muted">{tx("Loading dashboard…")}</p>
+        <p className="text-center text-sm font-medium text-muted">
+          {tx("Loading dashboard…")}
+        </p>
         <div className="h-28 animate-pulse rounded-theme-lg border border-border bg-surface motion-reduce:animate-none" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((item) => (

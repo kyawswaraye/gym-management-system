@@ -442,7 +442,8 @@ form.dialog-panel[role="dialog"][aria-modal="true"] {
   margin-left: 0;
 }
 
-[role="dialog"][aria-modal="true"] > :first-child:is(:has(> h2), :has(> div > h2)) {
+[role="dialog"][aria-modal="true"]
+  > :first-child:is(:has(> h2), :has(> div > h2)) {
   background: var(--color-button-navy);
   border-bottom: 0;
   color: #ffffff;
@@ -476,18 +477,24 @@ form.dialog-panel[role="dialog"][aria-modal="true"] {
   width: 16px;
   height: 16px;
   background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'%3E%3Cpath d='M4 4l8 8M12 4l-8 8'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'%3E%3Cpath d='M4 4l8 8M12 4l-8 8'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'%3E%3Cpath d='M4 4l8 8M12 4l-8 8'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'%3E%3Cpath d='M4 4l8 8M12 4l-8 8'/%3E%3C/svg%3E")
+    center / contain no-repeat;
 }
 
 [role="dialog"][aria-modal="true"] > :first-child .button:hover:not(:disabled),
-[role="dialog"][aria-modal="true"] > :first-child .button:active:not(:disabled) {
+[role="dialog"][aria-modal="true"]
+  > :first-child
+  .button:active:not(:disabled) {
   border-color: transparent;
   background: rgb(255 255 255 / 16%);
   color: #ffffff;
 }
 
-[role="dialog"] div:has(> .button + .button):not(:has(> :not(button))) > .button {
+[role="dialog"]
+  div:has(> .button + .button):not(:has(> :not(button)))
+  > .button {
   width: 100%;
   min-width: 0;
 }
@@ -682,10 +689,18 @@ html[lang="my"] textarea {
   color: var(--color-button-red);
 }
 
-[role="dialog"][aria-modal="true"] > :not(:first-child) .button.button-cancel:hover:not(:disabled),
-[role="dialog"][aria-modal="true"] > :not(:first-child) .button.button-cancel:active:not(:disabled),
-[role="dialog"][aria-modal="true"] > :not(:first-child) .button.button-warn:hover:not(:disabled),
-[role="dialog"][aria-modal="true"] > :not(:first-child) .button.button-warn:active:not(:disabled) {
+[role="dialog"][aria-modal="true"]
+  > :not(:first-child)
+  .button.button-cancel:hover:not(:disabled),
+[role="dialog"][aria-modal="true"]
+  > :not(:first-child)
+  .button.button-cancel:active:not(:disabled),
+[role="dialog"][aria-modal="true"]
+  > :not(:first-child)
+  .button.button-warn:hover:not(:disabled),
+[role="dialog"][aria-modal="true"]
+  > :not(:first-child)
+  .button.button-warn:active:not(:disabled) {
   border-color: var(--color-button-red);
   background: var(--color-danger-soft);
   color: var(--color-button-red);
@@ -699,12 +714,24 @@ html[lang="my"] textarea {
   color: #ffffff;
 }
 
-[role="dialog"][aria-modal="true"] > :not(:first-child) .button.button-edit:hover:not(:disabled),
-[role="dialog"][aria-modal="true"] > :not(:first-child) .button.button-edit:active:not(:disabled),
-[role="dialog"][aria-modal="true"] > :not(:first-child) .button.button-success:hover:not(:disabled),
-[role="dialog"][aria-modal="true"] > :not(:first-child) .button.button-success:active:not(:disabled),
-[role="dialog"][aria-modal="true"] > :not(:first-child) .button.button-create:hover:not(:disabled),
-[role="dialog"][aria-modal="true"] > :not(:first-child) .button.button-create:active:not(:disabled) {
+[role="dialog"][aria-modal="true"]
+  > :not(:first-child)
+  .button.button-edit:hover:not(:disabled),
+[role="dialog"][aria-modal="true"]
+  > :not(:first-child)
+  .button.button-edit:active:not(:disabled),
+[role="dialog"][aria-modal="true"]
+  > :not(:first-child)
+  .button.button-success:hover:not(:disabled),
+[role="dialog"][aria-modal="true"]
+  > :not(:first-child)
+  .button.button-success:active:not(:disabled),
+[role="dialog"][aria-modal="true"]
+  > :not(:first-child)
+  .button.button-create:hover:not(:disabled),
+[role="dialog"][aria-modal="true"]
+  > :not(:first-child)
+  .button.button-create:active:not(:disabled) {
   border-color: transparent;
   background: var(--color-primary-hover);
   color: #ffffff;
@@ -716,8 +743,12 @@ html[lang="my"] textarea {
   color: #ffffff;
 }
 
-[role="dialog"][aria-modal="true"] > :not(:first-child) .button.button-archive:hover:not(:disabled),
-[role="dialog"][aria-modal="true"] > :not(:first-child) .button.button-archive:active:not(:disabled) {
+[role="dialog"][aria-modal="true"]
+  > :not(:first-child)
+  .button.button-archive:hover:not(:disabled),
+[role="dialog"][aria-modal="true"]
+  > :not(:first-child)
+  .button.button-archive:active:not(:disabled) {
   border-color: transparent;
   background: var(--color-warning-strong);
   color: #ffffff;
@@ -890,7 +921,11 @@ table :is(td, th) :is(a, button):not(.button):disabled {
   height: 16rem;
   translate: -50% -50%;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgb(255 255 255 / 14%), transparent 72%);
+  background: radial-gradient(
+    closest-side,
+    rgb(255 255 255 / 14%),
+    transparent 72%
+  );
   pointer-events: none;
 }
 
