@@ -621,7 +621,7 @@ script installs Chromium through Playwright, starts a separate `gym-e2e-files`
 compose project for MinIO, ClamAV, and the object proxy, builds the web app,
 migrates as `gym_migration`, seeds MFA-backed E2E identities, and serves Django
 as `gym_runtime` on `127.0.0.1:8010`. Next.js listens on `localhost:3010`.
-Login still requires the BFF secret, password, and a real TOTP code. Placeholder
+Login still requires the BFF secret and password. This loopback server does not ask for an authenticator code. Placeholder
 passwords, TOTP secrets, and the local MinIO password live in `scripts/e2e-env.sh`
 and can be overridden with `E2E_*` variables; they are not production secrets.
 The file-service containers are removed when the command exits. Their volumes

@@ -94,6 +94,18 @@ describe("owner dashboard", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Active members")).toBeInTheDocument();
     expect(screen.getByText("4")).toBeInTheDocument();
+    expect(screen.getByText("Total members")).toBeInTheDocument();
+    expect(
+      screen.getByText("Not included in this report."),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Daily attendance is not included in this response.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Membership status is not included in this report."),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Asia\/Bangkok/)).toBeInTheDocument();
     expect(screen.getByText(/2026-10-01 to 2026-10-31/)).toBeInTheDocument();
     expect(
@@ -134,5 +146,50 @@ describe("owner dashboard", () => {
         "dashboard/?date_from=2026-08-01&date_to=2026-08-15",
       );
     });
+  });
+
+  it("draws attendance, member growth, and revenue from report rows", async () => {
+    loadDashboard.mockImplementation(async (path: string) => {
+      if (path.startsWith("reports/check-ins/")) {
+        return {
+          rows: [
+            { date: "2026-10-01", check_ins: 4 },
+            { date: "2026-10-02", check_ins: 5 },
+          ],
+        };
+      }
+      if (path.startsWith("reports/monthly/")) {
+        return {
+          rows: [
+            { date: "2026-10-01", new_members: 1, total_revenue: "4.00" },
+            { date: "2026-10-02", new_members: 1, total_revenue: "6.00" },
+          ],
+        };
+      }
+      return dashboard(financial);
+    });
+    render(<OwnerDashboard />);
+
+    const firstDay = await screen.findByRole("button", {
+      name: "2026-10-01: 4",
+    });
+    fireEvent.focus(firstDay);
+    expect(screen.getByText("2026-10-01 · 4")).toBeInTheDocument();
+    fireEvent.keyDown(firstDay, { key: "ArrowRight" });
+    expect(await screen.findByText("2026-10-02 · 5")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "2026-10-01: 4.00 THB" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "New members by day" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Revenue by day" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Monthly revenue" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1.00 THB")).toBeInTheDocument();
+    expect(screen.queryByText("7.00 THB")).toBeNull();
   });
 });

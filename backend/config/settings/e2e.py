@@ -1,8 +1,11 @@
 """Loopback browser-smoke settings.
 
-This module is selected only by the E2E scripts. It does not skip MFA, relax
-the BFF secret, or change password hashing. Mail is kept in memory so the real
-owner-invitation send can succeed without printing the acceptance token.
+This module is selected only by the E2E scripts. It does not relax the BFF
+secret or change password hashing. Password login is enough on this loopback
+server, so staff sign-in does not ask for an authenticator code. Production,
+staging, and the test settings module still enforce MFA. Mail is kept in
+memory so the real owner-invitation send can succeed without printing the
+acceptance token.
 """
 
 from django.core.exceptions import ImproperlyConfigured
@@ -10,6 +13,9 @@ from django.core.exceptions import ImproperlyConfigured
 from .base import *  # noqa: F403
 
 DEBUG = False
+# The staff app on localhost:3010 talks to this server. Keep the authenticator
+# challenge off here. Automated backend tests use config.settings.test.
+MFA_ENFORCED = False
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 PUSH_BACKEND = "locmem"
 PUSH_TOKEN_ENCRYPTION_KEY = str(

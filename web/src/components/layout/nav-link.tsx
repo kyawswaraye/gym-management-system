@@ -32,12 +32,15 @@ export function navLinkIsCurrent(
   });
 }
 
+const focusClass =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+
 function navLinkClass(current: boolean, parent: boolean): string {
-  const shared = `shrink-0 rounded-xl border px-3 py-2.5 ${parent ? "text-sm/8" : "text-sm"} transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0866ff]`;
+  const shared = `shrink-0 rounded-theme-md border px-3 py-2.5 ${parent ? "text-sm/8" : "text-sm"} font-medium text-text transition-colors duration-150 motion-reduce:transition-none ${focusClass}`;
   if (current) {
-    return `${shared} border-transparent bg-[#e7f3ff] font-semibold text-[#0866ff] hover:bg-[#d6e9ff]`;
+    return `${shared} border-primary bg-primary-soft font-semibold text-primary-hover hover:bg-primary-soft`;
   }
-  return `${shared} border-transparent font-medium text-[#050505] hover:bg-[#f2f2f2]`;
+  return `${shared} border-transparent hover:bg-inset`;
 }
 
 export function NavLink({

@@ -33,28 +33,28 @@ function activeFolder(
 
 function folderClass(open: boolean, current: boolean): string {
   const shared =
-    "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left text-sm/8 transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0866ff]";
+    "flex w-full items-center justify-between gap-3 rounded-theme-md border px-3 py-2.5 text-left text-sm/8 font-medium text-text transition-colors duration-150 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
   if (current) {
-    return `${shared} border-transparent bg-[#e7f3ff] font-semibold text-[#0866ff]`;
+    return `${shared} border-primary bg-primary-soft font-semibold text-primary-hover`;
   }
   if (open) {
-    return `${shared} border-transparent bg-transparent font-semibold text-[#0866ff]`;
+    return `${shared} border-transparent font-semibold hover:bg-inset`;
   }
-  return `${shared} border-transparent font-medium text-[#050505] hover:bg-[#f2f2f2]`;
+  return `${shared} border-transparent hover:bg-inset`;
 }
 
 function Chevron({ open }: { open: boolean }) {
   return (
     <svg
       aria-hidden="true"
-      className={`h-4 w-4 shrink-0 text-slate-500 transition-transform duration-150 ${open ? "rotate-90" : ""}`}
+      className={`size-4 shrink-0 transition-transform duration-150 motion-reduce:transition-none ${open ? "rotate-90" : ""}`}
       viewBox="0 0 20 20"
       fill="none"
     >
       <path
         d="M7.5 4.5 13 10l-5.5 5.5"
         stroke="currentColor"
-        strokeWidth="1.8"
+        strokeWidth="1.75"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -75,7 +75,7 @@ export function SidebarNav({ entries }: { entries: readonly NavEntry[] }) {
   const hrefs = navigationHrefs(entries);
 
   return (
-    <nav aria-label={tx("Primary")} className="mt-4 grid gap-1">
+    <nav aria-label={tx("Primary")} className="grid gap-1">
       {entries.map((entry) => {
         if (entry.kind === "link") {
           return (

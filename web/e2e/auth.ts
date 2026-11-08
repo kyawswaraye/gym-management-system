@@ -163,9 +163,16 @@ export async function signIn(page: Page, account: E2EAccount): Promise<void> {
   await page.getByLabel("Email", { exact: true }).fill(account.email);
   await page.getByLabel("Password", { exact: true }).fill(account.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(
-    page.getByLabel("Authenticator code", { exact: true }),
-  ).toBeVisible();
+  const code = page.getByLabel("Authenticator code", { exact: true });
+  let outcome = "";
+  await expect
+    .poll(async () => {
+      if (await code.isVisible()) outcome = "mfa";
+      else if (!/\/login\/?$/.test(new URL(page.url()).pathname)) outcome = "in";
+      return outcome;
+    })
+    .not.toBe("");
+  if (outcome === "in") return;
   await submitAuthenticatorCode(page, account.totpSecret);
   try {
     await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });

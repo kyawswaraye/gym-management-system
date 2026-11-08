@@ -18,14 +18,14 @@ function MenuIcon() {
         d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13"
         stroke="currentColor"
         strokeLinecap="round"
-        strokeWidth="1.8"
+        strokeWidth="1.75"
       />
     </svg>
   );
 }
 
 const toggleClass =
-  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0866ff]";
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-theme-md transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 function accountInitial(name: string): string {
   const trimmed = name.trim();
@@ -41,7 +41,7 @@ function SidebarTitle({ title }: { title: string }) {
     <span className="truncate tracking-tight">
       {" "}
       {tx("GymPilot")}
-      <span className="ml-1 font-bold text-[#0866ff]">MM</span>
+      <span className="ml-1 font-semibold">MM</span>
     </span>
   );
 }
@@ -66,7 +66,7 @@ function AccountChevron({ open }: { open: boolean }) {
   return (
     <svg
       aria-hidden="true"
-      className={`size-4 shrink-0 text-slate-400 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+      className={`size-4 shrink-0 text-muted transition-transform duration-150 motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
       fill="none"
       viewBox="0 0 20 20"
     >
@@ -75,7 +75,7 @@ function AccountChevron({ open }: { open: boolean }) {
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeWidth="1.6"
+        strokeWidth="1.75"
       />
     </svg>
   );
@@ -153,22 +153,22 @@ function AccountMenu({
         aria-expanded={menuOpen}
         aria-haspopup="dialog"
         aria-label={`${tx("Account")}, ${accountName}`}
-        className={`flex w-full min-w-0 items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0866ff] ${menuOpen ? "bg-[#f2f2f2]" : "hover:bg-[#f2f2f2]"}`}
+        className={`flex w-full min-w-0 items-center gap-2 rounded-theme-md p-2 text-left transition-colors motion-reduce:transition-none hover:bg-inset focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${menuOpen ? "bg-inset" : ""}`}
         type="button"
         onClick={toggleMenu}
       >
         <span
           aria-hidden="true"
-          className="grid size-9 shrink-0 place-items-center rounded-full bg-[#e7f3ff] text-sm font-semibold text-[#0866ff]"
+          className="grid size-8 shrink-0 place-items-center rounded-full bg-inset text-[13px] font-semibold text-text-secondary"
         >
           {accountInitial(accountName)}
         </span>
         <span className="min-w-0 flex-1 leading-snug">
-          <span className="block truncate text-sm font-semibold text-[#050505]">
+          <span className="block truncate text-sm font-semibold text-text">
             {accountName}
           </span>
           {email ? (
-            <span className="block truncate text-[0.7rem] text-slate-500">
+            <span className="block truncate text-caption text-muted">
               {email}
             </span>
           ) : null}
@@ -180,7 +180,7 @@ function AccountMenu({
             <div
               ref={menuRef}
               aria-label={tx("Account")}
-              className="z-50 rounded-2xl border border-[#e4e6eb] bg-white p-1.5 shadow-[0_12px_32px_rgba(5,5,5,0.14)]"
+              className="z-50 rounded-theme-lg border border-border bg-surface p-1.5 shadow-overlay"
               id={menuId}
               role="dialog"
               style={{
@@ -193,12 +193,12 @@ function AccountMenu({
               tabIndex={-1}
             >
               <div className="flex items-center justify-between gap-3 px-2.5 py-2">
-                <p className="min-w-0 truncate text-sm font-medium text-slate-500">
+                <p className="min-w-0 truncate text-sm font-medium text-muted">
                   {tx("Language")}
                 </p>
                 <LanguageSwitch variant="inline" />
               </div>
-              <div className="mx-2 my-1 h-px bg-[#e4e6eb]" />
+              <div className="mx-2 my-1 h-px bg-border" />
               <LogoutButton />
             </div>,
             document.body,
@@ -232,23 +232,23 @@ export function SidebarFrame({
     <>
       <aside
         aria-hidden={open ? undefined : true}
-        className={`relative z-30 bg-white text-[#050505] shadow-sm motion-reduce:transition-none max-md:grid max-md:overflow-hidden max-md:border-b max-md:border-[#e4e6eb] max-md:transition-[grid-template-rows] max-md:duration-300 max-md:ease-in-out md:fixed md:inset-y-0 md:left-0 md:flex md:w-64 md:flex-col md:overflow-hidden md:border-r md:border-[#e4e6eb] md:transition-[transform,box-shadow] md:duration-300 md:ease-in-out ${open ? "max-md:grid-rows-[1fr] md:translate-x-0" : "max-md:grid-rows-[0fr] max-md:border-b-0 md:-translate-x-full md:shadow-none"}`}
+        className={`relative z-30 bg-surface text-text shadow-none motion-reduce:transition-none max-md:grid max-md:overflow-hidden max-md:border-b max-md:border-border max-md:transition-[grid-template-rows] max-md:duration-300 max-md:ease-in-out md:fixed md:inset-y-0 md:left-0 md:flex md:w-64 md:flex-col md:overflow-hidden md:border-r md:border-border md:transition-transform md:duration-300 md:ease-in-out ${open ? "max-md:grid-rows-[1fr] md:translate-x-0" : "max-md:grid-rows-[0fr] max-md:border-b-0 md:-translate-x-full"}`}
         id="app-sidebar"
         inert={open ? undefined : true}
       >
-        <div className="flex min-h-0 flex-col overflow-hidden p-4 md:h-full md:min-h-0 md:flex-1 md:p-6">
-          <div className="flex min-w-0 shrink-0 items-center gap-2 border-b border-[#e4e6eb] pb-4">
+        <div className="flex min-h-0 flex-col overflow-hidden p-6 md:h-full md:min-h-0 md:flex-1">
+          <div className="mb-4 flex min-w-0 shrink-0 items-center gap-2 border-b border-border pb-4">
             <Link
               aria-label={
                 title === "GymPilot MM" ? tx("GymPilot MM") : undefined
               }
-              className="flex min-w-0 flex-1 items-center gap-2.5 text-sm font-semibold text-[#050505]"
+              className="flex min-w-0 flex-1 items-center gap-2.5 text-sm font-semibold text-text"
               href={homePath}
               title={title}
             >
               {gymLogo ? (
                 <GymLogo
-                  className="h-9 w-9 shrink-0 rounded-lg object-cover"
+                  className="h-9 w-9 shrink-0 rounded-theme-md object-cover"
                   fallback={
                     <img
                       src="/brand/gympilot-mark.png"
@@ -274,7 +274,7 @@ export function SidebarFrame({
               aria-controls="app-sidebar"
               aria-expanded="true"
               aria-label={tx("Hide sidebar")}
-              className={`${toggleClass} text-slate-500 hover:bg-[#f2f2f2] hover:text-[#050505]`}
+              className={`${toggleClass} text-muted hover:bg-inset hover:text-text`}
               type="button"
               onClick={() => setOpen(false)}
             >
@@ -284,7 +284,7 @@ export function SidebarFrame({
           <div className="md:min-h-0 md:flex-1 md:overflow-y-auto">
             <SidebarNav entries={navigation} />
           </div>
-          <footer className="mt-auto shrink-0 border-t border-[#e4e6eb] pt-3">
+          <footer className="mt-auto shrink-0 border-t border-border pt-3">
             <AccountMenu
               accountName={accountName}
               email={email}
@@ -298,7 +298,7 @@ export function SidebarFrame({
         aria-expanded="false"
         aria-hidden={open ? true : undefined}
         aria-label={tx("Show sidebar")}
-        className={`${toggleClass} fixed top-3 left-3 z-40 h-9 w-9 border border-[#e4e6eb] bg-white text-[#050505] shadow-md transition-opacity duration-300 ease-in-out hover:bg-[#f2f2f2] motion-reduce:transition-none ${open ? "pointer-events-none opacity-0" : "opacity-100"}`}
+        className={`${toggleClass} fixed top-3 left-3 z-40 border border-border bg-surface text-text shadow-overlay transition-opacity duration-300 ease-in-out hover:bg-inset motion-reduce:transition-none ${open ? "pointer-events-none opacity-0" : "opacity-100"}`}
         tabIndex={open ? -1 : 0}
         type="button"
         onClick={() => setOpen(true)}

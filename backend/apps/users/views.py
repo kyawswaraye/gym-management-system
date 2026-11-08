@@ -34,7 +34,8 @@ from .mfa import (
     confirm_enrollment,
     consume_mfa_challenge,
     create_mfa_challenge,
-    has_recent_mfa,
+    mfa_enforced,
+    session_mfa_recent,
 )
 from .models import RefreshSession, User
 from .schema import (
@@ -243,7 +244,7 @@ class LoginView(APIView):
                 raise AuthenticationFailed() from exc
             if not user.check_password(str(serializer.validated_data["password"])):
                 raise AuthenticationFailed()
-            if user.mfa_enabled:
+            if user.mfa_enabled and mfa_enforced():
                 token, expires_at = create_mfa_challenge(
                     user=user,
                     device_name=str(serializer.validated_data.get("device_name", "")),
@@ -540,7 +541,7 @@ class MeView(APIView):
                     "features": [],
                     "authz_version": None,
                     "mfa_enabled": request.user.mfa_enabled,
-                    "mfa_recent": has_recent_mfa(request.refresh_session),
+                    "mfa_recent": session_mfa_recent(request.refresh_session),
                 }
             )
         membership = request.gym_membership
@@ -586,7 +587,7 @@ class MeView(APIView):
                 "features": entitlements,
                 "authz_version": membership.authz_version,
                 "mfa_enabled": request.user.mfa_enabled,
-                "mfa_recent": has_recent_mfa(request.refresh_session),
+                "mfa_recent": session_mfa_recent(request.refresh_session),
             }
         )
 

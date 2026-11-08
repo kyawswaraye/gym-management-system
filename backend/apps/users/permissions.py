@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from apps.tenants.exceptions import MFARequired
 from apps.tenants.models import GymFeatureEntitlement
-from apps.users.mfa import has_recent_mfa
+from apps.users.mfa import has_recent_mfa, mfa_enforced
 from apps.users.models import RefreshSession
 
 
@@ -143,6 +143,8 @@ class IsActiveOwner(BasePermission):
 
 class RequiresRecentMFA(BasePermission):
     def has_permission(self, request: Request, view: APIView) -> bool:
+        if not mfa_enforced():
+            return True
         allowed = bool(
             getattr(request, "user", None)
             and getattr(request.user, "mfa_enabled", False)

@@ -13,6 +13,7 @@ import {
 } from "@/features/auth/client";
 import { PasswordInput } from "@/features/auth/password-input";
 import { DigitInput } from "@/lib/ui/digit-input";
+import { LoadingMark } from "@/components/loading-mark";
 
 export function LoginForm({
   sessionExpired = false,
@@ -85,7 +86,7 @@ export function LoginForm({
   }
 
   return (
-    <form className="mt-6 grid gap-4" onSubmit={submit} noValidate>
+    <form className="grid gap-4" onSubmit={submit} noValidate>
       {error && (
         <p className="error" role="alert">
           {tx(error)}
@@ -132,7 +133,13 @@ export function LoginForm({
           />
         </label>
       )}
-      <button className="button" type="submit" disabled={pending}>
+      <button
+        aria-busy={pending || undefined}
+        className="button w-full"
+        disabled={pending}
+        type="submit"
+      >
+        {pending ? <LoadingMark className="size-4" tone="light" /> : null}
         {pending
           ? tx("Verifying…")
           : mfaRequired

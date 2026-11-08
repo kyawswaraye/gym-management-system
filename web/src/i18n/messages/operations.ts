@@ -65,6 +65,9 @@ export const operationsEn = {
   "Check the printer settings and try again.":
     "Check the printer settings and try again.",
   "Check the staff profile.": "Check the staff profile.",
+  "Chart preview": "Chart preview",
+  "Sample shapes, not this period's figures.":
+    "Sample shapes, not this period's figures.",
   "Check-in": "Check-in",
   "Check-in challenge lifetime (seconds)":
     "Check-in challenge lifetime (seconds)",
@@ -566,6 +569,43 @@ export const operationsEn = {
     "Your account has no enabled tenant feature with matching permission.",
   "Your assigned members and personal-training sessions. Counts include only your sessions.":
     "Your assigned members and personal-training sessions. Counts include only your sessions.",
+  "Awaiting a decision": "Awaiting a decision",
+  "Check-ins by day": "Check-ins by day",
+  "Check-ins by week": "Check-ins by week",
+  "Collected in this period": "Collected in this period",
+  "Daily attendance is not included in this response.":
+    "Daily attendance is not included in this response.",
+  "Daily member totals are not included in this response.":
+    "Daily member totals are not included in this response.",
+  "Daily revenue is not included in this response.":
+    "Daily revenue is not included in this response.",
+  "Distinct people in this period": "Distinct people in this period",
+  "Ended in this period": "Ended in this period",
+  "Expiring windows overlap and are not shares of one total.":
+    "Expiring windows overlap and are not shares of one total.",
+  "Membership status is not included in this report.":
+    "Membership status is not included in this report.",
+  "Monthly revenue": "Monthly revenue",
+  "Monthly revenue is not included in this response.":
+    "Monthly revenue is not included in this response.",
+  "New members by day": "New members by day",
+  "New members by week": "New members by week",
+  "No check-ins in this period.": "No check-ins in this period.",
+  "No new members were recorded for this period.":
+    "No new members were recorded for this period.",
+  "No revenue was recorded for this period.":
+    "No revenue was recorded for this period.",
+  "Not included in this report.": "Not included in this report.",
+  "Revenue by day": "Revenue by day",
+  "Revenue by week": "Revenue by week",
+  "Revenue inside the selected range, summed by month.":
+    "Revenue inside the selected range, summed by month.",
+  "Select a point to see its total.": "Select a point to see its total.",
+  "Total members": "Total members",
+  Trends: "Trends",
+  "Visits on this day": "Visits on this day",
+  "Week of {date}": "Week of {date}",
+  "Weekly totals": "Weekly totals",
 } as const;
 
 export const operationsMm = {
@@ -637,6 +677,9 @@ export const operationsMm = {
   "Check the printer settings and try again.":
     "ပရင်တာ ဆက်တင်ကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။",
   "Check the staff profile.": "ဝန်ထမ်းပရိုဖိုင်ကို စစ်ဆေးပါ။",
+  "Chart preview": "ဂရပ်နမူနာ",
+  "Sample shapes, not this period's figures.":
+    "ဤပုံစံများသည် ဤကာလ၏ ကိန်းဂဏန်းများ မဟုတ်ပါ။",
   "Check-in": "ဝင်ရောက်မှု",
   "Check-in challenge lifetime (seconds)": "ဝင်ရောက်မှုကုဒ်သက်တမ်း (စက္ကန့်)",
   "Check-in challenge maximum uses": "ဝင်ရောက်မှုကုဒ် အများဆုံးအသုံးပြုခွင့်",
@@ -1147,4 +1190,42 @@ export const operationsMm = {
     "သင့်အကောင့်တွင် ကိုက်ညီသော ခွင့်ပြုချက်ရှိ၍ ဖွင့်ထားသော Gym လုပ်ဆောင်ချက် မရှိပါ။",
   "Your assigned members and personal-training sessions. Counts include only your sessions.":
     "သင့်ထံ သတ်မှတ်ထားသော အဖွဲ့ဝင်များနှင့် တစ်ဦးချင်း လေ့ကျင့်ချိန်များ။ အရေအတွက်တွင် သင့်ချိန်များသာ ပါဝင်ပါသည်။",
+  "Awaiting a decision": "ဆုံးဖြတ်ချက်ကို စောင့်ဆိုင်းနေသည်",
+  "Check-ins by day": "နေ့အလိုက် ဝင်ရောက်မှု",
+  "Check-ins by week": "အပတ်အလိုက် ဝင်ရောက်မှု",
+  "Collected in this period": "ဤကာလတွင် ကောက်ခံထားသည်",
+  "Daily attendance is not included in this response.":
+    "ဤတုံ့ပြန်ချက်တွင် နေ့စဉ် တက်ရောက်မှု မပါဝင်ပါ။",
+  "Daily member totals are not included in this response.":
+    "ဤတုံ့ပြန်ချက်တွင် နေ့စဉ် အဖွဲ့ဝင် စုစုပေါင်း မပါဝင်ပါ။",
+  "Daily revenue is not included in this response.":
+    "ဤတုံ့ပြန်ချက်တွင် နေ့စဉ် ဝင်ငွေ မပါဝင်ပါ။",
+  "Distinct people in this period": "ဤကာလအတွင်း လူတစ်ဦးချင်း",
+  "Ended in this period": "ဤကာလတွင် ကုန်ဆုံးသည်",
+  "Expiring windows overlap and are not shares of one total.":
+    "သက်တမ်းကုန်မည့် ကာလများသည် ထပ်နေပြီး စုစုပေါင်းတစ်ခု၏ အစိတ်အပိုင်းများ မဟုတ်ပါ။",
+  "Membership status is not included in this report.":
+    "ဤအစီရင်ခံစာတွင် အဖွဲ့ဝင် အခြေအနေ မပါဝင်ပါ။",
+  "Monthly revenue": "လစဉ် ဝင်ငွေ",
+  "Monthly revenue is not included in this response.":
+    "ဤတုံ့ပြန်ချက်တွင် လစဉ် ဝင်ငွေ မပါဝင်ပါ။",
+  "New members by day": "နေ့အလိုက် အဖွဲ့ဝင်သစ်",
+  "New members by week": "အပတ်အလိုက် အဖွဲ့ဝင်သစ်",
+  "No check-ins in this period.": "ဤကာလတွင် ဝင်ရောက်မှု မရှိပါ။",
+  "No new members were recorded for this period.":
+    "ဤကာလအတွက် အဖွဲ့ဝင်သစ် မှတ်တမ်း မရှိပါ။",
+  "No revenue was recorded for this period.":
+    "ဤကာလအတွက် ဝင်ငွေ မှတ်တမ်း မရှိပါ။",
+  "Not included in this report.": "ဤအစီရင်ခံစာတွင် မပါဝင်ပါ။",
+  "Revenue by day": "နေ့အလိုက် ဝင်ငွေ",
+  "Revenue by week": "အပတ်အလိုက် ဝင်ငွေ",
+  "Revenue inside the selected range, summed by month.":
+    "ရွေးချယ်ထားသော ကာလအတွင်း ဝင်ငွေကို လအလိုက် ပေါင်းထားသည်။",
+  "Select a point to see its total.":
+    "စုစုပေါင်းကို ကြည့်ရန် အမှတ်တစ်ခုကို ရွေးပါ။",
+  "Total members": "အဖွဲ့ဝင် စုစုပေါင်း",
+  Trends: "လမ်းကြောင်းများ",
+  "Visits on this day": "ဤနေ့ လာရောက်မှု",
+  "Week of {date}": "{date} အပတ်",
+  "Weekly totals": "အပတ်စဉ် စုစုပေါင်း",
 } satisfies Record<keyof typeof operationsEn, string>;

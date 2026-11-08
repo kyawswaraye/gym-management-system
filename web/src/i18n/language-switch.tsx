@@ -26,10 +26,10 @@ export function LanguageSwitch({
 
   function optionClass(selected: boolean) {
     if (inline) {
-      return `rounded-md px-2 py-1 leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0866ff] ${
+      return `rounded-theme-sm border px-2 py-1 leading-none transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
         selected
-          ? "bg-[#0866ff] text-white"
-          : "text-slate-500 hover:text-[#050505]"
+          ? "border-primary bg-surface text-primary-hover"
+          : "border-transparent text-text hover:bg-inset"
       }`;
     }
     return `min-h-8 rounded-lg px-3 py-1.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0866ff] ${
@@ -44,7 +44,7 @@ export function LanguageSwitch({
       aria-label={tx("Language")}
       className={
         inline
-          ? `inline-grid shrink-0 grid-cols-2 rounded-lg bg-white p-0.5 text-[11px] font-semibold ring-1 ring-[#e4e6eb] ${className}`
+          ? `inline-grid shrink-0 grid-cols-2 rounded-theme-md border border-border bg-surface p-0.5 text-[11px] font-semibold ${className}`
           : `grid grid-cols-2 gap-1 rounded-xl bg-[#e4e6eb] p-1 text-xs font-bold ${className}`
       }
       role="group"

@@ -2,10 +2,9 @@
 
 import type { ReactNode } from "react";
 
-import { useTx } from "@/i18n/use-tx";
+import { useLocale, useTx } from "@/i18n/use-tx";
 
-const TITLE_CLASS =
-  "text-3xl font-black tracking-tight text-slate-900 sm:text-4xl";
+const TITLE_CLASS = "text-display text-text";
 
 type PageHeaderProps = {
   title: string;
@@ -27,25 +26,28 @@ export function PageHeader({
   compact = false,
 }: PageHeaderProps) {
   const tx = useTx();
+  const locale = useLocale();
   const copy = compact ? (
-    <h1 className="text-lg font-bold text-slate-900" id={titleId}>
+    <h1 className="text-title text-text" id={titleId}>
       {tx(title)}
     </h1>
   ) : (
     <>
       {eyebrow ? (
-        <p className="text-xs font-bold tracking-[0.18em] text-[#0866ff] uppercase">
+        <p
+          className={`text-xs font-semibold text-primary-hover ${locale === "en" ? "tracking-[0.06em] uppercase" : "tracking-normal"}`}
+        >
           {tx(eyebrow)}
         </p>
       ) : null}
       <h1
-        className={eyebrow ? `mt-2 ${TITLE_CLASS}` : TITLE_CLASS}
+        className={eyebrow ? `mt-1 ${TITLE_CLASS}` : TITLE_CLASS}
         id={titleId}
       >
         {tx(title)}
       </h1>
       {description ? (
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+        <p className="mt-2 max-w-[640px] text-body text-muted">
           {typeof description === "string" ? tx(description) : description}
         </p>
       ) : null}
@@ -53,11 +55,9 @@ export function PageHeader({
   );
 
   return (
-    <header
-      className={compact ? "mb-3" : "mb-7 border-b border-slate-200 pb-6"}
-    >
+    <header className={compact ? "mb-3" : "mb-6 border-b border-border pb-6"}>
       {actions ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div>{copy}</div>
           {actions}
         </div>

@@ -210,9 +210,21 @@ def consume_mfa_challenge(*, token: str, code: str) -> MFAChallenge:
     return challenge
 
 
+def mfa_enforced() -> bool:
+    return bool(getattr(settings, "MFA_ENFORCED", True))
+
+
 def has_recent_mfa(session: RefreshSession | None) -> bool:
     if session is None or session.mfa_verified_at is None:
         return False
     return session.mfa_verified_at >= timezone.now() - timedelta(
         seconds=settings.MFA_STEP_UP_TTL_SECONDS
     )
+
+
+def session_mfa_recent(session: RefreshSession | None) -> bool:
+    """Report a fresh step-up, or treat it as fresh when local MFA is off."""
+
+    if not mfa_enforced():
+        return True
+    return has_recent_mfa(session)

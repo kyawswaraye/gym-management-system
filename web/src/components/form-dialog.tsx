@@ -2,6 +2,8 @@
 import { useTx } from "@/i18n/use-tx";
 
 import {
+  Children,
+  isValidElement,
   useEffect,
   useId,
   useRef,
@@ -10,10 +12,23 @@ import {
   type Ref,
 } from "react";
 
+import { LoadingMark } from "@/components/loading-mark";
+
 function dialogWidth(wide: boolean, compact: boolean): string {
   if (compact) return "sm:max-w-lg";
   if (wide) return "sm:max-w-3xl";
   return "sm:max-w-2xl";
+}
+
+function isActionRow(node: ReactNode): boolean {
+  if (!isValidElement<{ children?: ReactNode }>(node)) return false;
+  const kids = Children.toArray(node.props.children).filter(
+    (child) => typeof child !== "string" || child.trim() !== "",
+  );
+  return (
+    kids.length > 0 &&
+    kids.every((child) => isValidElement(child) && child.type === "button")
+  );
 }
 
 export function DialogFrame({
@@ -131,6 +146,11 @@ export function FormDialog({
     node?.focus({ preventScroll: true });
   }, [formRef]);
 
+  const items = Children.toArray(children);
+  const last = items.at(-1);
+  const pinned = last && isActionRow(last) ? last : null;
+  const body = pinned ? items.slice(0, -1) : items;
+
   return (
     <div
       className="fixed inset-0 z-50 grid overflow-hidden p-2 sm:place-items-center sm:p-6"
@@ -145,7 +165,7 @@ export function FormDialog({
         aria-describedby={description ? descriptionId : undefined}
         aria-labelledby={titleId}
         aria-modal="true"
-        className={`flex h-full max-h-full min-h-0 w-full flex-col overflow-y-auto overscroll-contain sm:h-auto sm:max-h-[min(90dvh,48rem)] ${dialogWidth(wide, compact)}`}
+        className={`dialog-panel flex h-full max-h-full min-h-0 w-full flex-col overscroll-contain sm:h-auto sm:max-h-[min(90dvh,48rem)] ${dialogWidth(wide, compact)}`}
         noValidate={noValidate || undefined}
         onKeyDown={(event) => {
           if (event.key !== "Escape" || pending) return;
@@ -183,17 +203,23 @@ export function FormDialog({
             {tx("Close")}{" "}
           </button>
         </div>
-        <div className="grid gap-4 px-5 py-4 sm:px-6">
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-5 py-4 sm:px-6">
           {pending ? (
             <p
               aria-live="polite"
-              className="text-sm font-medium text-slate-600"
+              className="flex items-center gap-2 text-sm font-medium text-slate-600"
             >
+              <LoadingMark className="size-4" />
               {tx(pendingLabel)}
             </p>
           ) : null}
-          {children}
+          {body}
         </div>
+        {pinned ? (
+          <div className="sticky bottom-0 z-10 border-t border-slate-100 bg-white px-5 py-4 sm:px-6">
+            {pinned}
+          </div>
+        ) : null}
       </form>
     </div>
   );

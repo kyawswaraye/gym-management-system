@@ -18,6 +18,8 @@ from apps.common.production import (
 
 from .base import *  # noqa: F403
 
+MFA_ENFORCED = True
+
 MIDDLEWARE = [
     *MIDDLEWARE,  # noqa: F405
     "django.middleware.csrf.CsrfViewMiddleware",

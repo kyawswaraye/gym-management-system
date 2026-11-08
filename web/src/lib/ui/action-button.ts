@@ -1,5 +1,12 @@
 export type ActionTone =
-  "create" | "edit" | "delete" | "cancel" | "archive" | "warn" | "success";
+  | "create"
+  | "edit"
+  | "delete"
+  | "cancel"
+  | "archive"
+  | "warn"
+  | "success"
+  | "view";
 
 const PENDING_LABEL =
   /^(saving|sending|loading|confirming|preparing|accepting|updating|verifying|opening|provisioning|signing|retrying)…?$/i;
@@ -13,6 +20,7 @@ const TONE_WORDS: Array<[ActionTone, string[]]> = [
     ["resume", "activate", "activation", "restore", "approve", "approval"],
   ],
   ["cancel", ["cancel", "cancellation", "discard", "hide", "back"]],
+  ["view", ["view"]],
   ["create", ["create", "add", "grant", "provision", "start", "new"]],
   ["edit", ["edit", "save", "update"]],
 ];

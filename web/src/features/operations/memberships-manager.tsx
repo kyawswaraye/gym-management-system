@@ -16,6 +16,7 @@ import {
 } from "@/features/operations/membership-writes";
 import { formatAppDate } from "@/lib/date";
 import { actionButtonClass } from "@/lib/ui/action-button";
+import { LoadingMark } from "@/components/loading-mark";
 import { DigitInput } from "@/lib/ui/digit-input";
 import { compactIdentifier, IdentifierValue } from "@/lib/ui/identifier";
 import type {
@@ -909,9 +910,7 @@ export function MembershipsManager({
               {canManagePlans ? (
                 <button
                   aria-expanded={showPlans}
-                  className={actionButtonClass(
-                    showPlans ? "Hide plans" : "View plans",
-                  )}
+                  className="button button-view"
                   onClick={() => setShowPlans((current) => !current)}
                   type="button"
                 >
@@ -930,7 +929,7 @@ export function MembershipsManager({
                   className={
                     showMembershipForm
                       ? actionButtonClass("Close membership form")
-                      : "button button-success"
+                      : "button"
                   }
                   onClick={() => {
                     if (showMembershipForm) {
@@ -1125,7 +1124,7 @@ export function MembershipsManager({
               >
                 <div className="flex items-start gap-3 border-b border-slate-100 pb-4">
                   <span
-                    className="grid min-h-9 shrink-0 place-items-center rounded-lg bg-slate-100 px-2 text-[0.65rem] font-black tracking-wide text-slate-700"
+                    className="grid min-h-9 shrink-0 place-items-center rounded-lg bg-inset px-2 text-[0.65rem] font-semibold tracking-wide text-text-secondary"
                     aria-hidden="true"
                   >
                     {tx("PLAN")}
@@ -1303,17 +1302,20 @@ export function MembershipsManager({
           </div>
         </div>
         {loading ? (
-          <div className="grid gap-3 p-5" role="status">
-            <span className="sr-only">{tx("Loading memberships.")}</span>
+          <div className="grid justify-items-center gap-3 p-8" role="status">
+            <LoadingMark />
+            <p className="text-sm font-medium text-slate-500">
+              {tx("Loading memberships.")}
+            </p>
             {[0, 1, 2].map((item) => (
               <div
-                className="h-16 animate-pulse rounded-xl bg-slate-100"
+                className="h-16 w-full animate-pulse rounded-xl bg-slate-100"
                 key={item}
               />
             ))}
           </div>
         ) : null}
-        <div className="overflow-x-auto">
+        <div className={loading ? "hidden" : "overflow-x-auto"}>
           <table
             aria-label={tx("Memberships")}
             className="w-full text-left text-sm"
@@ -1564,7 +1566,7 @@ export function MembershipsManager({
             <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
               <span
                 aria-hidden="true"
-                className="grid min-h-9 shrink-0 place-items-center rounded-lg bg-amber-100 px-2 text-[0.65rem] font-black tracking-wide text-amber-800"
+                className="grid min-h-9 shrink-0 place-items-center rounded-lg bg-inset px-2 text-[0.65rem] font-semibold tracking-wide text-text-secondary"
               >
                 {tx("MEMBER")}
               </span>
@@ -2142,6 +2144,16 @@ function NoteEditorDialog({
           ) : null}
           <div className="flex flex-wrap gap-2">
             <button
+              aria-label={tx("Discard note changes")}
+              className="button button-cancel"
+              disabled={pending}
+              onClick={onCancel}
+              type="button"
+            >
+              {" "}
+              {tx("Cancel")}{" "}
+            </button>
+            <button
               aria-label={tx("Save note for {member} · {plan}", {
                 member: shortMember,
                 plan: state.planName,
@@ -2152,16 +2164,6 @@ function NoteEditorDialog({
             >
               {" "}
               {tx("Save")}{" "}
-            </button>
-            <button
-              aria-label={tx("Discard note changes")}
-              className="button button-cancel"
-              disabled={pending}
-              onClick={onCancel}
-              type="button"
-            >
-              {" "}
-              {tx("Cancel")}{" "}
             </button>
           </div>
         </form>

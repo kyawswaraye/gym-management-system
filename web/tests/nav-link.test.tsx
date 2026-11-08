@@ -38,7 +38,7 @@ function renderLinks() {
 function expectCurrent(name: string) {
   const current = screen.getByRole("link", { name });
   expect(current).toHaveAttribute("aria-current", "page");
-  expect(current.className).toContain("bg-[#e7f3ff]");
+  expect(current.className).toContain("bg-primary-soft");
   expect(current.className).not.toContain("shadow-[inset_");
   return current;
 }
@@ -46,8 +46,8 @@ function expectCurrent(name: string) {
 function expectIdle(name: string) {
   const link = screen.getByRole("link", { name });
   expect(link).not.toHaveAttribute("aria-current");
-  expect(link.className).toContain("hover:bg-[#f2f2f2]");
-  expect(link.className).toContain("focus-visible:outline-[#0866ff]");
+  expect(link.className).toContain("hover:bg-inset");
+  expect(link.className).toContain("focus-visible:outline-primary");
 }
 
 function session(
