@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 from concurrent.futures import ThreadPoolExecutor
-from datetime import timedelta
+from datetime import date, timedelta
 from io import BytesIO
 from threading import Barrier
 from uuid import UUID, uuid4
@@ -124,13 +124,22 @@ def _load_member(gym: Gym, member_id: str) -> Member:
         return Member.objects.get(gym=gym, id=member_id)
 
 
+def _future_mondays() -> tuple[str, str]:
+    today = date.today()
+    delta = (0 - today.weekday()) % 7
+    if delta == 0:
+        delta = 7
+    first = today + timedelta(days=delta)
+    return first.isoformat(), (first + timedelta(days=7)).isoformat()
+
+
 def _sell(api: APIClient, headers: dict[str, str], *, member_id: str, plan_id: str) -> str:
     response = api.post(
         "/api/v1/memberships/",
         {
             "member_id": member_id,
             "plan_id": plan_id,
-            "start_date": "2026-10-01",
+            "start_date": (date.today() - timedelta(days=1)).isoformat(),
             "discount_amount": "0.00",
         },
         format="json",
@@ -386,8 +395,14 @@ def test_member_packages_schedule_and_class_booking_ignore_body_selectors() -> N
     class_package = _package(
         api, headers, package_type="CLASS", code="SPIN_PACK", class_type_id=type_id
     )
-    grant = _grant(api, headers, member_id=member_id, package_id=class_package)
-    other_grant = _grant(api, headers, member_id=other_id, package_id=class_package)
+    class_day, race_day = _future_mondays()
+    covered_on = date.today().isoformat()
+    grant = _grant(
+        api, headers, member_id=member_id, package_id=class_package, business_date=covered_on
+    )
+    other_grant = _grant(
+        api, headers, member_id=other_id, package_id=class_package, business_date=covered_on
+    )
     schedule = api.post(
         "/api/v1/class-schedules/",
         _schedule_body(
@@ -396,8 +411,8 @@ def test_member_packages_schedule_and_class_booking_ignore_body_selectors() -> N
             capacity=1,
             location="Studio A",
             location_is_exclusive=False,
-            effective_from="2026-11-02",
-            effective_until="2026-11-02",
+            effective_from=class_day,
+            effective_until=class_day,
             weekdays=[0],
             local_start_time="18:00:00",
             local_end_time="19:00:00",
@@ -424,7 +439,7 @@ def test_member_packages_schedule_and_class_booking_ignore_body_selectors() -> N
     )
 
     listed = client.get(
-        "/api/v1/member/schedule/?date_from=2026-11-02&date_to=2026-11-02",
+        f"/api/v1/member/schedule/?date_from={class_day}&date_to={class_day}",
         **_auth(token),
     )
     assert listed.status_code == 200, listed.json()
@@ -477,7 +492,7 @@ def test_member_packages_schedule_and_class_booking_ignore_body_selectors() -> N
     assert reused.status_code == 409
     assert reused.json()["error"]["code"] == "IDEMPOTENCY_KEY_REUSED"
     occupied = client.get(
-        "/api/v1/member/schedule/?date_from=2026-11-02&date_to=2026-11-02",
+        f"/api/v1/member/schedule/?date_from={class_day}&date_to={class_day}",
         **_auth(token),
     )
     booking_id = booked.json()["data"]["id"]
@@ -500,8 +515,8 @@ def test_member_packages_schedule_and_class_booking_ignore_body_selectors() -> N
             capacity=1,
             location="Race room",
             location_is_exclusive=False,
-            effective_from="2026-11-09",
-            effective_until="2026-11-09",
+            effective_from=race_day,
+            effective_until=race_day,
             weekdays=[0],
             local_start_time="18:00:00",
             local_end_time="19:00:00",
@@ -515,7 +530,9 @@ def test_member_packages_schedule_and_class_booking_ignore_body_selectors() -> N
         set_gym_context(gym_id=gym.id)
         race = ClassOccurrence.objects.get(class_schedule_id=second_schedule.json()["data"]["id"])
     third_id = _member(api, headers, first_name="Third")
-    third_grant = _grant(api, headers, member_id=third_id, package_id=class_package)
+    third_grant = _grant(
+        api, headers, member_id=third_id, package_id=class_package, business_date=covered_on
+    )
     barrier = Barrier(2, timeout=20)
     actor_id = owner.user_id
 

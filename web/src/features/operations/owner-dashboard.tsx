@@ -233,33 +233,35 @@ export function OwnerDashboard() {
     let cancelled = false;
     const { date_from: from, date_to: to } = dashboard.range;
     const includeFinance = dashboard.financial !== null;
-    setAttendance({ status: "loading" });
-    setMembers(
-      includeFinance ? { status: "loading" } : { status: "unavailable" },
-    );
-    setRevenue(
-      includeFinance ? { status: "loading" } : { status: "unavailable" },
-    );
-    setMonthly(
-      includeFinance ? { status: "loading" } : { status: "unavailable" },
-    );
     const weekCaption = (start: string) =>
       tx("Week of {date}", { date: start });
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      setAttendance({ status: "loading" });
+      setMembers(
+        includeFinance ? { status: "loading" } : { status: "unavailable" },
+      );
+      setRevenue(
+        includeFinance ? { status: "loading" } : { status: "unavailable" },
+      );
+      setMonthly(
+        includeFinance ? { status: "loading" } : { status: "unavailable" },
+      );
 
-    void (async () => {
-      try {
-        const report = await operationGet<unknown>(
-          `reports/check-ins/?date_from=${encodeURIComponent(from)}&date_to=${encodeURIComponent(to)}`,
-        );
-        const rows = attendanceDays(rowsOf(report));
-        if (cancelled) return;
-        setAttendance(attendanceState(rows, from, to, weekCaption));
-      } catch {
-        if (!cancelled) setAttendance({ status: "unavailable" });
-      }
-    })();
+      void (async () => {
+        try {
+          const report = await operationGet<unknown>(
+            `reports/check-ins/?date_from=${encodeURIComponent(from)}&date_to=${encodeURIComponent(to)}`,
+          );
+          const rows = attendanceDays(rowsOf(report));
+          if (cancelled) return;
+          setAttendance(attendanceState(rows, from, to, weekCaption));
+        } catch {
+          if (!cancelled) setAttendance({ status: "unavailable" });
+        }
+      })();
 
-    if (includeFinance) {
+      if (!includeFinance) return;
       void (async () => {
         const months = monthRequests(from, to);
         const results = await Promise.all(
@@ -307,10 +309,11 @@ export function OwnerDashboard() {
         setRevenue(countState(revenueDays, weekCaption));
         setMonthly(monthlyState(ready, from, to));
       })();
-    }
+    }, 0);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [dashboard, tx]);
 
@@ -1126,13 +1129,12 @@ function useChartPreview(): boolean {
   return useSyncExternalStore(
     () => () => undefined,
     () => {
-      if (process.env.NODE_ENV === "test") return false;
       const flag = new URLSearchParams(window.location.search).get("charts");
-      if (flag === "off") return false;
+      if (flag === "off" || process.env.NODE_ENV === "test") return false;
       if (flag === "preview") return true;
+      if (process.env.NODE_ENV === "production") return false;
       const host = window.location.hostname;
-      if (host === "localhost" || host === "127.0.0.1") return true;
-      return process.env.NODE_ENV !== "production";
+      return host === "localhost" || host === "127.0.0.1";
     },
     () => false,
   );

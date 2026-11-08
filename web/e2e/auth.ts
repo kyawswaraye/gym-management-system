@@ -164,14 +164,30 @@ export async function signIn(page: Page, account: E2EAccount): Promise<void> {
   await page.getByLabel("Password", { exact: true }).fill(account.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   const code = page.getByLabel("Authenticator code", { exact: true });
+  const alert = page.locator("p.error[role='alert']");
   let outcome = "";
+  let lastRetry = 0;
   await expect
-    .poll(async () => {
-      if (await code.isVisible()) outcome = "mfa";
-      else if (!/\/login\/?$/.test(new URL(page.url()).pathname))
-        outcome = "in";
-      return outcome;
-    })
+    .poll(
+      async () => {
+        if (await code.isVisible()) outcome = "mfa";
+        else if (!/\/login\/?$/.test(new URL(page.url()).pathname))
+          outcome = "in";
+        else if ((await alert.isVisible()) && Date.now() - lastRetry > 2_000) {
+          const message = (await alert.innerText()).trim();
+          if (/throttl|try again|unavailable|rate/i.test(message)) {
+            lastRetry = Date.now();
+            const button = page.getByRole("button", {
+              name: "Sign in",
+              exact: true,
+            });
+            if (await button.isEnabled()) await button.click();
+          }
+        }
+        return outcome;
+      },
+      { timeout: 45_000 },
+    )
     .not.toBe("");
   if (outcome === "in") return;
   await submitAuthenticatorCode(page, account.totpSecret);

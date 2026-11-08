@@ -77,13 +77,15 @@ def _package(
     return str(created.json()["data"]["id"])
 
 
-def _grant(api, headers, *, member_id: str, package_id: str) -> str:
+def _grant(
+    api, headers, *, member_id: str, package_id: str, business_date: str = "2026-10-01"
+) -> str:
     created = api.post(
         "/api/v1/member-service-packages/",
         {
             "member_id": member_id,
             "service_package_id": package_id,
-            "business_date": "2026-10-01",
+            "business_date": business_date,
             "complimentary": True,
             "reason": "Booking coverage",
         },
