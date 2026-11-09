@@ -30,7 +30,8 @@ from apps.users.permissions import RequiresRecentMFA
 def test_production_registry_registers_tested_write_tools() -> None:
     names = production_registry().names()
     assert names == closed_production_names()
-    assert "create_payment" not in names
+    assert "create_payment" in names
+    assert "approve_payment" not in names
     assert "invite_owner" not in names
     assert "invite_staff" not in names
     assert "revoke_display_device" not in names
