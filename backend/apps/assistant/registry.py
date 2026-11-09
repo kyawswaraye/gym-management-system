@@ -54,10 +54,40 @@ class ToolRegistry:
 def closed_production_names() -> tuple[str, ...]:
     """Return the names registered after their security tests passed."""
 
-    return ()
+    from apps.assistant.activity_tools import ACTIVITY_TOOL_NAMES
+    from apps.assistant.member_tools import MEMBER_TOOL_NAMES
+    from apps.assistant.staff_tools import STAFF_TOOL_NAMES
+    from apps.assistant.training_tools import TRAINING_TOOL_NAMES
+
+    return tuple(
+        sorted(
+            set(MEMBER_TOOL_NAMES)
+            | set(STAFF_TOOL_NAMES)
+            | set(ACTIVITY_TOOL_NAMES)
+            | set(TRAINING_TOOL_NAMES)
+        )
+    )
 
 
 def production_registry() -> ToolRegistry:
-    """Return the tools whose security tests have passed."""
+    """Return the tools whose security tests have passed.
 
-    return ToolRegistry()
+    Member, membership, staff, role, gym, announcement, check-in, trainer,
+    package, and class-type writes are registered. Class schedules, other
+    finance commands, mail, files, and push delivery stay out.
+    """
+
+    from apps.assistant.activity_tools import activity_tool_definitions
+    from apps.assistant.member_tools import member_tool_definitions
+    from apps.assistant.staff_tools import staff_tool_definitions
+    from apps.assistant.training_tools import training_tool_definitions
+
+    registry = ToolRegistry()
+    for tool in (
+        *member_tool_definitions(),
+        *staff_tool_definitions(),
+        *activity_tool_definitions(),
+        *training_tool_definitions(),
+    ):
+        registry.register(tool)
+    return registry
