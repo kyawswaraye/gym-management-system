@@ -50,7 +50,7 @@ SECRET_PLACEHOLDERS = {
     "MINIO_ACCESS_KEY",
     "MINIO_SECRET_KEY",
 }
-EMPTY_OK = {"MINIO_SESSION_TOKEN"}
+EMPTY_OK = {"MINIO_SESSION_TOKEN", "GEMINI_API_KEY", "GEMINI_MODEL"}
 EXPECTED_VALUES = {
     "PUBLIC_HOST": "app.example.com",
     "ACME_EMAIL": "ops@example.com",
@@ -93,6 +93,7 @@ EXPECTED_VALUES = {
     "ALERT_SMTP_PASSWORD_FILE": (
         "../environments/production/alert-smtp-password.example"
     ),
+    "ASSISTANT_ENABLED": "false",
 }
 PLACEHOLDER = "replace-from-secret-store"
 PRIVATE_SERVICES = (

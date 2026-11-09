@@ -89,6 +89,7 @@ module = [
   "apps.members.member_device_serializers",
   "apps.announcements.serializers",
   "apps.notifications.member_serializers",
+  "apps.assistant.serializers",
 ]
 disable_error_code = ["assignment", "type-arg"]
 

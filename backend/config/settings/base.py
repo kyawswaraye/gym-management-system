@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "apps.trainers",
     "apps.classes",
     "apps.reports",
+    "apps.assistant",
 ]
 MIDDLEWARE = [
     "apps.common.observability.request_log.RequestLogMiddleware",
@@ -256,3 +257,14 @@ CACHES = {
         "LOCATION": "gym-platform",
     }
 }
+# Empty or invalid values disable the assistant. They must not stop Django.
+ASSISTANT_ENABLED = os.environ.get("ASSISTANT_ENABLED", "false")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "")
+GEMINI_TIMEOUT = os.environ.get("GEMINI_TIMEOUT", "30")
+GEMINI_MAX_RETRIES = os.environ.get("GEMINI_MAX_RETRIES", "2")
+ASSISTANT_MAX_STEPS = os.environ.get("ASSISTANT_MAX_STEPS", "12")
+ASSISTANT_MAX_TOOL_CALLS = os.environ.get("ASSISTANT_MAX_TOOL_CALLS", "8")
+ASSISTANT_MAX_EXECUTION_TIME = os.environ.get("ASSISTANT_MAX_EXECUTION_TIME", "20")
+ASSISTANT_MAX_CONTEXT_TOKENS = os.environ.get("ASSISTANT_MAX_CONTEXT_TOKENS", "8000")
+ASSISTANT_LOCK_TIMEOUT_MS = os.environ.get("ASSISTANT_LOCK_TIMEOUT_MS", "2000")

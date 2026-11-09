@@ -228,6 +228,70 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/assistant/conversations/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["assistant_conversations_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assistant/conversations/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["assistant_conversations_read"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assistant/goals/{id}/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["assistant_goals_read"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assistant/status/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["assistant_status"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/audit-logs/": {
     parameters: {
       query?: never;
@@ -3886,6 +3950,15 @@ export interface components {
       first_name: string;
       last_name: string;
     };
+    AssistantStatus: {
+      available: boolean;
+      reasons: string[];
+    };
+    AssistantStatusEnvelope: {
+      success: boolean;
+      data: components["schemas"]["AssistantStatus"];
+      message: string;
+    };
     /**
      * @description * `ALL_ACTIVE_MEMBERS` - ALL_ACTIVE_MEMBERS
      *     * `PT_CLIENTS` - PT_CLIENTS
@@ -4485,6 +4558,34 @@ export interface components {
       data: components["schemas"]["CompletedFile"];
       message: string;
     };
+    Conversation: {
+      /** Format: uuid */
+      id: string;
+      status: string;
+      title: string;
+      /** Format: date-time */
+      created_at: string;
+    };
+    ConversationDetail: {
+      /** Format: uuid */
+      id: string;
+      status: string;
+      title: string;
+      /** Format: date-time */
+      created_at: string;
+      messages: components["schemas"]["Message"][];
+      goals: components["schemas"]["GoalSummary"][];
+    };
+    ConversationDetailEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ConversationDetail"];
+      message: string;
+    };
+    ConversationListEnvelope: {
+      success: boolean;
+      data: components["schemas"]["Conversation"][];
+      message: string;
+    };
     CurrentUserData: {
       principal_type: components["schemas"]["PrincipalTypeEnum"];
       user: components["schemas"]["CurrentUserIdentity"];
@@ -4690,6 +4791,15 @@ export interface components {
       error: components["schemas"]["ErrorDetail"];
       request_id: string;
     };
+    Execution: {
+      /** Format: uuid */
+      id: string;
+      tool_name: string;
+      attempt_number: number;
+      effect_reference: string;
+      external_side_effects: string[];
+      covers_external_side_effects: boolean;
+    };
     Expense: {
       /** Format: uuid */
       id: string;
@@ -4846,6 +4956,35 @@ export interface components {
      * @enum {string}
      */
     GenderEnum: "FEMALE" | "MALE" | "OTHER" | "UNSPECIFIED";
+    GoalDetail: {
+      /** Format: uuid */
+      id: string;
+      intent: string;
+      status: string;
+      version: number;
+      is_active: boolean;
+      /** Format: date-time */
+      expires_at: string;
+      result_summary: string;
+      missing_information: string[];
+      steps: components["schemas"]["Step"][];
+      executions: components["schemas"]["Execution"][];
+    };
+    GoalDetailEnvelope: {
+      success: boolean;
+      data: components["schemas"]["GoalDetail"];
+      message: string;
+    };
+    GoalSummary: {
+      /** Format: uuid */
+      id: string;
+      intent: string;
+      status: string;
+      version: number;
+      is_active: boolean;
+      /** Format: date-time */
+      expires_at: string;
+    };
     GymDisplay: {
       code: string;
       name: string;
@@ -5863,6 +6002,14 @@ export interface components {
      */
     MembershipStatusEnum:
       "PENDING" | "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED";
+    Message: {
+      /** Format: uuid */
+      id: string;
+      role: string;
+      body: string;
+      /** Format: date-time */
+      created_at: string;
+    };
     MethodTotal: {
       method: string;
       total: string;
@@ -7901,6 +8048,14 @@ export interface components {
      * @enum {string}
      */
     StaffStatusEnum: "ACTIVE" | "ON_LEAVE" | "TERMINATED" | "ARCHIVED";
+    Step: {
+      /** Format: uuid */
+      id: string;
+      position: number;
+      tool_name: string;
+      status: string;
+      attempt_number: number;
+    };
     StockAdjustRequest: {
       /** Format: uuid */
       product_id: string;
@@ -9383,6 +9538,168 @@ export interface operations {
         };
       };
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  assistant_conversations_list: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConversationListEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  assistant_conversations_read: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConversationDetailEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  assistant_goals_read: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GoalDetailEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  assistant_status: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AssistantStatusEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
         headers: {
           [name: string]: unknown;
         };

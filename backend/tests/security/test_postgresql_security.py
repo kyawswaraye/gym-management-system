@@ -93,6 +93,13 @@ TENANT_TABLES = {
     "announcements_announcement",
     "members_member_device",
     "notifications_push_attempt",
+    "assistant_conversation",
+    "assistant_goal",
+    "assistant_message",
+    "assistant_workflow",
+    "assistant_workflow_step",
+    "assistant_tool_execution",
+    "assistant_attachment_reference",
 }
 POLICY_COMMANDS = {"r", "a", "w", "d"}
 
