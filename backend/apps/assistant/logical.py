@@ -56,21 +56,19 @@ def acquire_claim(
     step: WorkflowStep,
     execution_identity: str,
 ) -> ClaimDecision:
-    """Insert the claim or reclaim an expired lease.
+    """Insert the claim or reclaim a finished lease.
 
     A completed or failed row is returned as-is. A live lease returns
-    ``busy``. A row past ``expires_at`` returns ``expired`` and is not
-    reclaimed.
+    ``busy``. An in-progress row past ``expires_at`` is reclaimed when its
+    lease is also over. The reclaim clock is read after the row lock.
     """
 
-    now = timezone.now()
-    lease = now + timedelta(seconds=settings.FINANCE_IDEMPOTENCY_CLAIM_SECONDS)
-    expires_at = now + timedelta(seconds=settings.FINANCE_IDEMPOTENCY_TTL_SECONDS)
     with transaction.atomic(durable=True):
         set_gym_context(gym_id=gym.id)
         inserted: LogicalClaim | None
         try:
             with transaction.atomic():
+                now = timezone.now()
                 inserted = LogicalClaim.objects.create(
                     gym=gym,
                     goal=goal,
@@ -78,8 +76,8 @@ def acquire_claim(
                     execution_identity=execution_identity,
                     state=LogicalClaim.State.IN_PROGRESS,
                     fence_token=1,
-                    locked_until=lease,
-                    expires_at=expires_at,
+                    locked_until=_lease_until(now),
+                    expires_at=_ttl_until(now),
                     resource_id="",
                 )
         except IntegrityError as exc:
@@ -96,25 +94,17 @@ def acquire_claim(
         )
         if existing is None:
             return ClaimDecision("busy", UUID(int=0), 0, None, "")
-        kind = _classify(existing, timezone.now())
-        if kind != "open":
+        now = timezone.now()
+        kind = _classify(existing, now)
+        if kind not in {"open", "expired"}:
             return _decision(existing, kind)
-        updated = LogicalClaim.objects.filter(
-            pk=existing.pk,
-            gym_id=gym.id,
-            state=LogicalClaim.State.IN_PROGRESS,
-            fence_token=existing.fence_token,
-            locked_until=existing.locked_until,
-            expires_at__gt=timezone.now(),
-        ).update(
-            fence_token=existing.fence_token + 1,
-            locked_until=lease,
-            updated_at=timezone.now(),
-        )
+        if kind == "expired" and existing.locked_until is not None and existing.locked_until > now:
+            return _decision(existing, "busy")
+        updated = _transfer_lease(existing, now, renew_expiry=kind == "expired")
         if updated != 1:
             existing.refresh_from_db()
             kind = _classify(existing, timezone.now())
-            if kind == "open":
+            if kind in {"open", "expired"}:
                 kind = "busy"
             return _decision(existing, kind)
         existing.refresh_from_db()
@@ -261,6 +251,41 @@ def _owned_update(
         fence_token=fence_token,
         locked_until=locked_until,
     ).update(**values)
+
+
+def _lease_until(now: datetime) -> datetime:
+    return now + timedelta(seconds=settings.FINANCE_IDEMPOTENCY_CLAIM_SECONDS)
+
+
+def _ttl_until(now: datetime) -> datetime:
+    return now + timedelta(seconds=settings.FINANCE_IDEMPOTENCY_TTL_SECONDS)
+
+
+def _transfer_lease(existing: LogicalClaim, now: datetime, *, renew_expiry: bool) -> int:
+    """Move the fence after the row is locked. Both clocks use this ``now``."""
+
+    values: dict[str, object] = {
+        "fence_token": existing.fence_token + 1,
+        "locked_until": _lease_until(now),
+        "updated_at": now,
+    }
+    query = LogicalClaim.objects.filter(
+        pk=existing.pk,
+        gym_id=existing.gym_id,
+        state=LogicalClaim.State.IN_PROGRESS,
+        fence_token=existing.fence_token,
+        locked_until=existing.locked_until,
+    )
+    if renew_expiry:
+        values["expires_at"] = _ttl_until(now)
+        query = query.filter(expires_at__lte=now)
+        if existing.locked_until is None:
+            query = query.filter(locked_until__isnull=True)
+        else:
+            query = query.filter(locked_until__lte=now)
+    else:
+        query = query.filter(expires_at__gt=now)
+    return query.update(**values)
 
 
 def _classify(row: LogicalClaim, now: datetime) -> str:

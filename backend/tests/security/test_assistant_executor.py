@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
-from uuid import UUID
+from threading import Barrier
+from uuid import UUID, uuid4
 
 import pytest
-from django.db import connection, transaction
+from django.db import connection, connections, transaction
 from django.http import Http404
 from django.test import override_settings
 from django.utils import timezone
@@ -24,11 +26,12 @@ from apps.assistant.executor import (
     execute_confirmed_tool,
 )
 from apps.assistant.identity import execution_identity
+from apps.assistant.logical import complete_owned_claim
 from apps.assistant.models import Goal, LogicalClaim, Message, ToolExecution, WorkflowStep
 from apps.assistant.records import open_staff_goal
 from apps.assistant.registry import ToolDefinition, closed_production_names, production_registry
 from apps.common.db.tenant_context import set_gym_context
-from apps.common.finance.exceptions import IdempotencyRequestInvalid
+from apps.common.finance.exceptions import FinanceStateConflict, IdempotencyRequestInvalid
 from apps.common.finance.idempotency import (
     IdempotentResponse,
     canonical_request_hash,
@@ -791,3 +794,354 @@ def test_trainer_only_finance_closure_stops_before_mutate() -> None:
     assert owner_result.outcome == "committed"
     assert Message.objects.filter(goal=goal).count() == 1
     assert production_registry().names() == closed_production_names()
+
+
+def _expired_claim(
+    gym: Gym,
+    goal: Goal,
+    step: WorkflowStep,
+    payload: dict[str, object],
+) -> LogicalClaim:
+    past = timezone.now() - timedelta(minutes=5)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        return LogicalClaim.objects.create(
+            gym=gym,
+            goal=goal,
+            step=step,
+            execution_identity=execution_identity(
+                gym_id=gym.id,
+                goal_id=goal.id,
+                step_id=step.id,
+                tool_name=step.tool_name,
+                attempt_number=step.attempt_number,
+                payload=payload,
+            ),
+            state=LogicalClaim.State.IN_PROGRESS,
+            fence_token=1,
+            locked_until=past,
+            expires_at=past,
+            resource_id="",
+        )
+
+
+def _posted(_call: ToolCall) -> IdempotentResponse:
+    return IdempotentResponse(
+        status=201,
+        body=b"{}",
+        resource_type="probe",
+        resource_id=uuid4(),
+    )
+
+
+def test_expired_claim_recovery_renews_the_fence_once() -> None:
+    gym, actor, goal, step = _ready("ex-exp-once", "probe_finance")
+    payload = {"amount": "10.00"}
+    claim = _expired_claim(gym, goal, step, payload)
+    calls = {"count": 0}
+
+    def finance_mutate(call: ToolCall) -> IdempotentResponse:
+        calls["count"] += 1
+        return _posted(call)
+
+    first = _run(
+        gym,
+        actor,
+        goal,
+        step,
+        _finance_contract("probe_finance", ("payments.create",)),
+        payload,
+        finance_mutate=finance_mutate,
+    )
+    replay = _run(
+        gym,
+        actor,
+        goal,
+        step,
+        _finance_contract("probe_finance", ("payments.create",)),
+        payload,
+        finance_mutate=finance_mutate,
+    )
+    claim.refresh_from_db()
+    assert first.outcome == "committed"
+    assert replay.outcome == "existing"
+    assert calls["count"] == 1
+    assert claim.fence_token == 2
+    assert claim.state == LogicalClaim.State.COMPLETED
+    assert claim.locked_until is None
+    assert claim.expires_at > timezone.now() + timedelta(hours=23)
+
+
+def test_concurrent_expired_recovery_has_one_owner() -> None:
+    gym, actor, goal, step = _ready("ex-exp-race", "probe_finance")
+    payload = {"amount": "10.00"}
+    _expired_claim(gym, goal, step, payload)
+    calls = {"count": 0}
+    barrier = Barrier(2)
+
+    def finance_mutate(call: ToolCall) -> IdempotentResponse:
+        calls["count"] += 1
+        return _posted(call)
+
+    def worker() -> str:
+        connections.close_all()
+        try:
+            barrier.wait(5)
+            result = _run(
+                gym,
+                actor,
+                goal,
+                step,
+                _finance_contract("probe_finance", ("payments.create",)),
+                payload,
+                finance_mutate=finance_mutate,
+            )
+            return result.outcome
+        finally:
+            connections.close_all()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(lambda _index: worker(), (0, 1)))
+    claim = LogicalClaim.objects.get(gym=gym, goal=goal)
+    assert calls["count"] == 1
+    assert claim.fence_token == 2
+    assert "committed" in outcomes
+    assert claim.locked_until is None or claim.locked_until > timezone.now() - timedelta(seconds=5)
+    assert claim.expires_at > timezone.now()
+
+
+def test_old_fence_is_rejected_before_the_service(monkeypatch: pytest.MonkeyPatch) -> None:
+    gym, actor, goal, step = _ready("ex-exp-stale", "probe_finance")
+    payload = {"amount": "10.00"}
+    claim = _expired_claim(gym, goal, step, payload)
+    stale_until = claim.locked_until
+    from apps.assistant.logical import ClaimDecision, acquire_claim
+
+    owned = acquire_claim(
+        gym=gym,
+        goal=goal,
+        step=step,
+        execution_identity=claim.execution_identity,
+    )
+    assert owned.fence_token == 2
+    past = timezone.now() - timedelta(minutes=5)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        LogicalClaim.objects.filter(pk=claim.id).update(locked_until=past, expires_at=past)
+    calls = {"count": 0}
+
+    def finance_mutate(call: ToolCall) -> IdempotentResponse:
+        calls["count"] += 1
+        return _posted(call)
+
+    def stale_acquire(**_kwargs: object) -> ClaimDecision:
+        return ClaimDecision("owned", claim.id, 1, stale_until, "")
+
+    monkeypatch.setattr(executor_module, "acquire_claim", stale_acquire)
+    with pytest.raises(ExecutionRejected) as caught:
+        _run(
+            gym,
+            actor,
+            goal,
+            step,
+            _finance_contract("probe_finance", ("payments.create",)),
+            payload,
+            finance_mutate=finance_mutate,
+        )
+    assert caught.value.code == "stale_owner"
+    assert calls["count"] == 0
+    claim.refresh_from_db()
+    assert claim.fence_token == 2
+
+
+def test_completion_with_an_old_fence_updates_nothing() -> None:
+    gym, _actor, goal, step = _ready("ex-exp-zero", "probe_finance")
+    payload = {"amount": "10.00"}
+    claim = _expired_claim(gym, goal, step, payload)
+    from apps.assistant.logical import acquire_claim
+
+    acquire_claim(
+        gym=gym,
+        goal=goal,
+        step=step,
+        execution_identity=claim.execution_identity,
+    )
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        with pytest.raises(ExecutionRejected) as caught:
+            complete_owned_claim(
+                gym_id=gym.id,
+                claim_id=claim.id,
+                fence_token=1,
+                locked_until=claim.locked_until,
+                resource_id="stale-resource",
+            )
+    assert caught.value.code == "stale_owner"
+    claim.refresh_from_db()
+    assert claim.fence_token == 2
+    assert claim.state == LogicalClaim.State.IN_PROGRESS
+    assert claim.resource_id == ""
+
+
+def test_crash_after_expired_recovery_can_reclaim_the_lease() -> None:
+    gym, actor, goal, step = _ready("ex-exp-crash", "probe_finance")
+    payload = {"amount": "10.00"}
+    claim = _expired_claim(gym, goal, step, payload)
+    calls = {"count": 0}
+
+    def crash(_call: ToolCall) -> IdempotentResponse:
+        calls["count"] += 1
+        raise RuntimeError("worker crashed")
+
+    with pytest.raises(RuntimeError, match="worker crashed"):
+        _run(
+            gym,
+            actor,
+            goal,
+            step,
+            _finance_contract("probe_finance", ("payments.create",)),
+            payload,
+            finance_mutate=crash,
+        )
+    claim.refresh_from_db()
+    assert calls["count"] == 1
+    assert claim.fence_token == 2
+    assert claim.state == LogicalClaim.State.IN_PROGRESS
+    assert claim.locked_until is not None
+    assert claim.locked_until <= timezone.now()
+    assert Message.objects.filter(goal=goal).count() == 0
+    assert ToolExecution.objects.filter(goal=goal).count() == 0
+
+    def finance_mutate(call: ToolCall) -> IdempotentResponse:
+        calls["count"] += 1
+        return _posted(call)
+
+    result = _run(
+        gym,
+        actor,
+        goal,
+        step,
+        _finance_contract("probe_finance", ("payments.create",)),
+        payload,
+        finance_mutate=finance_mutate,
+    )
+    claim.refresh_from_db()
+    assert result.outcome == "committed"
+    assert calls["count"] == 2
+    assert claim.fence_token == 3
+    assert claim.state == LogicalClaim.State.COMPLETED
+    assert claim.locked_until is None
+    assert claim.expires_at > timezone.now()
+
+
+def test_expired_recovery_failure_releases_the_lease() -> None:
+    gym, actor, goal, step = _ready("ex-exp-fail", "probe_finance")
+    payload = {"amount": "10.00"}
+    claim = _expired_claim(gym, goal, step, payload)
+
+    def crash(call: ToolCall) -> IdempotentResponse:
+        _message(call, "must roll back")
+        raise RuntimeError("service failed")
+
+    with pytest.raises(RuntimeError, match="service failed"):
+        _run(
+            gym,
+            actor,
+            goal,
+            step,
+            _finance_contract("probe_finance", ("payments.create",)),
+            payload,
+            finance_mutate=crash,
+        )
+    claim.refresh_from_db()
+    assert claim.state == LogicalClaim.State.IN_PROGRESS
+    assert claim.fence_token == 2
+    assert claim.locked_until is not None
+    assert claim.locked_until <= timezone.now()
+    assert Message.objects.filter(goal=goal).count() == 0
+    assert ToolExecution.objects.filter(goal=goal).count() == 0
+
+
+def test_expired_recovery_replay_does_not_repeat_the_service() -> None:
+    gym, actor, goal, step = _ready("ex-exp-replay", "probe_finance")
+    payload = {"amount": "10.00"}
+    _expired_claim(gym, goal, step, payload)
+    calls = {"count": 0}
+
+    def finance_mutate(call: ToolCall) -> IdempotentResponse:
+        calls["count"] += 1
+        return _posted(call)
+
+    contract = _finance_contract("probe_finance", ("payments.create",))
+    _run(gym, actor, goal, step, contract, payload, finance_mutate=finance_mutate)
+    second = _run(gym, actor, goal, step, contract, payload, finance_mutate=finance_mutate)
+    assert second.outcome == "existing"
+    assert calls["count"] == 1
+
+
+def test_failed_expired_claim_stays_closed() -> None:
+    gym, actor, goal, step = _ready("ex-exp-closed", "probe_finance")
+    payload = {"amount": "10.00"}
+    claim = _expired_claim(gym, goal, step, payload)
+    calls = {"count": 0}
+
+    def finance_mutate(_call: ToolCall) -> IdempotentResponse:
+        calls["count"] += 1
+        raise FinanceStateConflict()
+
+    contract = _finance_contract("probe_finance", ("payments.create",))
+    with pytest.raises(FinanceStateConflict):
+        _run(gym, actor, goal, step, contract, payload, finance_mutate=finance_mutate)
+    with pytest.raises(ExecutionRejected) as replay:
+        _run(gym, actor, goal, step, contract, payload, finance_mutate=finance_mutate)
+    claim.refresh_from_db()
+    assert replay.value.code == "finance_failed"
+    assert calls["count"] == 1
+    assert claim.state == LogicalClaim.State.FAILED
+    assert claim.fence_token == 2
+
+
+def test_expired_recovery_without_resource_id_rolls_back() -> None:
+    gym, actor, goal, step = _ready("ex-exp-empty", "probe_finance")
+    payload = {"amount": "10.00"}
+    claim = _expired_claim(gym, goal, step, payload)
+
+    def finance_mutate(call: ToolCall) -> IdempotentResponse:
+        _message(call, "must roll back")
+        return IdempotentResponse(status=201, body=b"{}")
+
+    with pytest.raises(ExecutionRejected) as caught:
+        _run(
+            gym,
+            actor,
+            goal,
+            step,
+            _finance_contract("probe_finance", ("payments.create",)),
+            payload,
+            finance_mutate=finance_mutate,
+        )
+    claim.refresh_from_db()
+    assert caught.value.code == "missing_effect_reference"
+    assert Message.objects.filter(goal=goal).count() == 0
+    assert claim.state == LogicalClaim.State.IN_PROGRESS
+    assert claim.resource_id == ""
+
+
+def test_runtime_role_cannot_read_another_gyms_expired_claim() -> None:
+    gym, _actor, goal, step = _ready("ex-exp-rls", "probe_finance")
+    other, _other_actor = _staff("ex-exp-rls2")
+    claim = _expired_claim(gym, goal, step, {"amount": "10.00"})
+    with transaction.atomic(), connection.cursor() as cursor:
+        set_gym_context(gym_id=other.id)
+        cursor.execute("SET LOCAL ROLE gym_runtime")
+        cursor.execute("SELECT count(*) FROM assistant_logical_claim WHERE id = %s", [claim.id])
+        hidden = cursor.fetchone()
+    with transaction.atomic(), connection.cursor() as cursor:
+        set_gym_context(gym_id=gym.id)
+        cursor.execute("SET LOCAL ROLE gym_runtime")
+        cursor.execute("SELECT count(*) FROM assistant_logical_claim WHERE id = %s", [claim.id])
+        visible = cursor.fetchone()
+    assert hidden is not None
+    assert visible is not None
+    assert hidden[0] == 0
+    assert visible[0] == 1

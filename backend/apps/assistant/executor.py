@@ -604,10 +604,10 @@ def _finance_reference(resource_id: object) -> str:
 
 
 def _logical_shortcut(call: ToolCall, identity: str) -> ExecutionResult | None:
-    """Finish a stored claim. An open lease returns control to acquisition."""
+    """Finish a stored claim. An open or expired lease returns to acquisition."""
 
     decision = peek_claim(gym_id=call.gym.id, execution_identity=identity)
-    if decision is None or decision.kind == "open":
+    if decision is None or decision.kind in {"open", "expired"}:
         return None
     if decision.kind == "completed":
         return _bookkeep_reference(call, decision.resource_id, identity)
@@ -615,11 +615,6 @@ def _logical_shortcut(call: ToolCall, identity: str) -> ExecutionResult | None:
         raise ExecutionRejected(
             "The finance command is stored as a failure.",
             code="finance_failed",
-        )
-    if decision.kind == "expired":
-        raise ExecutionRejected(
-            "The logical claim has expired.",
-            code="claim_expired",
         )
     return ExecutionResult("in_progress", None, None, identity)
 
