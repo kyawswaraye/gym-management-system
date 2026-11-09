@@ -18,11 +18,14 @@ from apps.assistant.executor import (
     ExecutionMode,
     ToolCall,
     ToolContract,
+    _finance_command,
     execute_confirmed_tool,
 )
+from apps.assistant.identity import execution_identity
 from apps.assistant.models import Goal
 from apps.assistant.prerequisites import FieldRequirement, Prerequisite
 from apps.assistant.registry import ToolDefinition, closed_production_names, production_registry
+from apps.common.finance.idempotency import canonical_request_hash
 from apps.tenants.exceptions import MFARequired
 from apps.tenants.models import Gym, GymMembership
 from apps.users.models import RefreshSession, User
@@ -349,3 +352,152 @@ def test_permission_mfa_and_mode_denials_do_not_call_the_handler() -> None:
     assert read.value.code == "operation"
     assert called["count"] == 0
     assert production_registry().names() == closed_production_names()
+
+
+def _schedule_contract() -> ToolContract:
+    return ToolContract(
+        definition=_tool("update_class_schedule", permissions=("classes.manage",)),
+        mode=ExecutionMode.FINANCE_IDEMPOTENT,
+        http_method="PATCH",
+        route="/api/v1/class-schedules/{schedule_id}/",
+        route_fields=("schedule_id",),
+    )
+
+
+def test_static_finance_route_keeps_the_method_and_body() -> None:
+    payload = {"amount": "10.00"}
+    contract = _contract(
+        _tool("probe_finance", permissions=("payments.create",)),
+        ExecutionMode.FINANCE_IDEMPOTENT,
+    )
+    command = _finance_command(contract, payload)
+    assert contract.route_fields == ()
+    assert command.http_method == "POST"
+    assert command.route == "/api/v1/payments/"
+    assert command.body is payload
+
+
+def test_uuid_route_fields_change_identity_and_finance_hash() -> None:
+    gym = _gym()
+    actor = _actor(gym)
+    goal = _goal(gym)
+    step_id = uuid4()
+    first_id = uuid4()
+    second_id = uuid4()
+    contract = _schedule_contract()
+    first = {"schedule_id": str(first_id).upper(), "location": "Hall"}
+    second = {"schedule_id": str(second_id), "location": "Hall"}
+    first_command = _finance_command(contract, first)
+    second_command = _finance_command(contract, second)
+    assert first_command.http_method == "PATCH"
+    assert first_command.route == f"/api/v1/class-schedules/{first_id}/"
+    assert first_command.body == {"location": "Hall"}
+    assert second_command.route == f"/api/v1/class-schedules/{second_id}/"
+    assert first_command.body == second_command.body
+    assert first_command.route != second_command.route
+    first_identity = execution_identity(
+        gym_id=gym.id,
+        goal_id=goal.id,
+        step_id=step_id,
+        tool_name=contract.definition.name,
+        attempt_number=1,
+        payload=first,
+    )
+    second_identity = execution_identity(
+        gym_id=gym.id,
+        goal_id=goal.id,
+        step_id=step_id,
+        tool_name=contract.definition.name,
+        attempt_number=1,
+        payload=second,
+    )
+    assert first_identity != second_identity
+    first_hash = canonical_request_hash(
+        gym_id=gym.id,
+        actor_membership_id=actor.id,
+        http_method=first_command.http_method,
+        route=first_command.route,
+        body=first_command.body,
+    )
+    second_hash = canonical_request_hash(
+        gym_id=gym.id,
+        actor_membership_id=actor.id,
+        http_method=second_command.http_method,
+        route=second_command.route,
+        body=second_command.body,
+    )
+    assert first_hash != second_hash
+
+
+def test_occurrence_cancel_route_keeps_only_the_reason() -> None:
+    occurrence_id = uuid4()
+    contract = ToolContract(
+        definition=_tool("cancel_class_occurrence", permissions=("classes.manage",)),
+        mode=ExecutionMode.FINANCE_IDEMPOTENT,
+        http_method="POST",
+        route="/api/v1/class-occurrences/{occurrence_id}/cancel/",
+        route_fields=("occurrence_id",),
+    )
+    command = _finance_command(
+        contract,
+        {"occurrence_id": str(occurrence_id), "reason": "Rain"},
+    )
+    assert command.http_method == "POST"
+    assert command.route == f"/api/v1/class-occurrences/{occurrence_id}/cancel/"
+    assert command.body == {"reason": "Rain"}
+
+
+def test_invalid_route_resource_stops_before_finance(monkeypatch: pytest.MonkeyPatch) -> None:
+    gym = _gym()
+
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("finance started")
+
+    monkeypatch.setattr("apps.assistant.executor.acquire_claim", fail)
+    monkeypatch.setattr("apps.assistant.executor.run_idempotent", fail)
+    request = _request(gym, _actor(gym), frozenset({"classes.manage"}))
+    contract = _schedule_contract()
+    payloads: tuple[dict[str, object], ...] = (
+        {"location": "Hall"},
+        {"schedule_id": "not-a-uuid", "location": "Hall"},
+    )
+    for payload in payloads:
+        with pytest.raises(ExecutionRejected) as caught:
+            _execute(request, contract, _goal(gym), payload=payload, finance_mutate=fail)
+        assert caught.value.code == "finance_route"
+    unresolved = ToolContract(
+        definition=contract.definition,
+        mode=ExecutionMode.FINANCE_IDEMPOTENT,
+        http_method="PATCH",
+        route="/api/v1/class-schedules/",
+        route_fields=("schedule_id",),
+    )
+    with pytest.raises(ExecutionRejected) as missing_token:
+        _execute(
+            request,
+            unresolved,
+            _goal(gym),
+            payload={"schedule_id": str(uuid4()), "location": "Hall"},
+            finance_mutate=fail,
+        )
+    assert missing_token.value.code == "finance_route"
+
+
+def test_route_field_gym_mismatch_stops_before_a_claim(monkeypatch: pytest.MonkeyPatch) -> None:
+    gym = _gym()
+    other = _gym("other")
+
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("finance started")
+
+    monkeypatch.setattr("apps.assistant.executor.acquire_claim", fail)
+    monkeypatch.setattr("apps.assistant.executor.run_idempotent", fail)
+    with pytest.raises(ExecutionRejected) as caught:
+        _execute(
+            _request(gym, _actor(gym), frozenset({"classes.manage"})),
+            _schedule_contract(),
+            _goal(gym),
+            payload={"gym_id": str(other.id), "schedule_id": str(uuid4()), "location": "Hall"},
+            finance_mutate=fail,
+        )
+    assert caught.value.code == "gym_mismatch"

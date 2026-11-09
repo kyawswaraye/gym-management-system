@@ -97,6 +97,16 @@ class ToolContract:
     finance_closed: bool = False
     http_method: str = ""
     route: str = ""
+    route_fields: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class FinanceCommand:
+    """The method, concrete route, and body passed to finance idempotency."""
+
+    http_method: str
+    route: str
+    body: Mapping[str, object]
 
 
 @dataclass(frozen=True)
@@ -160,6 +170,9 @@ def execute_confirmed_tool(
         )
     if contract.definition.approval_required:
         _match_approval(payload, load_approval)
+    command = None
+    if contract.mode != ExecutionMode.SAME_TRANSACTION:
+        command = _finance_command(contract, payload)
     step, identity, stored = _load_step(
         gym=gym,
         goal=goal,
@@ -191,9 +204,10 @@ def execute_confirmed_tool(
             expected_version=expected_version,
             identity=identity,
         )
+    assert command is not None
     return _run_finance(
         call=call,
-        contract=contract,
+        command=command,
         finance_mutate=finance_mutate,
         expected_version=expected_version,
         identity=identity,
@@ -237,6 +251,42 @@ def _reject_unsupported_contract(
             "A finance tool names the existing command method and route.",
             code="finance_route",
         )
+
+
+def _finance_command(contract: ToolContract, payload: Mapping[str, object]) -> FinanceCommand:
+    """Build the concrete finance command. Resource ids stay in the payload."""
+
+    if not contract.route_fields:
+        return FinanceCommand(contract.http_method, contract.route, payload)
+    route = contract.route
+    for field in contract.route_fields:
+        token = "{" + field + "}"
+        if route.count(token) != 1:
+            raise ExecutionRejected(
+                "The finance route does not name its resource.",
+                code="finance_route",
+            )
+        value = payload.get(field)
+        if not isinstance(value, str):
+            raise ExecutionRejected(
+                "The finance route resource is missing.",
+                code="finance_route",
+            )
+        try:
+            canonical = str(UUID(value))
+        except ValueError as exc:
+            raise ExecutionRejected(
+                "The finance route resource is not a valid identifier.",
+                code="finance_route",
+            ) from exc
+        route = route.replace(token, canonical, 1)
+    if "{" in route or "}" in route:
+        raise ExecutionRejected(
+            "The finance route is unresolved.",
+            code="finance_route",
+        )
+    body = {key: item for key, item in payload.items() if key not in contract.route_fields}
+    return FinanceCommand(contract.http_method, route, body)
 
 
 def _request_context(request: Request) -> tuple[str, str | None, str]:
@@ -452,7 +502,7 @@ def _run_same_transaction(
 def _run_finance(
     *,
     call: ToolCall,
-    contract: ToolContract,
+    command: FinanceCommand,
     finance_mutate: Callable[[ToolCall], IdempotentResponse] | None,
     expected_version: int,
     identity: str,
@@ -481,7 +531,7 @@ def _run_finance(
             try:
                 recovered = _completed_finance_reference(
                     call=call,
-                    contract=contract,
+                    command=command,
                     identity=identity,
                 )
             except IdempotencyRequestInvalid:
@@ -555,10 +605,10 @@ def _run_finance(
         finance = run_idempotent(
             gym_id=call.gym.id,
             actor_membership_id=call.actor.id,
-            http_method=contract.http_method,
-            route=contract.route,
+            http_method=command.http_method,
+            route=command.route,
             idempotency_key=identity,
-            body=call.payload,
+            body=command.body,
             mutate=_mutate,
             created_by_membership_id=call.actor.id,
             on_failed=_fail,
@@ -665,15 +715,15 @@ def _finance_version(
 def _completed_finance_reference(
     *,
     call: ToolCall,
-    contract: ToolContract,
+    command: FinanceCommand,
     identity: str,
 ) -> str | None:
     expected_hash = canonical_request_hash(
         gym_id=call.gym.id,
         actor_membership_id=call.actor.id,
-        http_method=contract.http_method,
-        route=contract.route,
-        body=call.payload,
+        http_method=command.http_method,
+        route=command.route,
+        body=command.body,
     )
     with transaction.atomic():
         set_gym_context(gym_id=call.gym.id)
@@ -682,8 +732,8 @@ def _completed_finance_reference(
                 gym_id=call.gym.id,
                 actor_membership_id=call.actor.id,
                 actor_member_id=None,
-                http_method=contract.http_method,
-                route=contract.route,
+                http_method=command.http_method,
+                route=command.route,
                 idempotency_key=identity,
                 state=IdempotencyRecord.State.COMPLETED,
             )
