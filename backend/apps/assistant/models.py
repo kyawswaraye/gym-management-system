@@ -371,3 +371,67 @@ class AttachmentReference(TenantModel):
                 name="assistant_attachment_purpose_ck",
             ),
         ]
+
+
+class LogicalClaim(TenantModel):
+    """Actor-independent claim for one assistant execution identity.
+
+    The fence token moves only when a reclaim commits. A completed row keeps
+    the resource id so a later actor can bookkeep without running the service.
+    Rows are not deleted.
+    """
+
+    class State(models.TextChoices):
+        IN_PROGRESS = "in_progress", "In progress"
+        COMPLETED = "completed", "Completed"
+        FAILED = "failed", "Failed"
+
+    goal = models.ForeignKey(Goal, on_delete=models.RESTRICT, related_name="logical_claims")
+    step = models.ForeignKey(
+        WorkflowStep,
+        on_delete=models.RESTRICT,
+        related_name="logical_claims",
+    )
+    execution_identity = models.CharField(max_length=64)
+    state = models.CharField(max_length=16, choices=State, default=State.IN_PROGRESS)
+    fence_token = models.BigIntegerField()
+    locked_until = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+    resource_id = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        db_table = "assistant_logical_claim"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["gym", "id"],
+                name="assistant_logical_gym_id_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["gym", "execution_identity"],
+                name="assistant_logical_identity_uniq",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(execution_identity__regex=r"^[0-9a-f]{64}$"),
+                name="assistant_logical_identity_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fence_token__gte=1),
+                name="assistant_logical_fence_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(state__in=["in_progress", "completed", "failed"]),
+                name="assistant_logical_status_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        state="completed",
+                        locked_until__isnull=True,
+                        resource_id__regex=r"^[A-Za-z0-9_-]{1,64}$",
+                    )
+                    | models.Q(state="in_progress", resource_id="", locked_until__isnull=False)
+                    | models.Q(state="failed", resource_id="", locked_until__isnull=True)
+                ),
+                name="assistant_logical_shape_ck",
+            ),
+        ]

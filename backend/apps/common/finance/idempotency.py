@@ -138,6 +138,8 @@ def run_idempotent(
     created_by_membership_id: uuid.UUID | None = None,
     request: object | None = None,
     actor_member_id: uuid.UUID | None = None,
+    on_failed: Callable[[], None] | None = None,
+    on_released: Callable[[], None] | None = None,
 ) -> IdempotentResult:
     """Claim the key, run ``mutate``, and commit the outcome with its effects.
 
@@ -152,7 +154,9 @@ def run_idempotent(
     returns only a 2xx ``IdempotentResponse``. A deterministic finance-domain
     failure is a ``CacheableIdempotentFailure`` raised from ``mutate``;
     ``request`` is the context used to render that response, including its
-    request id.
+    request id. ``on_failed`` and ``on_released`` run inside the settlement
+    transaction only when this attempt still owns the finance claim. HTTP
+    callers leave both unset.
     """
 
     if connection.in_atomic_block:
@@ -201,6 +205,7 @@ def run_idempotent(
                 record_id=claim.record_id,
                 expected_locked_until=claim.locked_until,
                 request_hash=request_hash,
+                on_owned=on_released,
             )
         else:
             status_code, failure_body = cached
@@ -211,6 +216,7 @@ def run_idempotent(
                 request_hash=request_hash,
                 status_code=status_code,
                 body=failure_body,
+                on_owned=on_failed,
             )
         raise
     return IdempotentResult(
@@ -386,6 +392,7 @@ def _record_failure(
     request_hash: str,
     status_code: int,
     body: bytes,
+    on_owned: Callable[[], None] | None = None,
 ) -> None:
     try:
         ciphertext = _encrypt(body)
@@ -422,6 +429,8 @@ def _record_failure(
                     "updated_at",
                 ]
             )
+            if on_owned is not None:
+                on_owned()
     except Exception:
         return
 
@@ -432,6 +441,7 @@ def _release_claim(
     record_id: uuid.UUID,
     expected_locked_until: datetime,
     request_hash: str,
+    on_owned: Callable[[], None] | None = None,
 ) -> None:
     """Drop this attempt's lease so a transient failure can be retried."""
 
@@ -443,6 +453,8 @@ def _release_claim(
                 return
             record.locked_until = timezone.now() - timedelta(seconds=1)
             record.save(update_fields=["locked_until", "updated_at"])
+            if on_owned is not None:
+                on_owned()
     except Exception:
         return
 

@@ -210,3 +210,99 @@ def commit_database_effect(
                 code="version_conflict",
             )
         return ExecutionResult("committed", next_version, reference, identity)
+
+
+def commit_bookkeeping(
+    *,
+    gym: Gym,
+    goal_id: UUID,
+    step_id: UUID,
+    tool_name: str,
+    attempt_number: int,
+    payload: Mapping[str, object],
+    reference: str,
+    lock_timeout: int | None = None,
+) -> ExecutionResult:
+    """Record an already committed resource id and advance the locked version.
+
+    The caller version is not consulted. This path does not run a business
+    service. The unique execution identity still rejects a second insert.
+    """
+
+    if reference == "" or len(reference) > 64:
+        raise ExecutionRejected(
+            "The database effect needs a reference.",
+            code="missing_effect_reference",
+        )
+    timeout = lock_timeout if lock_timeout is not None else lock_timeout_ms()
+    identity = execution_identity(
+        gym_id=gym.id,
+        goal_id=goal_id,
+        step_id=step_id,
+        tool_name=tool_name,
+        attempt_number=attempt_number,
+        payload=payload,
+    )
+    digest = payload_hash(payload)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        _set_lock_timeout(timeout)
+        try:
+            goal = _lock_goal(gym_id=gym.id, goal_id=goal_id)
+        except TimeoutError:
+            _clear_lock_timeout()
+            return ExecutionResult("in_progress", None, None, identity)
+        except Goal.DoesNotExist as exc:
+            _clear_lock_timeout()
+            raise ExecutionRejected("The goal is not in this gym.", code="goal_not_found") from exc
+        try:
+            step = WorkflowStep.objects.get(gym_id=gym.id, id=step_id, goal_id=goal.id)
+        except WorkflowStep.DoesNotExist as exc:
+            _clear_lock_timeout()
+            raise ExecutionRejected(
+                "The workflow step is not in this gym.",
+                code="step_not_found",
+            ) from exc
+        if step.tool_name != tool_name or step.attempt_number != attempt_number:
+            _clear_lock_timeout()
+            raise ExecutionRejected(
+                "The workflow step does not name this tool.",
+                code="step_tool",
+            )
+        try:
+            claim = _insert_claim(
+                gym=gym,
+                goal=goal,
+                step=step,
+                tool_name=tool_name,
+                attempt_number=attempt_number,
+                identity=identity,
+                payload_digest=digest,
+                external_side_effects=(),
+            )
+        except TimeoutError:
+            _clear_lock_timeout()
+            return ExecutionResult("in_progress", goal.version, None, identity)
+        except FileExistsError:
+            _clear_lock_timeout()
+            existing = ToolExecution.objects.get(gym_id=gym.id, execution_identity=identity)
+            return ExecutionResult(
+                "existing",
+                goal.version,
+                existing.effect_reference,
+                identity,
+            )
+        _clear_lock_timeout()
+        claim.effect_reference = reference
+        claim.save(update_fields=["effect_reference", "updated_at"])
+        next_version = goal.version + 1
+        updated = Goal.objects.filter(pk=goal.pk, version=goal.version).update(
+            version=next_version,
+            updated_at=timezone.now(),
+        )
+        if updated != 1:
+            raise ExecutionRejected(
+                "The goal version changed inside the lock.",
+                code="version_conflict",
+            )
+        return ExecutionResult("committed", next_version, reference, identity)

@@ -100,6 +100,7 @@ TENANT_TABLES = {
     "assistant_workflow_step",
     "assistant_tool_execution",
     "assistant_attachment_reference",
+    "assistant_logical_claim",
 }
 POLICY_COMMANDS = {"r", "a", "w", "d"}
 
