@@ -37,7 +37,7 @@ def test_registered_training_tools_are_confirmed_database_writes() -> None:
     names = production_registry().names()
     assert "create_payment" not in names
     assert "create_class_booking" not in names
-    assert "create_class_schedule" not in names
+    assert "create_class_schedule" in names
 
 
 def test_missing_permission_stops_before_a_training_service() -> None:

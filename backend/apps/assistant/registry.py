@@ -56,6 +56,7 @@ def closed_production_names() -> tuple[str, ...]:
 
     from apps.assistant.activity_tools import ACTIVITY_TOOL_NAMES
     from apps.assistant.member_tools import MEMBER_TOOL_NAMES
+    from apps.assistant.schedule_tools import SCHEDULE_TOOL_NAMES
     from apps.assistant.staff_tools import STAFF_TOOL_NAMES
     from apps.assistant.training_tools import TRAINING_TOOL_NAMES
 
@@ -65,6 +66,7 @@ def closed_production_names() -> tuple[str, ...]:
             | set(STAFF_TOOL_NAMES)
             | set(ACTIVITY_TOOL_NAMES)
             | set(TRAINING_TOOL_NAMES)
+            | set(SCHEDULE_TOOL_NAMES)
         )
     )
 
@@ -73,12 +75,13 @@ def production_registry() -> ToolRegistry:
     """Return the tools whose security tests have passed.
 
     Member, membership, staff, role, gym, announcement, check-in, trainer,
-    package, and class-type writes are registered. Class schedules, other
+    package, class-type, and class-schedule writes are registered. Other
     finance commands, mail, files, and push delivery stay out.
     """
 
     from apps.assistant.activity_tools import activity_tool_definitions
     from apps.assistant.member_tools import member_tool_definitions
+    from apps.assistant.schedule_tools import schedule_tool_definitions
     from apps.assistant.staff_tools import staff_tool_definitions
     from apps.assistant.training_tools import training_tool_definitions
 
@@ -88,6 +91,7 @@ def production_registry() -> ToolRegistry:
         *staff_tool_definitions(),
         *activity_tool_definitions(),
         *training_tool_definitions(),
+        *schedule_tool_definitions(),
     ):
         registry.register(tool)
     return registry
