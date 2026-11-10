@@ -38,6 +38,9 @@ def test_production_registry_registers_tested_write_tools() -> None:
     assert "create_salary_period" in names
     assert "approve_salary_period" not in names
     assert "reject_salary_period" not in names
+    assert "create_pt_sale" in names
+    assert "approve_pt_sale" not in names
+    assert "reject_pt_sale" not in names
     assert "invite_owner" not in names
     assert "invite_staff" not in names
     assert "revoke_display_device" not in names

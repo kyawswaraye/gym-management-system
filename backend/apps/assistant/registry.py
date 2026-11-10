@@ -61,6 +61,7 @@ def closed_production_names() -> tuple[str, ...]:
     from apps.assistant.inventory_tools import INVENTORY_TOOL_NAMES
     from apps.assistant.member_tools import MEMBER_TOOL_NAMES
     from apps.assistant.payment_tools import PAYMENT_TOOL_NAMES
+    from apps.assistant.pt_tools import PT_TOOL_NAMES
     from apps.assistant.retail_tools import RETAIL_TOOL_NAMES
     from apps.assistant.salary_tools import SALARY_TOOL_NAMES
     from apps.assistant.schedule_tools import SCHEDULE_TOOL_NAMES
@@ -78,6 +79,7 @@ def closed_production_names() -> tuple[str, ...]:
             | set(INVENTORY_TOOL_NAMES)
             | set(CASH_TOOL_NAMES)
             | set(PAYMENT_TOOL_NAMES)
+            | set(PT_TOOL_NAMES)
             | set(EXPENSE_TOOL_NAMES)
             | set(RETAIL_TOOL_NAMES)
             | set(SALARY_TOOL_NAMES)
@@ -90,8 +92,9 @@ def production_registry() -> ToolRegistry:
 
     Member, membership, staff, role, gym, announcement, check-in, trainer,
     package, class-type, class-schedule, occurrence-cancel, class-booking, stock,
-    cash-session, payment, receipt, expense, retail-sale, and salary-period writes
-    are registered. Approval, rejection, mail, files, and push delivery stay out.
+    cash-session, payment, receipt, expense, retail-sale, salary-period, PT sale,
+    commission, package, and PT booking writes are registered. Approval, rejection,
+    mail, files, and push delivery stay out.
     """
 
     from apps.assistant.activity_tools import activity_tool_definitions
@@ -101,6 +104,7 @@ def production_registry() -> ToolRegistry:
     from apps.assistant.inventory_tools import inventory_tool_definitions
     from apps.assistant.member_tools import member_tool_definitions
     from apps.assistant.payment_tools import payment_tool_definitions
+    from apps.assistant.pt_tools import pt_tool_definitions
     from apps.assistant.retail_tools import retail_tool_definitions
     from apps.assistant.salary_tools import salary_tool_definitions
     from apps.assistant.schedule_tools import schedule_tool_definitions
@@ -118,6 +122,7 @@ def production_registry() -> ToolRegistry:
         *inventory_tool_definitions(),
         *cash_tool_definitions(),
         *payment_tool_definitions(),
+        *pt_tool_definitions(),
         *expense_tool_definitions(),
         *retail_tool_definitions(),
         *salary_tool_definitions(),
