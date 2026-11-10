@@ -62,6 +62,7 @@ def closed_production_names() -> tuple[str, ...]:
     from apps.assistant.member_tools import MEMBER_TOOL_NAMES
     from apps.assistant.payment_tools import PAYMENT_TOOL_NAMES
     from apps.assistant.retail_tools import RETAIL_TOOL_NAMES
+    from apps.assistant.salary_tools import SALARY_TOOL_NAMES
     from apps.assistant.schedule_tools import SCHEDULE_TOOL_NAMES
     from apps.assistant.staff_tools import STAFF_TOOL_NAMES
     from apps.assistant.training_tools import TRAINING_TOOL_NAMES
@@ -79,6 +80,7 @@ def closed_production_names() -> tuple[str, ...]:
             | set(PAYMENT_TOOL_NAMES)
             | set(EXPENSE_TOOL_NAMES)
             | set(RETAIL_TOOL_NAMES)
+            | set(SALARY_TOOL_NAMES)
         )
     )
 
@@ -88,8 +90,8 @@ def production_registry() -> ToolRegistry:
 
     Member, membership, staff, role, gym, announcement, check-in, trainer,
     package, class-type, class-schedule, occurrence-cancel, class-booking, stock,
-    cash-session, payment, receipt, expense, and retail-sale writes are registered.
-    Approval, rejection, mail, files, and push delivery stay out.
+    cash-session, payment, receipt, expense, retail-sale, and salary-period writes
+    are registered. Approval, rejection, mail, files, and push delivery stay out.
     """
 
     from apps.assistant.activity_tools import activity_tool_definitions
@@ -100,6 +102,7 @@ def production_registry() -> ToolRegistry:
     from apps.assistant.member_tools import member_tool_definitions
     from apps.assistant.payment_tools import payment_tool_definitions
     from apps.assistant.retail_tools import retail_tool_definitions
+    from apps.assistant.salary_tools import salary_tool_definitions
     from apps.assistant.schedule_tools import schedule_tool_definitions
     from apps.assistant.staff_tools import staff_tool_definitions
     from apps.assistant.training_tools import training_tool_definitions
@@ -117,6 +120,7 @@ def production_registry() -> ToolRegistry:
         *payment_tool_definitions(),
         *expense_tool_definitions(),
         *retail_tool_definitions(),
+        *salary_tool_definitions(),
     ):
         registry.register(tool)
     return registry
