@@ -57,6 +57,7 @@ def closed_production_names() -> tuple[str, ...]:
     from apps.assistant.activity_tools import ACTIVITY_TOOL_NAMES
     from apps.assistant.booking_tools import BOOKING_TOOL_NAMES
     from apps.assistant.cash_tools import CASH_TOOL_NAMES
+    from apps.assistant.expense_tools import EXPENSE_TOOL_NAMES
     from apps.assistant.inventory_tools import INVENTORY_TOOL_NAMES
     from apps.assistant.member_tools import MEMBER_TOOL_NAMES
     from apps.assistant.payment_tools import PAYMENT_TOOL_NAMES
@@ -75,6 +76,7 @@ def closed_production_names() -> tuple[str, ...]:
             | set(INVENTORY_TOOL_NAMES)
             | set(CASH_TOOL_NAMES)
             | set(PAYMENT_TOOL_NAMES)
+            | set(EXPENSE_TOOL_NAMES)
         )
     )
 
@@ -84,13 +86,14 @@ def production_registry() -> ToolRegistry:
 
     Member, membership, staff, role, gym, announcement, check-in, trainer,
     package, class-type, class-schedule, occurrence-cancel, class-booking, stock,
-    cash-session, and payment and receipt writes are registered. Approval,
+    cash-session, payment, receipt, and expense writes are registered. Approval,
     rejection, mail, files, and push delivery stay out.
     """
 
     from apps.assistant.activity_tools import activity_tool_definitions
     from apps.assistant.booking_tools import booking_tool_definitions
     from apps.assistant.cash_tools import cash_tool_definitions
+    from apps.assistant.expense_tools import expense_tool_definitions
     from apps.assistant.inventory_tools import inventory_tool_definitions
     from apps.assistant.member_tools import member_tool_definitions
     from apps.assistant.payment_tools import payment_tool_definitions
@@ -109,6 +112,7 @@ def production_registry() -> ToolRegistry:
         *inventory_tool_definitions(),
         *cash_tool_definitions(),
         *payment_tool_definitions(),
+        *expense_tool_definitions(),
     ):
         registry.register(tool)
     return registry
