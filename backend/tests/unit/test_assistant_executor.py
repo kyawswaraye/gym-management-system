@@ -377,6 +377,83 @@ def test_static_finance_route_keeps_the_method_and_body() -> None:
     assert command.body is payload
 
 
+def test_confirmation_fields_stay_out_of_the_finance_body() -> None:
+    gym = _gym()
+    record_id = str(uuid4())
+    payload = {
+        "payment_route_id": record_id.upper(),
+        "payment_id": record_id,
+        "cash_session_id": None,
+        "record_id": record_id,
+        "amount": "10.0",
+    }
+    contract = ToolContract(
+        definition=_tool(
+            "probe_approve",
+            permissions=("payments.approve",),
+            confirmation_required=True,
+            approval_required=True,
+        ),
+        mode=ExecutionMode.FINANCE_IDEMPOTENT,
+        http_method="POST",
+        route="/api/v1/payments/{payment_route_id}/approve/",
+        route_fields=("payment_route_id",),
+        confirmation_fields=("record_id", "amount"),
+    )
+    command = _finance_command(contract, payload)
+    assert command.body == {"payment_id": record_id, "cash_session_id": None}
+    goal_id = uuid4()
+    step_id = uuid4()
+    first_identity = execution_identity(
+        gym_id=gym.id,
+        goal_id=goal_id,
+        step_id=step_id,
+        tool_name="probe_approve",
+        attempt_number=1,
+        payload=payload,
+    )
+    second_identity = execution_identity(
+        gym_id=gym.id,
+        goal_id=goal_id,
+        step_id=step_id,
+        tool_name="probe_approve",
+        attempt_number=1,
+        payload={**payload, "amount": "10.00"},
+    )
+    assert first_identity != second_identity
+    called = {"count": 0}
+    request = _request(gym, _actor(gym), frozenset({"payments.approve"}))
+    with pytest.raises(ExecutionRejected) as mismatched:
+        _execute(
+            request,
+            contract,
+            _goal(gym),
+            payload={**payload, "amount": "9.00"},
+            finance_mutate=lambda _call: called.__setitem__("count", 1),
+            load_approval=lambda: ApprovalSnapshot(record_id=record_id, amount="10.00"),
+        )
+    assert mismatched.value.code == "approval_mismatch"
+    assert called["count"] == 0
+    bare = _contract(
+        _tool(
+            "probe_approve",
+            permissions=("payments.approve",),
+            approval_required=True,
+        ),
+        ExecutionMode.FINANCE_IDEMPOTENT,
+    )
+    with pytest.raises(ExecutionRejected) as unsupported:
+        _execute(
+            request,
+            bare,
+            _goal(gym),
+            payload=payload,
+            finance_mutate=lambda _call: called.__setitem__("count", 1),
+        )
+    assert unsupported.value.code == "execution_mode"
+    assert called["count"] == 0
+
+
 def test_uuid_route_fields_change_identity_and_finance_hash() -> None:
     gym = _gym()
     actor = _actor(gym)

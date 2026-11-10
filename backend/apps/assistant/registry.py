@@ -93,8 +93,9 @@ def production_registry() -> ToolRegistry:
     Member, membership, staff, role, gym, announcement, check-in, trainer,
     package, class-type, class-schedule, occurrence-cancel, class-booking, stock,
     cash-session, payment, receipt, expense, retail-sale, salary-period, PT sale,
-    commission, package, and PT booking writes are registered. Approval, rejection,
-    mail, files, and push delivery stay out.
+    commission, package, and PT booking writes are registered. Payment, expense,
+    retail, salary, and PT sale approval and rejection are registered. Mail, files,
+    and push delivery stay out.
     """
 
     from apps.assistant.activity_tools import activity_tool_definitions

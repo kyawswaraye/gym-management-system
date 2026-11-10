@@ -26,6 +26,7 @@ from apps.assistant.pt_tools import (
     UPDATE_SALE_ROUTE,
     VOID_SALE_ROUTE,
     adjust_package_ledger_command,
+    approve_pt_sale_command,
     attend_pt_booking_command,
     cancel_pt_booking_command,
     cancel_pt_sale_command,
@@ -37,6 +38,7 @@ from apps.assistant.pt_tools import (
     pt_tool_contracts,
     pt_tool_definitions,
     record_pt_commission_payment_command,
+    reject_pt_sale_command,
     submit_pt_sale_command,
     update_pt_sale_command,
     void_pt_sale_body,
@@ -64,6 +66,7 @@ from apps.users.models import User
 
 _NAMES = (
     "adjust_package_ledger",
+    "approve_pt_sale",
     "attend_pt_booking",
     "cancel_pt_booking",
     "cancel_pt_sale",
@@ -72,6 +75,7 @@ _NAMES = (
     "grant_member_package",
     "mark_pt_booking_no_show",
     "record_pt_commission_payment",
+    "reject_pt_sale",
     "submit_pt_sale",
     "update_pt_sale",
     "void_pt_sale",
@@ -149,8 +153,8 @@ def _assert_same_hash(
     )
 
 
-def _hashed(command: dict[str, object], route_key: str) -> dict[str, object]:
-    return {key: value for key, value in command.items() if key != route_key}
+def _hashed(command: dict[str, object], *route_keys: str) -> dict[str, object]:
+    return {key: value for key, value in command.items() if key not in route_keys}
 
 
 def test_pt_tools_keep_trainer_finance_open() -> None:
@@ -158,8 +162,8 @@ def test_pt_tools_keep_trainer_finance_open() -> None:
     definitions = {tool.name: tool for tool in pt_tool_definitions()}
     names = production_registry().names()
     assert tuple(sorted(definitions)) == PT_TOOL_NAMES == _NAMES
-    assert "approve_pt_sale" not in names
-    assert "reject_pt_sale" not in names
+    assert "approve_pt_sale" in names
+    assert "reject_pt_sale" in names
     assert set(PT_TOOL_NAMES).isdisjoint(SALARY_TOOL_NAMES)
     assert set(PT_TOOL_NAMES).isdisjoint(BOOKING_TOOL_NAMES)
     assert set(PT_TOOL_NAMES).isdisjoint(TRAINING_TOOL_NAMES)
@@ -199,7 +203,9 @@ def test_pt_tools_keep_trainer_finance_open() -> None:
         assert contract.definition.features == ("pt",)
         assert contract.definition.operation == "write"
         assert contract.definition.confirmation_required is True
-        assert contract.definition.approval_required is False
+        approval = contract.definition.name in {"approve_pt_sale", "reject_pt_sale"}
+        assert contract.definition.approval_required is approval
+        assert contract.confirmation_fields == (("record_id", "amount") if approval else ())
         assert contract.definition.external_side_effects == ()
         assert contract.definition.module == "trainers"
 
@@ -498,7 +504,7 @@ def test_permission_and_gym_stop_before_a_pt_service() -> None:
             payload={**_sale_raw(), "gross_fee": "100.001"},
             confirmed=True,
         )
-    for tool_name in ("approve_pt_sale", "reject_pt_sale"):
+    for tool_name in ("print_pt_sale", "download_pt_sale"):
         with pytest.raises(ExecutionRejected) as unknown:
             execute_registered_tool(
                 request=request,
@@ -511,3 +517,51 @@ def test_permission_and_gym_stop_before_a_pt_service() -> None:
                 confirmed=True,
             )
         assert unknown.value.code == "unknown_tool"
+
+
+def test_approval_confirmation_stays_out_of_the_view_hash() -> None:
+    sale_id = uuid4()
+    session_id = uuid4()
+    approved = approve_pt_sale_command(
+        {
+            "pt_sale_id": str(sale_id).upper(),
+            "cash_session_id": str(session_id),
+            "record_id": str(sale_id),
+            "amount": "100.0",
+            "confirmed": True,
+        }
+    )
+    assert approved["pt_sale_id"] == str(sale_id)
+    assert approved["amount"] == "100.0"
+    assert "confirmed" not in approved
+    _assert_same_hash(
+        _hashed(approved, "pt_sale_id", "record_id", "amount"),
+        {"cash_session_id": session_id},
+        method="POST",
+        route=sale_command_route(sale_id=sale_id, action="approve"),
+    )
+    omitted = approve_pt_sale_command(
+        {"pt_sale_id": str(sale_id), "record_id": str(sale_id), "amount": "100.00"}
+    )
+    _assert_same_hash(
+        _hashed(omitted, "pt_sale_id", "record_id", "amount"),
+        {"cash_session_id": None},
+        method="POST",
+        route=sale_command_route(sale_id=sale_id, action="approve"),
+    )
+    rejected = reject_pt_sale_command(
+        {
+            "pt_sale_id": str(sale_id),
+            "rejection_reason": "  Duplicate  ",
+            "record_id": str(sale_id),
+            "amount": "100.00",
+            "confirmed": True,
+        }
+    )
+    assert "pt_sale_id" in rejected
+    _assert_same_hash(
+        _hashed(rejected, "pt_sale_id", "record_id", "amount"),
+        {"rejection_reason": "Duplicate"},
+        method="POST",
+        route=sale_command_route(sale_id=sale_id, action="reject"),
+    )

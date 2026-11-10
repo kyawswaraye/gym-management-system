@@ -36,7 +36,7 @@ def test_registered_training_tools_are_confirmed_database_writes() -> None:
     assert tools["update_class_type"].permissions == ("classes.manage",)
     names = production_registry().names()
     assert "create_payment" in names
-    assert "approve_payment" not in names
+    assert "approve_payment" in names
     assert "create_class_booking" not in TRAINING_TOOL_NAMES
     assert "create_class_booking" in names
     assert "create_class_schedule" in names

@@ -19,6 +19,7 @@ from apps.assistant.expense_tools import (
     EXPENSE_UPDATE_ROUTE,
     SUBMIT_ROUTE,
     VOID_ROUTE,
+    approve_expense_command,
     cancel_expense_command,
     create_category_body,
     create_category_command,
@@ -27,6 +28,7 @@ from apps.assistant.expense_tools import (
     execute_registered_tool,
     expense_tool_contracts,
     expense_tool_definitions,
+    reject_expense_command,
     submit_expense_command,
     update_category_command,
     update_expense_command,
@@ -50,14 +52,17 @@ from apps.tenants.models import Gym, GymMembership
 from apps.users.models import User
 
 _NAMES = (
+    "approve_expense",
     "cancel_expense",
     "create_expense",
     "create_expense_category",
+    "reject_expense",
     "submit_expense",
     "update_expense",
     "update_expense_category",
     "void_expense",
 )
+_APPROVAL = frozenset({"approve_expense", "reject_expense"})
 
 
 def _category_raw() -> dict[str, object]:
@@ -110,8 +115,8 @@ def _assert_same_hash(
     )
 
 
-def _hashed(command: dict[str, object], route_key: str) -> dict[str, object]:
-    return {key: value for key, value in command.items() if key != route_key}
+def _hashed(command: dict[str, object], *route_keys: str) -> dict[str, object]:
+    return {key: value for key, value in command.items() if key not in route_keys}
 
 
 def test_expense_tools_are_closed_finance_commands() -> None:
@@ -119,8 +124,8 @@ def test_expense_tools_are_closed_finance_commands() -> None:
     definitions = {tool.name: tool for tool in expense_tool_definitions()}
     names = production_registry().names()
     assert tuple(sorted(definitions)) == EXPENSE_TOOL_NAMES == _NAMES
-    assert "approve_expense" not in names
-    assert "reject_expense" not in names
+    assert "approve_expense" in names
+    assert "reject_expense" in names
     assert set(EXPENSE_TOOL_NAMES).isdisjoint(PAYMENT_TOOL_NAMES)
     assert set(EXPENSE_TOOL_NAMES).isdisjoint(CASH_TOOL_NAMES)
     assert set(PAYMENT_TOOL_NAMES) <= set(names)
@@ -158,6 +163,9 @@ def test_expense_tools_are_closed_finance_commands() -> None:
         assert contract.definition.features == ("finance",)
         assert contract.definition.operation == "write"
         assert contract.definition.confirmation_required is True
+        approval = contract.definition.name in _APPROVAL
+        assert contract.definition.approval_required is approval
+        assert contract.confirmation_fields == (("record_id", "amount") if approval else ())
         assert contract.definition.external_side_effects == ()
         assert contract.definition.module == "expenses"
 
@@ -334,7 +342,7 @@ def test_permission_and_gym_stop_before_an_expense_service() -> None:
         execute_registered_tool(
             request=request,
             view=APIView(),
-            tool_name="approve_expense",
+            tool_name="print_expense",
             goal=goal,
             step_id=uuid4(),
             expected_version=1,
@@ -342,3 +350,37 @@ def test_permission_and_gym_stop_before_an_expense_service() -> None:
             confirmed=True,
         )
     assert unknown.value.code == "unknown_tool"
+
+
+def test_approval_confirmation_stays_out_of_the_view_hash() -> None:
+    expense_id = uuid4()
+    approved = approve_expense_command(
+        {
+            "expense_id": str(expense_id).upper(),
+            "record_id": str(expense_id),
+            "amount": "25.0",
+            "confirmed": True,
+        }
+    )
+    assert approved["amount"] == "25.0"
+    assert "confirmed" not in approved
+    _assert_same_hash(
+        _hashed(approved, "expense_route_id", "record_id", "amount"),
+        {"expense_id": str(expense_id), "cash_session_id": None},
+        method="POST",
+        route=command_route(expense_id=expense_id, action="approve"),
+    )
+    rejected = reject_expense_command(
+        {
+            "expense_id": str(expense_id),
+            "rejection_reason": "  Duplicate  ",
+            "record_id": str(expense_id),
+            "amount": "25.00",
+        }
+    )
+    _assert_same_hash(
+        _hashed(rejected, "expense_route_id", "record_id", "amount"),
+        {"expense_id": str(expense_id), "reason": "Duplicate"},
+        method="POST",
+        route=command_route(expense_id=expense_id, action="reject"),
+    )

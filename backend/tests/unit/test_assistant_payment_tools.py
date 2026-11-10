@@ -22,6 +22,7 @@ from apps.assistant.payment_tools import (
     SUBMIT_ROUTE,
     UPDATE_ROUTE,
     VOID_ROUTE,
+    approve_payment_command,
     cancel_payment_command,
     create_payment_body,
     create_payment_command,
@@ -30,6 +31,7 @@ from apps.assistant.payment_tools import (
     payment_tool_definitions,
     refund_payment_body,
     refund_payment_command,
+    reject_payment_command,
     submit_payment_command,
     update_payment_command,
     void_payment_body,
@@ -53,14 +55,17 @@ from apps.tenants.models import Gym, GymMembership
 from apps.users.models import User
 
 _NAMES = (
+    "approve_payment",
     "cancel_payment",
     "create_payment",
     "refund_payment",
+    "reject_payment",
     "submit_payment",
     "update_payment",
     "void_payment",
     "void_receipt",
 )
+_APPROVAL = frozenset({"approve_payment", "reject_payment"})
 
 
 def _create_raw() -> dict[str, object]:
@@ -118,8 +123,8 @@ def test_payment_tools_are_closed_finance_commands() -> None:
     definitions = {tool.name: tool for tool in payment_tool_definitions()}
     names = production_registry().names()
     assert tuple(sorted(definitions)) == PAYMENT_TOOL_NAMES == _NAMES
-    assert "approve_payment" not in names
-    assert "reject_payment" not in names
+    assert "approve_payment" in names
+    assert "reject_payment" in names
     assert set(PAYMENT_TOOL_NAMES).isdisjoint(CASH_TOOL_NAMES)
     assert set(PAYMENT_TOOL_NAMES).isdisjoint(INVENTORY_TOOL_NAMES)
     assert set(PAYMENT_TOOL_NAMES).isdisjoint(BOOKING_TOOL_NAMES)
@@ -161,6 +166,9 @@ def test_payment_tools_are_closed_finance_commands() -> None:
         assert contract.definition.features == ("finance",)
         assert contract.definition.operation == "write"
         assert contract.definition.confirmation_required is True
+        approval = contract.definition.name in _APPROVAL
+        assert contract.definition.approval_required is approval
+        assert contract.confirmation_fields == (("record_id", "amount") if approval else ())
         assert contract.definition.external_side_effects == ()
         assert contract.definition.module == "payments"
 
@@ -362,7 +370,7 @@ def test_permission_and_gym_stop_before_a_payment_service() -> None:
         execute_registered_tool(
             request=request,
             view=APIView(),
-            tool_name="approve_payment",
+            tool_name="print_payment",
             goal=goal,
             step_id=uuid4(),
             expected_version=1,
@@ -370,3 +378,50 @@ def test_permission_and_gym_stop_before_a_payment_service() -> None:
             confirmed=True,
         )
     assert unknown.value.code == "unknown_tool"
+
+
+def test_approval_confirmation_stays_out_of_the_view_hash() -> None:
+    payment_id = uuid4()
+    session_id = uuid4()
+    approve = {
+        "payment_id": str(payment_id).upper(),
+        "cash_session_id": str(session_id),
+        "record_id": str(payment_id),
+        "amount": "40.0",
+        "confirmed": True,
+    }
+    command = approve_payment_command(approve)
+    assert command["record_id"] == str(payment_id)
+    assert command["amount"] == "40.0"
+    assert "confirmed" not in command
+    _assert_same_hash(
+        _hashed(command, "payment_route_id", "record_id", "amount"),
+        {"payment_id": str(payment_id), "cash_session_id": session_id},
+        method="POST",
+        route=command_route(payment_id=payment_id, action="approve"),
+    )
+    omitted = approve_payment_command(
+        {"payment_id": str(payment_id), "record_id": str(payment_id), "amount": "40.00"}
+    )
+    _assert_same_hash(
+        _hashed(omitted, "payment_route_id", "record_id", "amount"),
+        {"payment_id": str(payment_id), "cash_session_id": None},
+        method="POST",
+        route=command_route(payment_id=payment_id, action="approve"),
+    )
+    rejected = reject_payment_command(
+        {
+            "payment_id": str(payment_id),
+            "rejection_reason": "  Duplicate  ",
+            "record_id": str(payment_id),
+            "amount": "40.00",
+            "confirmed": True,
+        }
+    )
+    assert "confirmed" not in rejected
+    _assert_same_hash(
+        _hashed(rejected, "payment_route_id", "record_id", "amount"),
+        {"payment_id": str(payment_id), "reason": "Duplicate"},
+        method="POST",
+        route=command_route(payment_id=payment_id, action="reject"),
+    )

@@ -31,16 +31,17 @@ def test_production_registry_registers_tested_write_tools() -> None:
     names = production_registry().names()
     assert names == closed_production_names()
     assert "create_payment" in names
-    assert "approve_payment" not in names
+    assert "approve_payment" in names
+    assert "reject_payment" in names
     assert "create_retail_sale" in names
-    assert "approve_retail_sale" not in names
-    assert "reject_retail_sale" not in names
+    assert "approve_retail_sale" in names
+    assert "reject_retail_sale" in names
     assert "create_salary_period" in names
-    assert "approve_salary_period" not in names
-    assert "reject_salary_period" not in names
+    assert "approve_salary_period" in names
+    assert "reject_salary_period" in names
     assert "create_pt_sale" in names
-    assert "approve_pt_sale" not in names
-    assert "reject_pt_sale" not in names
+    assert "approve_pt_sale" in names
+    assert "reject_pt_sale" in names
     assert "invite_owner" not in names
     assert "invite_staff" not in names
     assert "revoke_display_device" not in names

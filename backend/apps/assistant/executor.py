@@ -98,6 +98,7 @@ class ToolContract:
     http_method: str = ""
     route: str = ""
     route_fields: tuple[str, ...] = ()
+    confirmation_fields: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -251,14 +252,28 @@ def _reject_unsupported_contract(
             "A finance tool names the existing command method and route.",
             code="finance_route",
         )
+    if (
+        contract.mode == ExecutionMode.FINANCE_IDEMPOTENT
+        and contract.definition.approval_required
+        and set(contract.confirmation_fields) != {"record_id", "amount"}
+    ):
+        raise ExecutionRejected(
+            "An approval tool confirms the record and amount outside the finance body.",
+            code="execution_mode",
+        )
 
 
 def _finance_command(contract: ToolContract, payload: Mapping[str, object]) -> FinanceCommand:
-    """Build the concrete finance command. Resource ids stay in the payload."""
+    """Build the concrete finance command. Resource ids stay in the payload.
 
-    if not contract.route_fields:
-        return FinanceCommand(contract.http_method, contract.route, payload)
+    Confirmation fields are checked before this command and stay out of the
+    view-body hash. Route fields are substituted into the path and also stay
+    out of that hash.
+    """
+
     route = contract.route
+    if not contract.route_fields and not contract.confirmation_fields:
+        return FinanceCommand(contract.http_method, route, payload)
     for field in contract.route_fields:
         token = "{" + field + "}"
         if route.count(token) != 1:
@@ -285,7 +300,8 @@ def _finance_command(contract: ToolContract, payload: Mapping[str, object]) -> F
             "The finance route is unresolved.",
             code="finance_route",
         )
-    body = {key: item for key, item in payload.items() if key not in contract.route_fields}
+    excluded = set(contract.route_fields) | set(contract.confirmation_fields)
+    body = {key: item for key, item in payload.items() if key not in excluded}
     return FinanceCommand(contract.http_method, route, body)
 
 

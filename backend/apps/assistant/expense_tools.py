@@ -1,8 +1,8 @@
 """Expense commands through the existing finance runner.
 
 Handlers do not call ``run_idempotent``. The executor does, outside the
-assistant transaction. Approve and reject stay unregistered until the stored
-amount can be split from the route. Each finance body matches the view body,
+assistant transaction. Approve and reject confirm the stored expense id and
+``money_text`` amount outside the view-body hash. Each finance body matches the view body,
 and the route id is a separate field so the view's category or expense id
 remains in that hash.
 """
@@ -21,28 +21,44 @@ from rest_framework.request import Request
 from rest_framework.serializers import Serializer
 from rest_framework.views import APIView
 
+from apps.assistant.approval import (
+    CONFIRMATION_FIELDS,
+    approval_loader,
+    attach_confirmation,
+    expense_snapshot,
+)
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
-from apps.assistant.executor import ExecutionMode, ToolCall, ToolContract, execute_confirmed_tool
+from apps.assistant.executor import (
+    ApprovalSnapshot,
+    ExecutionMode,
+    ToolCall,
+    ToolContract,
+    execute_confirmed_tool,
+)
 from apps.assistant.models import Goal
 from apps.assistant.prerequisites import FieldRequirement, Prerequisite
 from apps.assistant.registry import ToolDefinition
 from apps.cashbook.serializers import session_payload, transaction_payload
 from apps.common.finance.idempotency import IdempotentResponse
 from apps.expenses.serializers import (
+    ApproveExpenseSerializer,
     CancelExpenseSerializer,
     EmptyCommandSerializer,
     ExpenseCategoryUpdateSerializer,
     ExpenseCategoryWriteSerializer,
     ExpenseUpdateSerializer,
     ExpenseWriteSerializer,
+    RejectExpenseSerializer,
     VoidExpenseSerializer,
     category_payload,
     expense_payload,
 )
 from apps.expenses.services import (
+    approve_expense,
     cancel_expense,
     create_category,
     create_expense_draft,
+    reject_expense,
     submit_expense,
     update_category,
     update_expense_draft,
@@ -55,6 +71,8 @@ CATEGORY_UPDATE_ROUTE = "/api/v1/expense-categories/{category_route_id}/"
 EXPENSE_ROUTE = "/api/v1/expenses/"
 EXPENSE_UPDATE_ROUTE = "/api/v1/expenses/{expense_route_id}/"
 SUBMIT_ROUTE = "/api/v1/expenses/{expense_route_id}/submit/"
+APPROVE_ROUTE = "/api/v1/expenses/{expense_route_id}/approve/"
+REJECT_ROUTE = "/api/v1/expenses/{expense_route_id}/reject/"
 CANCEL_ROUTE = "/api/v1/expenses/{expense_route_id}/cancel/"
 VOID_ROUTE = "/api/v1/expenses/{expense_route_id}/void/"
 _ROUTE_KEYS = (
@@ -70,9 +88,16 @@ class RegisteredTool:
     contract: ToolContract
     finance_mutate: Any
     prepare: Any
+    load_approval: Any = None
 
 
-def _definition(name: str, description: str, permission: str) -> ToolDefinition:
+def _definition(
+    name: str,
+    description: str,
+    permission: str,
+    *,
+    approval: bool = False,
+) -> ToolDefinition:
     return ToolDefinition(
         name=name,
         description=description,
@@ -81,6 +106,7 @@ def _definition(name: str, description: str, permission: str) -> ToolDefinition:
         permissions=(permission,),
         features=("finance",),
         confirmation_required=True,
+        approval_required=approval,
     )
 
 
@@ -91,6 +117,7 @@ def _contract(
     http_method: str,
     route: str,
     route_fields: tuple[str, ...] = (),
+    confirmation_fields: tuple[str, ...] = (),
 ) -> ToolContract:
     return ToolContract(
         definition=definition,
@@ -104,6 +131,7 @@ def _contract(
         http_method=http_method,
         route=route,
         route_fields=route_fields,
+        confirmation_fields=confirmation_fields,
     )
 
 
@@ -301,6 +329,59 @@ def cancel_expense_command(payload: Mapping[str, object]) -> dict[str, object]:
     )
 
 
+_APPROVAL_STRIP = (
+    "gym_id",
+    "expense_id",
+    "expense_route_id",
+    "record_id",
+    "amount",
+    "confirmed",
+)
+
+
+def approve_expense_body(data: Mapping[str, object], *, expense_id: str) -> dict[str, object]:
+    """Return the approve body whose finance hash matches the HTTP view."""
+
+    fields = _validated_with(ApproveExpenseSerializer, data)
+    cash_session_id = fields.get("cash_session_id")
+    return {
+        "expense_id": expense_id,
+        "cash_session_id": None if cash_session_id is None else str(cash_session_id),
+    }
+
+
+def reject_expense_body(data: Mapping[str, object], *, expense_id: str) -> dict[str, object]:
+    """Return the reject body whose finance hash matches the HTTP view."""
+
+    fields = _validated_with(RejectExpenseSerializer, data)
+    return {"expense_id": expense_id, "reason": str(fields["rejection_reason"])}
+
+
+def _approval_command(body: dict[str, object], payload: Mapping[str, object]) -> dict[str, object]:
+    bound = _bind_route(
+        body,
+        payload,
+        source="expense_id",
+        route_key="expense_route_id",
+        body_key="expense_id",
+    )
+    return attach_confirmation(bound, payload)
+
+
+def approve_expense_command(payload: Mapping[str, object]) -> dict[str, object]:
+    return _approval_command(
+        approve_expense_body(_without(payload, *_APPROVAL_STRIP), expense_id=""),
+        payload,
+    )
+
+
+def reject_expense_command(payload: Mapping[str, object]) -> dict[str, object]:
+    return _approval_command(
+        reject_expense_body(_without(payload, *_APPROVAL_STRIP), expense_id=""),
+        payload,
+    )
+
+
 def void_expense_command(payload: Mapping[str, object]) -> dict[str, object]:
     body = void_expense_body(
         _without(payload, "gym_id", "expense_id", "expense_route_id"),
@@ -472,6 +553,57 @@ def _cancel_expense(call: ToolCall) -> IdempotentResponse:
     return _render_expense(expense, "Expense cancelled", 200)
 
 
+_APPROVAL_KEYS = ("expense_id", "expense_route_id", "record_id", "amount")
+
+
+def _approve_expense(call: ToolCall) -> IdempotentResponse:
+    fields = _validated_with(ApproveExpenseSerializer, _without(call.payload, *_APPROVAL_KEYS))
+    expense, session, movement = approve_expense(
+        gym=call.gym,
+        actor=call.actor,
+        expense_id=_required_uuid(call.payload.get("expense_route_id")),
+        cash_session_id=fields.get("cash_session_id"),
+        request_id=call.request_id,
+        ip_address=call.ip_address,
+        user_agent=call.user_agent,
+    )
+    rendered = {
+        "success": True,
+        "data": {
+            "expense": expense_payload(expense),
+            "cash_session": None if session is None else session_payload(session),
+            "cash_transaction": None if movement is None else transaction_payload(movement),
+        },
+        "message": "Expense approved",
+    }
+    return IdempotentResponse(
+        status=200,
+        body=JSONRenderer().render(rendered),
+        resource_type="Expense",
+        resource_id=expense.id,
+    )
+
+
+def _reject_expense(call: ToolCall) -> IdempotentResponse:
+    body = _without(call.payload, *_APPROVAL_KEYS)
+    reason = body.pop("reason")
+    fields = _validated_with(RejectExpenseSerializer, {**body, "rejection_reason": reason})
+    expense = reject_expense(
+        gym=call.gym,
+        actor=call.actor,
+        expense_id=_required_uuid(call.payload.get("expense_route_id")),
+        reason=str(fields["rejection_reason"]),
+        request_id=call.request_id,
+        ip_address=call.ip_address,
+        user_agent=call.user_agent,
+    )
+    return _render_expense(expense, "Expense rejected", 200)
+
+
+def _load_expense_approval(gym: Gym, payload: Mapping[str, object]) -> ApprovalSnapshot:
+    return expense_snapshot(gym, payload.get("expense_route_id"))
+
+
 def _void_expense(call: ToolCall) -> IdempotentResponse:
     fields = _validated_with(VoidExpenseSerializer, _present(call.payload, *_ROUTE_KEYS))
     original, reversal, movement = void_expense(
@@ -596,6 +728,41 @@ _VOID = RegisteredTool(
     finance_mutate=_void_expense,
     prepare=_command_prepare(void_expense_command),
 )
+_APPROVE = RegisteredTool(
+    contract=_contract(
+        _definition("approve_expense", "Approve an expense", "expenses.approve", approval=True),
+        (
+            FieldRequirement("expense_id", "Expense"),
+            FieldRequirement("record_id", "Stored expense"),
+            FieldRequirement("amount", "Stored amount"),
+        ),
+        http_method="POST",
+        route=APPROVE_ROUTE,
+        route_fields=("expense_route_id",),
+        confirmation_fields=CONFIRMATION_FIELDS,
+    ),
+    finance_mutate=_approve_expense,
+    prepare=_command_prepare(approve_expense_command),
+    load_approval=_load_expense_approval,
+)
+_REJECT = RegisteredTool(
+    contract=_contract(
+        _definition("reject_expense", "Reject an expense", "expenses.approve", approval=True),
+        (
+            FieldRequirement("expense_id", "Expense"),
+            FieldRequirement("record_id", "Stored expense"),
+            FieldRequirement("amount", "Stored amount"),
+            FieldRequirement("reason", "Rejection reason"),
+        ),
+        http_method="POST",
+        route=REJECT_ROUTE,
+        route_fields=("expense_route_id",),
+        confirmation_fields=CONFIRMATION_FIELDS,
+    ),
+    finance_mutate=_reject_expense,
+    prepare=_command_prepare(reject_expense_command),
+    load_approval=_load_expense_approval,
+)
 _REGISTERED = {
     tool.contract.definition.name: tool
     for tool in (
@@ -604,6 +771,8 @@ _REGISTERED = {
         _CREATE,
         _UPDATE,
         _SUBMIT,
+        _APPROVE,
+        _REJECT,
         _CANCEL,
         _VOID,
     )
@@ -648,4 +817,5 @@ def execute_registered_tool(
         payload=command,
         confirmed=confirmed,
         finance_mutate=tool.finance_mutate,
+        load_approval=approval_loader(request, command, tool.load_approval),
     )

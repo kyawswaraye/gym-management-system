@@ -23,10 +23,12 @@ from apps.assistant.salary_tools import (
     SUBMIT_ROUTE,
     UPDATE_ROUTE,
     VOID_ROUTE,
+    approve_salary_period_command,
     cancel_salary_period_command,
     create_salary_period_body,
     create_salary_period_command,
     execute_registered_tool,
+    reject_salary_period_command,
     replace_salary_lines_body,
     replace_salary_lines_command,
     salary_tool_contracts,
@@ -49,13 +51,16 @@ from apps.tenants.models import Gym, GymMembership
 from apps.users.models import User
 
 _NAMES = (
+    "approve_salary_period",
     "cancel_salary_period",
     "create_salary_period",
+    "reject_salary_period",
     "replace_salary_lines",
     "submit_salary_period",
     "update_salary_period",
     "void_salary_period",
 )
+_APPROVAL = frozenset({"approve_salary_period", "reject_salary_period"})
 
 
 def _ordered_pair() -> tuple[str, str]:
@@ -130,8 +135,8 @@ def _assert_same_hash(
     )
 
 
-def _hashed(command: dict[str, object], route_key: str) -> dict[str, object]:
-    return {key: value for key, value in command.items() if key != route_key}
+def _hashed(command: dict[str, object], *route_keys: str) -> dict[str, object]:
+    return {key: value for key, value in command.items() if key not in route_keys}
 
 
 def test_salary_tools_are_closed_finance_commands() -> None:
@@ -139,8 +144,8 @@ def test_salary_tools_are_closed_finance_commands() -> None:
     definitions = {tool.name: tool for tool in salary_tool_definitions()}
     names = production_registry().names()
     assert tuple(sorted(definitions)) == SALARY_TOOL_NAMES == _NAMES
-    assert "approve_salary_period" not in names
-    assert "reject_salary_period" not in names
+    assert "approve_salary_period" in names
+    assert "reject_salary_period" in names
     assert set(SALARY_TOOL_NAMES).isdisjoint(RETAIL_TOOL_NAMES)
     assert set(SALARY_TOOL_NAMES).isdisjoint(EXPENSE_TOOL_NAMES)
     assert set(SALARY_TOOL_NAMES).isdisjoint(PAYMENT_TOOL_NAMES)
@@ -178,7 +183,9 @@ def test_salary_tools_are_closed_finance_commands() -> None:
         assert contract.definition.features == ("finance",)
         assert contract.definition.operation == "write"
         assert contract.definition.confirmation_required is True
-        assert contract.definition.approval_required is False
+        approval = contract.definition.name in _APPROVAL
+        assert contract.definition.approval_required is approval
+        assert contract.confirmation_fields == (("record_id", "amount") if approval else ())
         assert contract.definition.external_side_effects == ()
         assert contract.definition.module == "salaries"
 
@@ -375,7 +382,7 @@ def test_permission_and_gym_stop_before_a_salary_service() -> None:
             },
             confirmed=True,
         )
-    for tool_name in ("approve_salary_period", "reject_salary_period"):
+    for tool_name in ("print_salary_period", "download_salary_period"):
         with pytest.raises(ExecutionRejected) as unknown:
             execute_registered_tool(
                 request=request,
@@ -388,3 +395,65 @@ def test_permission_and_gym_stop_before_a_salary_service() -> None:
                 confirmed=True,
             )
         assert unknown.value.code == "unknown_tool"
+
+
+def test_approval_confirmation_stays_out_of_the_view_hash() -> None:
+    period_id = uuid4()
+    first_line = uuid4()
+    second_line = uuid4()
+    session_id = uuid4()
+    if first_line > second_line:
+        first_line, second_line = second_line, first_line
+    approved = approve_salary_period_command(
+        {
+            "salary_period_id": str(period_id).upper(),
+            "cash_sessions": [
+                {"line_id": str(second_line), "cash_session_id": str(session_id)},
+                {"line_id": str(first_line), "cash_session_id": str(session_id)},
+            ],
+            "record_id": str(period_id),
+            "amount": "125.50",
+            "confirmed": True,
+        }
+    )
+    assert approved["amount"] == "125.50"
+    assert "confirmed" not in approved
+    _assert_same_hash(
+        _hashed(approved, "period_route_id", "record_id", "amount"),
+        {
+            "salary_period_id": str(period_id),
+            "cash_sessions": [
+                {"line_id": first_line, "cash_session_id": session_id},
+                {"line_id": second_line, "cash_session_id": session_id},
+            ],
+        },
+        method="POST",
+        route=command_route(period_id=period_id, action="approve"),
+    )
+    omitted = approve_salary_period_command(
+        {
+            "salary_period_id": str(period_id),
+            "record_id": str(period_id),
+            "amount": "0.00",
+        }
+    )
+    _assert_same_hash(
+        _hashed(omitted, "period_route_id", "record_id", "amount"),
+        {"salary_period_id": str(period_id), "cash_sessions": []},
+        method="POST",
+        route=command_route(period_id=period_id, action="approve"),
+    )
+    rejected = reject_salary_period_command(
+        {
+            "salary_period_id": str(period_id),
+            "rejection_reason": "  Duplicate  ",
+            "record_id": str(period_id),
+            "amount": "125.50",
+        }
+    )
+    _assert_same_hash(
+        _hashed(rejected, "period_route_id", "record_id", "amount"),
+        {"salary_period_id": str(period_id), "reason": "Duplicate"},
+        method="POST",
+        route=command_route(period_id=period_id, action="reject"),
+    )

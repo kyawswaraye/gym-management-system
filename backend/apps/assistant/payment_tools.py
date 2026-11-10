@@ -1,10 +1,10 @@
 """Payment and receipt commands through the existing finance runner.
 
 Handlers do not call ``run_idempotent``. The executor does, outside the
-assistant transaction. Approve and reject stay unregistered until the stored
-amount can be split from the route. Print and download stay out. Each finance
-body matches the view body, and the route id is a separate field so the view's
-payment or receipt id remains in that hash.
+assistant transaction. Approve and reject confirm the stored payment id and
+``money_text`` amount outside the view-body hash. Print and download stay out.
+Each finance body matches the view body, and the route id is a separate field
+so the view's payment or receipt id remains in that hash.
 """
 
 from __future__ import annotations
@@ -21,19 +21,33 @@ from rest_framework.request import Request
 from rest_framework.serializers import Serializer
 from rest_framework.views import APIView
 
+from apps.assistant.approval import (
+    CONFIRMATION_FIELDS,
+    approval_loader,
+    attach_confirmation,
+    payment_snapshot,
+)
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
-from apps.assistant.executor import ExecutionMode, ToolCall, ToolContract, execute_confirmed_tool
+from apps.assistant.executor import (
+    ApprovalSnapshot,
+    ExecutionMode,
+    ToolCall,
+    ToolContract,
+    execute_confirmed_tool,
+)
 from apps.assistant.models import Goal
 from apps.assistant.prerequisites import FieldRequirement, Prerequisite
 from apps.assistant.registry import ToolDefinition
-from apps.cashbook.serializers import transaction_payload
+from apps.cashbook.serializers import session_payload, transaction_payload
 from apps.common.finance.idempotency import IdempotentResponse
 from apps.members.payment_serializers import (
+    ApprovePaymentSerializer,
     CancelPaymentSerializer,
     EmptyCommandSerializer,
     PaymentUpdateSerializer,
     PaymentWriteSerializer,
     RefundPaymentSerializer,
+    RejectPaymentSerializer,
     VoidPaymentSerializer,
     VoidReceiptSerializer,
     money_text,
@@ -42,9 +56,11 @@ from apps.members.payment_serializers import (
     settlement_payload,
 )
 from apps.members.payment_services import (
+    approve_payment,
     cancel_payment,
     create_payment_draft,
     refund_payment,
+    reject_payment,
     submit_payment,
     update_payment_draft,
     void_payment,
@@ -55,6 +71,8 @@ from apps.tenants.models import Gym
 CREATE_ROUTE = "/api/v1/payments/"
 UPDATE_ROUTE = "/api/v1/payments/{payment_route_id}/"
 SUBMIT_ROUTE = "/api/v1/payments/{payment_route_id}/submit/"
+APPROVE_ROUTE = "/api/v1/payments/{payment_route_id}/approve/"
+REJECT_ROUTE = "/api/v1/payments/{payment_route_id}/reject/"
 CANCEL_ROUTE = "/api/v1/payments/{payment_route_id}/cancel/"
 VOID_ROUTE = "/api/v1/payments/{payment_route_id}/void/"
 REFUND_ROUTE = "/api/v1/payments/{payment_route_id}/refund/"
@@ -67,9 +85,16 @@ class RegisteredTool:
     contract: ToolContract
     finance_mutate: Any
     prepare: Any
+    load_approval: Any = None
 
 
-def _definition(name: str, description: str, permission: str) -> ToolDefinition:
+def _definition(
+    name: str,
+    description: str,
+    permission: str,
+    *,
+    approval: bool = False,
+) -> ToolDefinition:
     return ToolDefinition(
         name=name,
         description=description,
@@ -78,6 +103,7 @@ def _definition(name: str, description: str, permission: str) -> ToolDefinition:
         permissions=(permission,),
         features=("finance",),
         confirmation_required=True,
+        approval_required=approval,
     )
 
 
@@ -88,6 +114,7 @@ def _contract(
     http_method: str,
     route: str,
     route_fields: tuple[str, ...] = (),
+    confirmation_fields: tuple[str, ...] = (),
 ) -> ToolContract:
     return ToolContract(
         definition=definition,
@@ -101,6 +128,7 @@ def _contract(
         http_method=http_method,
         route=route,
         route_fields=route_fields,
+        confirmation_fields=confirmation_fields,
     )
 
 
@@ -289,6 +317,70 @@ def cancel_payment_command(payload: Mapping[str, object]) -> dict[str, object]:
     )
 
 
+def approve_payment_body(data: Mapping[str, object], *, payment_id: str) -> dict[str, object]:
+    """Return the approve body whose finance hash matches the HTTP view."""
+
+    fields = _validated_with(ApprovePaymentSerializer, data)
+    cash_session_id = fields.get("cash_session_id")
+    return {
+        "payment_id": payment_id,
+        "cash_session_id": None if cash_session_id is None else str(cash_session_id),
+    }
+
+
+def reject_payment_body(data: Mapping[str, object], *, payment_id: str) -> dict[str, object]:
+    """Return the reject body whose finance hash matches the HTTP view."""
+
+    fields = _validated_with(RejectPaymentSerializer, data)
+    return {"payment_id": payment_id, "reason": str(fields["rejection_reason"])}
+
+
+def _approval_command(
+    body: dict[str, object],
+    payload: Mapping[str, object],
+) -> dict[str, object]:
+    bound = _bind_route(
+        body,
+        payload,
+        source="payment_id",
+        route_key="payment_route_id",
+        body_key="payment_id",
+    )
+    return attach_confirmation(bound, payload)
+
+
+def approve_payment_command(payload: Mapping[str, object]) -> dict[str, object]:
+    body = approve_payment_body(
+        _without(
+            payload,
+            "gym_id",
+            "payment_id",
+            "payment_route_id",
+            "record_id",
+            "amount",
+            "confirmed",
+        ),
+        payment_id="",
+    )
+    return _approval_command(body, payload)
+
+
+def reject_payment_command(payload: Mapping[str, object]) -> dict[str, object]:
+    body = reject_payment_body(
+        _without(
+            payload,
+            "gym_id",
+            "payment_id",
+            "payment_route_id",
+            "record_id",
+            "amount",
+            "confirmed",
+        ),
+        payment_id="",
+    )
+    return _approval_command(body, payload)
+
+
 def void_payment_command(payload: Mapping[str, object]) -> dict[str, object]:
     body = void_payment_body(
         _without(payload, "gym_id", "payment_id", "payment_route_id"),
@@ -458,6 +550,68 @@ def _submit_payment(call: ToolCall) -> IdempotentResponse:
         user_agent=call.user_agent,
     )
     return _render_payment(payment, "Payment submitted", 200)
+
+
+_APPROVAL_KEYS = ("payment_id", "payment_route_id", "record_id", "amount")
+
+
+def _approve_payment(call: ToolCall) -> IdempotentResponse:
+    fields = _validated_with(ApprovePaymentSerializer, _without(call.payload, *_APPROVAL_KEYS))
+    payment, receipt, session, movement, settlement = approve_payment(
+        gym=call.gym,
+        actor=call.actor,
+        payment_id=_required_uuid(call.payload.get("payment_route_id")),
+        cash_session_id=fields.get("cash_session_id"),
+        request_id=call.request_id,
+        ip_address=call.ip_address,
+        user_agent=call.user_agent,
+    )
+    rendered = {
+        "success": True,
+        "data": {
+            "payment": payment_payload(payment),
+            "receipt": receipt_payload(receipt),
+            "cash_session": None if session is None else session_payload(session),
+            "cash_transaction": None if movement is None else transaction_payload(movement),
+            "membership_settlement": (
+                None
+                if settlement is None
+                else settlement_payload(
+                    membership_id=settlement["membership_id"],
+                    payment_status=str(settlement["payment_status"]),
+                    paid_amount=cast(Decimal, settlement["paid_amount"]),
+                    balance_amount=cast(Decimal, settlement["balance_amount"]),
+                )
+            ),
+        },
+        "message": "Payment approved",
+    }
+    return IdempotentResponse(
+        status=200,
+        body=JSONRenderer().render(rendered),
+        resource_type="Payment",
+        resource_id=payment.id,
+    )
+
+
+def _reject_payment(call: ToolCall) -> IdempotentResponse:
+    body = _without(call.payload, *_APPROVAL_KEYS)
+    reason = body.pop("reason")
+    fields = _validated_with(RejectPaymentSerializer, {**body, "rejection_reason": reason})
+    payment = reject_payment(
+        gym=call.gym,
+        actor=call.actor,
+        payment_id=_required_uuid(call.payload.get("payment_route_id")),
+        reason=str(fields["rejection_reason"]),
+        request_id=call.request_id,
+        ip_address=call.ip_address,
+        user_agent=call.user_agent,
+    )
+    return _render_payment(payment, "Payment rejected", 200)
+
+
+def _load_payment_approval(gym: Gym, payload: Mapping[str, object]) -> ApprovalSnapshot:
+    return payment_snapshot(gym, payload.get("payment_route_id"))
 
 
 def _cancel_payment(call: ToolCall) -> IdempotentResponse:
@@ -639,9 +793,54 @@ _VOID_RECEIPT = RegisteredTool(
     finance_mutate=_void_receipt,
     prepare=_command_prepare(void_receipt_command),
 )
+_APPROVE = RegisteredTool(
+    contract=_contract(
+        _definition("approve_payment", "Approve a payment", "payments.approve", approval=True),
+        (
+            FieldRequirement("payment_id", "Payment"),
+            FieldRequirement("record_id", "Stored payment"),
+            FieldRequirement("amount", "Stored amount"),
+        ),
+        http_method="POST",
+        route=APPROVE_ROUTE,
+        route_fields=("payment_route_id",),
+        confirmation_fields=CONFIRMATION_FIELDS,
+    ),
+    finance_mutate=_approve_payment,
+    prepare=_command_prepare(approve_payment_command),
+    load_approval=_load_payment_approval,
+)
+_REJECT = RegisteredTool(
+    contract=_contract(
+        _definition("reject_payment", "Reject a payment", "payments.approve", approval=True),
+        (
+            FieldRequirement("payment_id", "Payment"),
+            FieldRequirement("record_id", "Stored payment"),
+            FieldRequirement("amount", "Stored amount"),
+            FieldRequirement("reason", "Rejection reason"),
+        ),
+        http_method="POST",
+        route=REJECT_ROUTE,
+        route_fields=("payment_route_id",),
+        confirmation_fields=CONFIRMATION_FIELDS,
+    ),
+    finance_mutate=_reject_payment,
+    prepare=_command_prepare(reject_payment_command),
+    load_approval=_load_payment_approval,
+)
 _REGISTERED = {
     tool.contract.definition.name: tool
-    for tool in (_CREATE, _UPDATE, _SUBMIT, _CANCEL, _VOID, _REFUND, _VOID_RECEIPT)
+    for tool in (
+        _CREATE,
+        _UPDATE,
+        _SUBMIT,
+        _APPROVE,
+        _REJECT,
+        _CANCEL,
+        _VOID,
+        _REFUND,
+        _VOID_RECEIPT,
+    )
 }
 PAYMENT_TOOL_NAMES = tuple(sorted(_REGISTERED))
 
@@ -683,4 +882,5 @@ def execute_registered_tool(
         payload=command,
         confirmed=confirmed,
         finance_mutate=tool.finance_mutate,
+        load_approval=approval_loader(request, command, tool.load_approval),
     )

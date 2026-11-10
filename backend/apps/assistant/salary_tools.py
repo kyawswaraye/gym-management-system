@@ -1,8 +1,8 @@
 """Salary period commands through the existing finance runner.
 
 Handlers do not call ``run_idempotent``. The executor does, outside the
-assistant transaction. Approve and reject stay unregistered until the stored
-line total can be split from the route. Each finance body matches the view
+assistant transaction. Approve and reject confirm the stored period id and
+``money_text`` of the stored line sum outside the view-body hash. Each finance body matches the view
 body, and the route id is a separate field so the view's period id remains in
 that hash. Line replacement uses the published ``PUT`` route.
 """
@@ -21,8 +21,20 @@ from rest_framework.request import Request
 from rest_framework.serializers import Serializer
 from rest_framework.views import APIView
 
+from apps.assistant.approval import (
+    CONFIRMATION_FIELDS,
+    approval_loader,
+    attach_confirmation,
+    salary_snapshot,
+)
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
-from apps.assistant.executor import ExecutionMode, ToolCall, ToolContract, execute_confirmed_tool
+from apps.assistant.executor import (
+    ApprovalSnapshot,
+    ExecutionMode,
+    ToolCall,
+    ToolContract,
+    execute_confirmed_tool,
+)
 from apps.assistant.models import Goal
 from apps.assistant.prerequisites import FieldRequirement, Prerequisite
 from apps.assistant.registry import ToolDefinition
@@ -30,8 +42,10 @@ from apps.cashbook.serializers import transaction_payload
 from apps.common.finance.idempotency import IdempotentResponse
 from apps.expenses.serializers import expense_payload
 from apps.salaries.serializers import (
+    ApproveSalarySerializer,
     CancelSalarySerializer,
     EmptyCommandSerializer,
+    RejectSalarySerializer,
     SalaryLinesReplaceSerializer,
     SalaryPeriodUpdateSerializer,
     SalaryPeriodWriteSerializer,
@@ -39,8 +53,10 @@ from apps.salaries.serializers import (
     period_payload,
 )
 from apps.salaries.services import (
+    approve_period,
     cancel_period,
     create_period,
+    reject_period,
     replace_lines,
     submit_period,
     update_period,
@@ -52,6 +68,8 @@ CREATE_ROUTE = "/api/v1/salary-periods/"
 UPDATE_ROUTE = "/api/v1/salary-periods/{period_route_id}/"
 LINES_ROUTE = "/api/v1/salary-periods/{period_route_id}/lines/"
 SUBMIT_ROUTE = "/api/v1/salary-periods/{period_route_id}/submit/"
+APPROVE_ROUTE = "/api/v1/salary-periods/{period_route_id}/approve/"
+REJECT_ROUTE = "/api/v1/salary-periods/{period_route_id}/reject/"
 CANCEL_ROUTE = "/api/v1/salary-periods/{period_route_id}/cancel/"
 VOID_ROUTE = "/api/v1/salary-periods/{period_route_id}/void/"
 _ROUTE_KEYS = ("period_route_id", "salary_period_id")
@@ -62,9 +80,16 @@ class RegisteredTool:
     contract: ToolContract
     finance_mutate: Any
     prepare: Any
+    load_approval: Any = None
 
 
-def _definition(name: str, description: str, permission: str) -> ToolDefinition:
+def _definition(
+    name: str,
+    description: str,
+    permission: str,
+    *,
+    approval: bool = False,
+) -> ToolDefinition:
     return ToolDefinition(
         name=name,
         description=description,
@@ -73,6 +98,7 @@ def _definition(name: str, description: str, permission: str) -> ToolDefinition:
         permissions=(permission,),
         features=("finance",),
         confirmation_required=True,
+        approval_required=approval,
     )
 
 
@@ -83,6 +109,7 @@ def _contract(
     http_method: str,
     route: str,
     route_fields: tuple[str, ...] = (),
+    confirmation_fields: tuple[str, ...] = (),
 ) -> ToolContract:
     return ToolContract(
         definition=definition,
@@ -96,6 +123,7 @@ def _contract(
         http_method=http_method,
         route=route,
         route_fields=route_fields,
+        confirmation_fields=confirmation_fields,
     )
 
 
@@ -292,6 +320,58 @@ def cancel_salary_period_command(payload: Mapping[str, object]) -> dict[str, obj
     )
 
 
+_APPROVAL_STRIP = (
+    "gym_id",
+    "salary_period_id",
+    "period_route_id",
+    "record_id",
+    "amount",
+    "confirmed",
+)
+
+
+def approve_salary_period_body(data: Mapping[str, object], *, period_id: str) -> dict[str, object]:
+    """Return the approve body whose finance hash matches the HTTP view."""
+
+    fields = _validated_with(ApproveSalarySerializer, data)
+    return {
+        "salary_period_id": period_id,
+        "cash_sessions": _json_value(fields.get("cash_sessions", [])),
+    }
+
+
+def reject_salary_period_body(data: Mapping[str, object], *, period_id: str) -> dict[str, object]:
+    """Return the reject body whose finance hash matches the HTTP view."""
+
+    fields = _validated_with(RejectSalarySerializer, data)
+    return {"salary_period_id": period_id, "reason": str(fields["rejection_reason"])}
+
+
+def _approval_command(body: dict[str, object], payload: Mapping[str, object]) -> dict[str, object]:
+    bound = _bind_route(
+        body,
+        payload,
+        source="salary_period_id",
+        route_key="period_route_id",
+        body_key="salary_period_id",
+    )
+    return attach_confirmation(bound, payload)
+
+
+def approve_salary_period_command(payload: Mapping[str, object]) -> dict[str, object]:
+    return _approval_command(
+        approve_salary_period_body(_without(payload, *_APPROVAL_STRIP), period_id=""),
+        payload,
+    )
+
+
+def reject_salary_period_command(payload: Mapping[str, object]) -> dict[str, object]:
+    return _approval_command(
+        reject_salary_period_body(_without(payload, *_APPROVAL_STRIP), period_id=""),
+        payload,
+    )
+
+
 def void_salary_period_command(payload: Mapping[str, object]) -> dict[str, object]:
     body = void_salary_period_body(
         _without(payload, "gym_id", "salary_period_id", "period_route_id"),
@@ -447,6 +527,57 @@ def _cancel_period(call: ToolCall) -> IdempotentResponse:
     return _render_period(period, "Salary period cancelled", 200)
 
 
+_APPROVAL_KEYS = ("salary_period_id", "period_route_id", "record_id", "amount")
+
+
+def _approve_period(call: ToolCall) -> IdempotentResponse:
+    fields = _validated_with(ApproveSalarySerializer, _without(call.payload, *_APPROVAL_KEYS))
+    period, expenses, movements = approve_period(
+        gym=call.gym,
+        actor=call.actor,
+        period_id=_required_uuid(call.payload.get("period_route_id")),
+        cash_sessions=list(fields.get("cash_sessions", [])),
+        request_id=call.request_id,
+        ip_address=call.ip_address,
+        user_agent=call.user_agent,
+    )
+    rendered = {
+        "success": True,
+        "data": {
+            "salary_period": period_payload(period),
+            "expenses": [expense_payload(expense) for expense in expenses],
+            "cash_transactions": [transaction_payload(movement) for movement in movements],
+        },
+        "message": "Salary period approved",
+    }
+    return IdempotentResponse(
+        status=200,
+        body=JSONRenderer().render(rendered),
+        resource_type="SalaryPeriod",
+        resource_id=period.id,
+    )
+
+
+def _reject_period(call: ToolCall) -> IdempotentResponse:
+    body = _without(call.payload, *_APPROVAL_KEYS)
+    reason = body.pop("reason")
+    fields = _validated_with(RejectSalarySerializer, {**body, "rejection_reason": reason})
+    period = reject_period(
+        gym=call.gym,
+        actor=call.actor,
+        period_id=_required_uuid(call.payload.get("period_route_id")),
+        reason=str(fields["rejection_reason"]),
+        request_id=call.request_id,
+        ip_address=call.ip_address,
+        user_agent=call.user_agent,
+    )
+    return _render_period(period, "Salary period rejected", 200)
+
+
+def _load_salary_approval(gym: Gym, payload: Mapping[str, object]) -> ApprovalSnapshot:
+    return salary_snapshot(gym, payload.get("period_route_id"))
+
+
 def _void_period(call: ToolCall) -> IdempotentResponse:
     fields = _validated_with(VoidSalarySerializer, _present(call.payload, *_ROUTE_KEYS))
     period, reversals = void_period(
@@ -554,9 +685,54 @@ _VOID = RegisteredTool(
     finance_mutate=_void_period,
     prepare=_command_prepare(void_salary_period_command),
 )
+_APPROVE = RegisteredTool(
+    contract=_contract(
+        _definition(
+            "approve_salary_period",
+            "Approve a salary period",
+            "salaries.approve",
+            approval=True,
+        ),
+        (
+            FieldRequirement("salary_period_id", "Salary period"),
+            FieldRequirement("record_id", "Stored period"),
+            FieldRequirement("amount", "Stored line total"),
+        ),
+        http_method="POST",
+        route=APPROVE_ROUTE,
+        route_fields=("period_route_id",),
+        confirmation_fields=CONFIRMATION_FIELDS,
+    ),
+    finance_mutate=_approve_period,
+    prepare=_command_prepare(approve_salary_period_command),
+    load_approval=_load_salary_approval,
+)
+_REJECT = RegisteredTool(
+    contract=_contract(
+        _definition(
+            "reject_salary_period",
+            "Reject a salary period",
+            "salaries.approve",
+            approval=True,
+        ),
+        (
+            FieldRequirement("salary_period_id", "Salary period"),
+            FieldRequirement("record_id", "Stored period"),
+            FieldRequirement("amount", "Stored line total"),
+            FieldRequirement("reason", "Rejection reason"),
+        ),
+        http_method="POST",
+        route=REJECT_ROUTE,
+        route_fields=("period_route_id",),
+        confirmation_fields=CONFIRMATION_FIELDS,
+    ),
+    finance_mutate=_reject_period,
+    prepare=_command_prepare(reject_salary_period_command),
+    load_approval=_load_salary_approval,
+)
 _REGISTERED = {
     tool.contract.definition.name: tool
-    for tool in (_CREATE, _UPDATE, _LINES, _SUBMIT, _CANCEL, _VOID)
+    for tool in (_CREATE, _UPDATE, _LINES, _SUBMIT, _APPROVE, _REJECT, _CANCEL, _VOID)
 }
 SALARY_TOOL_NAMES = tuple(sorted(_REGISTERED))
 
@@ -598,4 +774,5 @@ def execute_registered_tool(
         payload=command,
         confirmed=confirmed,
         finance_mutate=tool.finance_mutate,
+        load_approval=approval_loader(request, command, tool.load_approval),
     )

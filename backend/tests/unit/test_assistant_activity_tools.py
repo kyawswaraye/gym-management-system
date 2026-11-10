@@ -37,7 +37,7 @@ def test_registered_activity_tools_are_confirmed_database_writes() -> None:
     assert tools["check_out_check_in"].permissions == ("checkins.update",)
     names = production_registry().names()
     assert "create_payment" in names
-    assert "approve_payment" not in names
+    assert "approve_payment" in names
     assert "invite_owner" not in names
 
 

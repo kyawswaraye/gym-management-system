@@ -1,8 +1,8 @@
 """PT sale, commission, package, and booking commands through the finance runner.
 
 Handlers do not call ``run_idempotent``. The executor does, outside the
-assistant transaction. Approve and reject stay unregistered until the stored
-gross fee can be split from the route. These views do not close trainer-only
+assistant transaction. Approve and reject confirm the stored sale id and
+``money_text`` of the gross fee outside the view-body hash. These views do not close trainer-only
 finance access, so the contracts leave ``finance_closed`` false. Each finance
 body matches the view body. The route id is a separate field and is not added
 to a body the view does not hash.
@@ -22,8 +22,20 @@ from rest_framework.request import Request
 from rest_framework.serializers import Serializer
 from rest_framework.views import APIView
 
+from apps.assistant.approval import (
+    CONFIRMATION_FIELDS,
+    approval_loader,
+    attach_confirmation,
+    pt_sale_snapshot,
+)
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
-from apps.assistant.executor import ExecutionMode, ToolCall, ToolContract, execute_confirmed_tool
+from apps.assistant.executor import (
+    ApprovalSnapshot,
+    ExecutionMode,
+    ToolCall,
+    ToolContract,
+    execute_confirmed_tool,
+)
 from apps.assistant.models import Goal
 from apps.assistant.prerequisites import FieldRequirement, Prerequisite
 from apps.assistant.registry import ToolDefinition
@@ -42,8 +54,10 @@ from apps.trainers.pt_booking_services import (
 )
 from apps.trainers.pt_commission_services import record_pt_commission_payment
 from apps.trainers.pt_sale_services import (
+    approve_pt_sale,
     cancel_pt_sale,
     create_pt_sale,
+    reject_pt_sale,
     submit_pt_sale,
     update_pt_sale,
 )
@@ -54,7 +68,9 @@ from apps.trainers.serializers import (
     PTBookingCancelSerializer,
     PTBookingWriteSerializer,
     PTCommissionPaymentWriteSerializer,
+    PTSaleApproveSerializer,
     PTSaleCancelSerializer,
+    PTSaleRejectSerializer,
     PTSaleUpdateSerializer,
     PTSaleVoidSerializer,
     PTSaleWriteSerializer,
@@ -70,6 +86,8 @@ CREATE_SALE_ROUTE = "/api/v1/pt-sales/"
 UPDATE_SALE_ROUTE = "/api/v1/pt-sales/{pt_sale_id}/"
 CANCEL_SALE_ROUTE = "/api/v1/pt-sales/{pt_sale_id}/cancel/"
 SUBMIT_SALE_ROUTE = "/api/v1/pt-sales/{pt_sale_id}/submit/"
+APPROVE_SALE_ROUTE = "/api/v1/pt-sales/{pt_sale_id}/approve/"
+REJECT_SALE_ROUTE = "/api/v1/pt-sales/{pt_sale_id}/reject/"
 VOID_SALE_ROUTE = "/api/v1/pt-sales/{pt_sale_id}/void/"
 COMMISSION_ROUTE = "/api/v1/pt-commissions/{commission_id}/record-payment/"
 GRANT_ROUTE = "/api/v1/member-service-packages/"
@@ -85,9 +103,16 @@ class RegisteredTool:
     contract: ToolContract
     finance_mutate: Any
     prepare: Any
+    load_approval: Any = None
 
 
-def _definition(name: str, description: str, permission: str) -> ToolDefinition:
+def _definition(
+    name: str,
+    description: str,
+    permission: str,
+    *,
+    approval: bool = False,
+) -> ToolDefinition:
     return ToolDefinition(
         name=name,
         description=description,
@@ -96,6 +121,7 @@ def _definition(name: str, description: str, permission: str) -> ToolDefinition:
         permissions=(permission,),
         features=("pt",),
         confirmation_required=True,
+        approval_required=approval,
     )
 
 
@@ -106,6 +132,7 @@ def _contract(
     http_method: str,
     route: str,
     route_fields: tuple[str, ...] = (),
+    confirmation_fields: tuple[str, ...] = (),
 ) -> ToolContract:
     return ToolContract(
         definition=definition,
@@ -119,6 +146,7 @@ def _contract(
         http_method=http_method,
         route=route,
         route_fields=route_fields,
+        confirmation_fields=confirmation_fields,
     )
 
 
@@ -312,6 +340,37 @@ def submit_pt_sale_command(payload: Mapping[str, object]) -> dict[str, object]:
     return _keep_route({}, payload, "pt_sale_id")
 
 
+_APPROVAL_STRIP = ("gym_id", "pt_sale_id", "record_id", "amount", "confirmed")
+
+
+def approve_pt_sale_body(data: Mapping[str, object]) -> dict[str, object]:
+    """Return the approve body whose finance hash matches the HTTP view."""
+
+    fields = _validated_with(PTSaleApproveSerializer, data)
+    return {"cash_session_id": _json_value(fields.get("cash_session_id"))}
+
+
+def reject_pt_sale_body(data: Mapping[str, object]) -> dict[str, object]:
+    """Return the reject body whose finance hash matches the HTTP view."""
+
+    return _finance_body(PTSaleRejectSerializer, data)
+
+
+def _approval_command(
+    body: dict[str, object],
+    payload: Mapping[str, object],
+) -> dict[str, object]:
+    return attach_confirmation(_keep_route(body, payload, "pt_sale_id"), payload)
+
+
+def approve_pt_sale_command(payload: Mapping[str, object]) -> dict[str, object]:
+    return _approval_command(approve_pt_sale_body(_without(payload, *_APPROVAL_STRIP)), payload)
+
+
+def reject_pt_sale_command(payload: Mapping[str, object]) -> dict[str, object]:
+    return _approval_command(reject_pt_sale_body(_without(payload, *_APPROVAL_STRIP)), payload)
+
+
 def void_pt_sale_command(payload: Mapping[str, object]) -> dict[str, object]:
     body = void_pt_sale_body(_without(payload, "gym_id", "pt_sale_id"))
     return _keep_route(body, payload, "pt_sale_id")
@@ -496,6 +555,63 @@ def _submit_sale(call: ToolCall) -> IdempotentResponse:
         user_agent=call.user_agent,
     )
     return _render_sale(row, "PT sale submitted", 200)
+
+
+_APPROVAL_KEYS = ("pt_sale_id", "record_id", "amount")
+
+
+def _approve_sale(call: ToolCall) -> IdempotentResponse:
+    fields = _validated_with(PTSaleApproveSerializer, _without(call.payload, *_APPROVAL_KEYS))
+    row, payment, receipt, movement, commission, granted = approve_pt_sale(
+        gym=call.gym,
+        actor=call.actor,
+        sale_id=_required_uuid(call.payload.get("pt_sale_id")),
+        cash_session_id=fields.get("cash_session_id"),
+        request_id=call.request_id,
+        ip_address=call.ip_address,
+        user_agent=call.user_agent,
+    )
+    if granted is not None:
+        row.__dict__["granted_package_id"] = granted.id
+    rendered = {
+        "success": True,
+        "data": {
+            "sale": pt_sale_payload(row),
+            "payment": None if payment is None else payment_payload(payment),
+            "receipt": None if receipt is None else receipt_payload(receipt),
+            "cash_session": None if movement is None else session_payload(movement.cash_session),
+            "cash_transaction": None if movement is None else transaction_payload(movement),
+            "commission": commission_payload(commission),
+            "member_service_package": (
+                None if granted is None else member_package_payload(granted)
+            ),
+        },
+        "message": "PT sale approved",
+    }
+    return IdempotentResponse(
+        status=200,
+        body=JSONRenderer().render(rendered),
+        resource_type="PTSale",
+        resource_id=row.id,
+    )
+
+
+def _reject_sale(call: ToolCall) -> IdempotentResponse:
+    fields = _validated_with(PTSaleRejectSerializer, _without(call.payload, *_APPROVAL_KEYS))
+    row = reject_pt_sale(
+        gym=call.gym,
+        actor=call.actor,
+        sale_id=_required_uuid(call.payload.get("pt_sale_id")),
+        rejection_reason=str(fields["rejection_reason"]),
+        request_id=call.request_id,
+        ip_address=call.ip_address,
+        user_agent=call.user_agent,
+    )
+    return _render_sale(row, "PT sale rejected", 200)
+
+
+def _load_pt_approval(gym: Gym, payload: Mapping[str, object]) -> ApprovalSnapshot:
+    return pt_sale_snapshot(gym, payload.get("pt_sale_id"))
 
 
 def _void_sale(call: ToolCall) -> IdempotentResponse:
@@ -863,6 +979,41 @@ _CANCEL_BOOKING = RegisteredTool(
     finance_mutate=_cancel_booking,
     prepare=_command_prepare(cancel_pt_booking_command),
 )
+_APPROVE_SALE = RegisteredTool(
+    contract=_contract(
+        _definition("approve_pt_sale", "Approve a PT sale", "pt.sales.approve", approval=True),
+        (
+            FieldRequirement("pt_sale_id", "PT sale"),
+            FieldRequirement("record_id", "Stored sale"),
+            FieldRequirement("amount", "Stored gross fee"),
+        ),
+        http_method="POST",
+        route=APPROVE_SALE_ROUTE,
+        route_fields=("pt_sale_id",),
+        confirmation_fields=CONFIRMATION_FIELDS,
+    ),
+    finance_mutate=_approve_sale,
+    prepare=_command_prepare(approve_pt_sale_command),
+    load_approval=_load_pt_approval,
+)
+_REJECT_SALE = RegisteredTool(
+    contract=_contract(
+        _definition("reject_pt_sale", "Reject a PT sale", "pt.sales.approve", approval=True),
+        (
+            FieldRequirement("pt_sale_id", "PT sale"),
+            FieldRequirement("record_id", "Stored sale"),
+            FieldRequirement("amount", "Stored gross fee"),
+            FieldRequirement("rejection_reason", "Rejection reason"),
+        ),
+        http_method="POST",
+        route=REJECT_SALE_ROUTE,
+        route_fields=("pt_sale_id",),
+        confirmation_fields=CONFIRMATION_FIELDS,
+    ),
+    finance_mutate=_reject_sale,
+    prepare=_command_prepare(reject_pt_sale_command),
+    load_approval=_load_pt_approval,
+)
 _REGISTERED = {
     tool.contract.definition.name: tool
     for tool in (
@@ -870,6 +1021,8 @@ _REGISTERED = {
         _UPDATE_SALE,
         _CANCEL_SALE,
         _SUBMIT_SALE,
+        _APPROVE_SALE,
+        _REJECT_SALE,
         _VOID_SALE,
         _COMMISSION,
         _GRANT,
@@ -920,4 +1073,5 @@ def execute_registered_tool(
         payload=command,
         confirmed=confirmed,
         finance_mutate=tool.finance_mutate,
+        load_approval=approval_loader(request, command, tool.load_approval),
     )
