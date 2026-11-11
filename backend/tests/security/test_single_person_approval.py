@@ -11,7 +11,7 @@ from django.test import override_settings
 
 from apps.common.db.tenant_context import set_gym_context
 from apps.tenants.models import GymMembership, GymMembershipRole, Role
-from tests.security.test_cashbook import _adjust, _open
+from tests.security.test_cashbook import _adjust, _open, _reconcile
 from tests.security.test_expenses import _category
 from tests.security.test_expenses import _draft as _expense_draft
 from tests.security.test_payment_controls import _approve, _pending_bank
@@ -103,8 +103,33 @@ def test_owner_and_desk_complete_their_own_finance_without_a_second_person() -> 
         == 200
     )
     assert _expense_self(api, owner_headers, gym, category_id) == 200
+    pure_session = _open(api, owner_headers, gym=gym, register="PURE")
+    assert pure_session.status_code == 201, pure_session.content
+    pure_session_id = pure_session.json()["data"]["session"]["id"]
+    assert (
+        _adjust(
+            api,
+            owner_headers,
+            gym=gym,
+            session_id=pure_session_id,
+            direction="IN",
+            amount="1.00",
+        ).status_code
+        == 201
+    )
 
     _grant(gym, owner, "RECEPTIONIST", owner=True)
+    assert (
+        _adjust(
+            api,
+            owner_headers,
+            gym=gym,
+            session_id=pure_session_id,
+            direction="OUT",
+            amount="1.00",
+        ).status_code
+        == 201
+    )
     owner_reception_payment = _pending_bank(
         api, owner_headers, gym, member_id, membership_id, "12.00"
     )
@@ -219,16 +244,49 @@ def test_owner_and_desk_complete_their_own_finance_without_a_second_person() -> 
     )
     desk_session = _open(api, desk_headers, gym=gym, register="DSK1")
     assert desk_session.status_code == 201, desk_session.content
+    desk_session_id = desk_session.json()["data"]["session"]["id"]
+    desk_adjust = _adjust(
+        api,
+        desk_headers,
+        gym=gym,
+        session_id=desk_session_id,
+        direction="IN",
+        amount="1.00",
+        key="sod-desk-adjust-1",
+    )
+    assert desk_adjust.status_code == 201, desk_adjust.content
+    assert desk_adjust.json()["data"]["session"]["manual_net"] == "1.00"
+    replay = _adjust(
+        api,
+        desk_headers,
+        gym=gym,
+        session_id=desk_session_id,
+        direction="IN",
+        amount="1.00",
+        key="sod-desk-adjust-1",
+    )
+    assert replay.content == desk_adjust.content
     assert (
         _adjust(
             api,
             desk_headers,
             gym=gym,
-            session_id=desk_session.json()["data"]["session"]["id"],
+            session_id=owner_session_id,
             direction="IN",
             amount="1.00",
         ).status_code
-        == 403
+        == 404
+    )
+    assert (
+        _adjust(
+            api,
+            owner_headers,
+            gym=gym,
+            session_id=desk_session_id,
+            direction="IN",
+            amount="1.00",
+        ).status_code
+        == 201
     )
     manager_session = _open(api, manager_headers, gym=gym, register="MGR1")
     assert manager_session.status_code == 201, manager_session.content
@@ -256,3 +314,67 @@ def test_owner_and_desk_complete_their_own_finance_without_a_second_person() -> 
         ).status_code
         == 403
     )
+    desk_trainer_session = _open(api, desk_trainer_headers, gym=gym, register="DSK2")
+    assert desk_trainer_session.status_code == 201, desk_trainer_session.content
+    desk_trainer_session_id = desk_trainer_session.json()["data"]["session"]["id"]
+    assert (
+        _adjust(
+            api,
+            desk_trainer_headers,
+            gym=gym,
+            session_id=desk_trainer_session_id,
+            direction="IN",
+            amount="1.00",
+        ).status_code
+        == 201
+    )
+    assert (
+        _adjust(
+            api,
+            desk_trainer_headers,
+            gym=gym,
+            session_id=owner_session_id,
+            direction="IN",
+            amount="1.00",
+        ).status_code
+        == 404
+    )
+    assert (
+        _adjust(
+            api,
+            trainer_headers,
+            gym=gym,
+            session_id=owner_session_id,
+            direction="IN",
+            amount="1.00",
+        ).status_code
+        == 403
+    )
+    assert (
+        _adjust(
+            api,
+            other_headers,
+            gym=gym,
+            session_id=owner_session_id,
+            direction="IN",
+            amount="1.00",
+        ).status_code
+        == 404
+    )
+    closed = _reconcile(
+        api,
+        owner_headers,
+        session_id=pure_session_id,
+        actual="100.00",
+        key="sod-close-pure-001",
+    )
+    assert closed.status_code == 200, closed.content
+    late = _adjust(
+        api,
+        owner_headers,
+        gym=gym,
+        session_id=pure_session_id,
+        direction="IN",
+        amount="1.00",
+    )
+    assert late.status_code == 409

@@ -58,15 +58,26 @@ def restricts_to_own_sessions(
     """True when this membership holds the protected Reception role.
 
     Another role, including a custom role that grants ``permission_code``,
-    does not remove the own-session limit.
+    does not remove the own-session limit. A protected owner may adjust any
+    open till in the gym, so ``cashbook.adjust`` does not apply this limit
+    to the owner.
     """
 
     if permission_code == "":
         return False
-    return holds_protected_role(
+    if not holds_protected_role(
         gym_id=gym_id,
         membership_id=membership_id,
         role_key=_RECEPTION_KEY,
+    ):
+        return False
+    return not (
+        permission_code == "cashbook.adjust"
+        and holds_protected_role(
+            gym_id=gym_id,
+            membership_id=membership_id,
+            role_key="OWNER",
+        )
     )
 
 
