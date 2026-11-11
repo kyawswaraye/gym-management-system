@@ -24,7 +24,11 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.audit.services import write_tenant_audit
 from apps.cashbook.models import CashSession, CashTransaction
-from apps.cashbook.selectors import holds_protected_role, membership_has_permission
+from apps.cashbook.selectors import (
+    holds_protected_role,
+    membership_has_permission,
+    reception_record_scope_applies,
+)
 from apps.cashbook.services import revalidate_cash_actor
 from apps.expenses.models import Expense
 from apps.expenses.services import post_staff_salary_expense, void_linked_salary_expense
@@ -633,7 +637,7 @@ def _lock_period(*, gym_id: UUID, period_id: UUID) -> SalaryPeriod:
 
 def _lock_visible_period(*, gym_id: UUID, period_id: UUID, actor: GymMembership) -> SalaryPeriod:
     period = _lock_period(gym_id=gym_id, period_id=period_id)
-    if not _holds_reception(gym_id=gym_id, membership_id=actor.id):
+    if not reception_record_scope_applies(gym_id=gym_id, membership_id=actor.id):
         return period
     if actor.id not in {period.created_by_membership_id, period.submitted_by_membership_id}:
         raise Http404

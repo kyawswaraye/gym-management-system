@@ -242,16 +242,19 @@ def _may_pay_own_commission(*, gym_id: UUID, membership_id: UUID) -> bool:
 
 
 def _assert_payer(*, gym_id: UUID, actor: GymMembership) -> None:
-    if holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key=_TRAINER_ROLE):
-        raise PermissionDenied()
-    manager = holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key=_MANAGER_ROLE)
     owner = holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key=_OWNER_ROLE)
+    manager = holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key=_MANAGER_ROLE)
     receptionist = holds_protected_role(
         gym_id=gym_id, membership_id=actor.id, role_key=_RECEPTION_ROLE
     )
-    if receptionist and not manager and not owner:
+    trainer = holds_protected_role(gym_id=gym_id, membership_id=actor.id, role_key=_TRAINER_ROLE)
+    if owner or (manager and receptionist):
+        return
+    if trainer:
         raise PermissionDenied()
-    if not manager and not owner:
+    if receptionist and not manager:
+        raise PermissionDenied()
+    if not manager:
         raise PermissionDenied()
 
 

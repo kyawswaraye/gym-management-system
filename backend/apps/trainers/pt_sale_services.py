@@ -637,6 +637,9 @@ def _assert_approver(*, gym: Gym, actor: GymMembership) -> None:
     receptionist = holds_protected_role(
         gym_id=gym.id, membership_id=actor.id, role_key="RECEPTIONIST"
     )
+    trainer = holds_protected_role(gym_id=gym.id, membership_id=actor.id, role_key="TRAINER")
+    if trainer and not (owner or (manager and receptionist)):
+        raise PermissionDenied()
     if receptionist and not manager and not owner:
         raise PermissionDenied()
     if not manager and not owner:

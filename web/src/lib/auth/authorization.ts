@@ -37,11 +37,16 @@ export function trainerAssignmentRestricted(session: CurrentUser): boolean {
 }
 
 function protectedAdjuster(session: CurrentUser): boolean {
-  return (
-    holdsProtectedManagement(session) &&
-    !holdsRole(session, "TRAINER") &&
-    !holdsRole(session, "RECEPTIONIST")
-  );
+  if (!holdsProtectedManagement(session)) {
+    return false;
+  }
+  if (session.gym_membership?.is_owner || holdsRole(session, "OWNER")) {
+    return true;
+  }
+  if (holdsRole(session, "MANAGER") && holdsRole(session, "RECEPTIONIST")) {
+    return true;
+  }
+  return !holdsRole(session, "TRAINER") && !holdsRole(session, "RECEPTIONIST");
 }
 
 /** Owner, or one person who is both manager and receptionist. */
@@ -88,12 +93,22 @@ export function canAdjustMemberSessions(session: CurrentUser): boolean {
   );
 }
 
+function trainerRestrictionYields(session: CurrentUser): boolean {
+  if (!holdsRole(session, "TRAINER")) {
+    return true;
+  }
+  if (session.gym_membership?.is_owner || holdsRole(session, "OWNER")) {
+    return true;
+  }
+  return holdsRole(session, "MANAGER") && holdsRole(session, "RECEPTIONIST");
+}
+
 export function canPayPtCommission(session: CurrentUser): boolean {
   return (
     hasFeature(session, "pt") &&
     hasPermission(session, "pt.commissions.pay") &&
     holdsProtectedManagement(session) &&
-    !holdsRole(session, "TRAINER")
+    trainerRestrictionYields(session)
   );
 }
 
@@ -102,7 +117,7 @@ export function canApprovePtSale(session: CurrentUser): boolean {
     hasFeature(session, "pt") &&
     hasPermission(session, "pt.sales.approve") &&
     holdsProtectedManagement(session) &&
-    !holdsRole(session, "TRAINER")
+    trainerRestrictionYields(session)
   );
 }
 

@@ -316,13 +316,15 @@ def _status_for_remaining(*, remaining: int, valid_until: date, today: date) -> 
 
 
 def _assert_adjuster(*, gym: Gym, actor: GymMembership) -> None:
-    if holds_protected_role(gym_id=gym.id, membership_id=actor.id, role_key="RECEPTIONIST"):
-        raise PermissionDenied()
-    if holds_protected_role(gym_id=gym.id, membership_id=actor.id, role_key="TRAINER"):
-        raise PermissionDenied()
-    manager = holds_protected_role(gym_id=gym.id, membership_id=actor.id, role_key="MANAGER")
     owner = holds_protected_role(gym_id=gym.id, membership_id=actor.id, role_key="OWNER")
-    if not manager and not owner:
+    manager = holds_protected_role(gym_id=gym.id, membership_id=actor.id, role_key="MANAGER")
+    receptionist = holds_protected_role(
+        gym_id=gym.id, membership_id=actor.id, role_key="RECEPTIONIST"
+    )
+    trainer = holds_protected_role(gym_id=gym.id, membership_id=actor.id, role_key="TRAINER")
+    if owner or (manager and receptionist):
+        return
+    if receptionist or trainer or not manager:
         raise PermissionDenied()
 
 

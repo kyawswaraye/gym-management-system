@@ -1,8 +1,9 @@
 """Tenant-scoped salary period reads.
 
-A protected Reception membership sees only periods it created or submitted,
-and never a posted or void period. Another creator's draft is absent. The
-payee object is limited to id, staff code, and display name.
+A receptionist who is not also a protected owner or manager sees only periods
+they created or submitted, and never a posted or void period. Another creator's
+draft is absent. Owner and manager keep the gym-wide read. The payee object is
+limited to id, staff code, and display name.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from django.db.models import Q, QuerySet
 from django.http import Http404
 from rest_framework.exceptions import ValidationError
 
-from apps.cashbook.selectors import holds_protected_role
+from apps.cashbook.selectors import reception_record_scope_applies
 from apps.salaries.models import SalaryPeriod
 
 _SALT = "salary-period-list"
@@ -39,11 +40,7 @@ def get_period(*, gym_id: UUID, period_id: UUID, actor_membership_id: UUID) -> S
 
 def visible_periods(*, gym_id: UUID, actor_membership_id: UUID) -> QuerySet[SalaryPeriod]:
     queryset = SalaryPeriod.objects.filter(gym_id=gym_id)
-    if holds_protected_role(
-        gym_id=gym_id,
-        membership_id=actor_membership_id,
-        role_key="RECEPTIONIST",
-    ):
+    if reception_record_scope_applies(gym_id=gym_id, membership_id=actor_membership_id):
         queryset = queryset.filter(
             Q(created_by_membership_id=actor_membership_id)
             | Q(submitted_by_membership_id=actor_membership_id)

@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   PLATFORM_ACCESS_PATH,
+  canAdjustMemberSessions,
+  canApprovePtSale,
   canIssueCheckInChallenge,
   canOpenCheckIns,
   canOpenGymSettings,
   canOpenTrainerDashboard,
+  canPayPtCommission,
   gymSettingsAccess,
   hasFeature,
   hasTenantCapability,
@@ -410,5 +413,44 @@ describe("tenant authorization helpers", () => {
         trainer(["reports.financial"], ["reports", "pt"], ["TRAINER"]),
       ),
     ).toBe(false);
+  });
+
+  it("lets the owner and a desk manager act when trainer is also assigned", () => {
+    const staff = (roles: string[], isOwner = false) =>
+      ({
+        ...session(
+          ["pt.sales.approve", "pt.commissions.pay", "pt.sessions.adjust"],
+          ["pt"],
+        ),
+        gym_membership: { is_owner: isOwner, roles },
+      }) as CurrentUser;
+
+    const allowed = [
+      staff(["OWNER"], true),
+      staff(["MANAGER", "RECEPTIONIST"]),
+      staff(["MANAGER", "RECEPTIONIST", "TRAINER"]),
+      staff(["MANAGER"]),
+    ];
+    for (const current of allowed) {
+      expect(canApprovePtSale(current)).toBe(true);
+      expect(canPayPtCommission(current)).toBe(true);
+      expect(canAdjustMemberSessions(current)).toBe(true);
+    }
+
+    const ownerTrainer = staff(["OWNER", "TRAINER"], true);
+    expect(canApprovePtSale(ownerTrainer)).toBe(true);
+    expect(canPayPtCommission(ownerTrainer)).toBe(true);
+    expect(canAdjustMemberSessions(ownerTrainer)).toBe(true);
+
+    const denied = [
+      staff(["MANAGER", "TRAINER"]),
+      staff(["RECEPTIONIST"]),
+      staff(["TRAINER"]),
+    ];
+    for (const current of denied) {
+      expect(canApprovePtSale(current)).toBe(false);
+      expect(canPayPtCommission(current)).toBe(false);
+      expect(canAdjustMemberSessions(current)).toBe(false);
+    }
   });
 });

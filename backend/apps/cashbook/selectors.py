@@ -32,6 +32,23 @@ def holds_protected_role(*, gym_id: UUID, membership_id: UUID, role_key: str) ->
     ).exists()
 
 
+def reception_record_scope_applies(*, gym_id: UUID, membership_id: UUID) -> bool:
+    """True when reception limits hide other people's rows and posted or void rows.
+
+    A protected owner or manager keeps the gym-wide read, including when that
+    membership also holds the protected receptionist role.
+    """
+
+    if not holds_protected_role(
+        gym_id=gym_id, membership_id=membership_id, role_key=_RECEPTION_KEY
+    ):
+        return False
+    return not (
+        holds_protected_role(gym_id=gym_id, membership_id=membership_id, role_key="OWNER")
+        or holds_protected_role(gym_id=gym_id, membership_id=membership_id, role_key="MANAGER")
+    )
+
+
 def restricts_to_own_sessions(
     *,
     gym_id: UUID,

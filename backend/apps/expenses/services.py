@@ -1027,19 +1027,22 @@ def _assert_pt_commission_approver(
     """Require a protected manager or owner to post the payout expense.
 
     The accrual creator may post only when they are the owner, or both manager
-    and receptionist. A receptionist or trainer alone cannot post.
+    and receptionist. A receptionist or trainer alone cannot post. The trainer
+    assignment does not block an owner, or a manager who is also receptionist.
     """
 
-    if approver.id in {created_by_membership_id, submitted_by_membership_id}:
-        if not _may_close_own_expense(gym_id=gym_id, membership_id=approver.id):
-            raise PermissionDenied()
-    if holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="TRAINER"):
-        raise PermissionDenied()
-    manager = holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="MANAGER")
     owner = holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="OWNER")
+    manager = holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="MANAGER")
     receptionist = holds_protected_role(
         gym_id=gym_id, membership_id=approver.id, role_key="RECEPTIONIST"
     )
+    if approver.id in {created_by_membership_id, submitted_by_membership_id}:
+        if not _may_close_own_expense(gym_id=gym_id, membership_id=approver.id):
+            raise PermissionDenied()
+    if holds_protected_role(gym_id=gym_id, membership_id=approver.id, role_key="TRAINER") and not (
+        owner or (manager and receptionist)
+    ):
+        raise PermissionDenied()
     if receptionist and not manager and not owner:
         raise PermissionDenied()
     if not manager and not owner:

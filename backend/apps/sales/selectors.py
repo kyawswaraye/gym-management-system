@@ -1,7 +1,8 @@
 """Tenant-scoped retail sale reads.
 
-A protected Reception membership sees only sales it created or submitted,
-and never a posted or void sale. Another creator's draft is absent.
+A receptionist who is not also a protected owner or manager sees only sales
+they created or submitted, and never a posted or void sale. Another creator's
+draft is absent. Owner and manager keep the gym-wide read.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from django.db.models import Q, QuerySet
 from django.http import Http404
 from rest_framework.exceptions import ValidationError
 
-from apps.cashbook.selectors import holds_protected_role
+from apps.cashbook.selectors import reception_record_scope_applies
 from apps.sales.models import RetailSale
 
 _SALT = "retail-sale-list"
@@ -37,11 +38,7 @@ def get_sale(*, gym_id: UUID, sale_id: UUID, actor_membership_id: UUID) -> Retai
 
 def visible_sales(*, gym_id: UUID, actor_membership_id: UUID) -> QuerySet[RetailSale]:
     queryset = RetailSale.objects.filter(gym_id=gym_id)
-    if holds_protected_role(
-        gym_id=gym_id,
-        membership_id=actor_membership_id,
-        role_key="RECEPTIONIST",
-    ):
+    if reception_record_scope_applies(gym_id=gym_id, membership_id=actor_membership_id):
         queryset = queryset.filter(
             Q(created_by_membership_id=actor_membership_id)
             | Q(submitted_by_membership_id=actor_membership_id)
