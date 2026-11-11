@@ -89,23 +89,19 @@ def revalidate_cash_actor(
 def assert_owner_may_adjust(actor: GymMembership) -> None:
     """Interim rule until an Owner-configurable adjustment policy exists.
 
-    Holding the protected Reception role always denies adjustment. Otherwise
-    only the protected Owner role may adjust, even when ``cashbook.adjust``
-    is granted to a Manager, Accountant, or custom role.
+    Only the protected Owner may adjust, even when ``cashbook.adjust`` is
+    granted to a Manager, Accountant, or custom role. Receptionist or Trainer
+    on that same owner does not remove the grant. A manager who also works
+    the desk still cannot adjust.
     """
 
     if holds_protected_role(
         gym_id=actor.gym_id,
         membership_id=actor.id,
-        role_key="RECEPTIONIST",
-    ):
-        raise PermissionDenied()
-    if not holds_protected_role(
-        gym_id=actor.gym_id,
-        membership_id=actor.id,
         role_key="OWNER",
     ):
-        raise PermissionDenied()
+        return
+    raise PermissionDenied()
 
 
 def open_cash_session(
