@@ -1,3 +1,4 @@
+import { assistantEn, assistantMm } from "@/i18n/messages/assistant";
 import { authEn, authMm } from "@/i18n/messages/auth";
 import { commonEn, commonMm } from "@/i18n/messages/common";
 import { financeEn, financeMm } from "@/i18n/messages/finance";
@@ -15,6 +16,7 @@ function merge(
 
 export const messages = {
   en: merge(
+    assistantEn,
     commonEn,
     authEn,
     navEn,
@@ -25,6 +27,7 @@ export const messages = {
     platformEn,
   ),
   mm: merge(
+    assistantMm,
     commonMm,
     authMm,
     navMm,

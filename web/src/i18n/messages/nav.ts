@@ -1,5 +1,6 @@
 export const navEn = {
   Account: "Account",
+  Assistant: "Assistant",
   Audit: "Audit",
   Files: "Files",
   GymPilot: "GymPilot",
@@ -22,6 +23,7 @@ export const navEn = {
 
 export const navMm = {
   Account: "အကောင့်",
+  Assistant: "လက်ထောက်",
   Audit: "စစ်ဆေးမှု",
   Files: "ဖိုင်များ",
   GymPilot: "GymPilot",

@@ -85,6 +85,7 @@ export function workspaceNavigation(
     dashboard.push({ href: "/pt/dashboard", label: "Trainer dashboard" });
   }
   add(entries, "Dashboard", dashboard);
+  add(entries, "Assistant", [{ href: "/assistant", label: "Assistant" }]);
 
   const members: NavLinkItem[] = [];
   if (hasTenantCapability(session, "members.view", "members")) {
