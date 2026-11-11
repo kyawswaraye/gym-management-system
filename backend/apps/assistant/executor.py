@@ -20,6 +20,7 @@ from typing import cast
 from uuid import UUID
 
 from django.db import connection, transaction
+from django.http import Http404
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 from rest_framework.views import APIView
@@ -67,12 +68,14 @@ from apps.users.permissions import (
 )
 
 _MODES = frozenset({"same_transaction", "finance_idempotent", "external"})
+READ_PAGE_LIMIT = 25
 
 
 class ExecutionMode:
     SAME_TRANSACTION = "same_transaction"
     FINANCE_IDEMPOTENT = "finance_idempotent"
     EXTERNAL = "external"
+    READ = "read"
 
 
 @dataclass(frozen=True)
@@ -126,6 +129,19 @@ class ToolCall:
     authz_version: int | None = None
     permission_codes: frozenset[str] = frozenset()
     execution_identity: str = ""
+
+
+@dataclass(frozen=True)
+class ReadCall:
+    """Session values a read selector may use. The payload is not a session."""
+
+    gym: Gym
+    actor: GymMembership
+    payload: Mapping[str, object]
+    request_id: str
+    ip_address: str | None
+    user_agent: str
+    permission_codes: frozenset[str] = frozenset()
 
 
 def execute_confirmed_tool(
@@ -213,6 +229,83 @@ def execute_confirmed_tool(
         expected_version=expected_version,
         identity=identity,
     )
+
+
+def execute_read_tool(
+    *,
+    request: Request,
+    view: APIView,
+    contract: ToolContract,
+    payload: Mapping[str, object],
+    read: Callable[[ReadCall], Mapping[str, object]],
+) -> Mapping[str, object]:
+    """Authorize the session and return one bounded read.
+
+    The selector runs inside the session gym. This path does not confirm, approve,
+    claim, or write an idempotency or assistant execution row.
+    """
+
+    _reject_read_contract(contract)
+    if not isinstance(payload, dict):
+        raise ExecutionRejected("Read payload must be a JSON object.", code="payload")
+    gym, actor = _session(request)
+    _reject_payload_gym(payload, gym_id=gym.id)
+    _authorize(request=request, view=view, contract=contract)
+    if contract.prerequisite is not None:
+        missing = missing_fields(contract.prerequisite, payload)
+        if missing:
+            raise ExecutionRejected(
+                "Required fields are missing: " + ", ".join(missing),
+                code="missing_fields",
+            )
+    _reject_read_limit(payload)
+    request_id, ip_address, user_agent = _request_context(request)
+    call = ReadCall(
+        gym=gym,
+        actor=actor,
+        payload=payload,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        permission_codes=_permission_codes(request),
+    )
+    try:
+        with transaction.atomic():
+            set_gym_context(gym_id=gym.id)
+            result = read(call)
+    except Http404 as exc:
+        raise ExecutionRejected("The record was not found.", code="not_found") from exc
+    if not isinstance(result, dict):
+        raise ExecutionRejected("The read result is not an object.", code="read_result")
+    return result
+
+
+def _reject_read_contract(contract: ToolContract) -> None:
+    if contract.definition.operation != "read" or contract.mode != ExecutionMode.READ:
+        raise ExecutionRejected("This executor runs read tools.", code="operation")
+    if contract.definition.external_side_effects:
+        raise ExecutionRejected(
+            "External side effects stay outside the assistant executor.",
+            code="external_side_effects",
+        )
+    if contract.definition.confirmation_required or contract.definition.approval_required:
+        raise ExecutionRejected(
+            "A read tool does not confirm or approve.",
+            code="execution_mode",
+        )
+    if contract.permission_mode not in {"all", "any"}:
+        raise ExecutionRejected("The permission mode is not supported.", code="permission_mode")
+
+
+def _reject_read_limit(payload: Mapping[str, object]) -> None:
+    if "limit" not in payload:
+        return
+    limit = payload["limit"]
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= READ_PAGE_LIMIT:
+        raise ExecutionRejected(
+            "Read pages contain at most 25 rows.",
+            code="invalid_limit",
+        )
 
 
 def _reject_unsupported_contract(

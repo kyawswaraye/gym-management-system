@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import timedelta
 from uuid import uuid4
 
 import pytest
+from django.http import Http404
 from django.test import override_settings
 from django.urls import Resolver404, resolve
 from django.utils import timezone
@@ -16,18 +18,21 @@ from apps.assistant.execution import ExecutionRejected
 from apps.assistant.executor import (
     ApprovalSnapshot,
     ExecutionMode,
+    ReadCall,
     ToolCall,
     ToolContract,
     _finance_command,
     execute_confirmed_tool,
+    execute_read_tool,
 )
 from apps.assistant.identity import execution_identity
-from apps.assistant.models import Goal
+from apps.assistant.models import Goal, LogicalClaim, ToolExecution
 from apps.assistant.prerequisites import FieldRequirement, Prerequisite
 from apps.assistant.registry import ToolDefinition, closed_production_names, production_registry
 from apps.common.finance.idempotency import canonical_request_hash
 from apps.tenants.exceptions import MFARequired
-from apps.tenants.models import Gym, GymMembership
+from apps.tenants.models import Gym, GymMembership, IdempotencyRecord
+from apps.trainers.selectors import TrainerMemberScope
 from apps.users.models import RefreshSession, User
 
 
@@ -578,3 +583,190 @@ def test_route_field_gym_mismatch_stops_before_a_claim(monkeypatch: pytest.Monke
             finance_mutate=fail,
         )
     assert caught.value.code == "gym_mismatch"
+
+
+def _read_contract(
+    *,
+    permissions: tuple[str, ...] = ("payments.view",),
+    finance_closed: bool = False,
+) -> ToolContract:
+    return ToolContract(
+        definition=_tool("probe_read", permissions=permissions, operation="read"),
+        mode=ExecutionMode.READ,
+        finance_closed=finance_closed,
+    )
+
+
+def _install_read_context(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    seen = {"atomic": False, "gym_id": None, "writes": 0}
+
+    class _Atomic:
+        def __enter__(self) -> _Atomic:
+            seen["atomic"] = True
+            return self
+
+        def __exit__(self, *_args: object) -> bool:
+            return False
+
+    def context(*, gym_id: object) -> None:
+        assert seen["atomic"] is True
+        seen["gym_id"] = gym_id
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        seen["writes"] = int(seen["writes"]) + 1
+        raise AssertionError("a read wrote")
+
+    monkeypatch.setattr("apps.assistant.executor.transaction.atomic", lambda: _Atomic())
+    monkeypatch.setattr("apps.assistant.executor.set_gym_context", context)
+    monkeypatch.setattr(ToolExecution.objects, "create", forbidden)
+    monkeypatch.setattr(IdempotencyRecord.objects, "create", forbidden)
+    monkeypatch.setattr(LogicalClaim.objects, "create", forbidden)
+    monkeypatch.setattr("apps.assistant.executor.acquire_claim", forbidden)
+    monkeypatch.setattr("apps.assistant.executor.run_idempotent", forbidden)
+    monkeypatch.setattr("apps.assistant.executor.commit_database_effect", forbidden)
+    return seen
+
+
+def _read(
+    request: Request,
+    contract: ToolContract,
+    payload: dict[str, object],
+    read: object,
+) -> Mapping[str, object]:
+    return execute_read_tool(
+        request=request,
+        view=APIView(),
+        contract=contract,
+        payload=payload,
+        read=read,  # type: ignore[arg-type]
+    )
+
+
+def test_permitted_read_returns_the_selector_and_writes_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gym = _gym()
+    goal = _goal(gym)
+    seen = _install_read_context(monkeypatch)
+    called = {"count": 0}
+
+    def read(call: ReadCall) -> dict[str, object]:
+        called["count"] += 1
+        assert call.gym.id == gym.id
+        assert call.actor.gym_id == gym.id
+        return {"id": "pay-1", "amount": "10.00"}
+
+    result = _read(
+        _request(gym, _actor(gym), frozenset({"payments.view"})),
+        _read_contract(),
+        {"limit": 25},
+        read,
+    )
+    assert result == {"id": "pay-1", "amount": "10.00"}
+    assert called["count"] == 1
+    assert seen["gym_id"] == gym.id
+    assert seen["writes"] == 0
+    assert goal.version == 1
+
+
+def test_read_permission_denial_does_not_call_the_selector() -> None:
+    gym = _gym()
+    called = {"count": 0}
+    with pytest.raises(PermissionDenied):
+        _read(
+            _request(gym, _actor(gym), frozenset()),
+            _read_contract(),
+            {},
+            lambda _call: called.__setitem__("count", 1),
+        )
+    assert called["count"] == 0
+
+
+def test_trainer_only_finance_read_is_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    gym = _gym()
+    called = {"count": 0}
+    monkeypatch.setattr(
+        "apps.trainers.selectors.trainer_member_scope",
+        lambda **_kwargs: TrainerMemberScope(restricted=True, profile_ids=()),
+    )
+    with pytest.raises(Http404):
+        _read(
+            _request(gym, _actor(gym), frozenset({"payments.view"})),
+            _read_contract(finance_closed=True),
+            {},
+            lambda _call: called.__setitem__("count", 1),
+        )
+    assert called["count"] == 0
+
+
+def test_read_payload_gym_mismatch_stops_before_the_selector() -> None:
+    gym = _gym()
+    other = _gym("other")
+    called = {"count": 0}
+    with pytest.raises(ExecutionRejected) as caught:
+        _read(
+            _request(gym, _actor(gym), frozenset({"payments.view"})),
+            _read_contract(),
+            {"gym_id": str(other.id)},
+            lambda _call: called.__setitem__("count", 1),
+        )
+    assert caught.value.code == "gym_mismatch"
+    assert called["count"] == 0
+
+
+def test_read_hides_a_record_from_another_gym(monkeypatch: pytest.MonkeyPatch) -> None:
+    gym = _gym()
+    other = _gym("other")
+    payment_id = uuid4()
+    seen = _install_read_context(monkeypatch)
+
+    def read(call: ReadCall) -> dict[str, object]:
+        if call.gym.id != other.id:
+            raise Http404
+        return {"id": str(payment_id)}
+
+    with pytest.raises(ExecutionRejected) as caught:
+        _read(
+            _request(gym, _actor(gym), frozenset({"payments.view"})),
+            _read_contract(),
+            {"payment_id": str(payment_id)},
+            read,
+        )
+    assert caught.value.code == "not_found"
+    assert other.code not in str(caught.value)
+    assert seen["writes"] == 0
+
+
+def test_read_limit_above_25_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    gym = _gym()
+    called = {"count": 0}
+    _install_read_context(monkeypatch)
+    with pytest.raises(ExecutionRejected) as caught:
+        _read(
+            _request(gym, _actor(gym), frozenset({"payments.view"})),
+            _read_contract(),
+            {"limit": 26},
+            lambda _call: called.__setitem__("count", 1),
+        )
+    assert caught.value.code == "invalid_limit"
+    assert called["count"] == 0
+
+
+def test_write_executor_still_rejects_a_read_operation() -> None:
+    gym = _gym()
+    called = {"count": 0}
+    contract = ToolContract(
+        definition=_tool("probe_read", permissions=("payments.view",), operation="read"),
+        mode=ExecutionMode.SAME_TRANSACTION,
+    )
+    with pytest.raises(ExecutionRejected) as caught:
+        _execute(
+            _request(gym, _actor(gym), frozenset({"payments.view"})),
+            contract,
+            _goal(gym),
+            payload={},
+            effect=lambda _call: called.__setitem__("count", 1),
+        )
+    assert caught.value.code == "operation"
+    assert called["count"] == 0
+    assert production_registry().names() == closed_production_names()
