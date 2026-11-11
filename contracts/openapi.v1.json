@@ -1690,6 +1690,180 @@
                 }
             }
         },
+        "/api/v1/assistant/confirmations/{id}/confirm/": {
+            "post": {
+                "operationId": "assistant_confirmations_confirm",
+                "description": "Authenticate inside a transaction, then run the handler outside one.\n\nGemini and finance commands cannot stay inside the request transaction.\nStaff authentication still needs one to set the tenant context.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "assistant"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ConfirmRequestRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ConfirmRequestRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ConfirmRequestRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConfirmationEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/assistant/confirmations/{id}/reject/": {
+            "post": {
+                "operationId": "assistant_confirmations_reject",
+                "description": "Authenticate inside a transaction, then run the handler outside one.\n\nGemini and finance commands cannot stay inside the request transaction.\nStaff authentication still needs one to set the tenant context.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "assistant"
+                ],
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConfirmationEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/assistant/conversations/": {
             "get": {
                 "operationId": "assistant_conversations_list",
@@ -1912,6 +2086,102 @@
                         "description": ""
                     },
                     "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/assistant/turns/": {
+            "post": {
+                "operationId": "assistant_turns_create",
+                "description": "Authenticate inside a transaction, then run the handler outside one.\n\nGemini and finance commands cannot stay inside the request transaction.\nStaff authentication still needs one to set the tenant context.",
+                "tags": [
+                    "assistant"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TurnRequestRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TurnRequestRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TurnRequestRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "staffBearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TurnEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "503": {
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -25843,6 +26113,21 @@
                     "type"
                 ]
             },
+            "ApprovalConfirmation": {
+                "type": "object",
+                "properties": {
+                    "record_id": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "amount",
+                    "record_id"
+                ]
+            },
             "ApproveExpenseRequest": {
                 "type": "object",
                 "properties": {
@@ -28148,6 +28433,87 @@
                     "success"
                 ]
             },
+            "ConfirmRequestRequest": {
+                "type": "object",
+                "properties": {
+                    "confirmed": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "confirmed"
+                ]
+            },
+            "ConfirmationData": {
+                "type": "object",
+                "properties": {
+                    "conversation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "message": {
+                        "$ref": "#/components/schemas/TurnMessage"
+                    },
+                    "pending_confirmation": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/PendingConfirmation"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "tool_activity": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ToolActivity"
+                        }
+                    },
+                    "outcome": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "conversation_id",
+                    "message",
+                    "outcome",
+                    "pending_confirmation",
+                    "tool_activity"
+                ]
+            },
+            "ConfirmationEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/ConfirmationData"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
+                ]
+            },
+            "ConfirmationField": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "value"
+                ]
+            },
             "Conversation": {
                 "type": "object",
                 "properties": {
@@ -28161,6 +28527,10 @@
                     "title": {
                         "type": "string"
                     },
+                    "created_by_membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time"
@@ -28168,6 +28538,7 @@
                 },
                 "required": [
                     "created_at",
+                    "created_by_membership_id",
                     "id",
                     "status",
                     "title"
@@ -28186,6 +28557,10 @@
                     "title": {
                         "type": "string"
                     },
+                    "created_by_membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time"
@@ -28201,13 +28576,23 @@
                         "items": {
                             "$ref": "#/components/schemas/GoalSummary"
                         }
+                    },
+                    "pending_confirmation": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/PendingConfirmation"
+                            }
+                        ],
+                        "nullable": true
                     }
                 },
                 "required": [
                     "created_at",
+                    "created_by_membership_id",
                     "goals",
                     "id",
                     "messages",
+                    "pending_confirmation",
                     "status",
                     "title"
                 ]
@@ -36252,6 +36637,47 @@
                     "purpose"
                 ]
             },
+            "PendingConfirmation": {
+                "type": "object",
+                "properties": {
+                    "step_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "goal_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "tool_name": {
+                        "type": "string"
+                    },
+                    "summary": {
+                        "type": "string"
+                    },
+                    "fields": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ConfirmationField"
+                        }
+                    },
+                    "approval": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ApprovalConfirmation"
+                            }
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "approval",
+                    "fields",
+                    "goal_id",
+                    "step_id",
+                    "summary",
+                    "tool_name"
+                ]
+            },
             "PeriodReport": {
                 "type": "object",
                 "properties": {
@@ -40930,6 +41356,21 @@
                     "refresh_token"
                 ]
             },
+            "ToolActivity": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "status"
+                ]
+            },
             "TrainerAssignment": {
                 "type": "object",
                 "properties": {
@@ -41351,6 +41792,99 @@
                     "member_id",
                     "member_number",
                     "starts_at"
+                ]
+            },
+            "TurnData": {
+                "type": "object",
+                "properties": {
+                    "conversation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "message": {
+                        "$ref": "#/components/schemas/TurnMessage"
+                    },
+                    "pending_confirmation": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/PendingConfirmation"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "tool_activity": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ToolActivity"
+                        }
+                    }
+                },
+                "required": [
+                    "conversation_id",
+                    "message",
+                    "pending_confirmation",
+                    "tool_activity"
+                ]
+            },
+            "TurnEnvelope": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/TurnData"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "data",
+                    "message",
+                    "success"
+                ]
+            },
+            "TurnMessage": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "body": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "body",
+                    "created_at",
+                    "id",
+                    "role"
+                ]
+            },
+            "TurnRequestRequest": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4000
+                    },
+                    "conversation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "message"
                 ]
             },
             "UploadIntentData": {

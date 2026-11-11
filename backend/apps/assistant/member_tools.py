@@ -401,6 +401,10 @@ def member_tool_definitions() -> tuple[ToolDefinition, ...]:
     return tuple(tool.contract.definition for tool in _REGISTERED.values())
 
 
+def member_tool_contracts() -> dict[str, ToolContract]:
+    return {name: tool.contract for name, tool in _REGISTERED.items()}
+
+
 def execute_registered_tool(
     *,
     request: Request,

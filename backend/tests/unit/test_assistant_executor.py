@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from django.http import Http404
 from django.test import override_settings
-from django.urls import Resolver404, resolve
+from django.urls import resolve
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
@@ -130,9 +130,9 @@ def _execute(
     )
 
 
-def test_turn_endpoint_is_not_registered() -> None:
-    with pytest.raises(Resolver404):
-        resolve("/api/v1/assistant/turns/")
+def test_turn_endpoint_is_registered() -> None:
+    match = resolve("/api/v1/assistant/turns/")
+    assert match.view_name == "assistant-turns"
     assert production_registry().names() == closed_production_names()
 
 

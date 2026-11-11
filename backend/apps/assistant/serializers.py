@@ -31,6 +31,7 @@ class ConversationSerializer(serializers.Serializer[dict[str, object]]):
     id = serializers.UUIDField()
     status = serializers.CharField()
     title = serializers.CharField()
+    created_by_membership_id = serializers.UUIDField()
     created_at = serializers.DateTimeField()
 
 
@@ -67,9 +68,88 @@ class ExecutionSerializer(serializers.Serializer[dict[str, object]]):
     covers_external_side_effects = serializers.BooleanField()
 
 
+class ConfirmationFieldSerializer(serializers.Serializer[dict[str, object]]):
+    name = serializers.CharField()
+    value = serializers.CharField()
+
+
+class ApprovalConfirmationSerializer(serializers.Serializer[dict[str, object]]):
+    record_id = serializers.CharField()
+    amount = serializers.CharField()
+
+
+class PendingConfirmationSerializer(serializers.Serializer[dict[str, object]]):
+    step_id = serializers.UUIDField()
+    goal_id = serializers.UUIDField()
+    tool_name = serializers.CharField()
+    summary = serializers.CharField()
+    fields = ConfirmationFieldSerializer(many=True)
+    approval = ApprovalConfirmationSerializer(allow_null=True)
+
+
+class ToolActivitySerializer(serializers.Serializer[dict[str, object]]):
+    name = serializers.CharField()
+    status = serializers.CharField()
+
+
+class TurnMessageSerializer(serializers.Serializer[dict[str, object]]):
+    id = serializers.UUIDField()
+    role = serializers.CharField()
+    body = serializers.CharField()
+    created_at = serializers.DateTimeField()
+
+
+class TurnDataSerializer(serializers.Serializer[dict[str, object]]):
+    conversation_id = serializers.UUIDField()
+    message = TurnMessageSerializer()
+    pending_confirmation = PendingConfirmationSerializer(allow_null=True)
+    tool_activity = ToolActivitySerializer(many=True)
+
+
+class TurnEnvelopeSerializer(serializers.Serializer[dict[str, object]]):
+    success = serializers.BooleanField()
+    data = TurnDataSerializer()
+    message = serializers.CharField()
+
+
+class ConfirmationDataSerializer(TurnDataSerializer):
+    outcome = serializers.CharField()
+
+
+class ConfirmationEnvelopeSerializer(serializers.Serializer[dict[str, object]]):
+    success = serializers.BooleanField()
+    data = ConfirmationDataSerializer()
+    message = serializers.CharField()
+
+
+class TurnRequestSerializer(StrictQuerySerializer):
+    message = serializers.CharField(max_length=4000)
+    conversation_id = serializers.UUIDField(required=False)
+
+    def validate_message(self, value: str) -> str:
+        text = value.strip()
+        if text == "":
+            raise serializers.ValidationError("This field is required.")
+        return text
+
+
+class ConfirmRequestSerializer(StrictQuerySerializer):
+    confirmed = serializers.BooleanField()
+
+    def validate_confirmed(self, value: bool) -> bool:
+        if value is not True:
+            raise serializers.ValidationError("Confirmation is required.")
+        return True
+
+
+class RejectRequestSerializer(StrictQuerySerializer):
+    pass
+
+
 class ConversationDetailSerializer(ConversationSerializer):
     messages = MessageSerializer(many=True)
     goals = GoalSummarySerializer(many=True)
+    pending_confirmation = PendingConfirmationSerializer(allow_null=True)
 
 
 class GoalDetailSerializer(GoalSummarySerializer):
@@ -108,6 +188,7 @@ def conversation_data(row: Conversation) -> dict[str, object]:
         "id": row.id,
         "status": row.status,
         "title": row.title,
+        "created_by_membership_id": row.created_by_membership_id,
         "created_at": row.created_at,
     }
 

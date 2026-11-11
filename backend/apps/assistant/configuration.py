@@ -83,6 +83,26 @@ def lock_timeout_ms() -> int:
     return _positive_int(str(getattr(settings, "ASSISTANT_LOCK_TIMEOUT_MS", "2000")), 2000, 5000)
 
 
+def gemini_timeout_seconds() -> int:
+    return _positive_int(str(getattr(settings, "GEMINI_TIMEOUT", "30")), 30, 120)
+
+
+def gemini_max_retries() -> int:
+    return _positive_int(str(getattr(settings, "GEMINI_MAX_RETRIES", "2")), 2, 5)
+
+
+def max_steps() -> int:
+    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_STEPS", "12")), 12, 20)
+
+
+def max_tool_calls() -> int:
+    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_TOOL_CALLS", "8")), 8, 20)
+
+
+def max_execution_seconds() -> int:
+    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_EXECUTION_TIME", "20")), 20, 60)
+
+
 def classify_provider_failure(*, status_code: int | None, provider_status: str) -> ProviderFailure:
     """Separate credential rejection from quota, timeout, and network failure."""
 

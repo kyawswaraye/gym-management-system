@@ -228,6 +228,50 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/assistant/confirmations/{id}/confirm/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * @description Authenticate inside a transaction, then run the handler outside one.
+     *
+     *     Gemini and finance commands cannot stay inside the request transaction.
+     *     Staff authentication still needs one to set the tenant context.
+     */
+    post: operations["assistant_confirmations_confirm"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assistant/confirmations/{id}/reject/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * @description Authenticate inside a transaction, then run the handler outside one.
+     *
+     *     Gemini and finance commands cannot stay inside the request transaction.
+     *     Staff authentication still needs one to set the tenant context.
+     */
+    post: operations["assistant_confirmations_reject"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/assistant/conversations/": {
     parameters: {
       query?: never;
@@ -286,6 +330,28 @@ export interface paths {
     get: operations["assistant_status"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assistant/turns/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * @description Authenticate inside a transaction, then run the handler outside one.
+     *
+     *     Gemini and finance commands cannot stay inside the request transaction.
+     *     Staff authentication still needs one to set the tenant context.
+     */
+    post: operations["assistant_turns_create"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3889,6 +3955,10 @@ export interface components {
       /** Format: date-time */
       ends_at?: string | null;
     };
+    ApprovalConfirmation: {
+      record_id: string;
+      amount: string;
+    };
     ApproveExpenseRequest: {
       /** Format: uuid */
       cash_session_id?: string | null;
@@ -4558,11 +4628,33 @@ export interface components {
       data: components["schemas"]["CompletedFile"];
       message: string;
     };
+    ConfirmRequestRequest: {
+      confirmed: boolean;
+    };
+    ConfirmationData: {
+      /** Format: uuid */
+      conversation_id: string;
+      message: components["schemas"]["TurnMessage"];
+      pending_confirmation: components["schemas"]["PendingConfirmation"] | null;
+      tool_activity: components["schemas"]["ToolActivity"][];
+      outcome: string;
+    };
+    ConfirmationEnvelope: {
+      success: boolean;
+      data: components["schemas"]["ConfirmationData"];
+      message: string;
+    };
+    ConfirmationField: {
+      name: string;
+      value: string;
+    };
     Conversation: {
       /** Format: uuid */
       id: string;
       status: string;
       title: string;
+      /** Format: uuid */
+      created_by_membership_id: string;
       /** Format: date-time */
       created_at: string;
     };
@@ -4571,10 +4663,13 @@ export interface components {
       id: string;
       status: string;
       title: string;
+      /** Format: uuid */
+      created_by_membership_id: string;
       /** Format: date-time */
       created_at: string;
       messages: components["schemas"]["Message"][];
       goals: components["schemas"]["GoalSummary"][];
+      pending_confirmation: components["schemas"]["PendingConfirmation"] | null;
     };
     ConversationDetailEnvelope: {
       success: boolean;
@@ -6943,6 +7038,16 @@ export interface components {
       received_at?: string;
       reference_number?: string;
     };
+    PendingConfirmation: {
+      /** Format: uuid */
+      step_id: string;
+      /** Format: uuid */
+      goal_id: string;
+      tool_name: string;
+      summary: string;
+      fields: components["schemas"]["ConfirmationField"][];
+      approval: components["schemas"]["ApprovalConfirmation"] | null;
+    };
     PeriodReport: {
       gym: components["schemas"]["ReportGym"];
       timezone: string;
@@ -8258,6 +8363,10 @@ export interface components {
       /** Format: date-time */
       refresh_expires_at: string;
     };
+    ToolActivity: {
+      name: string;
+      status: string;
+    };
     TrainerAssignment: {
       /** Format: uuid */
       id: string;
@@ -8381,6 +8490,31 @@ export interface components {
       starts_at: string;
       /** Format: date-time */
       ends_at: string;
+    };
+    TurnData: {
+      /** Format: uuid */
+      conversation_id: string;
+      message: components["schemas"]["TurnMessage"];
+      pending_confirmation: components["schemas"]["PendingConfirmation"] | null;
+      tool_activity: components["schemas"]["ToolActivity"][];
+    };
+    TurnEnvelope: {
+      success: boolean;
+      data: components["schemas"]["TurnData"];
+      message: string;
+    };
+    TurnMessage: {
+      /** Format: uuid */
+      id: string;
+      role: string;
+      body: string;
+      /** Format: date-time */
+      created_at: string;
+    };
+    TurnRequestRequest: {
+      message: string;
+      /** Format: uuid */
+      conversation_id?: string;
     };
     UploadIntentData: {
       /** Format: uuid */
@@ -9547,6 +9681,118 @@ export interface operations {
       };
     };
   };
+  assistant_confirmations_confirm: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ConfirmRequestRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ConfirmRequestRequest"];
+        "multipart/form-data": components["schemas"]["ConfirmRequestRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConfirmationEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  assistant_confirmations_reject: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConfirmationEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
   assistant_conversations_list: {
     parameters: {
       query?: {
@@ -9700,6 +9946,71 @@ export interface operations {
         };
       };
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+    };
+  };
+  assistant_turns_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TurnRequestRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["TurnRequestRequest"];
+        "multipart/form-data": components["schemas"]["TurnRequestRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TurnEnvelope"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorEnvelope"];
+        };
+      };
+      503: {
         headers: {
           [name: string]: unknown;
         };
