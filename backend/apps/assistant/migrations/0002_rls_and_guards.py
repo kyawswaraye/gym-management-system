@@ -218,6 +218,37 @@ REVOKE ALL ON FUNCTION app_guard_assistant_identity() FROM gym_runtime, gym_migr
 DROP FUNCTION IF EXISTS app_guard_assistant_effect();
 DROP FUNCTION IF EXISTS app_guard_assistant_delete();
 DROP FUNCTION IF EXISTS app_guard_assistant_identity();
+
+-- These keys reference the (gym_id, id) unique indexes created in 0001.
+-- Drop them before 0001 removes those indexes. The single-column foreign
+-- keys from 0001 keep Django's truncated names, so the forward DROP IF
+-- EXISTS statements do not remove them and this reverse leaves them in place.
+ALTER TABLE assistant_tool_execution
+  DROP CONSTRAINT IF EXISTS assistant_execution_step_same_gym_fk;
+ALTER TABLE assistant_tool_execution
+  DROP CONSTRAINT IF EXISTS assistant_execution_goal_same_gym_fk;
+ALTER TABLE assistant_workflow_step
+  DROP CONSTRAINT IF EXISTS assistant_step_workflow_same_gym_fk;
+ALTER TABLE assistant_workflow_step
+  DROP CONSTRAINT IF EXISTS assistant_step_goal_same_gym_fk;
+ALTER TABLE assistant_workflow
+  DROP CONSTRAINT IF EXISTS assistant_workflow_goal_same_gym_fk;
+ALTER TABLE assistant_message
+  DROP CONSTRAINT IF EXISTS assistant_message_goal_same_gym_fk;
+ALTER TABLE assistant_message
+  DROP CONSTRAINT IF EXISTS assistant_message_conversation_same_gym_fk;
+ALTER TABLE assistant_message
+  DROP CONSTRAINT IF EXISTS assistant_message_actor_same_gym_fk;
+ALTER TABLE assistant_goal
+  DROP CONSTRAINT IF EXISTS assistant_goal_conversation_same_gym_fk;
+ALTER TABLE assistant_goal
+  DROP CONSTRAINT IF EXISTS assistant_goal_actor_same_gym_fk;
+ALTER TABLE assistant_conversation
+  DROP CONSTRAINT IF EXISTS assistant_conv_actor_same_gym_fk;
+ALTER TABLE assistant_attachment_reference
+  DROP CONSTRAINT IF EXISTS assistant_attachment_file_same_gym_fk;
+ALTER TABLE assistant_attachment_reference
+  DROP CONSTRAINT IF EXISTS assistant_attachment_goal_same_gym_fk;
 """
 )
 
