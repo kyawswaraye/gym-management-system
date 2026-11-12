@@ -137,6 +137,11 @@ test.describe("signed-in owner", () => {
       page.getByText("Your conversations", { exact: true }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
+    // A previous spec may already have a conversation. Start a new one so
+    // restore cannot append this turn to that conversation and hide its title.
+    await page
+      .getByRole("button", { name: "New conversation", exact: true })
+      .click();
 
     const first = await ask(page, "Search members.");
     expect(first).toContain("E2Escan");
