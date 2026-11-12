@@ -10,7 +10,7 @@ from rest_framework.request import Request
 from apps.common.api.exceptions import AccessTokenExpired, AuthenticationFailed
 from apps.common.db.tenant_context import set_gym_context, set_identity_context
 from apps.common.observability.authority import note_observability_authority
-from apps.tenants.models import Gym, GymMembership, Permission, RolePermission
+from apps.tenants.models import Gym, GymMembership, GymMembershipRole, Permission, RolePermission
 
 from .member_sessions import establish_member_principal
 from .models import RefreshSession
@@ -81,6 +81,13 @@ class StaffJWTAuthentication(BaseAuthentication):
         request.gym = gym
         request.gym_membership = membership
         request.permission_codes = permission_codes
+        request.role_keys = frozenset(
+            GymMembershipRole.objects.filter(
+                gym_id=gym_id,
+                gym_membership=membership,
+                role__is_active=True,
+            ).values_list("role__key", flat=True)
+        )
         request.refresh_session = session
         request.principal_type = RefreshSession.PrincipalType.STAFF
         note_observability_authority(request, actor_id=session.user.id, gym_id=gym.id)
