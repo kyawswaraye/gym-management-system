@@ -19,6 +19,8 @@ from apps.common.production import (
 from .base import *  # noqa: F403
 
 MFA_ENFORCED = True
+if ASSISTANT_E2E_SCRIPT:  # noqa: F405
+    raise ImproperlyConfigured("The assistant E2E script cannot run in production.")
 
 MIDDLEWARE = [
     *MIDDLEWARE,  # noqa: F405

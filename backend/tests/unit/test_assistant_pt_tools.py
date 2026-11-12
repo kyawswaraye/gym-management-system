@@ -422,6 +422,7 @@ def test_finance_bodies_match_the_view_request_hash() -> None:
 
 def test_permission_and_gym_stop_before_a_pt_service() -> None:
     request, goal = _session()
+    request.gym_membership.is_owner = False
     sale_id = str(uuid4())
     payloads = (
         ("create_pt_sale", _sale_raw()),

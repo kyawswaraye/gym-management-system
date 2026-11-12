@@ -8,6 +8,8 @@ from dataclasses import dataclass
 class FieldRequirement:
     name: str
     description: str
+    required: bool = True
+    kind: str = "string"
 
 
 @dataclass(frozen=True)
@@ -22,6 +24,8 @@ class Prerequisite:
 def missing_fields(prerequisite: Prerequisite, collected: Mapping[str, object]) -> tuple[str, ...]:
     missing: list[str] = []
     for field in prerequisite.fields:
+        if not field.required:
+            continue
         value = collected.get(field.name, None)
         if value is None or value == "":
             missing.append(field.name)

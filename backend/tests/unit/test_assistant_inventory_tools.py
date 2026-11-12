@@ -218,6 +218,7 @@ def test_finance_bodies_match_the_view_request_hash() -> None:
 
 def test_permission_and_gym_stop_before_an_inventory_service() -> None:
     request, goal = _session()
+    request.gym_membership.is_owner = False
     payloads = (
         ("create_product_category", _category_raw()),
         ("create_product", _product_raw()),

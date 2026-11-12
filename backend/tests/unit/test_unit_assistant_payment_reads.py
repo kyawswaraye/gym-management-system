@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 from django.http import Http404
+from rest_framework.exceptions import ValidationError
 
 from apps.assistant.executor import ApprovalSnapshot, ExecutionMode, ReadCall
 from apps.assistant.payment_reads import (
@@ -29,6 +30,8 @@ _SEARCH_KEYS = {
     "description",
     "business_date",
     "member_id",
+    "entry_type",
+    "original_payment_id",
 }
 _DETAIL_KEYS = {
     "record_id",
@@ -40,6 +43,8 @@ _DETAIL_KEYS = {
     "description",
     "business_date",
     "member_id",
+    "entry_type",
+    "original_payment_id",
 }
 _HIDDEN = {
     "phone",
@@ -84,6 +89,8 @@ def _payment(payment_id: object, amount: str = "99.00") -> SimpleNamespace:
         description="Day pass",
         business_date=date(2026, 11, 10),
         member_id=None,
+        entry_type="CHARGE",
+        original_payment_id=None,
         phone="09123456789",
         email="member@example.test",
         reference_number="secret-ref",
@@ -152,6 +159,8 @@ def test_search_uses_the_session_and_omits_contact_fields(monkeypatch: pytest.Mo
             "description": "Day pass",
             "business_date": "2026-11-10",
             "member_id": None,
+            "entry_type": "CHARGE",
+            "original_payment_id": None,
         }
     ]
     assert set(rows[0]) == _SEARCH_KEYS
@@ -172,6 +181,25 @@ def test_get_payment_returns_the_snapshot_amount(monkeypatch: pytest.MonkeyPatch
     assert result["amount"] == "10.50"
     assert set(result) == _DETAIL_KEYS
     assert _HIDDEN.isdisjoint(result)
+
+
+def test_refund_rows_keep_the_stored_entry_type(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_id = uuid4()
+    refund = _payment(uuid4(), "15.00")
+    refund.entry_type = "REFUND"
+    refund.original_payment_id = original_id
+    monkeypatch.setattr(
+        "apps.assistant.payment_reads.page_payments",
+        lambda **_kwargs: ([refund], {"has_more": False, "next_after": None}),
+    )
+    result = search_payments(_call(_gym(), {}))
+    rows = result["results"]
+    assert isinstance(rows, list)
+    assert rows[0]["entry_type"] == "REFUND"
+    assert rows[0]["original_payment_id"] == str(original_id)
+    assert rows[0]["amount"] == "15.00"
+    with pytest.raises(ValidationError):
+        search_payments(_call(_gym(), {"entry_type": "REFUND"}))
 
 
 def test_get_payment_hides_an_invalid_id(monkeypatch: pytest.MonkeyPatch) -> None:

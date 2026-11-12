@@ -25,6 +25,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
+from apps.assistant.access import assistant_full_access
 from apps.assistant.configuration import lock_timeout_ms
 from apps.assistant.execution import (
     ExecutionRejected,
@@ -458,7 +459,8 @@ def _reject_payload_gym(payload: Mapping[str, object], *, gym_id: UUID) -> None:
 
 def _authorize(*, request: Request, view: APIView, contract: ToolContract) -> None:
     tool = contract.definition
-    if tool.permissions:
+    full_access = assistant_full_access(request)
+    if tool.permissions and not full_access:
         granted: object = getattr(request, "permission_codes", frozenset())
         if isinstance(granted, str) or not isinstance(granted, frozenset | set):
             raise PermissionDenied()
@@ -469,13 +471,19 @@ def _authorize(*, request: Request, view: APIView, contract: ToolContract) -> No
             requirements = _requirements(tool.permissions, tool.features)
             if not RequiresPermissions().has_permission(request, requirements):
                 raise PermissionDenied()
-    elif not tool.requires_active_owner:
+    elif not tool.permissions and not tool.requires_active_owner:
         raise PermissionDenied()
     if tool.requires_active_owner and not IsActiveOwner().has_permission(request, view):
         raise PermissionDenied()
     if tool.features:
+        gym = getattr(request, "gym", None)
+        if not isinstance(gym, Gym) or gym.id is None:
+            raise PermissionDenied()
         requirements = _requirements(tool.permissions, tool.features)
-        if not RequiresEntitlements().has_permission(request, requirements):
+        with transaction.atomic():
+            set_gym_context(gym_id=gym.id)
+            entitled = RequiresEntitlements().has_permission(request, requirements)
+        if not entitled:
             raise PermissionDenied()
     if contract.finance_closed and not TrainerFinanceClosed().has_permission(request, view):
         raise PermissionDenied()

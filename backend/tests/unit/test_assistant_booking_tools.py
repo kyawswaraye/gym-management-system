@@ -32,6 +32,7 @@ from apps.assistant.models import Goal
 from apps.assistant.registry import production_registry
 from apps.assistant.schedule_tools import SCHEDULE_TOOL_NAMES
 from apps.assistant.training_tools import TRAINING_TOOL_NAMES
+from apps.assistant.turns import _offered
 from apps.classes.booking_views import EmptyCommandSerializer
 from apps.classes.serializers import ClassBookingCancelSerializer, ClassBookingWriteSerializer
 from apps.common.finance.idempotency import canonical_request_hash
@@ -201,6 +202,7 @@ def test_finance_bodies_match_the_view_request_hash() -> None:
 
 def test_permission_and_gym_stop_before_a_booking_service() -> None:
     request, goal = _session()
+    request.gym_membership.is_owner = False
     create_payload = _create_raw()
     attend_payload = {"booking_id": str(uuid4())}
     no_show_payload = {"booking_id": str(uuid4())}
@@ -263,3 +265,33 @@ def test_permission_and_gym_stop_before_a_booking_service() -> None:
             payload={**attend_payload, "reason": "extra"},
             confirmed=True,
         )
+
+
+def _offer_request(codes: frozenset[str]) -> Request:
+    gym = Gym(id=uuid4(), code="offer", name="Offer", status=Gym.Status.ACTIVE)
+    actor = GymMembership(id=uuid4(), gym=gym, status=GymMembership.Status.ACTIVE, is_owner=False)
+    request = Request(APIRequestFactory().get("/api/v1/assistant/turns/"))
+    request.gym = gym
+    request.gym_membership = actor
+    request.permission_codes = codes
+    return request
+
+
+def test_booking_offer_accepts_either_book_or_manage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("apps.assistant.turns._entitled", lambda request, features: True)
+    booked = _offered(_offer_request(frozenset({"classes.book"})))
+    managed = _offered(_offer_request(frozenset({"classes.manage"})))
+    attendance = _offered(_offer_request(frozenset({"classes.attendance"})))
+    assert "create_class_booking" in booked
+    assert "cancel_class_booking" in booked
+    assert "attend_class_booking" not in booked
+    assert "mark_class_booking_no_show" not in booked
+    assert "create_class_booking" in managed
+    assert "cancel_class_booking" in managed
+    assert "attend_class_booking" not in managed
+    assert "create_class_booking" not in attendance
+    assert "cancel_class_booking" not in attendance
+    assert "attend_class_booking" in attendance
+    assert "mark_class_booking_no_show" in attendance

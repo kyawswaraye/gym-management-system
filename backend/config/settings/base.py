@@ -259,6 +259,8 @@ CACHES = {
 }
 # Empty or invalid values disable the assistant. They must not stop Django.
 ASSISTANT_ENABLED = os.environ.get("ASSISTANT_ENABLED", "false")
+# The Playwright script is a code flag. An environment variable cannot turn it on.
+ASSISTANT_E2E_SCRIPT = False
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "")
 GEMINI_TIMEOUT = os.environ.get("GEMINI_TIMEOUT", "30")

@@ -43,7 +43,7 @@ def test_registered_activity_tools_are_confirmed_database_writes() -> None:
 
 def test_missing_permission_stops_before_announcement_or_check_in() -> None:
     gym = Gym(id=uuid4(), code="act-unit", name="Desk", status=Gym.Status.ACTIVE)
-    actor = GymMembership(id=uuid4(), gym=gym, status=GymMembership.Status.ACTIVE, is_owner=True)
+    actor = GymMembership(id=uuid4(), gym=gym, status=GymMembership.Status.ACTIVE, is_owner=False)
     request = Request(APIRequestFactory().post("/api/v1/assistant/internal/"))
     request.user = User(email="desk@example.test")
     request.gym = gym

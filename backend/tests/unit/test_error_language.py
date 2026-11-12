@@ -52,6 +52,16 @@ def test_interpolated_limits_keep_their_numbers() -> None:
     )
 
 
+def test_assistant_unavailable_has_myanmar_text() -> None:
+    assert (
+        translate_error_text("The assistant is unavailable.", myanmar=True) == "လက်ထောက်ကို အသုံးမပြုနိုင်ပါ။"
+    )
+    assert (
+        translate_error_text("The assistant is unavailable.", myanmar=False)
+        == "The assistant is unavailable."
+    )
+
+
 def test_every_coded_error_has_myanmar_text() -> None:
     import apps
     from apps.common.api.error_catalog import myanmar_messages

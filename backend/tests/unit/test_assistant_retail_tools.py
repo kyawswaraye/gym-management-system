@@ -302,6 +302,7 @@ def test_finance_bodies_match_the_view_request_hash() -> None:
 
 def test_permission_and_gym_stop_before_a_retail_service() -> None:
     request, goal = _session()
+    request.gym_membership.is_owner = False
     sale_id = str(uuid4())
     product_id = str(uuid4())
     line_id = str(uuid4())

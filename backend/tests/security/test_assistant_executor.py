@@ -687,6 +687,7 @@ def test_missing_feature_and_either_booking_permission() -> None:
         ("classes.book", "classes.manage"),
         permission_mode="any",
     )
+    actor.is_owner = False
     denied = _request(gym, actor, frozenset({"classes.view"}))
     with pytest.raises(PermissionDenied):
         execute_confirmed_tool(
@@ -700,6 +701,7 @@ def test_missing_feature_and_either_booking_permission() -> None:
             confirmed=True,
             effect=effect,
         )
+    actor.is_owner = True
     booked = _request(gym, actor, frozenset({"classes.book"}))
     managed = _request(gym, actor, frozenset({"classes.manage"}))
     first = execute_confirmed_tool(

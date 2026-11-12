@@ -204,6 +204,7 @@ def test_permission_feature_and_route_stop_before_finance() -> None:
     _enable(gym, "pt")
     goal = _goal(gym, owner)
     draft = _sale(str(uuid4()), uuid4(), "2026-11-10")
+    owner.is_owner = False
     for tool_name, command, codes in (
         (_CREATE, draft, frozenset()),
         (_CREATE, draft, frozenset({"pt.sales.view"})),
@@ -211,6 +212,7 @@ def test_permission_feature_and_route_stop_before_finance() -> None:
     ):
         with pytest.raises(PermissionDenied):
             _run(gym, owner, goal, tool_name, command, 1, codes=codes)
+    owner.is_owner = True
     with pytest.raises(ValidationError):
         _run(
             gym,

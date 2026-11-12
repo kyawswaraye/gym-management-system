@@ -222,6 +222,7 @@ def test_permission_feature_trainer_and_route_stop_before_finance() -> None:
     _enable(gym, "finance")
     goal = _goal(gym, owner)
     draft = _sale(gym, uuid4())
+    owner.is_owner = False
     for tool_name, command, codes in (
         (_CREATE, draft, frozenset()),
         (_CREATE, draft, frozenset({"retail.view"})),
@@ -229,6 +230,7 @@ def test_permission_feature_trainer_and_route_stop_before_finance() -> None:
     ):
         with pytest.raises(PermissionDenied):
             _run(gym, owner, goal, tool_name, command, 1, codes=codes)
+    owner.is_owner = True
     with pytest.raises(Http404):
         _run(gym, trainer_membership, goal, _CREATE, draft, 1, codes=_CREATE_CODES)
     bare_user = User.objects.create_user("rtl1-bare@example.test", "correct horse battery staple")

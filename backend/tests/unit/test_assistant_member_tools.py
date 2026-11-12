@@ -53,7 +53,7 @@ def test_registered_member_tools_are_confirmed_database_writes() -> None:
 
 def test_missing_permission_and_unknown_tool_do_not_run() -> None:
     gym = Gym(id=uuid4(), code="mem-unit", name="Members", status=Gym.Status.ACTIVE)
-    actor = GymMembership(id=uuid4(), gym=gym, status=GymMembership.Status.ACTIVE, is_owner=True)
+    actor = GymMembership(id=uuid4(), gym=gym, status=GymMembership.Status.ACTIVE, is_owner=False)
     goal = Goal(id=uuid4(), gym=gym, version=1)
     request = Request(APIRequestFactory().post("/api/v1/assistant/internal/"))
     request.user = User(email="staff@example.test", mfa_enabled=True)
@@ -87,3 +87,39 @@ def test_missing_permission_and_unknown_tool_do_not_run() -> None:
             confirmed=True,
         )
     assert caught.value.code == "unknown_tool"
+
+
+def test_plan_duration_accepts_an_everyday_word() -> None:
+    from apps.assistant.member_tools import _plan_changes
+    from apps.members.serializers import MembershipPlanCreateSerializer
+
+    stored = _plan_changes(
+        {
+            "name": "Yoga",
+            "duration_value": 1,
+            "duration_unit": "month",
+            "price": 50000,
+        }
+    )
+    serializer = MembershipPlanCreateSerializer(data=stored)
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["duration_unit"] == "MONTH"
+
+
+def test_saved_plan_is_not_proposed_again() -> None:
+    from apps.assistant.turns import _same_saved_change
+
+    saved = (
+        "create_plan",
+        {"name": "Yoga", "price": 50000, "duration_unit": "month", "duration_value": 1},
+    )
+    assert _same_saved_change(
+        "create_plan",
+        {"name": "Yoga", "price": "50000", "duration_unit": "MONTH", "duration_value": "1"},
+        saved,
+    )
+    assert not _same_saved_change(
+        "create_plan",
+        {"name": "Yoga", "price": "1500", "duration_unit": "MONTH", "duration_value": "1"},
+        saved,
+    )

@@ -101,7 +101,7 @@ def test_finance_body_matches_the_view_request_hash() -> None:
 
 def test_permission_and_gym_stop_before_a_schedule_service() -> None:
     gym = Gym(id=uuid4(), code="sch-unit", name="Schedule", status=Gym.Status.ACTIVE)
-    actor = GymMembership(id=uuid4(), gym=gym, status=GymMembership.Status.ACTIVE, is_owner=True)
+    actor = GymMembership(id=uuid4(), gym=gym, status=GymMembership.Status.ACTIVE, is_owner=False)
     request = Request(APIRequestFactory().post("/api/v1/assistant/internal/"))
     request.user = User(email="desk@example.test")
     request.gym = gym
@@ -239,6 +239,7 @@ def _session() -> tuple[Request, Goal]:
 
 def test_update_and_cancel_stop_before_a_service() -> None:
     request, goal = _session()
+    request.gym_membership.is_owner = False
     update_payload = {"schedule_id": str(uuid4()), "location": "Hall"}
     cancel_payload = {"occurrence_id": str(uuid4()), "reason": "Rain"}
     for tool_name, payload in (

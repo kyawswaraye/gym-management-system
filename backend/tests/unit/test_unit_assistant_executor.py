@@ -14,6 +14,7 @@ from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 from rest_framework.views import APIView
 
+from apps.assistant.access import assistant_full_access
 from apps.assistant.execution import ExecutionRejected
 from apps.assistant.executor import (
     ApprovalSnapshot,
@@ -21,6 +22,7 @@ from apps.assistant.executor import (
     ReadCall,
     ToolCall,
     ToolContract,
+    _authorize,
     _finance_command,
     execute_confirmed_tool,
     execute_read_tool,
@@ -40,12 +42,12 @@ def _gym(code: str = "exec") -> Gym:
     return Gym(id=uuid4(), code=code, name=code, status=Gym.Status.ACTIVE)
 
 
-def _actor(gym: Gym) -> GymMembership:
+def _actor(gym: Gym, *, owner: bool = True) -> GymMembership:
     return GymMembership(
         id=uuid4(),
         gym=gym,
         status=GymMembership.Status.ACTIVE,
-        is_owner=True,
+        is_owner=owner,
     )
 
 
@@ -278,7 +280,7 @@ def test_approval_mismatch_does_not_call_the_handler() -> None:
 def test_permission_mfa_and_mode_denials_do_not_call_the_handler() -> None:
     gym = _gym()
     called = {"count": 0}
-    actor = _actor(gym)
+    actor = _actor(gym, owner=False)
 
     def effect(_call: ToolCall) -> str:
         called["count"] += 1
@@ -669,12 +671,33 @@ def test_permitted_read_returns_the_selector_and_writes_nothing(
     assert goal.version == 1
 
 
+def test_owner_manager_and_receptionist_skip_named_permissions() -> None:
+    gym = _gym()
+    contract = _contract(_tool("probe_write"))
+    view = APIView()
+    _authorize(
+        request=_request(gym, _actor(gym), frozenset()),
+        view=view,
+        contract=contract,
+    )
+    desk = _actor(gym, owner=False)
+    for role in ("MANAGER", "RECEPTIONIST"):
+        request = _request(gym, desk, frozenset())
+        request.role_keys = frozenset({role})
+        assert assistant_full_access(request) is True
+        _authorize(request=request, view=view, contract=contract)
+    trainer = _request(gym, desk, frozenset())
+    trainer.role_keys = frozenset({"TRAINER"})
+    with pytest.raises(PermissionDenied):
+        _authorize(request=trainer, view=view, contract=contract)
+
+
 def test_read_permission_denial_does_not_call_the_selector() -> None:
     gym = _gym()
     called = {"count": 0}
     with pytest.raises(PermissionDenied):
         _read(
-            _request(gym, _actor(gym), frozenset()),
+            _request(gym, _actor(gym, owner=False), frozenset()),
             _read_contract(),
             {},
             lambda _call: called.__setitem__("count", 1),

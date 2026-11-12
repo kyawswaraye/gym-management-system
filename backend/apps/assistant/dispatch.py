@@ -21,15 +21,22 @@ from apps.assistant.booking_tools import booking_tool_contracts
 from apps.assistant.booking_tools import execute_registered_tool as execute_booking
 from apps.assistant.cash_tools import cash_tool_contracts
 from apps.assistant.cash_tools import execute_registered_tool as execute_cash
+from apps.assistant.class_reads import class_read_tool_contracts
+from apps.assistant.commission_reads import commission_read_tool_contracts
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
 from apps.assistant.executor import ApprovalSnapshot, ToolContract
 from apps.assistant.expense_tools import execute_registered_tool as execute_expense
 from apps.assistant.expense_tools import expense_tool_contracts
+from apps.assistant.finance_reads import finance_read_tool_contracts
 from apps.assistant.inventory_tools import execute_registered_tool as execute_inventory
 from apps.assistant.inventory_tools import inventory_tool_contracts
+from apps.assistant.member_reads import member_read_tool_contracts
 from apps.assistant.member_tools import execute_registered_tool as execute_member
 from apps.assistant.member_tools import member_tool_contracts
+from apps.assistant.membership_reads import membership_read_tool_contracts
 from apps.assistant.models import Goal
+from apps.assistant.operations_reads import operations_read_tool_contracts
+from apps.assistant.package_reads import package_read_tool_contracts
 from apps.assistant.payment_reads import (
     PAYMENT_READ_TOOL_NAMES,
     execute_registered_read,
@@ -63,6 +70,13 @@ def tool_contracts() -> dict[str, ToolContract]:
         loaded: dict[str, ToolContract] = {}
         for group in (
             member_tool_contracts(),
+            member_read_tool_contracts(),
+            membership_read_tool_contracts(),
+            package_read_tool_contracts(),
+            class_read_tool_contracts(),
+            commission_read_tool_contracts(),
+            finance_read_tool_contracts(),
+            operations_read_tool_contracts(),
             staff_tool_contracts(),
             activity_tool_contracts(),
             training_tool_contracts(),
@@ -91,9 +105,10 @@ def execute_offered_read(
 ) -> Mapping[str, object]:
     """Run one registered read. The payload does not choose the gym."""
 
-    if tool_name not in PAYMENT_READ_TOOL_NAMES:
+    reader = _READERS.get(tool_name)
+    if reader is None:
         raise ExecutionRejected("This tool is not registered.", code="unknown_tool")
-    return execute_registered_read(
+    return reader(
         request=request,
         view=view,
         tool_name=tool_name,
@@ -171,6 +186,40 @@ def _load_writers() -> None:
     _bind(PT_TOOL_NAMES, execute_pt)
 
 
+def _load_readers() -> None:
+    from apps.assistant.class_reads import CLASS_READ_TOOL_NAMES
+    from apps.assistant.class_reads import execute_registered_read as execute_class_read
+    from apps.assistant.commission_reads import COMMISSION_READ_TOOL_NAMES
+    from apps.assistant.commission_reads import execute_registered_read as execute_commission_read
+    from apps.assistant.finance_reads import FINANCE_READ_TOOL_NAMES
+    from apps.assistant.finance_reads import execute_registered_read as execute_finance_read
+    from apps.assistant.member_reads import MEMBER_READ_TOOL_NAMES
+    from apps.assistant.member_reads import execute_registered_read as execute_member_read
+    from apps.assistant.membership_reads import MEMBERSHIP_READ_TOOL_NAMES
+    from apps.assistant.membership_reads import execute_registered_read as execute_membership_read
+    from apps.assistant.operations_reads import OPERATIONS_READ_TOOL_NAMES
+    from apps.assistant.operations_reads import execute_registered_read as execute_operations_read
+    from apps.assistant.package_reads import PACKAGE_READ_TOOL_NAMES
+    from apps.assistant.package_reads import execute_registered_read as execute_package_read
+
+    for name in PAYMENT_READ_TOOL_NAMES:
+        _READERS[name] = execute_registered_read
+    for name in MEMBER_READ_TOOL_NAMES:
+        _READERS[name] = execute_member_read
+    for name in MEMBERSHIP_READ_TOOL_NAMES:
+        _READERS[name] = execute_membership_read
+    for name in PACKAGE_READ_TOOL_NAMES:
+        _READERS[name] = execute_package_read
+    for name in CLASS_READ_TOOL_NAMES:
+        _READERS[name] = execute_class_read
+    for name in COMMISSION_READ_TOOL_NAMES:
+        _READERS[name] = execute_commission_read
+    for name in FINANCE_READ_TOOL_NAMES:
+        _READERS[name] = execute_finance_read
+    for name in OPERATIONS_READ_TOOL_NAMES:
+        _READERS[name] = execute_operations_read
+
+
 _APPROVAL_SOURCES: dict[str, tuple[str, ApprovalLoader]] = {
     "approve_payment": ("payment_id", payment_snapshot),
     "reject_payment": ("payment_id", payment_snapshot),
@@ -184,4 +233,6 @@ _APPROVAL_SOURCES: dict[str, tuple[str, ApprovalLoader]] = {
     "reject_pt_sale": ("pt_sale_id", pt_sale_snapshot),
 }
 
+_READERS: dict[str, Callable[..., Mapping[str, object]]] = {}
+_load_readers()
 _load_writers()

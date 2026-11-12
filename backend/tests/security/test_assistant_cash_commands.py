@@ -203,6 +203,7 @@ def test_permission_feature_trainer_and_date_stop_before_finance() -> None:
     _enable(gym, "finance")
     goal = _goal(gym, owner)
     opened = _open_payload(gym)
+    owner.is_owner = False
     for tool_name, command, codes in (
         (_OPEN, opened, frozenset()),
         (_OPEN, opened, frozenset({"cashbook.view"})),
@@ -216,6 +217,7 @@ def test_permission_feature_trainer_and_date_stop_before_finance() -> None:
     ):
         with pytest.raises(PermissionDenied):
             _run(gym, owner, goal, tool_name, command, 1, codes=codes)
+    owner.is_owner = True
     with pytest.raises(Http404):
         _run(gym, trainer_membership, goal, _OPEN, opened, 1, codes=_OPEN_CODES)
     bare_user = User.objects.create_user("cash1-bare@example.test", "correct horse battery staple")

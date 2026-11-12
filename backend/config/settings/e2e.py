@@ -13,6 +13,11 @@ from django.core.exceptions import ImproperlyConfigured
 from .base import *  # noqa: F403
 
 DEBUG = False
+# Playwright drives the real tools. This process does not call Gemini.
+ASSISTANT_ENABLED = "true"
+ASSISTANT_E2E_SCRIPT = True
+GEMINI_API_KEY = ""
+GEMINI_MODEL = ""
 # The staff app on localhost:3010 talks to this server. Keep the authenticator
 # challenge off here. Automated backend tests use config.settings.test.
 MFA_ENFORCED = False

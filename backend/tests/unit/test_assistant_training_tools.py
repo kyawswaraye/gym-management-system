@@ -44,7 +44,7 @@ def test_registered_training_tools_are_confirmed_database_writes() -> None:
 
 def test_missing_permission_stops_before_a_training_service() -> None:
     gym = Gym(id=uuid4(), code="trn-unit", name="Training", status=Gym.Status.ACTIVE)
-    actor = GymMembership(id=uuid4(), gym=gym, status=GymMembership.Status.ACTIVE, is_owner=True)
+    actor = GymMembership(id=uuid4(), gym=gym, status=GymMembership.Status.ACTIVE, is_owner=False)
     request = Request(APIRequestFactory().post("/api/v1/assistant/internal/"))
     request.user = User(email="desk@example.test")
     request.gym = gym

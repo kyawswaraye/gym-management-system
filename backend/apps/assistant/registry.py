@@ -57,9 +57,16 @@ def closed_production_names() -> tuple[str, ...]:
     from apps.assistant.activity_tools import ACTIVITY_TOOL_NAMES
     from apps.assistant.booking_tools import BOOKING_TOOL_NAMES
     from apps.assistant.cash_tools import CASH_TOOL_NAMES
+    from apps.assistant.class_reads import CLASS_READ_TOOL_NAMES
+    from apps.assistant.commission_reads import COMMISSION_READ_TOOL_NAMES
     from apps.assistant.expense_tools import EXPENSE_TOOL_NAMES
+    from apps.assistant.finance_reads import FINANCE_READ_TOOL_NAMES
     from apps.assistant.inventory_tools import INVENTORY_TOOL_NAMES
+    from apps.assistant.member_reads import MEMBER_READ_TOOL_NAMES
     from apps.assistant.member_tools import MEMBER_TOOL_NAMES
+    from apps.assistant.membership_reads import MEMBERSHIP_READ_TOOL_NAMES
+    from apps.assistant.operations_reads import OPERATIONS_READ_TOOL_NAMES
+    from apps.assistant.package_reads import PACKAGE_READ_TOOL_NAMES
     from apps.assistant.payment_reads import PAYMENT_READ_TOOL_NAMES
     from apps.assistant.payment_tools import PAYMENT_TOOL_NAMES
     from apps.assistant.pt_tools import PT_TOOL_NAMES
@@ -72,6 +79,13 @@ def closed_production_names() -> tuple[str, ...]:
     return tuple(
         sorted(
             set(MEMBER_TOOL_NAMES)
+            | set(MEMBER_READ_TOOL_NAMES)
+            | set(MEMBERSHIP_READ_TOOL_NAMES)
+            | set(PACKAGE_READ_TOOL_NAMES)
+            | set(CLASS_READ_TOOL_NAMES)
+            | set(COMMISSION_READ_TOOL_NAMES)
+            | set(FINANCE_READ_TOOL_NAMES)
+            | set(OPERATIONS_READ_TOOL_NAMES)
             | set(STAFF_TOOL_NAMES)
             | set(ACTIVITY_TOOL_NAMES)
             | set(TRAINING_TOOL_NAMES)
@@ -97,16 +111,27 @@ def production_registry() -> ToolRegistry:
     cash-session, payment, receipt, expense, retail-sale, salary-period, PT sale,
     commission, package, and PT booking writes are registered. Payment, expense,
     retail, salary, and PT sale approval and rejection are registered. Payment
-    search and payment detail reads are registered. Mail, files, and push
+    search, payment detail, member search, member detail, membership search,
+    membership plan search, granted package search, class occurrence search,
+    class booking search,
+    retail sale search, expense search, salary period search, cash session
+    search, and PT commission search reads are registered. Mail, files, and push
     delivery stay out.
     """
 
     from apps.assistant.activity_tools import activity_tool_definitions
     from apps.assistant.booking_tools import booking_tool_definitions
     from apps.assistant.cash_tools import cash_tool_definitions
+    from apps.assistant.class_reads import class_read_tool_definitions
+    from apps.assistant.commission_reads import commission_read_tool_definitions
     from apps.assistant.expense_tools import expense_tool_definitions
+    from apps.assistant.finance_reads import finance_read_tool_definitions
     from apps.assistant.inventory_tools import inventory_tool_definitions
+    from apps.assistant.member_reads import member_read_tool_definitions
     from apps.assistant.member_tools import member_tool_definitions
+    from apps.assistant.membership_reads import membership_read_tool_definitions
+    from apps.assistant.operations_reads import operations_read_tool_definitions
+    from apps.assistant.package_reads import package_read_tool_definitions
     from apps.assistant.payment_reads import payment_read_tool_definitions
     from apps.assistant.payment_tools import payment_tool_definitions
     from apps.assistant.pt_tools import pt_tool_definitions
@@ -119,6 +144,9 @@ def production_registry() -> ToolRegistry:
     registry = ToolRegistry()
     for tool in (
         *member_tool_definitions(),
+        *member_read_tool_definitions(),
+        *membership_read_tool_definitions(),
+        *package_read_tool_definitions(),
         *staff_tool_definitions(),
         *activity_tool_definitions(),
         *training_tool_definitions(),
@@ -126,10 +154,14 @@ def production_registry() -> ToolRegistry:
         *booking_tool_definitions(),
         *inventory_tool_definitions(),
         *cash_tool_definitions(),
+        *class_read_tool_definitions(),
+        *commission_read_tool_definitions(),
         *payment_tool_definitions(),
         *payment_read_tool_definitions(),
         *pt_tool_definitions(),
         *expense_tool_definitions(),
+        *finance_read_tool_definitions(),
+        *operations_read_tool_definitions(),
         *retail_tool_definitions(),
         *salary_tool_definitions(),
     ):

@@ -115,7 +115,7 @@ def _run(
 
 def test_staff_permission_confirmation_and_gym_are_checked_before_the_service() -> None:
     gym = Gym(id=uuid4(), code="stf-unit", name="Staff", status=Gym.Status.ACTIVE)
-    actor = GymMembership(id=uuid4(), gym=gym, status=GymMembership.Status.ACTIVE, is_owner=True)
+    actor = GymMembership(id=uuid4(), gym=gym, status=GymMembership.Status.ACTIVE, is_owner=False)
     request = _request(gym, actor, frozenset())
     with pytest.raises(PermissionDenied):
         _run(request, "update_staff_profile", {"staff_id": str(uuid4()), "display_name": "Ada"})

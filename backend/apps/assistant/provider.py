@@ -18,6 +18,7 @@ from apps.assistant.configuration import (
     ProviderFailure,
     assistant_configuration,
     classify_provider_failure,
+    e2e_script_enabled,
     gemini_max_retries,
     gemini_timeout_seconds,
 )
@@ -120,7 +121,7 @@ def generate_content(
     }
     if declarations:
         body["tools"] = [{"functionDeclarations": declarations}]
-    sender = transport or _post
+    sender = transport or (_scripted_transport if e2e_script_enabled() else _post)
     attempts = gemini_max_retries()
     last = ProviderFailure.PROVIDER
     for attempt in range(attempts + 1):
@@ -140,6 +141,15 @@ def generate_content(
         except (TypeError, ValueError) as exc:
             raise ProviderCallError(ProviderFailure.PROVIDER) from exc
     raise ProviderCallError(last)
+
+
+def _scripted_transport(body: dict[str, object], timeout: int) -> dict[str, object]:
+    """Playwright script. Production never selects this transport."""
+
+    del timeout
+    from apps.assistant.e2e_provider import scripted_response
+
+    return scripted_response(body)
 
 
 def _post(body: dict[str, object], timeout: int) -> dict[str, object]:

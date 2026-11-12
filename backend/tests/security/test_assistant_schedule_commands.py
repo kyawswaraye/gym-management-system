@@ -223,9 +223,11 @@ def test_permission_feature_gym_and_route_stop_before_finance() -> None:
     goal = _goal(gym, owner)
     update_payload = {"schedule_id": str(uuid4()), "location": "Hall"}
     cancel_payload = {"occurrence_id": str(uuid4()), "reason": "Rain"}
+    owner.is_owner = False
     for tool_name, command in ((_UPDATE, update_payload), (_CANCEL, cancel_payload)):
         with pytest.raises(PermissionDenied):
             _run(gym, owner, goal, tool_name, command, 1, codes=frozenset())
+    owner.is_owner = True
     assert IdempotencyRecord.objects.filter(gym=gym).count() == 0
 
     bare_user = User.objects.create_user("upd1-bare@example.test", "correct horse battery staple")

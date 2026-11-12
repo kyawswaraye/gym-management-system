@@ -131,14 +131,19 @@ def test_payment_reads_stay_in_the_actor_gym_and_write_nothing() -> None:
     found = {row["id"] for row in page["results"]}
     assert found == {str(first.id), str(second.id)}
     assert str(foreign.id) not in found
+    stored = {str(first.id): first, str(second.id): second}
     for row in page["results"]:
         assert _HIDDEN.isdisjoint(row)
+        assert row["entry_type"] == stored[row["id"]].entry_type
+        assert row["original_payment_id"] is None
 
     detail = _read(gym, owner, "get_payment", {"payment_id": str(first.id)})
     snapshot = payment_snapshot(gym, first.id)
     assert detail["record_id"] == snapshot.record_id
     assert detail["amount"] == snapshot.amount
     assert detail["amount"] == "40.00"
+    assert detail["entry_type"] == first.entry_type
+    assert detail["original_payment_id"] is None
     assert _HIDDEN.isdisjoint(detail)
 
     with pytest.raises(ExecutionRejected) as missing:

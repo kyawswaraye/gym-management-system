@@ -15,6 +15,28 @@ from apps.users.permissions import (
     RequiresRecentMFA,
 )
 
+FULL_ACCESS_ROLE_KEYS = frozenset({"OWNER", "MANAGER", "RECEPTIONIST"})
+
+
+def assistant_full_access(request: Request) -> bool:
+    """Let an owner, manager, or receptionist run every assistant tool.
+
+    Accountant, trainer, and custom roles still need each permission the tool
+    names. Gym feature entitlements stay separate.
+    """
+
+    membership = getattr(request, "gym_membership", None)
+    status = getattr(membership, "status", None)
+    active = getattr(getattr(membership, "Status", None), "ACTIVE", None)
+    if membership is None or status != active:
+        return False
+    if getattr(membership, "is_owner", False):
+        return True
+    roles = getattr(request, "role_keys", ())
+    if isinstance(roles, str) or not isinstance(roles, frozenset | set | tuple | list):
+        return False
+    return any(role in FULL_ACCESS_ROLE_KEYS for role in roles)
+
 
 class _RequirementView:
     """Carries the permission codes the original view declared."""
@@ -33,8 +55,9 @@ def enforce_tool_access(*, request: Request, view: APIView, tool: ToolDefinition
     """
 
     requirements = cast(APIView, _RequirementView(tool.permissions, tool.features))
-    if not RequiresPermissions().has_permission(request, requirements):
-        raise PermissionDenied()
+    if tool.permissions and not assistant_full_access(request):
+        if not RequiresPermissions().has_permission(request, requirements):
+            raise PermissionDenied()
     if tool.features and not RequiresEntitlements().has_permission(request, requirements):
         raise PermissionDenied()
     if tool.requires_recent_mfa:
@@ -54,4 +77,10 @@ def call_authorized_service[Result](
     return service()
 
 
-__all__ = ["MFARequired", "call_authorized_service", "enforce_tool_access"]
+__all__ = [
+    "FULL_ACCESS_ROLE_KEYS",
+    "MFARequired",
+    "assistant_full_access",
+    "call_authorized_service",
+    "enforce_tool_access",
+]

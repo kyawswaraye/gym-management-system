@@ -51,6 +51,14 @@ def _positive_int(value: str, default: int, upper: int) -> int:
     return parsed
 
 
+def e2e_script_enabled() -> bool:
+    """True only for the disposable Playwright settings module."""
+
+    if not bool(getattr(settings, "ASSISTANT_E2E_SCRIPT", False)):
+        return False
+    return str(getattr(settings, "SETTINGS_MODULE", "")) == "config.settings.e2e"
+
+
 def assistant_configuration() -> AssistantConfiguration:
     """Read Gemini settings. This never raises and never returns the key."""
 
@@ -74,6 +82,9 @@ def assistant_configuration() -> AssistantConfiguration:
     elif len(model) > _MODEL_MAX or _unsafe(model):
         reasons.append("invalid_model")
 
+    if e2e_script_enabled():
+        available = enabled is True
+        return AssistantConfiguration(available=available, reasons=tuple(reasons))
     blocking = {"invalid_flag", "missing_key", "invalid_key", "missing_model", "invalid_model"}
     available = enabled is True and not any(reason in blocking for reason in reasons)
     return AssistantConfiguration(available=available, reasons=tuple(reasons))

@@ -62,10 +62,23 @@ _MEMBER_FIELDS = (
 )
 _PLAN_FIELDS = (
     FieldRequirement("name", "Plan name"),
-    FieldRequirement("duration_value", "Duration"),
-    FieldRequirement("duration_unit", "Duration unit"),
-    FieldRequirement("price", "Price"),
+    FieldRequirement("duration_value", "Duration as a whole number, such as 1"),
+    FieldRequirement(
+        "duration_unit",
+        "Duration unit. Send DAY, WEEK, MONTH, or YEAR. Map the staff member's words yourself.",
+    ),
+    FieldRequirement("price", "Price in the gym currency, such as 50000 or 50000.00"),
 )
+_DURATION_UNITS = {
+    "day": "DAY",
+    "days": "DAY",
+    "week": "WEEK",
+    "weeks": "WEEK",
+    "month": "MONTH",
+    "months": "MONTH",
+    "year": "YEAR",
+    "years": "YEAR",
+}
 
 
 @dataclass(frozen=True)
@@ -183,8 +196,19 @@ def _restore_member(call: ToolCall) -> str:
     return str(member.id)
 
 
+def _plan_changes(payload: Mapping[str, object]) -> dict[str, object]:
+    """Accept the words a model copies from staff. The serializer stores codes."""
+
+    data = dict(payload)
+    unit = data.get("duration_unit")
+    if isinstance(unit, str):
+        token = unit.strip().casefold()
+        data["duration_unit"] = _DURATION_UNITS.get(token, unit.strip().upper())
+    return data
+
+
 def _create_plan(call: ToolCall) -> str:
-    payload = _validated(MembershipPlanCreateSerializer, call.payload)
+    payload = _validated(MembershipPlanCreateSerializer, _plan_changes(call.payload))
     price = payload["price"]
     if not isinstance(price, Decimal):
         raise ValidationError({"price": ["Enter a price."]})
@@ -207,7 +231,10 @@ def _update_plan(call: ToolCall) -> str:
         gym=call.gym,
         actor=call.actor,
         plan_id=plan_id,
-        changes=_validated(MembershipPlanUpdateSerializer, _body(call.payload, "plan_id")),
+        changes=_validated(
+            MembershipPlanUpdateSerializer,
+            _plan_changes(_body(call.payload, "plan_id")),
+        ),
     )
     return str(plan.id)
 

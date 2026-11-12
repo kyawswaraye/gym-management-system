@@ -107,6 +107,8 @@ def get_payment(call: ReadCall) -> dict[str, object]:
         "description": row.description,
         "business_date": _date_text(row.business_date),
         "member_id": _member_text(row.member_id),
+        "entry_type": row.entry_type,
+        "original_payment_id": _member_text(row.original_payment_id),
     }
 
 
@@ -151,6 +153,8 @@ def _search_row(row: Payment) -> dict[str, object]:
         "description": row.description,
         "business_date": _date_text(row.business_date),
         "member_id": _member_text(row.member_id),
+        "entry_type": row.entry_type,
+        "original_payment_id": _member_text(row.original_payment_id),
     }
 
 

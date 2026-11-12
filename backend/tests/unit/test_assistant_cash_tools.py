@@ -239,6 +239,7 @@ def test_finance_bodies_match_the_view_request_hash() -> None:
 
 def test_permission_and_gym_stop_before_a_cash_service() -> None:
     request, goal = _session()
+    request.gym_membership.is_owner = False
     session_id = str(uuid4())
     payloads = (
         ("open_cash_session", _open_raw()),

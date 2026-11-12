@@ -268,6 +268,7 @@ def test_permission_feature_gym_and_route_stop_before_finance() -> None:
     }
     attend_payload = {"booking_id": str(uuid4())}
     cancel_payload = {"booking_id": str(uuid4()), "reason": "Rain"}
+    owner.is_owner = False
     for tool_name, command, codes in (
         (_CREATE, create_payload, frozenset()),
         (_CREATE, create_payload, _ATTENDANCE),
@@ -277,6 +278,7 @@ def test_permission_feature_gym_and_route_stop_before_finance() -> None:
     ):
         with pytest.raises(PermissionDenied):
             _run(gym, owner, goal, tool_name, command, 1, codes=codes)
+    owner.is_owner = True
     with pytest.raises(ValidationError):
         _run(
             gym,

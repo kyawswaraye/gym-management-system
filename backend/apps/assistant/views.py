@@ -181,8 +181,9 @@ class _StaffCommandView(APIView):
         try:
             with transaction.atomic():
                 self.initial(rest_request, *args, **kwargs)
-            if rest_request.method.lower() in self.http_method_names:
-                handler = getattr(self, rest_request.method.lower(), self.http_method_not_allowed)
+            method = rest_request.method
+            if method is not None and method.lower() in self.http_method_names:
+                handler = getattr(self, method.lower(), self.http_method_not_allowed)
             else:
                 handler = self.http_method_not_allowed
             response = handler(rest_request, *args, **kwargs)

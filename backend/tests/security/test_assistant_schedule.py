@@ -210,8 +210,10 @@ def test_permission_feature_and_gym_stop_before_a_finance_claim() -> None:
         user_agent="",
     )
     command = _schedule_payload(class_type.id, profile.id)
+    owner.is_owner = False
     with pytest.raises(PermissionDenied):
         _run(gym, owner, goal, command, 1, codes=frozenset())
+    owner.is_owner = True
     assert _completed(gym) == 0
     assert ClassSchedule.objects.filter(gym=gym).count() == 0
 

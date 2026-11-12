@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Mapping
 from typing import cast
 
 from apps.assistant.executor import ApprovalSnapshot, ToolContract
+from apps.assistant.knowledge import public_tool_label
 from apps.assistant.registry import ToolDefinition
 
 _CONTROL = frozenset({"confirmed", "gym_id"})
@@ -14,6 +16,9 @@ _APPROVAL = frozenset({"record_id", "amount"})
 _DEPTH = 6
 _WIDTH = 40
 _TEXT = 2000
+_SKU = re.compile(r"^[A-Z0-9][A-Z0-9_-]{0,31}$")
+_LINE_MONEY = ("discount",)
+_UNAVAILABLE = "Product unavailable"
 
 
 def json_copy(value: object, depth: int = 0) -> object:
@@ -83,8 +88,9 @@ def declaration(contract: ToolContract) -> dict[str, object]:
         for field in contract.prerequisite.fields:
             if field.name in hidden:
                 continue
-            properties[field.name] = {"type": "string", "description": field.description}
-            required.append(field.name)
+            properties[field.name] = {"type": field.kind, "description": field.description}
+            if field.required:
+                required.append(field.name)
     return {
         "name": tool.name,
         "description": tool.description,
@@ -147,14 +153,77 @@ def public_pending(
         if isinstance(record_id, str) and isinstance(amount, str) and record_id and amount:
             pair = {"record_id": record_id, "amount": amount}
     summary = raw.get("summary")
+    fields = display_fields(payload, approval=pair is not None)
+    labels = raw.get("labels")
+    if isinstance(labels, Mapping):
+        for field in fields:
+            label = labels.get(field["name"])
+            if isinstance(label, str) and label.strip():
+                field["value"] = label.strip()
+        fields.extend(_sale_line_fields(payload, labels))
+    else:
+        fields.extend(_sale_line_fields(payload, {}))
+    label = public_tool_label(tool_name)
     return {
         "step_id": step_id,
         "goal_id": goal_id,
-        "tool_name": tool_name,
-        "summary": summary if isinstance(summary, str) and summary else tool_name,
-        "fields": display_fields(payload, approval=pair is not None),
+        "tool_name": label,
+        "summary": summary if isinstance(summary, str) and summary else label,
+        "fields": fields,
         "approval": pair,
     }
+
+
+def _sale_line_fields(
+    payload: Mapping[str, object],
+    labels: Mapping[str, object],
+) -> list[dict[str, str]]:
+    """Show stored sale lines. The label is the one saved with the proposal."""
+
+    lines = payload.get("lines")
+    if not isinstance(lines, list):
+        return []
+    fields: list[dict[str, str]] = []
+    for index, line in enumerate(lines):
+        if not isinstance(line, Mapping):
+            continue
+        prefix = f"lines.{index}"
+        stored = labels.get(f"{prefix}.product_id")
+        fields.append({"name": f"{prefix}.product", "value": _stored_product(stored)})
+        if "quantity" in line:
+            quantity = _stored_scalar(line.get("quantity"))
+            if quantity != "":
+                fields.append({"name": f"{prefix}.quantity", "value": quantity})
+        for key in _LINE_MONEY:
+            if key not in line:
+                continue
+            amount = _stored_scalar(line.get(key))
+            if amount != "":
+                fields.append({"name": f"{prefix}.{key}", "value": amount})
+    return fields
+
+
+def _stored_product(value: object) -> str:
+    if not isinstance(value, str):
+        return _UNAVAILABLE
+    text = " ".join(value.split())
+    name, marker, sku = text.rpartition(" (")
+    if marker == "" or not text.endswith(")"):
+        return _UNAVAILABLE
+    code = sku[:-1]
+    if not name.strip() or _SKU.fullmatch(code) is None:
+        return _UNAVAILABLE
+    return f"{name.strip()} ({code})"
+
+
+def _stored_scalar(value: object) -> str:
+    if isinstance(value, bool) or value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()[:200]
+    if isinstance(value, int | float):
+        return str(value)
+    return ""
 
 
 def _display(value: object) -> str:

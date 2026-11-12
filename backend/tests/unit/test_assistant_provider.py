@@ -5,6 +5,7 @@ from django.test import override_settings
 
 from apps.assistant.configuration import ProviderFailure
 from apps.assistant.dispatch import tool_contracts
+from apps.assistant.e2e_provider import scripted_response
 from apps.assistant.executor import ApprovalSnapshot
 from apps.assistant.proposals import declaration, model_arguments, with_snapshot
 from apps.assistant.provider import ProviderCallError, generate_content, parse_model_turn
@@ -121,3 +122,147 @@ def test_approval_declaration_omits_the_stored_amount() -> None:
     assert "record_id" not in properties
     assert "payment_id" in properties
     assert "confirmed" not in properties
+
+
+@override_settings(
+    ASSISTANT_ENABLED="true",
+    ASSISTANT_E2E_SCRIPT=True,
+    SETTINGS_MODULE="config.settings.e2e",
+    GEMINI_API_KEY="",
+    GEMINI_MODEL="",
+)
+def test_e2e_script_calls_the_read_without_gemini() -> None:
+    turn = generate_content(
+        contents=[{"role": "user", "parts": [{"text": "Search members."}]}],
+        declarations=[],
+        system_instruction="test",
+    )
+
+    assert [call.name for call in turn.calls] == ["search_members"]
+    assert turn.text == ""
+
+
+@override_settings(
+    ASSISTANT_ENABLED="true",
+    ASSISTANT_E2E_SCRIPT=True,
+    SETTINGS_MODULE="config.settings.local",
+    GEMINI_API_KEY="",
+    GEMINI_MODEL="",
+)
+def test_e2e_script_stays_off_outside_the_e2e_settings() -> None:
+    with pytest.raises(ProviderCallError) as raised:
+        generate_content(
+            contents=[{"role": "user", "parts": [{"text": "Search members."}]}],
+            declarations=[],
+            system_instruction="test",
+        )
+
+    assert raised.value.failure == ProviderFailure.CREDENTIAL
+
+
+def test_e2e_script_creates_a_plan_instead_of_a_member() -> None:
+    payload = scripted_response(
+        {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": (
+                                "Create a membership plan code=E2EREJECT name=RejectMe "
+                                "duration_value=30 duration_unit=DAY price=7.00"
+                            )
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    candidates = payload["candidates"]
+    assert isinstance(candidates, list)
+    candidate = candidates[0]
+    assert isinstance(candidate, dict)
+    content = candidate["content"]
+    assert isinstance(content, dict)
+    parts = content["parts"]
+    assert isinstance(parts, list)
+    part = parts[0]
+    assert isinstance(part, dict)
+    call = part["functionCall"]
+    assert isinstance(call, dict)
+    assert call["name"] == "create_plan"
+    arguments = call["args"]
+    assert isinstance(arguments, dict)
+    assert arguments["code"] == "E2EREJECT"
+    assert arguments["price"] == "7.00"
+
+
+def test_e2e_script_stops_after_the_plan_proposal() -> None:
+    payload = scripted_response(
+        {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": "Create a membership plan code=E2EONCE name=Once price=8.00"}
+                    ],
+                },
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "functionResponse": {
+                                "name": "create_plan",
+                                "response": {"status": "confirmation_required"},
+                            }
+                        }
+                    ],
+                },
+            ]
+        }
+    )
+
+    candidates = payload["candidates"]
+    assert isinstance(candidates, list)
+    candidate = candidates[0]
+    assert isinstance(candidate, dict)
+    content = candidate["content"]
+    assert isinstance(content, dict)
+    parts = content["parts"]
+    assert isinstance(parts, list)
+    part = parts[0]
+    assert isinstance(part, dict)
+    assert part["text"] == "Review the change before confirming."
+
+
+def test_e2e_script_reports_completion_only_after_the_server_saved_it() -> None:
+    payload = scripted_response(
+        {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": (
+                                "The change is saved. Continue only if a different "
+                                "step is still required."
+                            )
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    candidates = payload["candidates"]
+    assert isinstance(candidates, list)
+    candidate = candidates[0]
+    assert isinstance(candidate, dict)
+    content = candidate["content"]
+    assert isinstance(content, dict)
+    parts = content["parts"]
+    assert isinstance(parts, list)
+    part = parts[0]
+    assert isinstance(part, dict)
+    assert part["text"] == "The change is complete."
