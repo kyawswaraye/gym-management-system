@@ -57,7 +57,7 @@ class RefundExceedsBalance(FinanceStateConflict):
 
 
 class RetailCorrectionUnavailable(CacheableIdempotentFailure):
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY  # type: ignore[assignment]
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     default_code = "RETAIL_CORRECTION_UNAVAILABLE"
     default_detail = (
         "Retail product charges stay posted until retail void and returns publish "
