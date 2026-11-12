@@ -32,14 +32,20 @@ from apps.assistant.dispatch import (
     tool_contracts,
 )
 from apps.assistant.execution import ExecutionRejected
+from apps.assistant.executor import ToolContract
 from apps.assistant.knowledge import (
     assistant_context,
+    complete_stored_reply,
     gate_sentence,
     grounded_read_reply,
     listing_tools,
     lookup_refusal,
+    offered_operations,
+    operation_workflow,
     public_activity,
     refuse_write_for_lookup,
+    short_reply_kind,
+    speaks_burmese,
     staff_notice,
     stored_listing_reply,
     unnamed_member_payment_reply,
@@ -49,13 +55,16 @@ from apps.assistant.knowledge import (
 )
 from apps.assistant.lookups import (
     assignment_gap,
+    attach_sale_package,
     booking_package_gap,
     existing_assignment,
     member_has_class_booking,
     membership_conflict,
     proposal_block,
     refundable_balance,
+    remember_sale_package,
     resolve_references,
+    sale_package_failure,
     unmetered_gate,
 )
 from apps.assistant.models import Conversation, Goal, Message, WorkflowStep
@@ -78,10 +87,30 @@ from apps.assistant.records import (
 )
 from apps.assistant.registry import ToolDefinition, production_registry
 from apps.assistant.serializers import message_data
+from apps.assistant.workflow_state import (
+    absorb_proposal,
+    absorb_read,
+    capability_brief,
+    completion_sentence,
+    dashboard_arguments,
+    direct_reply,
+    is_state_message,
+    load_state,
+    provider_notice,
+    remember_commit,
+    remember_intent,
+    save_state,
+    selling_membership,
+    state_brief,
+)
 from apps.classes.exceptions import ClassFull, ScheduleConflict
 from apps.common.api.exceptions import CodedAPIException, RequestRejected
 from apps.common.db.tenant_context import set_gym_context
-from apps.members.exceptions import MembershipOverlap, MembershipStateConflict
+from apps.members.exceptions import (
+    CheckInIneligible,
+    MembershipOverlap,
+    MembershipStateConflict,
+)
 from apps.members.payment_services import (
     PaymentPostingConflict,
     PTPaymentOwned,
@@ -106,33 +135,34 @@ _SYSTEM = (
     "When the staff ask for a member, call search_members or get_member and "
     "answer from that result. If search_members returns ambiguous, list the "
     "member numbers and ask which one. Do not choose one. For a membership, "
-    "call search_memberships with that member id. A membership plan catalog is "
-    "search_membership_plans, including inactive plans. If several plans share "
-    "a name, list the plan codes and whether each is active, and ask which "
-    "code. Do not claim that only one plan exists. For a PT or class package "
+    "call search_memberships with that member id. A new membership sale uses "
+    "search_membership_plans with eligible_for_sale true. Offer only ACTIVE "
+    "plans, with code and price. If several active plans share a name, ask "
+    "which code. If the staff names an inactive plan, say it is not available "
+    "for a new sale. Do not offer an inactive plan. For a period total, call "
+    "get_gym_dashboard. For announcements, call search_announcements and keep "
+    "DRAFT, SCHEDULED, PUBLISHED, CANCELLED, and EXPIRED distinct. For a PT or class package "
     "balance, call search_pt_packages and use its status, dates, and "
-    "remaining_sessions. Do not invent a balance. For a class on today or a "
-    "stated date, call search_class_occurrences with that gym-local date. For "
-    "a general class or booking list, omit date_from and date_to. For who is "
-    "booked, call search_bookings. If search_bookings returns ambiguous, list the member "
-    "numbers and ask which one. Do not choose one. Do not invent a class time, "
-    "capacity, or booked count. For a retail sale, call search_sales and use "
-    "its stored total_amount, status, and business_date. For a general sales or "
-    "expense list, omit business_date and status and return every matching row. "
-    "If that read was not called, do not invent a sale or an expense. For an "
-    "expense, call search_expenses and use its stored amount, status, and "
-    "business_date. For a salary period, call search_salary_periods and use "
-    "its stored status and period dates. Do not invent or change a date. For "
-    "a general salary or cash list, omit business_date and status. For a cash "
+    "remaining_sessions. For a class on today or a stated date, call "
+    "search_class_occurrences with that gym-local date. For a general class or "
+    "booking list, omit date_from and date_to. For who is booked, call "
+    "search_bookings. If search_bookings returns ambiguous, list the member "
+    "numbers and ask which one. Do not choose one. For a retail sale, call "
+    "search_sales and use its stored total_amount, status, and business_date. "
+    "For a general sales or expense list, omit business_date and status and "
+    "return every matching row. For an expense, call search_expenses and use "
+    "its stored amount, status, and business_date. For a salary period, call "
+    "search_salary_periods and use its stored status and period dates. For a "
+    "general salary or cash list, omit business_date and status. For a cash "
     "session, call search_cash_sessions and include both open and closed "
     "sessions unless the staff names one status. Use the stored status and "
-    "business date. "
-    "Do not invent a closing balance. For a PT commission or its payouts, call "
+    "business date. For a PT commission or its payouts, call "
     "search_pt_commissions and use the stored commission amounts and payment "
-    "amounts. Do not invent a payout. A payment search row includes its stored "
-    "entry_type. A refund is a payment whose entry_type is REFUND. "
-    "Do not invent an amount, member, payment, sale, expense, attendance, "
-    "booking, stock quantity, salary, or commission. Counts and today's "
+    "amounts. A payment search row includes its stored entry_type. A refund is "
+    "a payment whose entry_type is REFUND. If that read was not called, do not "
+    "invent the record. Do not invent an amount, member, payment, sale, expense, "
+    "attendance, booking, class time, capacity, booked count, stock quantity, "
+    "salary, commission, payout, closing balance, or date. Counts and today's "
     "schedule come from the live gym brief. There is no daily shift roster. "
     "If no read tool can retrieve the record, say that you cannot retrieve "
     "it. Do not invent the record. Do not call a write tool to answer a "
@@ -157,13 +187,14 @@ _SYSTEM = (
     "If creating the assignment returns already_saved, that assignment is already "
     "saved. Do not propose it again. A metered PT booking needs an active PT "
     "package with sessions left. If the tool returns package_required, do not "
-    "propose the booking. Say that the member needs a posted PT sale first. Write "
-    "tools only propose a change. Never say a write succeeded before it is "
-    "confirmed. For an approval, send the record's own id field and do not "
+    "propose the booking. Say that the member needs a posted PT sale first. "
+    "For an approval, send the record's own id field and do not "
     "invent record_id or amount. The server supplies the stored amount. "
     "If a confirmation is already waiting, explain that one change in the "
     "staff member's language and do not propose another write. "
-    "When the task is finished, say what is done in one sentence and stop. "
+    "When the task is finished, say what is done and the one relevant next "
+    "step when one remains. Do not offer an unrelated action. Use the workflow "
+    "state for ids and dates already collected. Do not ask for them again. "
     "When the staff write in Burmese, reply in Burmese in one or two short "
     "sentences. Keep stored names, member numbers, SKU codes, plan codes, "
     "dates, amounts, and statuses exactly as stored. Myanmar digits have the "
@@ -172,16 +203,15 @@ _SYSTEM = (
     "one, ask which member number. Do not list other members' payments. If "
     "the member name matches more than one member, list the member numbers "
     "and ask which one. If the member, trainer, date, time, or amount is missing "
-    "or ambiguous, ask one short question. Do not invent a date or a time. "
-    "Reply in the staff member's language."
+    "or ambiguous, ask one short question. Reply in the staff member's language."
 )
 _CONTINUE = (
     "The previous change is saved. Do not propose that same change again. "
     "Do not propose a trainer assignment that already exists. "
     "If the request is finished, say that it is done in the staff member's "
-    "language in one sentence and stop. Do not ask what to do next. "
-    "If a different step is still required, ask the one missing fact or "
-    "propose that different change."
+    "language. If one relevant next step remains, say that step. Do not offer "
+    "an unrelated action. If a different step is still required, ask the one "
+    "missing fact or propose that different change."
 )
 _UNAVAILABLE = "The assistant is unavailable."
 _LIMIT = "I could not finish that within the assistant limit."
@@ -190,6 +220,11 @@ _READ_NUDGE = (
     "Call the stored read for this list before answering. For a general list, "
     "omit date_from, date_to, business_date, and status. Do not invent rows, "
     "dates, or amounts."
+)
+_AGREE = (
+    "The staff agreed to the one operation already under discussion. Propose "
+    "that change and wait for confirmation. Do not replace it with a member "
+    "lookup. Do not say the change is already saved."
 )
 
 
@@ -224,7 +259,33 @@ def run_turn(
         role=Message.Role.STAFF,
         body=message,
     )
-    pending = _waiting(gym, conversation, actor)
+    pending_step = _waiting_step(gym, conversation, actor)
+    pending = _pending_card(pending_step)
+    kind = short_reply_kind(message)
+    if kind == "decline":
+        return _decline_reply(gym, conversation, message, pending_step)
+    cue = ""
+    if kind == "affirm":
+        continued = _affirm_reply(gym, conversation, message, pending_step)
+        if continued is not None:
+            return continued
+        cue = _AGREE
+    if pending is None:
+        stored = direct_reply(message, load_state(gym, conversation))
+        if stored is not None:
+            saved = append_message(
+                gym=gym,
+                conversation=conversation,
+                actor=None,
+                role=Message.Role.ASSISTANT,
+                body=stored[:4000],
+            )
+            return {
+                "conversation_id": conversation.id,
+                "message": message_data(saved),
+                "pending_confirmation": None,
+                "tool_activity": [],
+            }
     limit = None if pending is not None else unsupported_lookup_reply(message)
     if limit is None and pending is None:
         limit = unnamed_member_payment_reply(message)
@@ -249,7 +310,7 @@ def run_turn(
         actor=actor,
         conversation=conversation,
         instruction=_SYSTEM,
-        cue="",
+        cue=cue,
         provider_fallback=_UNAVAILABLE,
     )
     if answered is None:
@@ -297,7 +358,8 @@ def _reply(
     history = _history(gym, conversation)
     offered = _offered(request)
     contracts = tool_contracts()
-    declarations = [declaration(contracts[name]) for name in sorted(offered) if name in contracts]
+    staff_text = _staff_text(history)
+    declarations = _model_declarations(offered, contracts, staff_text)
     contents = _contents(history)
     if cue:
         contents.append({"role": "user", "parts": [{"text": cue}]})
@@ -305,8 +367,8 @@ def _reply(
     proposal = pending
     deadline = monotonic() + max_execution_seconds()
     calls_used = 0
+    model_calls = 0
     reply = ""
-    staff_text = _staff_text(history)
     forced: str | None = None
     blocked_write = False
     read_completed = False
@@ -314,9 +376,16 @@ def _reply(
     completed_reads: dict[str, Mapping[str, object]] = {}
     attempted_reads: set[str] = set()
     nudged = False
+    limit_reached = False
     if pending is not None:
         instruction += " A confirmation is already waiting. Do not propose another write."
+    workflow = load_state(gym, conversation)
+    remember_intent(workflow, staff_text)
+    remember_sale_package(gym, conversation, workflow)
     context = assistant_context(gym, _codes(request), assistant_full_access(request))
+    opening_card = capability_brief(staff_text, workflow)
+    instruction += "\n\n" + opening_card
+    instruction += "\n" + state_brief(workflow)
     instruction += "\n\n" + context
     marker = "Live gym brief"
     live_brief = context[context.find(marker) :] if marker in context else ""
@@ -325,6 +394,7 @@ def _reply(
             if monotonic() >= deadline:
                 reply = reply or _LIMIT
                 break
+            model_calls += 1
             turn = generate_content(
                 contents=contents,
                 declarations=declarations,
@@ -367,6 +437,7 @@ def _reply(
                     proposal=proposal,
                     saved=saved,
                     staff_text=staff_text,
+                    workflow=workflow,
                 )
                 if outcome is not None:
                     proposal = outcome
@@ -386,8 +457,39 @@ def _reply(
                 notice = staff_notice(body, staff_text)
                 if notice is not None:
                     forced = notice
+                elif body.get("status") == "already_saved":
+                    from apps.assistant.knowledge import speaks_burmese
+
+                    burmese = speaks_burmese(staff_text)
+                    if call.name == "create_assignment":
+                        forced = (
+                            "ဒီတာဝန်ပေးမှုက ရှိပြီးသားပါ။"
+                            if burmese
+                            else "That trainer assignment is already stored."
+                        )
+                    else:
+                        number = body.get("member_number")
+                        shown = number if isinstance(number, str) else ""
+                        forced = (
+                            f"ဒီအဖွဲ့ဝင် ရှိပြီးသားပါ။ အဖွဲ့ဝင်နံပါတ် {shown}။".strip()
+                            if burmese
+                            else f"That member already exists. Member number {shown}.".strip()
+                        )
                 if body.get("error"):
-                    logger.info("assistant tool failed: %s", body.get("error"))
+                    field = body.get("field")
+                    safe_field = (
+                        field
+                        if isinstance(field, str)
+                        and field.isascii()
+                        and field.replace("_", "").isalnum()
+                        and len(field) <= 40
+                        else ""
+                    )
+                    logger.info(
+                        "assistant tool failed: %s field=%s",
+                        body.get("error"),
+                        safe_field or "none",
+                    )
                 activity.append({"name": call.name, "status": _activity_status(body)})
                 if forced is not None:
                     break
@@ -398,13 +500,46 @@ def _reply(
             if turn.text and proposal is not None:
                 reply = turn.text
                 break
+            if proposal is None:
+                ready = complete_stored_reply(staff_text, completed_reads)
+                if ready is not None:
+                    reply = ready
+                    break
         else:
+            limit_reached = True
             reply = reply or _LIMIT
-    except ProviderCallError:
+    except ProviderCallError as exc:
+        logger.info("assistant provider failed: %s", exc.failure.value)
         if provider_fallback is None:
+            _log_turn(
+                model_calls=model_calls,
+                tool_calls=calls_used,
+                activity=activity,
+                declarations=declarations,
+                contracts=contracts,
+                limit_reached=limit_reached,
+                workflow=workflow,
+                opening_card=opening_card,
+            )
+            save_state(gym, conversation, workflow)
             return None
-        reply = provider_fallback
+        reply = (
+            provider_notice(staff_text, workflow)
+            if provider_fallback == _UNAVAILABLE
+            else provider_fallback
+        )
         activity.append({"name": "assistant", "status": "unavailable"})
+    _log_turn(
+        model_calls=model_calls,
+        tool_calls=calls_used,
+        activity=activity,
+        declarations=declarations,
+        contracts=contracts,
+        limit_reached=limit_reached,
+        workflow=workflow,
+        opening_card=opening_card,
+    )
+    save_state(gym, conversation, workflow)
     if reply == "" and forced:
         reply = forced
     elif reply == "":
@@ -466,6 +601,26 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
         )
         raise RequestRejected({"confirmation": ["This confirmation has expired."]})
     payload = _confirmed_payload(step)
+    if step.tool_name == "create_pt_sale" and sale_package_failure(gym, payload) is not None:
+        _cancel_operation(gym, goal.conversation, "cancelled")
+        close_goal(
+            gym=gym,
+            goal=goal,
+            step=step,
+            status=Goal.Status.CANCELLED,
+            step_status=WorkflowStep.Status.CANCELLED,
+            summary="package_unavailable",
+        )
+        raise RequestRejected(
+            {
+                "confirmation": [
+                    gate_sentence(
+                        "package_unavailable",
+                        _latest_staff(gym, goal.conversation),
+                    )
+                ]
+            }
+        )
     try:
         result = execute_confirmed_write(
             request=request,
@@ -587,6 +742,26 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
             _confirmation_text(gym, goal.conversation, "assignment"),
         )
     except PackageNotEligible:
+        if step.tool_name == "create_pt_sale":
+            _cancel_operation(gym, goal.conversation, "cancelled")
+            close_goal(
+                gym=gym,
+                goal=goal,
+                step=step,
+                status=Goal.Status.CANCELLED,
+                step_status=WorkflowStep.Status.CANCELLED,
+                summary="package_unavailable",
+            )
+            raise RequestRejected(
+                {
+                    "confirmation": [
+                        gate_sentence(
+                            "package_unavailable",
+                            _latest_staff(gym, goal.conversation),
+                        )
+                    ]
+                }
+            ) from None
         class_booking = step.tool_name == "create_class_booking"
         close_goal(
             gym=gym,
@@ -634,7 +809,27 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
                 "class_package" if class_booking else "package",
             ),
         )
+    except CheckInIneligible:
+        logger.info("assistant confirmation check-in ineligible")
+        close_goal(
+            gym=gym,
+            goal=goal,
+            step=step,
+            status=Goal.Status.CANCELLED,
+            step_status=WorkflowStep.Status.CANCELLED,
+            summary="check_in_ineligible",
+        )
+        return _confirmation_result(
+            gym,
+            goal,
+            step,
+            "cancelled",
+            _confirmation_text(gym, goal.conversation, "check_in_ineligible"),
+        )
     if result.outcome in {"committed", "existing"}:
+        workflow = load_state(gym, goal.conversation)
+        remember_commit(gym, workflow, step.tool_name, payload, result.effect_reference)
+        save_state(gym, goal.conversation, workflow)
         close_goal(
             gym=gym,
             goal=goal,
@@ -654,7 +849,14 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
         if followed is not None:
             followed["outcome"] = result.outcome
             return followed
-        return _confirmation_result(gym, goal, step, result.outcome, "The change is complete.")
+        staff_text = _staff_text(_history(gym, goal.conversation))
+        return _confirmation_result(
+            gym,
+            goal,
+            step,
+            result.outcome,
+            completion_sentence(workflow, staff_text),
+        )
     if result.outcome == "in_progress":
         text = "That change is already in progress."
     elif result.outcome == "bookkeeping_pending":
@@ -741,6 +943,7 @@ def _handle_call(
     proposal: dict[str, object] | None,
     saved: tuple[str, Mapping[str, object]] | None = None,
     staff_text: str = "",
+    workflow: dict[str, str] | None = None,
 ) -> tuple[dict[str, object] | None, dict[str, object]]:
     if name not in offered:
         return None, {"error": "unknown_tool"}
@@ -754,12 +957,21 @@ def _handle_call(
         return None, {"error": "invalid_arguments"}
     if tool.operation == "read":
         today = None
-        if name in listing_tools(staff_text):
+        if name in listing_tools(staff_text) or name == "get_gym_dashboard":
             from apps.trainers.selectors import gym_local_date
 
             today = gym_local_date(gym)
+        if name == "get_gym_dashboard" and today is not None:
+            payload = dashboard_arguments(payload, staff_text, today)
+        if name == "search_membership_plans" and selling_membership(staff_text, workflow):
+            payload = dict(payload)
+            payload["eligible_for_sale"] = True
         payload = widen_list_filters(name, payload, staff_text, today)
-        return None, _read(request, view, name, payload)
+        body = _read(request, view, name, payload)
+        result = body.get("result")
+        if workflow is not None and isinstance(result, Mapping) and "error" not in body:
+            absorb_read(workflow, name, result)
+        return None, body
     if refuse_write_for_lookup(staff_text, tool.operation):
         return None, {"error": "not_a_read"}
     if tool.operation != "write":
@@ -780,6 +992,11 @@ def _handle_call(
         )
         if failure is not None:
             return None, failure
+        if name == "create_pt_sale" and workflow is not None:
+            extra, package_failure = attach_sale_package(gym, conversation, payload, workflow)
+            if package_failure is not None:
+                return None, package_failure
+            labels.update(extra)
         meter = unmetered_gate(gym, actor, name, payload, staff_text)
         if meter is not None:
             return None, meter
@@ -801,7 +1018,7 @@ def _handle_call(
             missing = missing_fields(contract.prerequisite, payload)
             if missing:
                 return None, {"error": "missing_fields", "fields": list(missing)}
-        return _open_proposal(
+        opened = _open_proposal(
             gym=gym,
             actor=actor,
             conversation=conversation,
@@ -809,6 +1026,9 @@ def _handle_call(
             payload=payload,
             labels=labels,
         )
+        if workflow is not None and opened[0] is not None:
+            absorb_proposal(workflow, name, payload)
+        return opened
     except PermissionDenied:
         return None, {"error": "permission_denied"}
     except Http404:
@@ -986,6 +1206,14 @@ def _waiting(
     conversation: Conversation,
     actor: GymMembership,
 ) -> dict[str, object] | None:
+    return _pending_card(_waiting_step(gym, conversation, actor))
+
+
+def _waiting_step(
+    gym: Gym,
+    conversation: Conversation,
+    actor: GymMembership,
+) -> tuple[Goal, WorkflowStep] | None:
     if conversation.created_by_membership_id != actor.id:
         return None
     with transaction.atomic():
@@ -1016,7 +1244,201 @@ def _waiting(
     raw = step.required_input if isinstance(step.required_input, dict) else {}
     if raw.get("actor_membership_id") != str(actor.id):
         return None
+    return goal, step
+
+
+def _pending_card(pair: tuple[Goal, WorkflowStep] | None) -> dict[str, object] | None:
+    if pair is None:
+        return None
+    goal, step = pair
+    raw = step.required_input if isinstance(step.required_input, dict) else {}
     return public_pending(raw, step_id=step.id, goal_id=goal.id, tool_name=step.tool_name)
+
+
+def _decline_reply(
+    gym: Gym,
+    conversation: Conversation,
+    message: str,
+    pair: tuple[Goal, WorkflowStep] | None,
+) -> dict[str, object]:
+    if pair is None:
+        return _stored_reply(
+            gym,
+            conversation,
+            _spoken(message, "There is no change waiting.", "စောင့်နေတဲ့ ပြောင်းလဲမှု မရှိပါ။"),
+            None,
+        )
+    goal, step = pair
+    if goal.expires_at <= timezone.now():
+        return _expire_reply(gym, conversation, message, goal, step)
+    _cancel_operation(gym, conversation, "cancelled")
+    close_goal(
+        gym=gym,
+        goal=goal,
+        step=step,
+        status=Goal.Status.CANCELLED,
+        step_status=WorkflowStep.Status.CANCELLED,
+        summary="rejected",
+    )
+    return _stored_reply(gym, conversation, gate_sentence("rejected", message), None)
+
+
+def _affirm_reply(
+    gym: Gym,
+    conversation: Conversation,
+    message: str,
+    pair: tuple[Goal, WorkflowStep] | None,
+) -> dict[str, object] | None:
+    """Continue one discussed operation. A waiting card is not executed here."""
+
+    if pair is not None:
+        goal, step = pair
+        if goal.expires_at <= timezone.now():
+            return _expire_reply(gym, conversation, message, goal, step)
+        return _stored_reply(
+            gym,
+            conversation,
+            _spoken(
+                message,
+                "Use the confirmation to save it. Nothing is saved yet.",
+                "အတည်ပြုချက်ကို နှိပ်မှ သိမ်းပါမယ်။ မသိမ်းရသေးပါ။",
+            ),
+            _pending_card(pair),
+        )
+    question = _latest_assistant(gym, conversation)
+    offered = offered_operations(question)
+    if len(offered) > 1:
+        return _stored_reply(
+            gym,
+            conversation,
+            _spoken(message, "Which change should I continue?", "ဘယ်အရာကို ဆက်လုပ်မလဲ။"),
+            None,
+        )
+    state = load_state(gym, conversation)
+    tool = offered[0] if offered else _active_operation(state)
+    if tool and state.get("last_outcome") == "saved" and state.get("last_tool") == tool:
+        tool = ""
+    if not tool:
+        return _stored_reply(
+            gym,
+            conversation,
+            _spoken(message, "What should I add?", "ဘာကို ထည့်မလဲ။"),
+            None,
+        )
+    workflow = operation_workflow(tool)
+    if workflow:
+        state["workflow"] = workflow
+    state["next"] = tool
+    save_state(gym, conversation, state)
+    return None
+
+
+def _expire_reply(
+    gym: Gym,
+    conversation: Conversation,
+    message: str,
+    goal: Goal,
+    step: WorkflowStep,
+) -> dict[str, object]:
+    _cancel_operation(gym, conversation, "expired")
+    close_goal(
+        gym=gym,
+        goal=goal,
+        step=step,
+        status=Goal.Status.EXPIRED,
+        step_status=WorkflowStep.Status.CANCELLED,
+        summary="expired",
+    )
+    return _stored_reply(
+        gym,
+        conversation,
+        _spoken(
+            message,
+            "This confirmation has expired. Nothing was saved.",
+            "ဒီအတည်ပြုချက်က သက်တမ်းကုန်ပါပြီ။ ဘာမှ မသိမ်းပါ။",
+        ),
+        None,
+    )
+
+
+def _active_operation(state: Mapping[str, str]) -> str:
+    if state.get("last_outcome") in {"cancelled", "expired"}:
+        return ""
+    if state.get("stage") in {"cancelled", "expired"}:
+        return ""
+    last = state.get("last_tool") or ""
+    nxt = state.get("next") or ""
+    pending = state.get("pending_tool") or ""
+    if state.get("stage") == "completed" or state.get("last_outcome") == "saved":
+        if nxt and nxt not in {last, "approval"}:
+            return nxt
+        return ""
+    if pending and pending != "approval":
+        return pending
+    if nxt and nxt != "approval":
+        return nxt
+    return ""
+
+
+def _cancel_operation(gym: Gym, conversation: Conversation, stage: str) -> None:
+    state = load_state(gym, conversation)
+    state["stage"] = stage
+    state["pending_tool"] = ""
+    state["last_outcome"] = stage
+    save_state(gym, conversation, state)
+
+
+def _stored_reply(
+    gym: Gym,
+    conversation: Conversation,
+    body: str,
+    pending: dict[str, object] | None,
+) -> dict[str, object]:
+    saved = append_message(
+        gym=gym,
+        conversation=conversation,
+        actor=None,
+        role=Message.Role.ASSISTANT,
+        body=body[:4000],
+    )
+    return {
+        "conversation_id": conversation.id,
+        "message": message_data(saved),
+        "pending_confirmation": pending,
+        "tool_activity": [],
+    }
+
+
+def _spoken(text: str, english: str, burmese: str) -> str:
+    return burmese if speaks_burmese(text) else english
+
+
+def _latest_staff(gym: Gym, conversation: Conversation) -> str:
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        row = (
+            Message.objects.filter(gym=gym, conversation=conversation, role=Message.Role.STAFF)
+            .order_by("-created_at", "-id")
+            .only("body")
+            .first()
+        )
+    return row.body if row is not None else ""
+
+
+def _latest_assistant(gym: Gym, conversation: Conversation) -> str:
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        row = (
+            Message.objects.filter(
+                gym=gym,
+                conversation=conversation,
+                role=Message.Role.ASSISTANT,
+            )
+            .order_by("-created_at", "-id")
+            .only("body")
+            .first()
+        )
+    return row.body if row is not None else ""
 
 
 def _conversation(
@@ -1030,7 +1452,7 @@ def _conversation(
         return open_conversation(gym=gym, actor=actor, title=title)
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
-        conversation = get_conversation(gym=gym, conversation_id=conversation_id)
+        conversation = get_conversation(gym=gym, actor=actor, conversation_id=conversation_id)
     if conversation.created_by_membership_id != actor.id:
         raise Http404
     return conversation
@@ -1126,6 +1548,78 @@ def _session(request: Request) -> tuple[Gym, GymMembership]:
     return gym, actor
 
 
+def _log_turn(
+    *,
+    model_calls: int,
+    tool_calls: int,
+    activity: list[dict[str, str]],
+    declarations: list[dict[str, object]],
+    contracts: Mapping[str, ToolContract],
+    limit_reached: bool,
+    workflow: Mapping[str, str],
+    opening_card: str,
+) -> None:
+    """Record turn shape only. Prompts, names, and amounts stay out of the log."""
+
+    write_declarations = 0
+    read_declarations = 0
+    for item in declarations:
+        name = item.get("name")
+        contract = contracts.get(name) if isinstance(name, str) else None
+        if contract is None:
+            continue
+        if contract.definition.operation == "write":
+            write_declarations += 1
+        elif contract.definition.operation == "read":
+            read_declarations += 1
+    tools = ",".join(
+        f"{item['name']}:{item.get('status', '')}" for item in activity if item.get("name")
+    )
+    if opening_card.startswith("Relevant operation. Personal training"):
+        capability = "pt"
+    elif opening_card.startswith("Relevant operation. Members"):
+        capability = "members"
+    elif opening_card.startswith("Relevant operation. Payments"):
+        capability = "payments"
+    else:
+        capability = "other"
+    logger.info(
+        "assistant turn model_calls=%s tool_calls=%s tools=%s write_declarations=%s "
+        "read_declarations=%s limit_reached=%s capability=%s workflow=%s",
+        model_calls,
+        tool_calls,
+        tools or "none",
+        write_declarations,
+        read_declarations,
+        limit_reached,
+        capability,
+        workflow.get("workflow") or "none",
+    )
+
+
+def _model_declarations(
+    offered: frozenset[str],
+    contracts: Mapping[str, ToolContract],
+    staff_text: str,
+) -> list[dict[str, object]]:
+    """Hide write schemas when this lookup is already refused on the server.
+
+    The model prompt is not the permission check. ``_handle_call`` still rejects
+    a write that arrives for a lookup.
+    """
+
+    lookup_only = refuse_write_for_lookup(staff_text, "write")
+    selected: list[dict[str, object]] = []
+    for name in sorted(offered):
+        contract = contracts.get(name)
+        if contract is None:
+            continue
+        if lookup_only and contract.definition.operation == "write":
+            continue
+        selected.append(declaration(contract))
+    return selected
+
+
 def _staff_text(history: list[Message]) -> str:
     for message in reversed(history):
         if message.role == Message.Role.STAFF and message.body.strip():
@@ -1175,6 +1669,8 @@ def _balance_text(gym: Gym, payload: Mapping[str, object]) -> str:
 def _contents(messages: list[Message]) -> list[dict[str, object]]:
     contents: list[dict[str, object]] = []
     for message in messages[-_HISTORY:]:
+        if is_state_message(message):
+            continue
         text = message.body.strip()[:2000]
         if text == "":
             continue

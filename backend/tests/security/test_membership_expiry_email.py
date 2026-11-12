@@ -1031,3 +1031,82 @@ def test_concurrent_delivery_workers_send_one_email() -> None:
     notification = Notification.objects.get(gym_id=gym_id)
     assert notification.status == Notification.Status.SENT
     assert notification.attempt_count == 1
+
+
+def test_delayed_retry_sends_the_same_expiry_and_cancels_a_renewed_membership() -> None:
+    from django.core import mail
+
+    tenant = _provision("EXPIRY-LATE")
+    today = gym_today(tenant.gym)
+    _prepare(tenant, warning_days=[0, 7])
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        plan = _plan(tenant)
+        waiting = _member(
+            tenant, number="LATE-1", first_name="Late", email="late@example.test", today=today
+        )
+        moved = _member(
+            tenant, number="LATE-2", first_name="Moved", email="moved@example.test", today=today
+        )
+        finished = _member(
+            tenant,
+            number="LATE-3",
+            first_name="Done",
+            email="done@example.test",
+            today=today,
+        )
+        _sell(tenant, member=waiting, plan=plan, warning_day=7, today=today)
+        changed = _sell(tenant, member=moved, plan=plan, warning_day=7, today=today)
+        _sell(tenant, member=finished, plan=plan, warning_day=0, today=today)
+    assert _schedule(tenant) == 3
+    with override_settings(EMAIL_BACKEND="tests.mail_backends.ProviderOutageBackend"):
+        for _ in range(3):
+            assert _deliver(tenant) is DeliveryOutcome.RETRIED
+    mail.outbox.clear()
+    later = today + timedelta(days=1)
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        Notification.objects.filter(
+            gym=tenant.gym,
+            status=Notification.Status.PENDING,
+        ).update(next_attempt_at=timezone.now())
+        cancel_membership(
+            gym=tenant.gym,
+            actor=tenant.owner_membership,
+            membership_id=changed.id,
+            reason="Renewed",
+        )
+    outcomes = []
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        for _ in range(3):
+            outcomes.append(
+                deliver_next_membership_expiry_email(
+                    gym=tenant.gym,
+                    today=later,
+                    now=timezone.now(),
+                )
+            )
+    assert sorted(outcome.value if outcome else "" for outcome in outcomes) == [
+        "CANCELLED",
+        "CANCELLED",
+        "SENT",
+    ]
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == ["late@example.test"]
+    assert "Hello Late," in mail.outbox[0].body
+    assert "မင်္ဂလာပါ Late၊" in mail.outbox[0].body
+    assert mail.outbox[0].extra_headers[IDEMPOTENCY_HEADER]
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        assert (
+            deliver_next_membership_expiry_email(gym=tenant.gym, today=later, now=timezone.now())
+            is None
+        )
+    assert len(mail.outbox) == 1
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        sent = Notification.objects.get(gym=tenant.gym, recipient_member=waiting)
+        cancelled = Notification.objects.get(gym=tenant.gym, recipient_member=moved)
+    assert sent.status == Notification.Status.SENT
+    assert cancelled.status == Notification.Status.CANCELLED

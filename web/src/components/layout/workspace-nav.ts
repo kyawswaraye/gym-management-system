@@ -91,6 +91,9 @@ export function workspaceNavigation(
   if (hasTenantCapability(session, "members.view", "members")) {
     members.push({ href: "/members", label: "Members" });
   }
+  if (hasTenantCapability(session, "announcements.view", "members")) {
+    members.push({ href: "/announcements", label: "Announcements" });
+  }
   if (hasTenantCapability(session, "memberships.view", "memberships")) {
     members.push({ href: "/memberships", label: "Memberships" });
   }

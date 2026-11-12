@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { MotionProvider } from "./src/a11y/motion";
 import { AppProviders } from "./src/app/providers";
 import { assertRuntimeEnv, env } from "./src/config/env";
+import { flushInboxLink, navigationRef } from "./src/navigation/inboxLink";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 
 assertRuntimeEnv(env, __DEV__);
@@ -16,7 +17,7 @@ export default function App() {
       <SafeAreaProvider>
         <MotionProvider>
           <AppProviders>
-            <NavigationContainer>
+            <NavigationContainer ref={navigationRef} onReady={flushInboxLink}>
               <StatusBar barStyle="dark-content" />
               <RootNavigator />
             </NavigationContainer>

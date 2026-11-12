@@ -102,12 +102,14 @@ is 1024 MiB. Steady use must leave that 2048 MiB.
 | node exporter | 0.05 | 48 MiB |
 | blackbox exporter | 0.05 | 32 MiB |
 | postgres exporter | 0.05 | 64 MiB |
+| Notification scheduler | 0.05 | 160 MiB |
 
-Steady CPU is 3.20. Steady memory is 5712 MiB. `5712 + 2048` is 7760, inside
+Steady CPU is 3.25. Steady memory is 5872 MiB. `5872 + 2048` is 7920, inside
 8192. The one-shot migrate job is 0.50 CPU and 512 MiB and is not in the sum.
 
-`max_connections` stays 40. The planning sum is 2 API workers, 1 monitor
-connection, an operations reserve of 8, and 3 WAL senders. `14 < 40`.
+`max_connections` stays 40. The planning sum is 2 API workers, 1 scheduler
+connection, 1 monitor connection, an operations reserve of 8, and 3 WAL
+senders. `15 < 40`.
 
 ## Monitor role
 

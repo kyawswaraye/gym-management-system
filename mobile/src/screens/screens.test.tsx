@@ -2,6 +2,7 @@ import { fireEvent, render } from "@testing-library/react-native";
 
 jest.mock("@react-navigation/native", () => ({
   useIsFocused: () => true,
+  useRoute: () => ({ params: undefined }),
 }));
 import type { ReactElement } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";

@@ -135,6 +135,8 @@ def test_member_reads_register_without_changing_write_tools() -> None:
         "search_salary_periods",
         "search_cash_sessions",
         "search_pt_commissions",
+        "search_announcements",
+        "get_gym_dashboard",
     }
     for name in MEMBER_READ_TOOL_NAMES:
         tool = production_registry().get(name)

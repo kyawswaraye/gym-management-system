@@ -11,6 +11,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.common.api.error_catalog import wants_myanmar
 from apps.common.api.exceptions import RequestRejected
 from apps.common.api.responses import success_response
 from apps.common.api.schema import ErrorEnvelopeSerializer
@@ -75,9 +76,14 @@ class MemberNotificationListView(MemberNotificationView):
             member_id=request.member.id,
             limit=int(query["limit"]),
             after=str(query.get("after") or ""),
+            view=str(query.get("view") or "active"),
         )
+        language = "my" if wants_myanmar(request) else "en"
         return success_response(
-            MemberNotificationSerializer([notification_item(row) for row in rows], many=True).data,
+            MemberNotificationSerializer(
+                [notification_item(row, language=language) for row in rows],
+                many=True,
+            ).data,
             meta=meta,
         )
 
@@ -104,4 +110,7 @@ class MemberNotificationReadView(MemberNotificationView):
             notification_id=id,
             **_context(request),
         )
-        return success_response(MemberNotificationSerializer(notification_item(row)).data)
+        language = "my" if wants_myanmar(request) else "en"
+        return success_response(
+            MemberNotificationSerializer(notification_item(row, language=language)).data
+        )

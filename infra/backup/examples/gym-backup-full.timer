@@ -1,12 +1,13 @@
-# Example only. This timer is not installed and is not proof of a backup schedule.
+# Example only. This timer is not installed until it is copied and enabled.
 # Do not enable it until gym-backup bootstrap has exited 0.
+# This timer is not proof of a backup schedule by itself.
 
 [Unit]
-Description=Example daily gym PostgreSQL full backup
+Description=Daily gym PostgreSQL full backup
 
 [Timer]
 OnCalendar=*-*-* 02:15:00 UTC
-Persistent=false
+Persistent=true
 Unit=gym-backup-full.service
 
 [Install]

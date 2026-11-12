@@ -16,6 +16,8 @@ from apps.assistant.configuration import (
     ProviderFailure,
     assistant_configuration,
     classify_provider_failure,
+    gemini_max_retries,
+    max_steps,
 )
 from apps.assistant.identity import execution_identity
 from apps.assistant.prerequisites import FieldRequirement, Prerequisite, missing_fields
@@ -149,6 +151,25 @@ def test_provider_failures_are_classified_without_a_key_prefix() -> None:
         classify_provider_failure(status_code=500, provider_status="INTERNAL")
         is ProviderFailure.PROVIDER
     )
+
+
+def test_step_budget_defaults_to_four_and_retries_stay_at_one() -> None:
+    with override_settings(ASSISTANT_MAX_STEPS="4"):
+        assert max_steps() == 4
+    with override_settings(ASSISTANT_MAX_STEPS=""):
+        assert max_steps() == 4
+    with override_settings(ASSISTANT_MAX_STEPS="21"):
+        assert max_steps() == 4
+    with override_settings(ASSISTANT_MAX_STEPS="20"):
+        assert max_steps() == 20
+    with override_settings(ASSISTANT_MAX_STEPS="12"):
+        assert max_steps() == 12
+    with override_settings(GEMINI_MAX_RETRIES="1"):
+        assert gemini_max_retries() == 1
+    with override_settings(GEMINI_MAX_RETRIES="5"):
+        assert gemini_max_retries() == 1
+    with override_settings(GEMINI_MAX_RETRIES="0"):
+        assert gemini_max_retries() == 1
 
 
 def _request(*, enabled: bool, verified_at: object) -> Request:

@@ -64,15 +64,18 @@ reserve and a 1024 MiB backup reserve. The current planning table is:
 | node exporter | 0.05 | 48 MiB |
 | blackbox exporter | 0.05 | 32 MiB |
 | postgres exporter | 0.05 | 64 MiB |
+| Notification scheduler | 0.05 | 160 MiB |
 | Migrate, one shot | 0.50 | 512 MiB |
 
-Steady CPU is 3.20 of 4. Steady memory is 5712 MiB. `5712 + 2048` is 7760,
+Steady CPU is 3.25 of 4. Steady memory is 5872 MiB. `5872 + 2048` is 7920,
 inside 8192. The migrate job is not part of that sum and should run while
 traffic is paused.
 
 PostgreSQL `max_connections` is 40. Two sync Gunicorn workers hold one
-connection each when `DB_CONN_MAX_AGE` is 60. The monitor connection is 1.
-The operations reserve is 8 and `max_wal_senders` is 3. `2 + 1 + 8 + 3 < 40`.
+connection each when `DB_CONN_MAX_AGE` is 60. The scheduler holds one
+connection while a command runs and closes it afterward. The monitor
+connection is 1. The operations reserve is 8 and `max_wal_senders` is 3.
+`2 + 1 + 1 + 8 + 3 < 40`.
 Gunicorn refuses `WEB_CONCURRENCY` above 4. Raising workers, threads, or
 `max_connections` without a new measurement fails validation or process start.
 

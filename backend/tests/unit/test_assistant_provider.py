@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import logging
+import urllib.error
+from email.message import EmailMessage
+from io import BytesIO
+
 import pytest
 from django.test import override_settings
 
+from apps.assistant import provider as provider_module
 from apps.assistant.configuration import ProviderFailure
 from apps.assistant.dispatch import tool_contracts
 from apps.assistant.e2e_provider import scripted_response
@@ -47,26 +53,26 @@ def test_blocked_prompt_has_no_tool_call() -> None:
     assert turn.calls == ()
 
 
-def test_generate_content_retries_transport_failures_and_hides_the_key() -> None:
+def test_generate_content_does_not_retry_a_timeout_or_reveal_the_key() -> None:
     seen: list[dict[str, object]] = []
 
     def transport(body: dict[str, object], timeout: int) -> dict[str, object]:
         assert timeout == 30
         seen.append(body)
-        if len(seen) == 1:
-            raise ProviderCallError(ProviderFailure.TIMEOUT)
-        return {"candidates": [{"content": {"parts": [{"text": "Hello"}]}}]}
+        raise ProviderCallError(ProviderFailure.TIMEOUT)
 
     with override_settings(**_SETTINGS):
-        turn = generate_content(
-            contents=[{"role": "user", "parts": [{"text": "Hi"}]}],
-            declarations=[],
-            system_instruction="Stay in the gym.",
-            transport=transport,
-        )
-    assert turn.text == "Hello"
-    assert len(seen) == 2
-    assert "k" * 20 not in str(seen)
+        with pytest.raises(ProviderCallError) as raised:
+            generate_content(
+                contents=[{"role": "user", "parts": [{"text": "Hi"}]}],
+                declarations=[],
+                system_instruction="Stay in the gym.",
+                transport=transport,
+            )
+    assert raised.value.failure == ProviderFailure.TIMEOUT
+    assert raised.value.reached_provider is True
+    assert len(seen) == 1
+    assert "k" * 20 not in str(raised.value)
 
 
 def test_credential_failure_is_not_retried() -> None:
@@ -266,3 +272,194 @@ def test_e2e_script_reports_completion_only_after_the_server_saved_it() -> None:
     part = parts[0]
     assert isinstance(part, dict)
     assert part["text"] == "The change is complete."
+
+
+class _Body:
+    def __init__(self, raw: bytes) -> None:
+        self.raw = raw
+
+    def read(self, _limit: int) -> bytes:
+        return self.raw
+
+    def __enter__(self) -> _Body:
+        return self
+
+    def __exit__(self, *_args: object) -> bool:
+        return False
+
+
+def _http_error(status: int, payload: bytes) -> urllib.error.HTTPError:
+    return urllib.error.HTTPError(
+        "https://generativelanguage.googleapis.com",
+        status,
+        "error",
+        EmailMessage(),
+        BytesIO(payload),
+    )
+
+
+def test_only_an_unsent_connection_is_retried_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    import urllib.error
+    import urllib.request
+
+    pauses: list[int] = []
+    calls = {"count": 0}
+
+    def urlopen(_request: object, timeout: int) -> _Body:
+        assert timeout == 30
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise urllib.error.URLError(ConnectionRefusedError(61, "refused"))
+        return _Body(
+            b'{"candidates":[{"content":{"parts":[{"text":"Hello"}]}}],'
+            b'"usageMetadata":{"promptTokenCount":8,"candidatesTokenCount":1,"totalTokenCount":9}}'
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(provider_module, "_pause_before_retry", lambda: pauses.append(1))
+    with override_settings(**{**_SETTINGS, "GEMINI_MAX_RETRIES": "5"}):
+        turn = generate_content(
+            contents=[{"role": "user", "parts": [{"text": "Hi"}]}],
+            declarations=[],
+            system_instruction="salary 900000",
+            transport=None,
+        )
+    assert turn.text == "Hello"
+    assert turn.usage.prompt_tokens == 8
+    assert calls["count"] == 2
+    assert pauses == [1]
+
+
+def test_timeout_quota_and_reset_are_not_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    import urllib.error
+    import urllib.request
+
+    calls = {"count": 0}
+
+    def refuse_timeout(_request: object, timeout: int) -> _Body:
+        del timeout
+        calls["count"] += 1
+        raise TimeoutError()
+
+    monkeypatch.setattr(urllib.request, "urlopen", refuse_timeout)
+    with override_settings(**{**_SETTINGS, "GEMINI_MAX_RETRIES": "5"}):
+        with pytest.raises(ProviderCallError) as timed_out:
+            generate_content(
+                contents=[],
+                declarations=[],
+                system_instruction="test",
+            )
+    assert timed_out.value.failure == ProviderFailure.TIMEOUT
+    assert timed_out.value.reached_provider is True
+    assert calls["count"] == 1
+
+    def refuse_reset(_request: object, timeout: int) -> _Body:
+        del timeout
+        calls["count"] += 1
+        raise urllib.error.URLError(ConnectionResetError(54, "reset"))
+
+    calls["count"] = 0
+    monkeypatch.setattr(urllib.request, "urlopen", refuse_reset)
+    with override_settings(**{**_SETTINGS, "GEMINI_MAX_RETRIES": "5"}):
+        with pytest.raises(ProviderCallError) as reset:
+            generate_content(contents=[], declarations=[], system_instruction="test")
+    assert reset.value.reached_provider is True
+    assert reset.value.failure == ProviderFailure.NETWORK
+    assert calls["count"] == 1
+
+    def refuse_quota(_request: object, timeout: int) -> _Body:
+        del timeout
+        calls["count"] += 1
+        raise _http_error(
+            429,
+            b'{"error":{"status":"RESOURCE_EXHAUSTED","message":"MEM-9 salary"}}',
+        )
+
+    calls["count"] = 0
+    monkeypatch.setattr(urllib.request, "urlopen", refuse_quota)
+    with override_settings(**_SETTINGS):
+        with pytest.raises(ProviderCallError) as quota:
+            generate_content(contents=[], declarations=[], system_instruction="test")
+    assert quota.value.failure == ProviderFailure.QUOTA
+    assert calls["count"] == 1
+    assert "MEM-9" not in str(quota.value)
+    assert "salary" not in str(quota.value)
+
+
+def test_retry_pause_is_short(monkeypatch: pytest.MonkeyPatch) -> None:
+    slept: list[float] = []
+    monkeypatch.setattr(provider_module.time, "sleep", slept.append)
+    provider_module._pause_before_retry()
+    assert slept == [0.2]
+
+
+def test_usage_metadata_is_logged_without_the_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    del monkeypatch
+    secret = "salary 900000 MEM-000101"
+    caplog.set_level(logging.INFO, logger="apps.assistant.provider")
+
+    def transport(_body: dict[str, object], _timeout: int) -> dict[str, object]:
+        return {"candidates": [{"content": {"parts": [{"text": secret}]}}]}
+
+    with override_settings(**_SETTINGS):
+        turn = generate_content(
+            contents=[{"role": "user", "parts": [{"text": secret}]}],
+            declarations=[],
+            system_instruction=secret,
+            transport=transport,
+        )
+    assert turn.usage.prompt_tokens is None
+    assert "prompt_tokens=unavailable" in caplog.text
+    assert "candidate_tokens=unavailable" in caplog.text
+    assert "total_tokens=unavailable" in caplog.text
+    assert "outcome=ok" in caplog.text
+    assert "requests=1" in caplog.text
+    assert secret not in caplog.text
+    assert "k" * 20 not in caplog.text
+
+
+def test_present_usage_counts_are_logged_and_booleans_are_not_counts(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger="apps.assistant.provider")
+    parsed = parse_model_turn(
+        {
+            "candidates": [{"content": {"parts": [{"text": "Hi"}]}}],
+            "usageMetadata": {
+                "promptTokenCount": True,
+                "candidatesTokenCount": -3,
+                "totalTokenCount": "12",
+            },
+        }
+    )
+    assert parsed.usage.prompt_tokens is None
+    assert parsed.usage.candidate_tokens is None
+    assert parsed.usage.total_tokens is None
+
+    def transport(_body: dict[str, object], _timeout: int) -> dict[str, object]:
+        return {
+            "candidates": [{"content": {"parts": [{"text": "Hi"}]}}],
+            "usageMetadata": {
+                "promptTokenCount": 15,
+                "candidatesTokenCount": 2,
+                "totalTokenCount": 17,
+            },
+        }
+
+    with override_settings(**_SETTINGS):
+        turn = generate_content(
+            contents=[],
+            declarations=[],
+            system_instruction="hidden prompt",
+            transport=transport,
+        )
+    assert turn.usage.prompt_tokens == 15
+    assert turn.usage.candidate_tokens == 2
+    assert turn.usage.total_tokens == 17
+    assert "prompt_tokens=15" in caplog.text
+    assert "candidate_tokens=2" in caplog.text
+    assert "total_tokens=17" in caplog.text
+    assert "hidden prompt" not in caplog.text

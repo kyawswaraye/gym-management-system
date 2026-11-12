@@ -45,6 +45,7 @@ REQUIRED_SERVICES = (
     "blackbox",
     "node-exporter",
     "postgres-exporter",
+    "scheduler",
 )
 PRIVATE_SERVICES = ("web", "api", "postgres", "prometheus", "alertmanager", "grafana")
 PUBLISHED_PORTS = {80, 443}

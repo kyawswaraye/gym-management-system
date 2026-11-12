@@ -1,3 +1,4 @@
+import { LanguageSwitch } from "@/i18n/language-switch";
 import { pageMetadata } from "@/i18n/metadata";
 import { Tx } from "@/i18n/tx";
 import Link from "next/link";
@@ -12,7 +13,13 @@ export async function generateMetadata() {
 export default function ForgotPasswordPage() {
   return (
     <main className="grid w-full flex-1 place-items-center px-6 py-10">
-      <section className="card w-full max-w-md" aria-labelledby="forgot-title">
+      <section
+        className="card w-full min-w-0 max-w-md"
+        aria-labelledby="forgot-title"
+      >
+        <div className="mb-2 flex justify-end">
+          <LanguageSwitch className="w-28" />
+        </div>
         <BrandLogo />
         <h1 id="forgot-title" className="mt-6 text-3xl font-bold">
           {" "}

@@ -15728,6 +15728,12 @@ export interface operations {
       query?: {
         after?: string;
         limit?: number;
+        /**
+         * @description * `active` - active
+         *     * `history` - history
+         *     * `all` - all
+         */
+        view?: "active" | "history" | "all";
       };
       header?: never;
       path?: never;

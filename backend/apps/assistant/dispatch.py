@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from apps.assistant.activity_tools import activity_tool_contracts
 from apps.assistant.activity_tools import execute_registered_tool as execute_activity
+from apps.assistant.announcement_reads import announcement_read_tool_contracts
 from apps.assistant.approval import (
     expense_snapshot,
     payment_snapshot,
@@ -46,6 +47,7 @@ from apps.assistant.payment_tools import execute_registered_tool as execute_paym
 from apps.assistant.payment_tools import payment_tool_contracts
 from apps.assistant.pt_tools import execute_registered_tool as execute_pt
 from apps.assistant.pt_tools import pt_tool_contracts
+from apps.assistant.report_reads import report_read_tool_contracts
 from apps.assistant.retail_tools import execute_registered_tool as execute_retail
 from apps.assistant.retail_tools import retail_tool_contracts
 from apps.assistant.salary_tools import execute_registered_tool as execute_salary
@@ -86,6 +88,8 @@ def tool_contracts() -> dict[str, ToolContract]:
             cash_tool_contracts(),
             payment_tool_contracts(),
             payment_read_tool_contracts(),
+            report_read_tool_contracts(),
+            announcement_read_tool_contracts(),
             expense_tool_contracts(),
             retail_tool_contracts(),
             salary_tool_contracts(),
@@ -187,6 +191,10 @@ def _load_writers() -> None:
 
 
 def _load_readers() -> None:
+    from apps.assistant.announcement_reads import ANNOUNCEMENT_READ_TOOL_NAMES
+    from apps.assistant.announcement_reads import (
+        execute_registered_read as execute_announcement_read,
+    )
     from apps.assistant.class_reads import CLASS_READ_TOOL_NAMES
     from apps.assistant.class_reads import execute_registered_read as execute_class_read
     from apps.assistant.commission_reads import COMMISSION_READ_TOOL_NAMES
@@ -201,6 +209,8 @@ def _load_readers() -> None:
     from apps.assistant.operations_reads import execute_registered_read as execute_operations_read
     from apps.assistant.package_reads import PACKAGE_READ_TOOL_NAMES
     from apps.assistant.package_reads import execute_registered_read as execute_package_read
+    from apps.assistant.report_reads import REPORT_READ_TOOL_NAMES
+    from apps.assistant.report_reads import execute_registered_read as execute_report_read
 
     for name in PAYMENT_READ_TOOL_NAMES:
         _READERS[name] = execute_registered_read
@@ -218,6 +228,10 @@ def _load_readers() -> None:
         _READERS[name] = execute_finance_read
     for name in OPERATIONS_READ_TOOL_NAMES:
         _READERS[name] = execute_operations_read
+    for name in ANNOUNCEMENT_READ_TOOL_NAMES:
+        _READERS[name] = execute_announcement_read
+    for name in REPORT_READ_TOOL_NAMES:
+        _READERS[name] = execute_report_read
 
 
 _APPROVAL_SOURCES: dict[str, tuple[str, ApprovalLoader]] = {

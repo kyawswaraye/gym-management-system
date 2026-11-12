@@ -11,6 +11,7 @@ from apps.common.mail.resend import (
     RESEND_ENDPOINT_HOST,
     RESEND_ENDPOINT_PATH,
     RESEND_IDEMPOTENCY_HEADER,
+    RESEND_USER_AGENT,
     EmailBackend,
     ResendDeliveryError,
 )
@@ -79,6 +80,7 @@ def test_resend_translates_idempotency_and_omits_secrets_from_exceptions(
     assert captured["host"] == RESEND_ENDPOINT_HOST
     assert captured["path"] == RESEND_ENDPOINT_PATH
     assert captured["headers"][RESEND_IDEMPOTENCY_HEADER] == "password-reset:abc"
+    assert captured["headers"]["user-agent"] == RESEND_USER_AGENT
     assert IDEMPOTENCY_HEADER not in captured["headers"]
     assert b"staff@example.test" in captured["body"]
     assert "Authorization" not in str(captured["headers"]).title() or True

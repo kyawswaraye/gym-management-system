@@ -1,0 +1,43 @@
+export const announcementsEn = {
+  Announcements: "Announcements",
+  "Member notices": "Member notices",
+  "Draft, publish, or cancel a notice for members.":
+    "Draft, publish, or cancel a notice for members.",
+  "New announcement": "New announcement",
+  "Edit draft": "Edit draft",
+  "No announcements yet.": "No announcements yet.",
+  "Announcement title": "Announcement title",
+  "Announcement body": "Announcement body",
+  "Save draft": "Save draft",
+  "Update draft": "Update draft",
+  Publish: "Publish",
+  "All active members": "All active members",
+  "PT clients": "PT clients",
+  "Expiring within 7 days": "Expiring within 7 days",
+  "Expiring within 30 days": "Expiring within 30 days",
+  Event: "Event",
+  Promotion: "Promotion",
+  General: "General",
+} as const;
+
+export const announcementsMm = {
+  Announcements: "ကြေညာချက်များ",
+  "Member notices": "အဖွဲ့ဝင် အကြောင်းကြားချက်",
+  "Draft, publish, or cancel a notice for members.":
+    "အဖွဲ့ဝင်များအတွက် ကြေညာချက်ကို မူကြမ်း၊ ထုတ်ပြန်၊ သို့မဟုတ် ပယ်ဖျက်ပါ။",
+  "New announcement": "ကြေညာချက်အသစ်",
+  "Edit draft": "မူကြမ်းပြင်ရန်",
+  "No announcements yet.": "ကြေညာချက် မရှိသေးပါ။",
+  "Announcement title": "ခေါင်းစဉ်",
+  "Announcement body": "အကြောင်းအရာ",
+  "Save draft": "မူကြမ်းသိမ်းရန်",
+  "Update draft": "မူကြမ်းပြင်ရန်",
+  Publish: "ထုတ်ပြန်ရန်",
+  "All active members": "အသက်ဝင် အဖွဲ့ဝင်အားလုံး",
+  "PT clients": "PT အဖွဲ့ဝင်",
+  "Expiring within 7 days": "၇ ရက်အတွင်း ကုန်မည့်သူ",
+  "Expiring within 30 days": "၃၀ ရက်အတွင်း ကုန်မည့်သူ",
+  Event: "ပွဲ",
+  Promotion: "ပရိုမိုးရှင်း",
+  General: "အထွေထွေ",
+} satisfies Record<keyof typeof announcementsEn, string>;

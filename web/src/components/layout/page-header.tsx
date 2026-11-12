@@ -14,6 +14,7 @@ type PageHeaderProps = {
   actions?: ReactNode;
   children?: ReactNode;
   compact?: boolean;
+  tone?: "plain" | "premium";
 };
 
 export function PageHeader({
@@ -24,9 +25,11 @@ export function PageHeader({
   actions,
   children,
   compact = false,
+  tone = "plain",
 }: PageHeaderProps) {
   const tx = useTx();
   const locale = useLocale();
+  const premium = tone === "premium";
   const copy = compact ? (
     <h1 className="text-title text-text" id={titleId}>
       {tx(title)}
@@ -35,19 +38,21 @@ export function PageHeader({
     <>
       {eyebrow ? (
         <p
-          className={`text-xs font-semibold text-primary-hover ${locale === "en" ? "tracking-[0.06em] uppercase" : "tracking-normal"}`}
+          className={`text-xs font-semibold ${premium ? "text-[#f8e7b0]" : "text-primary-hover"} ${locale === "en" ? "tracking-[0.06em] uppercase" : "tracking-normal"}`}
         >
           {tx(eyebrow)}
         </p>
       ) : null}
       <h1
-        className={eyebrow ? `mt-1 ${TITLE_CLASS}` : TITLE_CLASS}
+        className={`${eyebrow ? "mt-1 " : ""}${premium ? "text-display text-white" : TITLE_CLASS}`}
         id={titleId}
       >
         {tx(title)}
       </h1>
       {description ? (
-        <p className="mt-2 max-w-[640px] text-body text-muted">
+        <p
+          className={`mt-2 max-w-[640px] text-body ${premium ? "text-[rgb(244_247_251/78%)]" : "text-muted"}`}
+        >
           {typeof description === "string" ? tx(description) : description}
         </p>
       ) : null}
@@ -55,7 +60,15 @@ export function PageHeader({
   );
 
   return (
-    <header className={compact ? "mb-3" : "mb-6 border-b border-border pb-6"}>
+    <header
+      className={
+        compact
+          ? "page-header page-header--compact"
+          : premium
+            ? "page-header page-header--premium"
+            : "page-header"
+      }
+    >
       {actions ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div>{copy}</div>

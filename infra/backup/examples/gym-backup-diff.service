@@ -1,13 +1,17 @@
-# Example only. Installing this unit is not a scheduled backup and not an alert.
-# Do not enable it until gym-backup bootstrap has exited 0.
+# Example only. Copy this unit to /etc/systemd/system before enabling it.
+# The command reads active-deployment.json and refuses a zero image digest.
 
 [Unit]
-Description=Example gym PostgreSQL differential backup
+Description=Gym PostgreSQL differential backup
 Documentation=file:docs/runbooks/phase8-increment-3.md
+After=docker.service
+Requires=docker.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=/opt/gym/infra/compose
-ExecStart=/usr/bin/docker compose --env-file /etc/gym/production.env -f docker-compose.prod.yml --profile backup run --rm backup-diff
-TimeoutStartSec=2h
+User=deploy
+Group=deploy
+WorkingDirectory=/var/lib/gym-deploy/production/src/infra/compose
+ExecStart=/usr/bin/python3 /usr/local/lib/gym-deploy/run-scheduled-backup.py diff
+TimeoutStartSec=2h 5min
 SuccessExitStatus=0

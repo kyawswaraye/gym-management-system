@@ -10,14 +10,17 @@ Deployment control is [Phase 8 increment 5](./phase8-increment-5.md) and does no
 The disposable local rehearsal is [Phase 8 increment 6](./phase8-increment-6.md) and does not prove a temporary VPS, GHCR, or an external provider.
 The opt-in local load characterization is [Phase 8 increment 7](./phase8-increment-7.md) and does not prove capacity or an SLO.
 The opt-in receipt and cash-close characterization is [Phase 8 increment 8](./phase8-increment-8.md) and does not prove a soak, an SLO, or a PT payout. The opt-in PT sale, session, payout, and report characterization is [Phase 8 increment 9](./phase8-increment-9.md) and does not prove a soak, an SLO, or financial reconciliation. The opt-in cash commission payout and till characterization is [Phase 8 increment 10](./phase8-increment-10.md) and does not prove a soak, an SLO, or financial reconciliation. The opt-in local bounded endurance characterization is [Phase 8 increment 11](./phase8-increment-11.md) and does not prove a soak, an SLO, or financial reconciliation. The opt-in local security characterization is [Phase 8 increment 12](./phase8-increment-12.md) and does not prove a penetration test, a formal security review, production security, or tenant isolation. The opt-in local identity-security characterization is [Phase 8 increment 13](./phase8-increment-13.md) and does not prove a penetration test, a formal security review, production security, tenant isolation, or a live provider. The opt-in local tenant-isolation characterization is [Phase 8 increment 14](./phase8-increment-14.md) and does not prove independent tenant isolation, a penetration test, a formal security review, or production proof.
-No GHCR push or offsite backup upload has been performed.
+A paragraph in this file is not evidence that the running host matches this source.
 
 ## Email
 
 Production mail is `apps.common.mail.resend.EmailBackend`. Set `RESEND_API_KEY`
 and a verified-style `DEFAULT_FROM_EMAIL`. `APP_PUBLIC_URL` must be HTTPS.
-Scheduler jobs remain `schedule_membership_expiry_emails` and
-`deliver_membership_expiry_emails`.
+The production Compose service `scheduler` runs the notification commands,
+`refresh_membership_statuses`, and `expire_profile_photo_uploads`.
+See [Notification scheduler](./notification-scheduler.md). That runbook is
+configuration. A Compose file on disk is not evidence that the service is
+deployed or that a handset or inbox received a message.
 
 Forgot password is a constant 200. Reset is 204 and issues no session.
 
@@ -54,9 +57,9 @@ Local and E2E Compose keep path-style `docker.io/pgsty/silo`.
 
 ## ClamAV
 
-Merge `docker-compose.clamav.prod.yml` on the VPS private network. Publish no
-host port. `CLAMAV_HOST` must be the Compose service name or another private
-address.
+The `clamav` service is already in `infra/compose/docker-compose.prod.yml`.
+Do not merge a separate ClamAV compose file. Publish no host port.
+`CLAMAV_HOST` must be the Compose service name `clamav`.
 
 ## Preflight
 
@@ -84,6 +87,21 @@ id and a service-account secret outside this repository. `google-services.json`,
 `GoogleService-Info.plist`, and the APNs `.p8` key stay out of git. Do not send
 live push until an Android message and an iOS message to consenting devices
 are proven. Redis and Celery are not part of this delivery path.
+
+## Assistant provider
+
+The staff assistant calls Google Gemini when `GEMINI_API_KEY` is set and the
+assistant feature is enabled. Each turn sends the staff member's message, a
+short gym brief, one capability card, workflow ids already collected, and the
+tool arguments the model requests. It does not send authentication tokens,
+passwords, or another gym's records. Financial and salary tools still require
+the staff member's existing permissions before any result is returned.
+
+This note is an implementation description. It is not legal approval of
+jurisdiction, retention, or data residency, and it is not Google's privacy
+approval. Leave the production assistant disabled until the API key exists and
+that data-handling decision is made. Tests use a mocked provider and do not
+call Gemini.
 
 Remaining external gates: Resend domain and API key with a live idempotent
 send; AWS bucket, IAM, CORS, and a live upload and download; ClamAV production

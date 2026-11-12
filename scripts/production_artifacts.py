@@ -99,6 +99,7 @@ PLACEHOLDER = "replace-from-secret-store"
 PRIVATE_SERVICES = (
     "web",
     "api",
+    "scheduler",
     "postgres",
     "clamav",
     "migrate",
@@ -117,6 +118,7 @@ STEADY_SERVICES = (
     "caddy",
     "web",
     "api",
+    "scheduler",
     "postgres",
     "clamav",
     "prometheus",
@@ -156,6 +158,7 @@ SERVICE_NETWORKS = {
     "caddy": {"edge", "app", "probe", "observe"},
     "web": {"edge", "app", "probe"},
     "api": {"app", "data", "scan", "probe"},
+    "scheduler": {"app", "data"},
     "postgres": {"data", "backup"},
     "clamav": {"scan"},
     "migrate": {"data"},
@@ -174,6 +177,7 @@ CAP_DROP_SERVICES = (
     "caddy",
     "web",
     "api",
+    "scheduler",
     "migrate",
     "prometheus",
     "alertmanager",
@@ -184,6 +188,7 @@ CAP_DROP_SERVICES = (
 )
 CONNECTION_RESERVE = 8
 MONITOR_CONNECTIONS = 1
+SCHEDULER_CONNECTIONS = 1
 STEADY_MEMORY_CEILING_MB = 5888
 STEADY_CPU_CEILING = 3.25
 HOST_MEMORY_MB = 8192
@@ -754,7 +759,7 @@ def _lint_service(name: str, service: dict[str, Any]) -> list[str]:
         errors.append(f"{name} must drop all capabilities")
     if name == "caddy" and "NET_BIND_SERVICE" not in _as_list(service.get("cap_add")):
         errors.append("caddy needs NET_BIND_SERVICE after dropping capabilities")
-    if name in {"api", "web", "migrate"} and service.get("user") != "10001:10001":
+    if name in {"api", "web", "migrate", "scheduler"} and service.get("user") != "10001:10001":
         errors.append(f"{name} must run as uid 10001")
     if (
         name != "migrate"
@@ -785,6 +790,27 @@ def _lint_roles(services: dict[str, Any]) -> list[str]:
         errors.append("migrate must use the migration database role")
     if "MIGRATION_DB_PASSWORD" in api or "POSTGRES_ADMIN_PASSWORD" in api:
         errors.append("api must not receive migration or admin database secrets")
+    scheduler = services["scheduler"]["environment"]
+    if not isinstance(scheduler, dict):
+        errors.append("scheduler environment must be a mapping")
+    else:
+        if scheduler.get("DATABASE_ROLE_MODE") != "runtime":
+            errors.append("scheduler must use the runtime database role")
+        if scheduler.get("DB_CONN_MAX_AGE") != "0":
+            errors.append("scheduler must not keep idle database connections")
+        if scheduler.get("DJANGO_SETTINGS_MODULE") != "config.settings.production":
+            errors.append("scheduler must use production settings")
+        if scheduler.get("EMAIL_BACKEND") != "apps.common.mail.resend.EmailBackend":
+            errors.append("scheduler must use the Resend backend")
+        if scheduler.get("PUSH_BACKEND") != "fcm":
+            errors.append("scheduler must use the FCM backend")
+        joined = " ".join(str(value) for value in scheduler.values())
+        if "ASSISTANT_E2E_SCRIPT" in scheduler or "locmem" in joined:
+            errors.append("scheduler must not use an E2E or locmem provider")
+        if "MIGRATION_DB_PASSWORD" in scheduler or "POSTGRES_ADMIN_PASSWORD" in scheduler:
+            errors.append("scheduler must not receive migration or admin database secrets")
+        if "ports" in services["scheduler"]:
+            errors.append("scheduler must not publish a host port")
     if "RUNTIME_DB_PASSWORD" in migrate or "POSTGRES_ADMIN_PASSWORD" in migrate:
         errors.append("migrate must not receive runtime or admin database secrets")
     if migrate != MIGRATE_ENVIRONMENT:
@@ -804,6 +830,33 @@ def _lint_roles(services: dict[str, Any]) -> list[str]:
         != "${MIGRATION_DB_USER:?Set MIGRATION_DB_USER}"
     ):
         errors.append("migrate user must come from MIGRATION_DB_USER")
+    if services["scheduler"].get("command") != [
+        "python",
+        "manage.py",
+        "run_notification_scheduler",
+    ]:
+        errors.append("scheduler command must be manage.py run_notification_scheduler")
+    if services["scheduler"].get("restart") != "unless-stopped":
+        errors.append("scheduler must restart unless stopped")
+    health = services["scheduler"].get("healthcheck")
+    if not isinstance(health, dict):
+        errors.append("scheduler healthcheck is missing")
+    elif (
+        health.get("interval") != "30s"
+        or health.get("timeout") != "15s"
+        or health.get("retries") != "3"
+        or health.get("start_period") != "120s"
+    ):
+        errors.append(
+            "scheduler healthcheck must use a 30s interval, 15s timeout, "
+            "3 retries, and a 120s start period"
+        )
+    if services["scheduler"].get("profiles"):
+        errors.append("scheduler must start with the production stack")
+    if "scheduler" in (services["api"].get("depends_on") or {}):
+        errors.append("api must not wait for the scheduler")
+    if "scheduler" in (services["caddy"].get("depends_on") or {}):
+        errors.append("caddy must not wait for the scheduler")
     if services["migrate"].get("profiles") != ["migrate"]:
         errors.append("migrate must be the one-shot migrate profile")
     if services["migrate"].get("restart") != "no":
@@ -844,7 +897,10 @@ def _lint_connections(services: dict[str, Any]) -> list[str]:
     maximum = int(match.group(1))
     if "max_wal_senders=3" not in joined:
         return ["postgres max_wal_senders must stay at 3 for backup"]
-    if 2 + MONITOR_CONNECTIONS + CONNECTION_RESERVE + 3 >= maximum:
+    if (
+        2 + SCHEDULER_CONNECTIONS + MONITOR_CONNECTIONS + CONNECTION_RESERVE + 3
+        >= maximum
+    ):
         return [
             "worker connections, WAL senders, and the reserve must fit max_connections"
         ]

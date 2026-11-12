@@ -43,10 +43,11 @@ this map and from the live gym brief. Do not invent a person, amount, date, or
 count that is not in the brief or in a tool result. Registered reads retrieve
 a member, a membership, a granted package, a payment, a class occurrence, a
 class booking, a retail sale, an expense, a salary period, a cash session,
-and a PT commission. A refund is a payment whose entry type is REFUND. Use
-the tool result for those records. Check-in history, announcement text,
-stock movements, trainer-assignment lists, PT sale records, and class-schedule
-definitions are not reads. The brief may show a count or today's list. If the
+a PT commission, an announcement, and a dashboard total. A refund is a payment
+whose entry type is REFUND. A new membership sale uses an active plan. Use
+the tool result for those records. Check-in history, stock movements,
+trainer-assignment lists, PT sale records, and class-schedule definitions
+are not reads. The brief may show a count or today's list. If the
 requested record is not in the brief, say it cannot be retrieved. Changing
 those records is a confirmed write, and a write is not a substitute for a
 read. Mail, files, push notifications, passwords, sessions, audit storage,
@@ -111,15 +112,9 @@ separate, and receipt printer options. Announcements are EVENT, PROMOTION, or
 GENERAL, aimed at all active members, PT clients, or members expiring in 7 or
 30 days, and move DRAFT, SCHEDULED, PUBLISHED, or cancelled.
 
-The assistant can propose those changes, search and read members, search
-memberships and granted packages, search payments, search class
-occurrences and class bookings, search retail sales and expenses, search
-salary periods, search cash sessions, and search PT commissions. A payment
-search row keeps its stored entry type CHARGE, REFUND, or REVERSAL. It does not
-send mail, push notifications, or files, and it does not read passwords, MFA,
-sessions, or audit storage. It does not invent a record when that read is
-not registered. Writes wait for the staff member's confirmation. A write is
-not saved until the server confirms it.
+The assistant does not send mail, push notifications, or files, and it does not
+read passwords, MFA, sessions, or audit storage. It does not invent a record
+when that read is not registered. A write is not saved until the server confirms it.
 """.strip()
 
 
@@ -431,11 +426,12 @@ _READ_DOMAINS = {
     "cash": frozenset({"search_cash_sessions"}),
     "commissions": frozenset({"search_pt_commissions"}),
     "payments": frozenset({"search_payments", "get_payment"}),
+    "announcements": frozenset({"search_announcements"}),
+    "reports": frozenset({"get_gym_dashboard"}),
 }
 _WRITE_ONLY_DOMAINS = frozenset(
     {
         "checkins",
-        "announcements",
         "assignments",
         "pt_sales",
         "inventory",
@@ -467,7 +463,6 @@ _GAP_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "လာရောက်မှတ်တမ်း",
         ),
     ),
-    ("announcements", ("announcement", "ကြေညာချက်", "ကြေညာ")),
     ("inventory", ("stock movement", "stock history", "adjustment history", "ကုန်လှုပ်ရှား")),
     ("assignments", ("who is assigned", "assignment list", "assignment history", "တာဝန်ပေးမှု")),
     ("pt_sales", ("pt sale", "pt sales", "pt အရောင်း")),
@@ -496,10 +491,6 @@ _LIMITS = {
         "I cannot look up check-in history. I only have today's check-in count, "
         "and recording a check-in waits for your confirmation.",
         "ဝင်ရောက်မှတ်တမ်းကို ကျွန်တော် မဖတ်နိုင်ပါ။ ဒီနေ့ စုစုပေါင်းကိုသာ သိနိုင်ပြီး၊ မှတ်တမ်းတင်ရန် အတည်ပြုချက် လိုပါတယ်။",
-    ),
-    "announcements": (
-        "I cannot read announcement text. I only have the published count.",
-        "ကြေညာချက် အသေးစိတ်ကို ကျွန်တော် မဖတ်နိုင်ပါ။",
     ),
     "inventory": (
         "I cannot read stock movements. I can see on-hand quantity, and a stock "
@@ -553,6 +544,7 @@ _FIELD_QUESTIONS = {
     "member_id": ("Which member?", "ဘယ်အဖွဲ့ဝင်လဲ။"),
     "trainer_staff_profile_id": ("Which trainer?", "ဘယ်သင်တန်းဆရာလဲ။"),
     "plan_id": ("Which plan?", "ဘယ်အစီအစဉ်လဲ။"),
+    "service_package_id": ("Which package?", "ဘယ်ပက်ကေ့လဲ။"),
     "membership_id": ("Which membership?", "ဘယ်အသင်းဝင်ကြေးလဲ။"),
     "payment_id": ("Which payment?", "ဘယ်ငွေပေးချေမှုလဲ။"),
     "class_occurrence_id": ("Which class?", "ဘယ်အတန်းလဲ။"),
@@ -613,6 +605,10 @@ _GATE_SENTENCES = {
     "currency_mismatch": (
         "Use the gym currency.",
         "အားကစားခန်းမရဲ့ ငွေကြေးကို သုံးပါ။",
+    ),
+    "package_unavailable": (
+        "That package is not available for this sale. Which package?",
+        "ဒီပက်ကေ့ကို အရောင်းအတွက် မသုံးနိုင်ပါ။ ဘယ်ပက်ကေ့လဲ။",
     ),
     "balance_exceeded": (
         "That amount is more than the outstanding balance.",
@@ -682,6 +678,10 @@ _GATE_SENTENCES = {
         "That record was not found in this gym.",
         "ဒီအားကစားခန်းမမှာ မှတ်တမ်း မတွေ့ပါ။",
     ),
+    "check_in_ineligible": (
+        "This member does not have an eligible active membership.",
+        "ဒီအဖွဲ့ဝင်မှာ ဝင်ရောက်နိုင်တဲ့ အသင်းဝင်ကြေး မရှိပါ။",
+    ),
 }
 _WRITE_WORDS = re.compile(
     r"\b(add|create|book|register|update|cancel|void|approve|reject|sell|"
@@ -692,7 +692,10 @@ _WRITE_PHRASES = (
     "record a ",
     "record the ",
     "လုပ်ပေး",
+    "ဖွင့်ချင်",
     "ဖွင့်ပေး",
+    "တပ်ပေး",
+    "ထည့်ပေး",
     "မှတ်ပေး",
     "ပယ်ဖျက်",
     "ပြင်ပေး",
@@ -859,7 +862,57 @@ def refuse_write_for_lookup(text: str, operation: str) -> bool:
 
     if operation != "write" or _is_change_request(text):
         return False
+    if short_reply_kind(text):
+        return False
     return _lookup_domain(text) is not None
+
+
+_AFFIRMATIONS = frozenset({"ထည့်မယ်", "အင်း", "ဟုတ်တယ်", "ရတယ်", "လုပ်ပါ"})
+_DECLINES = frozenset({"မထည့်တော့ဘူး", "မလုပ်တော့ဘူး", "မဟုတ်ဘူး"})
+_OFFERED_OPERATIONS = (
+    ("create_pt_sale", ("ပက်ကေ့", "package")),
+    ("create_pt_booking", ("ဘိုကင်", "booking")),
+    ("create_assignment", ("တာဝန်ပေး", "assignment")),
+    ("create_member", ("အဖွဲ့ဝင်အသစ်", "အဖွဲ့ဝင် အသစ်", "new member")),
+    ("create_membership", ("အသင်းဝင်", "membership")),
+    ("create_payment", ("ငွေပေး", "payment")),
+)
+
+
+def short_reply_kind(text: str) -> str:
+    """Return affirm, decline, or empty for a reply that only continues the last question."""
+
+    token = "".join(text.strip().strip("။.!?၊ ").split())
+    if token in _DECLINES:
+        return "decline"
+    if token in _AFFIRMATIONS:
+        return "affirm"
+    return ""
+
+
+def offered_operations(question: str) -> tuple[str, ...]:
+    """Return the distinct operations named by the immediately previous question."""
+
+    folded = question.casefold()
+    found: list[str] = []
+    for tool, words in _OFFERED_OPERATIONS:
+        if any(word in question or word in folded for word in words):
+            found.append(tool)
+    return tuple(found)
+
+
+def operation_workflow(tool: str) -> str:
+    """Return the workflow card for one offered operation."""
+
+    if tool in {"create_pt_sale", "create_pt_booking", "create_assignment"}:
+        return "pt"
+    if tool == "create_member":
+        return "member"
+    if tool == "create_membership":
+        return "membership"
+    if tool == "create_payment":
+        return "payment"
+    return ""
 
 
 def gate_sentence(
@@ -961,8 +1014,13 @@ _STATED_DATE_WORDS = (
     "next week",
     "this week",
     "last week",
+    "this month",
+    "next month",
     "မနက်ဖြန်",
     "မနေ့က",
+    "ဒီလ",
+    "နောက်လ",
+    "နောက်တစ်ပတ်",
 )
 _CLASS_DATE_TOOLS = frozenset({"search_class_occurrences", "search_bookings"})
 _BUSINESS_DATE_TOOLS = frozenset(
@@ -1065,13 +1123,26 @@ def widen_list_filters(
     updated = dict(payload)
     scope = _date_scope(staff_text)
     stated = _stated_date(staff_text)
+    window = None
+    named_day = None
+    if today is not None:
+        from apps.assistant.lookups import relative_day, relative_window
+
+        window = relative_window(staff_text, today)
+        named_day = None if window else relative_day(staff_text, today)
     if tool_name in _CLASS_DATE_TOOLS:
-        if scope == "open":
+        if window is not None:
+            updated["date_from"] = window[0].isoformat()
+            updated["date_to"] = window[1].isoformat()
+        elif scope == "open":
             updated.pop("date_from", None)
             updated.pop("date_to", None)
         elif scope == "today" and today is not None:
             updated["date_from"] = today.isoformat()
             updated["date_to"] = today.isoformat()
+        elif named_day is not None:
+            updated["date_from"] = named_day.isoformat()
+            updated["date_to"] = named_day.isoformat()
         elif stated is not None:
             updated["date_from"] = stated
             updated["date_to"] = stated
@@ -1080,6 +1151,8 @@ def widen_list_filters(
             updated.pop("business_date", None)
         elif scope == "today" and today is not None:
             updated["business_date"] = today.isoformat()
+        elif named_day is not None:
+            updated["business_date"] = named_day.isoformat()
         elif stated is not None:
             updated["business_date"] = stated
     if tool_name == "search_cash_sessions":
@@ -1102,10 +1175,14 @@ def widen_list_filters(
 def listing_tools(text: str) -> tuple[str, ...]:
     """Read tools a general list must use. A count can stay on the brief."""
 
-    if not _is_listing(text):
-        return ()
     folded = text.casefold()
+    if _dashboard_question(text):
+        return ("get_gym_dashboard",)
     tools: list[str] = []
+    if _announcement_question(text):
+        tools.append("search_announcements")
+    if not _is_listing(text):
+        return tuple(tools)
     if (
         "membership plan" in folded
         or "plan catalog" in folded
@@ -1131,6 +1208,24 @@ def listing_tools(text: str) -> tuple[str, ...]:
     if "cash session" in folded or "ငွေသား" in text:
         tools.append("search_cash_sessions")
     return tuple(dict.fromkeys(tools))
+
+
+def complete_stored_reply(
+    staff_text: str,
+    reads: Mapping[str, Mapping[str, object]],
+) -> str | None:
+    """Return a list answer only when the server will show that text in full.
+
+    A missing read stays None so the model can still call that tool. This does
+    not decide a write.
+    """
+
+    required = listing_tools(staff_text)
+    if required and not set(required).issubset(reads):
+        return None
+    if not required and _ambiguous_member_reply(staff_text, reads) is None:
+        return None
+    return stored_listing_reply(staff_text, reads)
 
 
 def stored_listing_reply(
@@ -1281,6 +1376,10 @@ def _ambiguous_member_reply(
 
 
 def _listed_chunk(tool: str, result: Mapping[str, object], staff_text: str) -> str:
+    if tool == "get_gym_dashboard":
+        return _dashboard_listing(result, staff_text)
+    if tool == "search_announcements":
+        return _announcement_listing(result, staff_text)
     label = _sentence(_LIST_LABELS[tool], staff_text)
     if tool == "search_membership_plans":
         body = _plan_listing(result, staff_text)
@@ -1297,13 +1396,81 @@ def _listed_chunk(tool: str, result: Mapping[str, object], staff_text: str) -> s
 
 
 def _plan_listing(result: Mapping[str, object], staff_text: str) -> str:
+    from apps.assistant.workflow_state import selling_membership
+
     rows = _mapping_rows(result)
+    if selling_membership(staff_text):
+        inactive = [row for row in rows if str(row.get("status") or "") == "INACTIVE"]
+        rows = [row for row in rows if str(row.get("status") or "") == "ACTIVE"]
+        if not rows and inactive:
+            if speaks_burmese(staff_text):
+                return "ဒီအစီအစဉ်က အသင်းဝင်အသစ်အတွက် အသုံးမပြုနိုင်ပါ။"
+            return "That plan is not available for a new membership."
     name = _named_plan(staff_text)
     if name:
         rows = [row for row in rows if str(row.get("name", "")).casefold() == name.casefold()]
         if len(rows) > 1:
             return _ask_plans(rows, staff_text)
     return _render_reads(({"results": rows},), staff_text)
+
+
+def _dashboard_question(text: str) -> bool:
+    if _is_change_request(text):
+        return False
+    folded = text.casefold()
+    if "လက်ကျန်" in text or "on hand" in folded or "sku" in folded:
+        return False
+    money = any(
+        word in folded or word in text
+        for word in ("income", "revenue", "profit", "ဝင်ငွေ", "အမြတ်", "ဘယ်လောက်")
+    )
+    expense = "expense" in folded or "အသုံး" in text or "ကုန်ကျ" in text
+    return (money or expense) and (
+        "ဘယ်လောက်" in text or "how much" in folded or "total" in folded or "ဒီလ" in text
+    )
+
+
+def _announcement_question(text: str) -> bool:
+    if _is_change_request(text):
+        return False
+    folded = text.casefold()
+    return "announcement" in folded or "ကြေညာ" in text
+
+
+def _dashboard_listing(result: Mapping[str, object], staff_text: str) -> str:
+    period = result.get("range")
+    start = ""
+    end = ""
+    if isinstance(period, Mapping):
+        start = str(period.get("date_from") or "")
+        end = str(period.get("date_to") or "")
+    financial = result.get("financial")
+    if not isinstance(financial, Mapping):
+        if speaks_burmese(staff_text):
+            return "ဒီစာရင်းရဲ့ ငွေကြေးပမာဏကို ကြည့်ခွင့် မရှိပါ။"
+        return "You cannot view the financial amounts for that range."
+    revenue = financial.get("total_revenue")
+    expenses = financial.get("total_expenses")
+    if speaks_burmese(staff_text):
+        return f"{start} မှ {end}။ ဝင်ငွေ {revenue}။ အသုံးစရိတ် {expenses}။"
+    return f"{start} to {end}. Revenue {revenue}. Expenses {expenses}."
+
+
+def _announcement_listing(result: Mapping[str, object], staff_text: str) -> str:
+    rows = _mapping_rows(result)
+    if not rows:
+        if speaks_burmese(staff_text):
+            return "ကြေညာချက် မရှိပါ။"
+        return "No announcements are stored."
+    shown = "; ".join(
+        " ".join(
+            part for part in (str(row.get("title") or ""), str(row.get("status") or "")) if part
+        )
+        for row in rows[:8]
+    )
+    if speaks_burmese(staff_text):
+        return f"ကြေညာချက်။ {shown}"
+    return f"Announcements. {shown}"
 
 
 def _named_plan(text: str) -> str | None:

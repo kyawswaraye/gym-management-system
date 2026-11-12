@@ -81,7 +81,13 @@ one-shot `migrate` service. Staging records `skip-backup-checkpoint` and
 still migrates only after that decision. Migration uses the existing
 migration identity and `--noinput`. A failed checkpoint does not migrate.
 Startup is `docker compose up -d --wait` without the migrate or backup
-profiles. After smoke, the host inspects each running service and requires
+profiles. Before migration, `promtool check config` reads the mounted
+Prometheus file. A failed check restores the previous Prometheus files and
+does not recreate a container. After startup, the deploy recreates only the
+Prometheus container and reads its `/api/v1/alertmanagers` response. The
+admin lifecycle API stays off. A failed target check restores the previous
+files and recreates only Prometheus again so the process matches those files.
+After smoke, the host inspects each running service and requires
 `Config.Image` to be the digest reference from the overlay. A missing,
 duplicate, or substituted container fails closed.
 
@@ -105,7 +111,12 @@ values.
 
 App rollback is `rollback-app` after a reviewed schema compatibility
 decision, and only when the active deployment state checksum and owner
-match. App rollback only changes API/web. Caddy may restart for config but
+match. App rollback restarts API, web, and the scheduler on the rolled-back
+API image, so the scheduler does not keep an older image. It also runs
+`promtool check config` and recreates only Prometheus so that process loads
+the rolled-back file. A failed check or a failed target read restores the
+Prometheus files from before that rollback and recreates only Prometheus
+from those files. Caddy may restart for config but
 its image digest is preserved. PostgreSQL, ClamAV, and the observability
 image digests are preserved from the active deployment state. A stale or
 malicious host image value is not used. The running PostgreSQL container

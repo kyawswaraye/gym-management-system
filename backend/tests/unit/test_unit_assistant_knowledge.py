@@ -120,7 +120,7 @@ def test_capabilities_follow_registered_tools() -> None:
     assert knowledge_capability("roster") == "unsupported"
     assert knowledge_capability("mail") == "unsupported"
     assert len(writes) == 98
-    assert len(reads) == 14
+    assert len(reads) == 16
 
 
 def test_an_unsupported_read_does_not_invent_a_record() -> None:

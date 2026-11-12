@@ -89,6 +89,24 @@ def membership_expiry_deduplication_key(
     )
 
 
+def expiry_reminder_still_due(*, expiry_date: date, today: date, warning_day: int) -> bool:
+    """Whether a scheduled reminder for this expiry date may still be sent.
+
+    Scheduling inserts the row only on the gym-local warning day. A later
+    retry may send on a following gym-local day while three facts stay true:
+    the expiry date is unchanged, today is still on or before that date, and
+    today is not earlier than the original warning day. A date after expiry,
+    or a larger gap than the warning day, is not this reminder.
+    """
+
+    if isinstance(warning_day, bool) or not isinstance(warning_day, int):
+        return False
+    if not 0 <= warning_day <= 365:
+        return False
+    remaining = (expiry_date - today).days
+    return 0 <= remaining <= warning_day
+
+
 def in_app_expiry_deduplication_key(*, membership: Membership, warning_day: int) -> str:
     return (
         f"in_app:membership_expiry:{membership.id}:{membership.expiry_date.isoformat()}:"
@@ -184,24 +202,79 @@ def render_expiry_message(
     gym_name: str,
     gym_email: str,
     gym_phone: str,
+    language: str = "en",
 ) -> tuple[str, str]:
-    """Plain-text subject and body. None of the inputs are a destination address."""
+    """Plain-text subject and body. None of the inputs are a destination address.
 
+    Members and gyms do not store a language. ``en`` is the default. ``my``
+    is Burmese. ``both`` keeps the English subject and appends the Burmese
+    body, which is how email and push are rendered without a preference.
+    The inbox passes the request ``Accept-Language`` instead.
+    """
+
+    english = _render_expiry_language(
+        member_name=member_name,
+        plan_name=plan_name,
+        expiry_date=expiry_date,
+        gym_name=gym_name,
+        gym_email=gym_email,
+        gym_phone=gym_phone,
+        language="en",
+    )
+    if language != "my" and language != "both":
+        return english
+    burmese = _render_expiry_language(
+        member_name=member_name,
+        plan_name=plan_name,
+        expiry_date=expiry_date,
+        gym_name=gym_name,
+        gym_email=gym_email,
+        gym_phone=gym_phone,
+        language="my",
+    )
+    if language == "my":
+        return burmese
+    return english[0], english[1] + "\n" + burmese[1]
+
+
+def _render_expiry_language(
+    *,
+    member_name: str,
+    plan_name: str,
+    expiry_date: date,
+    gym_name: str,
+    gym_email: str,
+    gym_phone: str,
+    language: str,
+) -> tuple[str, str]:
     safe_member = header_safe(member_name, max_length=201) or "Member"
     safe_plan = header_safe(plan_name, max_length=100) or "membership"
     safe_gym = header_safe(gym_name, max_length=150) or "Your gym"
     safe_date = expiry_date.isoformat()
-    subject = header_safe(
-        f"Your {safe_gym} membership expires on {safe_date}",
-        max_length=200,
-    )
-    lines = [
-        f"Hello {safe_member},",
-        "",
-        f"Your {safe_plan} membership at {safe_gym} expires on {safe_date}.",
-        "",
-        safe_gym,
-    ]
+    if language == "my":
+        subject = header_safe(
+            f"{safe_gym} အသင်းဝင်သက်တမ်းသည် {safe_date} တွင် ကုန်ဆုံးပါမည်",
+            max_length=200,
+        )
+        lines = [
+            f"မင်္ဂလာပါ {safe_member}၊",
+            "",
+            f"{safe_gym} ရှိ {safe_plan} အသင်းဝင်သက်တမ်းသည် {safe_date} တွင် ကုန်ဆုံးပါမည်။",
+            "",
+            safe_gym,
+        ]
+    else:
+        subject = header_safe(
+            f"Your {safe_gym} membership expires on {safe_date}",
+            max_length=200,
+        )
+        lines = [
+            f"Hello {safe_member},",
+            "",
+            f"Your {safe_plan} membership at {safe_gym} expires on {safe_date}.",
+            "",
+            safe_gym,
+        ]
     contact_email = _optional_email(gym_email)
     contact_phone = _optional_phone(gym_phone)
     if contact_email is not None:
@@ -470,6 +543,7 @@ def deliver_next_membership_expiry_email(
         gym_name=gym.name,
         gym_email=gym.email,
         gym_phone=gym.phone,
+        language="both",
     )
     reply_to = _optional_email(gym.email)
     message = EmailMessage(
@@ -556,10 +630,14 @@ def _cancellation_reason(
         return "payload"
     if warning_day not in _warning_days(settings_row):
         return "warning-day"
-    if membership.expiry_date != today + timedelta(days=warning_day):
-        return "warning-day"
     if payload.get("expiry_date") != membership.expiry_date.isoformat():
         return "payload"
+    if not expiry_reminder_still_due(
+        expiry_date=membership.expiry_date,
+        today=today,
+        warning_day=warning_day,
+    ):
+        return "warning-day"
     if payload.get("plan_name") != header_safe(membership.plan_name, max_length=100):
         return "payload"
     expected_key = membership_expiry_deduplication_key(

@@ -1,15 +1,18 @@
-# Example only. Installing this unit is not a scheduled backup and not an alert.
-# Do not enable it until gym-backup bootstrap has exited 0.
-# A nonzero exit is the signal reserved for the later observability increment.
-# Alert delivery is not claimed.
+# Example only. Copy this unit to /etc/systemd/system before enabling it.
+# The command reads active-deployment.json and refuses a zero image digest.
+# A nonzero exit is recorded by systemd. Alert inbox delivery is not claimed.
 
 [Unit]
-Description=Example gym PostgreSQL full backup
+Description=Gym PostgreSQL full backup
 Documentation=file:docs/runbooks/phase8-increment-3.md
+After=docker.service
+Requires=docker.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=/opt/gym/infra/compose
-ExecStart=/usr/bin/docker compose --env-file /etc/gym/production.env -f docker-compose.prod.yml --profile backup run --rm backup-full
-TimeoutStartSec=4h
+User=deploy
+Group=deploy
+WorkingDirectory=/var/lib/gym-deploy/production/src/infra/compose
+ExecStart=/usr/bin/python3 /usr/local/lib/gym-deploy/run-scheduled-backup.py full
+TimeoutStartSec=4h 5min
 SuccessExitStatus=0

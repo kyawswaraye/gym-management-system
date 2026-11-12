@@ -1,8 +1,11 @@
 import { useTx } from "../i18n/useTx";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRoute, type RouteProp } from "@react-navigation/native";
 import { useState } from "react";
+import { View } from "react-native";
 
 import { useMemberApi } from "../app/providers";
+import type { InboxStackParamList } from "../navigation/types";
 import { formatGymDateTime } from "../dates/gymLocal";
 import { useGymTimezone } from "../dates/useGymTimezone";
 import { queryKeys } from "../query/keys";
@@ -17,6 +20,8 @@ export function NotificationsScreen() {
   const queryClient = useQueryClient();
   const timeZone = useGymTimezone();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const route = useRoute<RouteProp<InboxStackParamList, "Inbox">>();
+  const focusId = route.params?.notificationId;
   return (
     <PagedScreen
       title={tx("Inbox")}
@@ -31,7 +36,11 @@ export function NotificationsScreen() {
         </Text>
       }
       renderItem={(item) => (
-        <>
+        <View
+          accessibilityLabel={
+            item.id === focusId ? "Opened notification" : undefined
+          }
+        >
           <Text
             style={{ fontSize: 17, fontWeight: item.read_at ? "400" : "700" }}
           >
@@ -67,7 +76,7 @@ export function NotificationsScreen() {
               }}
             />
           )}
-        </>
+        </View>
       )}
     />
   );

@@ -99,7 +99,10 @@ const ALLOWED_TENANT_PATHS = [
   /^\/api\/v1\/roles\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/permissions\/$/,
   /^\/api\/v1\/permissions\/$/,
   /^\/api\/v1\/gym-memberships\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/roles\/$/,
-  /^\/api\/v1\/members\/(?:[0-9a-f-]+\/(?:summary\/|archive\/)?)?$/,
+  /^\/api\/v1\/members\/(?:[0-9a-f-]+\/(?:summary\/|archive\/|restore\/)?)?$/,
+  /^\/api\/v1\/announcements\/$/,
+  /^\/api\/v1\/announcements\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/$/,
+  /^\/api\/v1\/announcements\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(?:publish|cancel)\/$/,
   MEMBER_PAYMENT_HISTORY_PATH,
   MEMBER_CHECK_IN_HISTORY_PATH,
   CHECK_IN_LIST_PATTERN,
@@ -156,6 +159,32 @@ const TENANT_AUDIT_FILTERS = new Set([
 const MEMBER_PAYMENT_HISTORY_FILTERS = new Set(["limit", "after"]);
 const CHECK_IN_LIST_FILTERS = new Set(["member_id", "open", "limit", "after"]);
 const MEMBER_LIST_PATH = "/api/v1/members/";
+const ANNOUNCEMENT_LIST_PATH = "/api/v1/announcements/";
+const ANNOUNCEMENT_ITEM_PATH =
+  /^\/api\/v1\/announcements\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/$/;
+const ANNOUNCEMENT_ACTION_PATH =
+  /^\/api\/v1\/announcements\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(?:publish|cancel)\/$/;
+const ANNOUNCEMENT_LIST_FILTERS = new Set([
+  "status",
+  "type",
+  "audience",
+  "limit",
+  "after",
+]);
+const ANNOUNCEMENT_STATUSES = new Set([
+  "DRAFT",
+  "SCHEDULED",
+  "PUBLISHED",
+  "CANCELLED",
+  "EXPIRED",
+]);
+const ANNOUNCEMENT_TYPES = new Set(["EVENT", "PROMOTION", "GENERAL"]);
+const ANNOUNCEMENT_AUDIENCES = new Set([
+  "ALL_ACTIVE_MEMBERS",
+  "PT_CLIENTS",
+  "EXPIRING_WITHIN_7_DAYS",
+  "EXPIRING_WITHIN_30_DAYS",
+]);
 const MEMBERSHIP_PLAN_LIST_PATH = "/api/v1/membership-plans/";
 const MEMBERSHIP_LIST_PATH = "/api/v1/memberships/";
 const MEMBERSHIP_EXPIRY_PATH = "/api/v1/memberships/expiry/";
@@ -460,6 +489,23 @@ function allowsGetOnlyQuery(
   return allows(search);
 }
 
+function allowsAnnouncementListQuery(search: string): boolean {
+  const values = strictQueryValues(search, ANNOUNCEMENT_LIST_FILTERS);
+  if (!values || !allowsCleanValues(values)) return false;
+  const status = values.get("status");
+  if (status !== undefined && !ANNOUNCEMENT_STATUSES.has(status)) return false;
+  const type = values.get("type");
+  if (type !== undefined && !ANNOUNCEMENT_TYPES.has(type)) return false;
+  const audience = values.get("audience");
+  if (audience !== undefined && !ANNOUNCEMENT_AUDIENCES.has(audience)) {
+    return false;
+  }
+  return (
+    allowsLimitValue(values.get("limit")) &&
+    allowsCursorValue(values.get("after"))
+  );
+}
+
 function allowsMemberListQuery(search: string): boolean {
   const values = strictQueryValues(search, MEMBER_LIST_FILTERS);
   if (!values || !allowsCleanValues(values)) return false;
@@ -587,6 +633,16 @@ function allowsForwardedQuery(
   }
   if (pathname === MEMBER_LIST_PATH) {
     return allowsGetOnlyQuery(method, search, allowsMemberListQuery);
+  }
+  if (pathname === ANNOUNCEMENT_LIST_PATH) {
+    if (method === "GET") return allowsAnnouncementListQuery(search);
+    return method === "POST" && search.length === 0;
+  }
+  if (ANNOUNCEMENT_ITEM_PATH.test(pathname)) {
+    return (method === "GET" || method === "PATCH") && search.length === 0;
+  }
+  if (ANNOUNCEMENT_ACTION_PATH.test(pathname)) {
+    return method === "POST" && search.length === 0;
   }
   if (pathname === MEMBERSHIP_PLAN_LIST_PATH) {
     return allowsGetOnlyQuery(method, search, allowsMembershipPlanListQuery);

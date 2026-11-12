@@ -28,7 +28,12 @@ from apps.audit.models import AuditLog
 from apps.common.db.tenant_context import set_gym_context
 from apps.members.member_device_services import revoke_devices_for_user
 from apps.members.models import Member, MemberDevice, MembershipPlan
-from apps.members.services import archive_member, gym_today, link_member_identity
+from apps.members.services import (
+    archive_member,
+    cancel_membership,
+    gym_today,
+    link_member_identity,
+)
 from apps.notifications.models import Notification, PushAttempt
 from apps.notifications.push_services import (
     deliver_next_push_notification,
@@ -398,7 +403,7 @@ def test_due_publish_inserts_recipients_and_expiry_keeps_the_inbox() -> None:
         inbox = notes.get(channel=Notification.Channel.IN_APP)
         push = notes.get(channel=Notification.Channel.PUSH)
         assert inbox.status == Notification.Status.SENT
-        assert push.status == Notification.Status.PENDING
+        assert push.status == Notification.Status.CANCELLED
 
 
 @override_settings(**jwt_settings())
@@ -876,6 +881,296 @@ def test_expiry_pushes_dedup_and_delivery_outcomes() -> None:
     assert device.revocation_reason == MemberDevice.RevocationReason.INVALID_TOKEN
     assert device.token_ciphertext is None
     assert token not in repr(transport.deliveries)
+
+
+def _consented_device(tenant, member: Member, token: str) -> MemberDevice:
+    from apps.notifications.tokens import encrypt_push_token, fingerprint_push_token
+
+    return MemberDevice.objects.create(
+        gym=tenant.gym,
+        member=member,
+        installation_id=uuid4(),
+        platform=MemberDevice.Platform.ANDROID,
+        push_consent=True,
+        token_ciphertext=encrypt_push_token(token),
+        token_fingerprint=fingerprint_push_token(token),
+        app_version="1",
+        os_version="1",
+        last_seen_at=timezone.now(),
+    )
+
+
+def test_push_retries_only_the_device_that_failed() -> None:
+    tenant = _provision(f"PART{uuid4().hex[:6].upper()}")
+    today = gym_today(tenant.gym)
+    _prepare(tenant, warning_days=[7], email_enabled=False)
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        settings_row = GymSettings.objects.get(gym=tenant.gym)
+        settings_row.membership_expiry_push_enabled = True
+        settings_row.save(update_fields=["membership_expiry_push_enabled", "updated_at"])
+        plan = _plan(tenant)
+        member = _orm_member(
+            tenant,
+            number="PART",
+            first_name="Part",
+            email=None,
+            today=today,
+        )
+        _sell(tenant, member=member, plan=plan, warning_day=7, today=today)
+        user = User.objects.create_user(f"part-{uuid4().hex[:8]}@example.test", PASSWORD)
+        link_member_identity(gym=tenant.gym, member_id=member.id, user=user)
+        first = _consented_device(tenant, member, "fcm-device-a")
+        second = _consented_device(tenant, member, "fcm-device-b")
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        assert schedule_membership_expiry_pushes(gym=tenant.gym, today=today) == 2
+        push = Notification.objects.get(gym=tenant.gym, channel=Notification.Channel.PUSH)
+    transport = locmem_transport()
+    transport.reset()
+    calls = {"count": 0}
+
+    def partial(_recorded: object) -> PushResult:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return PushResult(code="SENT", provider_message_id="accepted-a")
+        return PushResult(code=PROVIDER_UNAVAILABLE)
+
+    transport.handler = partial
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        outcome = deliver_next_push_notification(gym=tenant.gym, today=today)
+    assert outcome is DeliveryOutcome.RETRIED
+    assert len(transport.deliveries) == 2
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        push.refresh_from_db()
+        assert push.status == Notification.Status.PENDING
+        attempts = list(PushAttempt.objects.filter(notification=push))
+        accepted = next(row for row in attempts if row.status == PushAttempt.Status.SENT)
+        failed = next(row for row in attempts if row.status == PushAttempt.Status.FAILED)
+        assert accepted.attempt_count == 1
+        assert failed.attempt_count == 1
+        push.next_attempt_at = timezone.now()
+        push.save(update_fields=["next_attempt_at", "updated_at"])
+
+    def finish(_recorded: object) -> PushResult:
+        calls["count"] += 1
+        return PushResult(code="SENT", provider_message_id="accepted-b")
+
+    transport.handler = finish
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        outcome = deliver_next_push_notification(gym=tenant.gym, today=today)
+        accepted.refresh_from_db()
+        failed.refresh_from_db()
+        first.refresh_from_db()
+        second.refresh_from_db()
+    assert outcome is DeliveryOutcome.SENT
+    assert len(transport.deliveries) == 3
+    assert accepted.attempt_count == 1
+    assert failed.status == PushAttempt.Status.SENT
+    assert first.token_ciphertext is not None
+    assert second.token_ciphertext is not None
+    assert "fcm-device-a" not in repr(transport.deliveries)
+    assert "fcm-device-b" not in repr(transport.deliveries)
+
+
+def test_expiry_push_cancels_outdated_reminders_and_keeps_other_devices() -> None:
+    tenant = _provision(f"OLD{uuid4().hex[:6].upper()}")
+    other = _provision(f"OTH{uuid4().hex[:6].upper()}")
+    today = gym_today(tenant.gym)
+    _prepare(tenant, warning_days=[7], email_enabled=False)
+    _prepare(other, warning_days=[7], email_enabled=False)
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        settings_row = GymSettings.objects.get(gym=tenant.gym)
+        settings_row.membership_expiry_push_enabled = True
+        settings_row.save(update_fields=["membership_expiry_push_enabled", "updated_at"])
+        plan = _plan(tenant)
+        member = _orm_member(tenant, number="OLD", first_name="Old", email=None, today=today)
+        membership = _sell(tenant, member=member, plan=plan, warning_day=7, today=today)
+        user = User.objects.create_user(f"old-{uuid4().hex[:8]}@example.test", PASSWORD)
+        link_member_identity(gym=tenant.gym, member_id=member.id, user=user)
+        kept = _consented_device(tenant, member, "fcm-kept")
+        rejected = _consented_device(tenant, member, "fcm-rejected")
+    with transaction.atomic():
+        set_gym_context(gym_id=other.gym.id)
+        other_settings = GymSettings.objects.get(gym=other.gym)
+        other_settings.membership_expiry_push_enabled = True
+        other_settings.save(update_fields=["membership_expiry_push_enabled", "updated_at"])
+        other_plan = _plan(other)
+        other_member = _orm_member(
+            other, number="OTH", first_name="Other", email=None, today=gym_today(other.gym)
+        )
+        _sell(
+            other,
+            member=other_member,
+            plan=other_plan,
+            warning_day=7,
+            today=gym_today(other.gym),
+        )
+        assert schedule_membership_expiry_pushes(gym=other.gym, today=gym_today(other.gym)) == 2
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        assert schedule_membership_expiry_pushes(gym=tenant.gym, today=today) == 2
+        push = Notification.objects.get(gym=tenant.gym, channel=Notification.Channel.PUSH)
+    transport = locmem_transport()
+    transport.reset()
+    calls = {"count": 0}
+
+    def one_invalid(_recorded: object) -> PushResult:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return PushResult(code="SENT", provider_message_id="kept")
+        return PushResult(code=INVALID_TOKEN)
+
+    transport.handler = one_invalid
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        outcome = deliver_next_push_notification(gym=tenant.gym, today=today)
+        kept.refresh_from_db()
+        rejected.refresh_from_db()
+    assert outcome is DeliveryOutcome.SENT
+    live = [row for row in (kept, rejected) if row.revoked_at is None]
+    revoked = [row for row in (kept, rejected) if row.revoked_at is not None]
+    assert len(live) == 1 and live[0].token_ciphertext is not None
+    assert len(revoked) == 1
+    assert revoked[0].revocation_reason == MemberDevice.RevocationReason.INVALID_TOKEN
+    assert revoked[0].token_ciphertext is None
+    with transaction.atomic():
+        set_gym_context(gym_id=other.gym.id)
+        untouched = Notification.objects.get(gym=other.gym, channel=Notification.Channel.PUSH)
+    assert untouched.status == Notification.Status.PENDING
+
+    def reopen(notification: Notification) -> None:
+        notification.status = Notification.Status.PENDING
+        notification.sent_at = None
+        notification.failed_at = None
+        notification.attempt_count = 0
+        notification.next_attempt_at = timezone.now()
+        notification.last_error_code = ""
+        notification.save(
+            update_fields=[
+                "status",
+                "sent_at",
+                "failed_at",
+                "attempt_count",
+                "next_attempt_at",
+                "last_error_code",
+                "updated_at",
+            ]
+        )
+
+    transport.reset()
+    before = len(transport.deliveries)
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        settings_row = GymSettings.objects.get(gym=tenant.gym)
+        settings_row.membership_expiry_push_enabled = False
+        settings_row.save(update_fields=["membership_expiry_push_enabled", "updated_at"])
+        reopen(push)
+        outcome = deliver_next_push_notification(gym=tenant.gym, today=today)
+    assert outcome is DeliveryOutcome.CANCELLED
+    assert len(transport.deliveries) == before
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        settings_row = GymSettings.objects.get(gym=tenant.gym)
+        settings_row.membership_expiry_push_enabled = True
+        settings_row.save(update_fields=["membership_expiry_push_enabled", "updated_at"])
+        reopen(push)
+        outcome = deliver_next_push_notification(
+            gym=tenant.gym,
+            today=membership.expiry_date + timedelta(days=1),
+        )
+    assert outcome is DeliveryOutcome.CANCELLED
+    assert len(transport.deliveries) == before
+    with transaction.atomic():
+        set_gym_context(gym_id=tenant.gym.id)
+        cancel_membership(
+            gym=tenant.gym,
+            actor=tenant.owner_membership,
+            membership_id=membership.id,
+            reason="Renewed",
+        )
+        reopen(push)
+        outcome = deliver_next_push_notification(gym=tenant.gym, today=today)
+    assert outcome is DeliveryOutcome.CANCELLED
+    assert len(transport.deliveries) == before
+
+
+@override_settings(**jwt_settings())
+def test_cancelled_and_expired_announcements_stay_in_history() -> None:
+    api, headers, gym, _owner = _gym("history")
+    member_id = _member(api, headers, first_name="History")
+    _user, token = _link(gym, member_id, f"history-{uuid4().hex[:8]}@example.test")
+    created = api.post(
+        "/api/v1/announcements/",
+        _body(type="PROMOTION", title="Free PT", body="This week only."),
+        format="json",
+        **headers,
+    )
+    assert created.status_code == 201, created.content
+    announcement_id = created.json()["data"]["id"]
+    assert (
+        api.post(
+            f"/api/v1/announcements/{announcement_id}/publish/",
+            {},
+            format="json",
+            **headers,
+        ).status_code
+        == 200
+    )
+    client = APIClient()
+    auth = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
+    active = client.get("/api/v1/member/notifications/?view=active", **auth)
+    assert active.status_code == 200, active.content
+    assert len(active.json()["data"]) == 1
+    assert active.json()["data"][0]["announcement_type"] == "PROMOTION"
+    note_id = active.json()["data"][0]["id"]
+    assert (
+        api.post(
+            f"/api/v1/announcements/{announcement_id}/cancel/",
+            {},
+            format="json",
+            **headers,
+        ).status_code
+        == 200
+    )
+    hidden = client.get("/api/v1/member/notifications/", **auth)
+    assert hidden.json()["data"] == []
+    history = client.get("/api/v1/member/notifications/?view=history", **auth)
+    assert [item["id"] for item in history.json()["data"]] == [note_id]
+    everything = client.get("/api/v1/member/notifications/?view=all", **auth)
+    assert len(everything.json()["data"]) == 1
+    read = client.post(
+        f"/api/v1/member/notifications/{note_id}/read/",
+        {},
+        format="json",
+        **auth,
+    )
+    assert read.status_code == 200, read.content
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        row = Notification.objects.get(id=note_id)
+        assert row.status == Notification.Status.SENT
+        assert row.read_at is not None
+        pending = Notification.objects.filter(
+            gym=gym,
+            announcement_id=announcement_id,
+            channel=Notification.Channel.PUSH,
+            status=Notification.Status.PENDING,
+        )
+        assert pending.count() == 0
+        assert (
+            Notification.objects.filter(
+                gym=gym,
+                announcement_id=announcement_id,
+                channel=Notification.Channel.PUSH,
+                status=Notification.Status.CANCELLED,
+            ).count()
+            == 1
+        )
 
 
 def test_phase7_constraints_grants_and_email_shape_remain() -> None:

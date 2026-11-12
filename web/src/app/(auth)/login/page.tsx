@@ -1,3 +1,4 @@
+import { LanguageSwitch } from "@/i18n/language-switch";
 import { pageMetadata } from "@/i18n/metadata";
 import { Tx } from "@/i18n/tx";
 
@@ -17,9 +18,12 @@ export default async function LoginPage({
   return (
     <main
       aria-labelledby="login-title"
-      className="login-panel w-full bg-surface text-center"
+      className="login-panel w-full min-w-0 bg-surface text-center"
     >
-      <div className="login-panel__brand px-8 pt-10 pb-6 sm:px-10">
+      <div className="login-panel__brand px-8 pt-11 pb-6 sm:px-10">
+        <div className="mb-3 flex justify-end">
+          <LanguageSwitch className="w-28" />
+        </div>
         <BrandLogo />
         <div
           aria-hidden="true"

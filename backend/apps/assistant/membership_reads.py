@@ -47,6 +47,7 @@ class MembershipReadQuerySerializer(StrictSerializer):
 class MembershipPlanReadQuerySerializer(StrictSerializer):
     code = serializers.CharField(required=False, allow_blank=True, max_length=32)
     name = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    eligible_for_sale = serializers.BooleanField(required=False, default=False)
     limit = serializers.IntegerField(required=False, min_value=1, max_value=25, default=25)
     after = serializers.CharField(required=False, allow_blank=True, max_length=2048)
 
@@ -123,14 +124,17 @@ def search_memberships(call: ReadCall) -> dict[str, object]:
 
 
 def search_membership_plans(call: ReadCall) -> dict[str, object]:
-    """Return this gym's plan catalog, including inactive plans."""
+    """Return this gym's plan catalog. A sale lists active plans only."""
 
     if call.gym.id is None:
         raise ExecutionRejected("The assistant session is incomplete.", code="session")
     query = _plan_query(call.payload)
     code = str(query.get("code") or "").strip()
     name = str(query.get("name") or "").strip()
+    eligible = bool(query.get("eligible_for_sale"))
     queryset = MembershipPlan.objects.filter(gym=call.gym)
+    if eligible:
+        queryset = queryset.filter(is_active=True)
     if code:
         queryset = queryset.filter(code__iexact=code)
     if name:
@@ -141,6 +145,8 @@ def search_membership_plans(call: ReadCall) -> dict[str, object]:
         limit=int(query["limit"]),
         after=str(query.get("after") or ""),
     )
+    if eligible:
+        rows = [row for row in rows if row.is_active]
     return {
         "results": [_plan_row(row) for row in rows],
         "has_more": bool(meta["has_more"]),
@@ -278,11 +284,17 @@ _READS = {
     SEARCH_MEMBERSHIP_PLANS: _contract(
         _definition(
             SEARCH_MEMBERSHIP_PLANS,
-            "Search membership plans in this gym, including inactive plans. "
-            "A name that matches more than one plan is ambiguous.",
+            "Search membership plans in this gym. Set eligible_for_sale true "
+            "for a new sale so inactive plans are excluded. A name that matches "
+            "more than one remaining plan is ambiguous.",
         ),
         (
             FieldRequirement("code", "Stored plan code. Optional.", required=False),
+            FieldRequirement(
+                "eligible_for_sale",
+                "True when offering a plan for a new membership. Optional.",
+                required=False,
+            ),
             FieldRequirement(
                 "name",
                 "Stored plan name. Optional. Do not use a name when more than one plan has it.",

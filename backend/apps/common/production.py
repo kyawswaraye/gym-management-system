@@ -13,7 +13,21 @@ PRODUCTION_SCHEDULER_COMMANDS = (
     "deliver_push_notifications",
     "publish_scheduled_announcements",
     "expire_announcements",
+    "refresh_membership_statuses",
+    "expire_profile_photo_uploads",
 )
+# Whole seconds. Scheduling stays on the gym-local warning day inside the
+# command. These intervals only decide how often that command is attempted.
+PRODUCTION_SCHEDULER_INTERVALS_SECONDS = {
+    "schedule_membership_expiry_emails": 15 * 60,
+    "deliver_membership_expiry_emails": 5 * 60,
+    "schedule_membership_expiry_pushes": 15 * 60,
+    "deliver_push_notifications": 2 * 60,
+    "publish_scheduled_announcements": 60,
+    "expire_announcements": 5 * 60,
+    "refresh_membership_statuses": 15 * 60,
+    "expire_profile_photo_uploads": 60 * 60,
+}
 AWS_PRODUCTION_REGION = "ap-southeast-1"
 
 
@@ -92,6 +106,21 @@ def require_push_backend(
 def require_scheduler_commands(commands: tuple[str, ...]) -> None:
     if commands != PRODUCTION_SCHEDULER_COMMANDS:
         raise ImproperlyConfigured("Production scheduler commands must stay the documented set")
+
+
+def require_scheduler_intervals(intervals: Mapping[str, int]) -> None:
+    if tuple(intervals) != PRODUCTION_SCHEDULER_COMMANDS:
+        raise ImproperlyConfigured(
+            "Production scheduler intervals must follow the documented command set"
+        )
+    for name in PRODUCTION_SCHEDULER_COMMANDS:
+        seconds = intervals[name]
+        if isinstance(seconds, bool) or not isinstance(seconds, int) or not 60 <= seconds <= 86_400:
+            raise ImproperlyConfigured(
+                "Production scheduler intervals must be whole seconds from 60 through 86400"
+            )
+    if dict(intervals) != PRODUCTION_SCHEDULER_INTERVALS_SECONDS:
+        raise ImproperlyConfigured("Production scheduler intervals must stay the documented values")
 
 
 def require_https_endpoint(url: str, *, name: str) -> None:

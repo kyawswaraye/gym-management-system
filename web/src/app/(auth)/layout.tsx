@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { LanguageSwitch } from "@/i18n/language-switch";
+import { AuthLayoutLanguageSwitch } from "@/i18n/language-switch";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -9,13 +9,12 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div aria-hidden="true" className="auth-shell__emblem">
         <span className="auth-shell__emblem-ring" />
         <span className="auth-shell__emblem-arc" />
+        <span className="auth-shell__emblem-arc auth-shell__emblem-arc--inner" />
       </div>
       <div aria-hidden="true" className="auth-shell__glow" />
-      <div className="relative z-10 flex w-full max-w-md flex-col items-center gap-6">
+      <div className="relative z-10 flex w-full min-w-0 max-w-md flex-col items-center gap-6">
         {children}
-        <div className="w-full max-w-xs">
-          <LanguageSwitch />
-        </div>
+        <AuthLayoutLanguageSwitch />
       </div>
     </div>
   );

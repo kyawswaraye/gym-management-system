@@ -50,6 +50,15 @@ psql_admin() {
       "$@"
     return
   fi
+  if [[ "${E2E_ISOLATED:-}" == "1" ]]; then
+    if [[ -z "${E2E_POSTGRES_CONTAINER:-}" ]]; then
+      echo "Isolated E2E needs psql or E2E_POSTGRES_CONTAINER. Refusing the development database." >&2
+      exit 1
+    fi
+    docker exec -e PGPASSWORD="${POSTGRES_ADMIN_PASSWORD}" -i "${E2E_POSTGRES_CONTAINER}" \
+      psql -U "${POSTGRES_ADMIN_USER}" -v ON_ERROR_STOP=1 "$@"
+    return
+  fi
   if command -v docker >/dev/null 2>&1; then
     docker compose --project-directory "${ROOT}" exec -T postgres \
       psql -U "${POSTGRES_ADMIN_USER}" -v ON_ERROR_STOP=1 "$@"

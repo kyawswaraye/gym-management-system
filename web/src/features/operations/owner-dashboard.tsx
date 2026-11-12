@@ -99,7 +99,8 @@ const PRODUCT_TILES = [
   "bg-chart-indigo-soft text-chart-indigo",
 ];
 
-const CARD = "min-w-0 rounded-theme-lg border border-border bg-surface p-5";
+const CARD =
+  "min-w-0 rounded-2xl border border-[rgb(18_57_122/12%)] bg-surface p-5 shadow-[0_14px_36px_rgb(7_30_74/6%)]";
 
 const HERO_METRICS: {
   key: keyof DashboardData["operational"];
@@ -428,7 +429,7 @@ export function OwnerDashboard() {
                     aria-pressed={selected}
                     className={
                       selected
-                        ? "min-h-11 rounded-theme-sm border border-border bg-surface px-3 text-sm font-semibold text-primary-hover sm:shrink-0"
+                        ? "min-h-11 rounded-theme-sm border border-[rgb(232_196_96/55%)] bg-[#071e4a] px-3 text-sm font-semibold text-[#f8e7b0] sm:shrink-0"
                         : "min-h-11 rounded-theme-sm border border-transparent px-3 text-sm font-medium text-text-secondary hover:bg-hover sm:shrink-0"
                     }
                     key={item.value}

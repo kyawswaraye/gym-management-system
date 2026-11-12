@@ -64,6 +64,8 @@ describe("member journey", () => {
       setInstallationId: async () => undefined,
       getDeviceId: async () => null,
       setDeviceId: async () => undefined,
+      getPushConsent: async () => false,
+      setPushConsent: async () => undefined,
       getBiometricGate: async () => false,
       setBiometricGate: async () => undefined,
       getLocale: async () => (values.locale === "mm" ? "mm" : "en"),

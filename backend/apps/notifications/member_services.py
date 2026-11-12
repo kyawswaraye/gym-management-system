@@ -12,6 +12,7 @@ from django.db.models import Q
 from django.http import Http404
 from django.utils import timezone
 
+from apps.announcements.models import Announcement
 from apps.audit.services import write_tenant_audit
 from apps.common.api.exceptions import RequestRejected
 from apps.common.db.tenant_context import set_gym_context
@@ -24,8 +25,8 @@ _CURSOR_MAX_AGE = 24 * 60 * 60
 _ORDERING = "created_at DESC, id DESC"
 
 
-def notification_item(row: Notification) -> dict[str, Any]:
-    title, body, announcement_type = _content(row)
+def notification_item(row: Notification, *, language: str = "en") -> dict[str, Any]:
+    title, body, announcement_type = _content(row, language=language)
     return {
         "id": row.id,
         "type": row.type,
@@ -43,18 +44,21 @@ def page_member_notifications(
     member_id: uuid.UUID,
     limit: int,
     after: str,
+    view: str = "active",
 ) -> tuple[list[Notification], dict[str, Any]]:
     set_gym_context(gym_id=gym.id)
     scope = {
         "gym_id": str(gym.id),
         "member_id": str(member_id),
         "ordering": _ORDERING,
+        "view": view,
     }
     queryset = Notification.objects.filter(
         gym=gym,
         recipient_member_id=member_id,
         channel=Notification.Channel.IN_APP,
-    ).order_by("-created_at", "-id")
+    )
+    queryset = _apply_inbox_view(queryset, view=view).order_by("-created_at", "-id")
     if after:
         created_at, row_id = _decode_cursor(after, scope=scope)
         queryset = queryset.filter(
@@ -118,7 +122,25 @@ def mark_notification_read(
     return row
 
 
-def _content(row: Notification) -> tuple[str, str, str | None]:
+def _apply_inbox_view(queryset: Any, *, view: str) -> Any:
+    """Active inbox hides cancelled and expired announcements without deleting them.
+
+    ``all`` is the previous unfiltered list. ``history`` is announcement rows
+    that are no longer active. Membership-expiry reminders stay in ``active``.
+    """
+
+    if view == "all":
+        return queryset
+    now = timezone.now()
+    published = Q(announcement__status=Announcement.Status.PUBLISHED) & (
+        Q(announcement__ends_at__isnull=True) | Q(announcement__ends_at__gte=now)
+    )
+    if view == "history":
+        return queryset.filter(type=Notification.Type.ANNOUNCEMENT).exclude(published)
+    return queryset.filter(Q(type=Notification.Type.MEMBERSHIP_EXPIRY) | published)
+
+
+def _content(row: Notification, *, language: str) -> tuple[str, str, str | None]:
     payload = row.payload if isinstance(row.payload, dict) else {}
     if row.type == Notification.Type.ANNOUNCEMENT:
         title = payload.get("title")
@@ -148,6 +170,7 @@ def _content(row: Notification) -> tuple[str, str, str | None]:
         gym_name=str(gym_name),
         gym_email=gym_email if isinstance(gym_email, str) else "",
         gym_phone=gym_phone if isinstance(gym_phone, str) else "",
+        language=language,
     )
     return title, body, None
 

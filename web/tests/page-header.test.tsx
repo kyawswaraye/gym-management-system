@@ -21,8 +21,9 @@ describe("PageHeader", () => {
     expect(
       screen.getByText(/open Archived to find members who were archived/),
     ).toBeInTheDocument();
+    expect(container.querySelector("header")).toHaveClass("page-header");
     expect(container.querySelector("header")?.className ?? "").not.toMatch(
-      /bg-slate-900|rounded-2xl/,
+      /bg-slate-900|page-header--premium/,
     );
   });
 

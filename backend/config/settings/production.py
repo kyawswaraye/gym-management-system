@@ -2,6 +2,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from apps.common.production import (
     PRODUCTION_SCHEDULER_COMMANDS,
+    PRODUCTION_SCHEDULER_INTERVALS_SECONDS,
     require_allowlisted_value,
     require_aws_singapore_region,
     require_dedicated_reset_pepper,
@@ -13,6 +14,7 @@ from apps.common.production import (
     require_resend_backend,
     require_reset_ttl_seconds,
     require_scheduler_commands,
+    require_scheduler_intervals,
     require_verified_sender,
 )
 
@@ -61,6 +63,7 @@ require_dedicated_reset_pepper(
 )
 require_reset_ttl_seconds(PASSWORD_RESET_TTL_SECONDS)  # noqa: F405
 require_scheduler_commands(PRODUCTION_SCHEDULER_COMMANDS)
+require_scheduler_intervals(PRODUCTION_SCHEDULER_INTERVALS_SECONDS)
 require_push_backend(
     backend=PUSH_BACKEND,  # noqa: F405
     project_id=FCM_PROJECT_ID,  # noqa: F405

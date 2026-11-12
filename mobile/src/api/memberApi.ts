@@ -155,7 +155,7 @@ export function createMemberApi(client: ApiClient): MemberApi {
     async notifications(after) {
       const envelope = await client.request<Schemas["MemberNotification"][]>(
         "/api/v1/member/notifications/",
-        { query: { limit: 25, after } },
+        { query: { limit: 25, after, view: "active" } },
       );
       return pageOf(envelope);
     },

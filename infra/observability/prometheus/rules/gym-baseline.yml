@@ -160,3 +160,12 @@ groups:
           threshold: provisional
         annotations:
           summary: Deploy and restore evidence is unproven. This is not a deployment or restore proof.
+      - alert: GymSchedulerHeartbeatStale
+        expr: absent(gym_scheduler_heartbeat_timestamp_seconds) or (time() - gym_scheduler_heartbeat_timestamp_seconds) > 900 or gym_scheduler_heartbeat_ok == 0
+        for: 5m
+        labels:
+          severity: page
+          runbook: docs/runbooks/phase8-increment-4.md
+          threshold: provisional
+        annotations:
+          summary: Scheduler heartbeat is missing, stale, or not ok. Docker does not restart an unhealthy scheduler.

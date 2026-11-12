@@ -11042,6 +11042,21 @@
                             "minimum": 1,
                             "default": 25
                         }
+                    },
+                    {
+                        "in": "query",
+                        "name": "view",
+                        "schema": {
+                            "enum": [
+                                "active",
+                                "history",
+                                "all"
+                            ],
+                            "type": "string",
+                            "default": "active",
+                            "minLength": 1
+                        },
+                        "description": "* `active` - active\n* `history` - history\n* `all` - all"
                     }
                 ],
                 "tags": [

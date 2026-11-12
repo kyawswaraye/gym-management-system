@@ -141,6 +141,7 @@ def compose_ps() -> str:
         "blackbox",
         "node-exporter",
         "postgres-exporter",
+        "scheduler",
     ]
     rows = []
     for name in services:
@@ -252,8 +253,11 @@ def runner_factory(
 ):
     calls: list[tuple[str, ...]] = []
     known = service_images()
+    known["scheduler"] = known["api"]
     if images:
         known.update(images)
+        if "api" in images and "scheduler" not in images:
+            known["scheduler"] = images["api"]
 
     def run(command: tuple[str, ...], timeout: int = 30):
         module = deploy()
@@ -284,6 +288,19 @@ def runner_factory(
             return module.CommandResult(0, posture(), "")
         if "--format" in command and "json" in command:
             return module.CommandResult(0, compose_ps(), "")
+        if "promtool" in command:
+            return module.CommandResult(0, "SUCCESS: prometheus config is valid\n", "")
+        if any("/api/v1/alertmanagers" in part for part in command):
+            body = json.dumps(
+                {
+                    "status": "success",
+                    "data": {
+                        "activeAlertmanagers": [{"url": "http://alertmanager:9093/api/v2/alerts"}],
+                        "droppedAlertmanagers": [],
+                    },
+                }
+            )
+            return module.CommandResult(0, body, "")
         return module.CommandResult(0, "", "")
 
     return calls, run
@@ -1225,3 +1242,128 @@ def test_incoming_directories_do_not_overlap() -> None:
     steps = module.deployment_steps("production", "deploy", "not-applicable")
     assert steps.index("acquire-host-lock") < steps.index("verify-bundle")
     assert steps.index("verify-bundle") < steps.index("migrate")
+
+
+PREVIOUS_PROMETHEUS = "global:\n  scrape_interval: 30s\n# previous-prometheus-config\n"
+
+
+def _plant_previous_prometheus(state: Path) -> Path:
+    config = state / "src" / "infra" / "observability" / "prometheus"
+    rules = config / "rules"
+    rules.mkdir(parents=True)
+    (config / "prometheus.yml").write_text(PREVIOUS_PROMETHEUS, encoding="utf-8")
+    (rules / "old.yml").write_text("groups: []\n", encoding="utf-8")
+    return config / "prometheus.yml"
+
+
+def test_prometheus_targets_match_the_mounted_config() -> None:
+    module = deploy()
+    text = (ROOT / "infra/observability/prometheus/prometheus.yml").read_text(encoding="utf-8")
+    assert module.alertmanager_targets(text) == ("alertmanager:9093",)
+    assert module.alertmanager_targets("global:\n  scrape_interval: 30s\n") == ()
+    invalid = (
+        "alerting:\n"
+        "  alertmanagers:\n"
+        "    - static_configs:\n"
+        "        - targets:\n"
+        "            - not a target\n"
+    )
+    with pytest.raises(module.DeployError, match="invalid"):
+        module.alertmanager_targets(invalid)
+
+
+def test_deploy_checks_prometheus_before_migration_and_recreates_only_it(tmp_path: Path) -> None:
+    module = deploy()
+    steps = module.deployment_steps("production", "deploy", "not-applicable")
+    assert steps.index("check-prometheus") < steps.index("migrate")
+    assert steps.index("start-services") < steps.index("reload-prometheus")
+    assert steps.index("reload-prometheus") < steps.index("smoke")
+    rollback = module.deployment_steps("production", "rollback-app", "reviewed-authorized")
+    assert rollback.index("start-app") < rollback.index("reload-prometheus")
+    assert rollback.index("reload-prometheus") < rollback.index("smoke")
+    bundle = tmp_path / "bundle.tar"
+    module.build_bundle(ROOT, ROOT, bound(), bundle)
+    root = tmp_path / "host"
+    write_host(root, "production")
+    calls, run = runner_factory()
+    evidence = module.execute_deployment(
+        host_request(module, root, bundle, "production", "deploy", "not-applicable"),
+        run,
+    )
+    promtool = [index for index, command in enumerate(calls) if "promtool" in command]
+    recreate = [index for index, command in enumerate(calls) if "--force-recreate" in command]
+    queried = [
+        index
+        for index, command in enumerate(calls)
+        if any("/api/v1/alertmanagers" in part for part in command)
+    ]
+    migrate = next(index for index, command in enumerate(calls) if command[-1] == "migrate")
+    assert promtool[0] < migrate < recreate[0] < queried[0]
+    assert len(recreate) == 1
+    command = calls[recreate[0]]
+    assert command[-1] == "prometheus"
+    assert "--no-deps" in command
+    for service in ("api", "web", "caddy", "scheduler", "postgres", "alertmanager"):
+        assert service not in command
+    assert evidence["prometheus_alertmanagers"] == ["http://alertmanager:9093/api/v2/alerts"]
+
+
+def test_rejected_prometheus_config_is_restored_without_recreation(tmp_path: Path) -> None:
+    module = deploy()
+    bundle = tmp_path / "bundle.tar"
+    module.build_bundle(ROOT, ROOT, bound(), bundle)
+    root = tmp_path / "host"
+    write_host(root, "production")
+    state = root / "var" / "lib" / "gym-deploy" / "production"
+    previous = _plant_previous_prometheus(state)
+    calls, run = runner_factory(fail="promtool")
+    with pytest.raises(module.DeployError, match="failed promtool"):
+        module.execute_deployment(
+            host_request(module, root, bundle, "production", "deploy", "not-applicable"),
+            run,
+        )
+    assert previous.read_text(encoding="utf-8") == PREVIOUS_PROMETHEUS
+    assert not any("--force-recreate" in command for command in calls)
+    assert not any(command[-1] == "migrate" for command in calls)
+    evidence = json.loads((state / "evidence" / "latest.json").read_text(encoding="utf-8"))
+    assert evidence["failed_step"] == "check-prometheus"
+    assert evidence["rollback_boundary"] == module.FORWARD_BOUNDARY
+
+
+def test_failed_alertmanager_activation_restores_the_previous_process_config(
+    tmp_path: Path,
+) -> None:
+    module = deploy()
+    bundle = tmp_path / "bundle.tar"
+    module.build_bundle(ROOT, ROOT, bound(), bundle)
+    root = tmp_path / "host"
+    write_host(root, "production")
+    state = root / "var" / "lib" / "gym-deploy" / "production"
+    previous = _plant_previous_prometheus(state)
+    calls, base = runner_factory()
+    empty = json.dumps(
+        {
+            "status": "success",
+            "data": {"activeAlertmanagers": [], "droppedAlertmanagers": []},
+        }
+    )
+
+    def run(command: tuple[str, ...], timeout: int = 30):
+        if any("/api/v1/alertmanagers" in part for part in command):
+            calls.append(command)
+            return module.CommandResult(0, empty, "")
+        return base(command, timeout)
+
+    with pytest.raises(module.DeployError, match="did not become active"):
+        module.execute_deployment(
+            host_request(module, root, bundle, "production", "deploy", "not-applicable"),
+            run,
+        )
+    assert previous.read_text(encoding="utf-8") == PREVIOUS_PROMETHEUS
+    recreates = [command for command in calls if "--force-recreate" in command]
+    assert len(recreates) == 2
+    assert [command[-1] for command in recreates] == ["prometheus", "prometheus"]
+    evidence = json.loads((state / "evidence" / "latest.json").read_text(encoding="utf-8"))
+    assert evidence["failed_step"] == "reload-prometheus"
+    assert evidence["rollback_boundary"] == module.STOP_BOUNDARY
+    assert evidence["prometheus_alertmanagers"] == []

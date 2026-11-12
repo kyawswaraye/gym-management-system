@@ -134,6 +134,10 @@ REST_FRAMEWORK = {
         "password_forgot_ip": "20/min",
         "password_reset": "10/min",
         "password_reset_ip": "20/min",
+        "assistant_read": "60/60",
+        "assistant_turn": "20/60",
+        "assistant_gym_read": "180/60",
+        "assistant_gym_turn": "60/60",
     },
 }
 
@@ -264,9 +268,11 @@ ASSISTANT_E2E_SCRIPT = False
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "")
 GEMINI_TIMEOUT = os.environ.get("GEMINI_TIMEOUT", "30")
-GEMINI_MAX_RETRIES = os.environ.get("GEMINI_MAX_RETRIES", "2")
-ASSISTANT_MAX_STEPS = os.environ.get("ASSISTANT_MAX_STEPS", "12")
+GEMINI_MAX_RETRIES = os.environ.get("GEMINI_MAX_RETRIES", "1")
+ASSISTANT_MAX_STEPS = os.environ.get("ASSISTANT_MAX_STEPS", "4")
 ASSISTANT_MAX_TOOL_CALLS = os.environ.get("ASSISTANT_MAX_TOOL_CALLS", "8")
 ASSISTANT_MAX_EXECUTION_TIME = os.environ.get("ASSISTANT_MAX_EXECUTION_TIME", "20")
+# Not enforced. The fixed assistant prompt is larger than 8000 tokens.
+# Do not truncate tool declarations or security instructions to meet it.
 ASSISTANT_MAX_CONTEXT_TOKENS = os.environ.get("ASSISTANT_MAX_CONTEXT_TOKENS", "8000")
 ASSISTANT_LOCK_TIMEOUT_MS = os.environ.get("ASSISTANT_LOCK_TIMEOUT_MS", "2000")

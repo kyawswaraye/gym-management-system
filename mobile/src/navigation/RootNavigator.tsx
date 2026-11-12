@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "../app/providers";
+import { PushBridge } from "../notifications/PushBridge";
 import { AccountScreen } from "../screens/AccountScreen";
 import { CheckInsScreen } from "../screens/CheckInsScreen";
 import { DashboardScreen } from "../screens/DashboardScreen";
@@ -138,69 +139,72 @@ export function RootNavigator() {
     );
   }
   return (
-    <Tabs.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "600",
-          letterSpacing: 0.2,
-        },
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          paddingTop: 4,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="Home"
-        component={HomeStackScreen}
-        options={{
-          tabBarAccessibilityLabel: tx("Home"),
-          tabBarIcon: tabIcon("home"),
-          tabBarLabel: tx("Home"),
+    <>
+      <PushBridge />
+      <Tabs.Navigator
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.muted,
+          tabBarLabelStyle: {
+            fontSize: 11,
+            fontWeight: "600",
+            letterSpacing: 0.2,
+          },
+          tabBarStyle: {
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
+            borderTopWidth: 1,
+            paddingTop: 4,
+          },
         }}
-      />
-      <Tabs.Screen
-        name="Schedule"
-        component={ScheduleStackScreen}
-        options={{
-          tabBarAccessibilityLabel: tx("Schedule"),
-          tabBarIcon: tabIcon("schedule"),
-          tabBarLabel: tx("Schedule"),
-        }}
-      />
-      <Tabs.Screen
-        name="CheckIn"
-        component={CheckInStackScreen}
-        options={{
-          tabBarAccessibilityLabel: tx("Check in"),
-          tabBarIcon: tabIcon("checkin"),
-          tabBarLabel: tx("Check in"),
-        }}
-      />
-      <Tabs.Screen
-        name="Inbox"
-        component={InboxStackScreen}
-        options={{
-          tabBarAccessibilityLabel: tx("Inbox"),
-          tabBarIcon: tabIcon("inbox"),
-          tabBarLabel: tx("Inbox"),
-        }}
-      />
-      <Tabs.Screen
-        name="Account"
-        component={AccountStackScreen}
-        options={{
-          tabBarAccessibilityLabel: tx("Account"),
-          tabBarIcon: tabIcon("account"),
-          tabBarLabel: tx("Account"),
-        }}
-      />
-    </Tabs.Navigator>
+      >
+        <Tabs.Screen
+          name="Home"
+          component={HomeStackScreen}
+          options={{
+            tabBarAccessibilityLabel: tx("Home"),
+            tabBarIcon: tabIcon("home"),
+            tabBarLabel: tx("Home"),
+          }}
+        />
+        <Tabs.Screen
+          name="Schedule"
+          component={ScheduleStackScreen}
+          options={{
+            tabBarAccessibilityLabel: tx("Schedule"),
+            tabBarIcon: tabIcon("schedule"),
+            tabBarLabel: tx("Schedule"),
+          }}
+        />
+        <Tabs.Screen
+          name="CheckIn"
+          component={CheckInStackScreen}
+          options={{
+            tabBarAccessibilityLabel: tx("Check in"),
+            tabBarIcon: tabIcon("checkin"),
+            tabBarLabel: tx("Check in"),
+          }}
+        />
+        <Tabs.Screen
+          name="Inbox"
+          component={InboxStackScreen}
+          options={{
+            tabBarAccessibilityLabel: tx("Inbox"),
+            tabBarIcon: tabIcon("inbox"),
+            tabBarLabel: tx("Inbox"),
+          }}
+        />
+        <Tabs.Screen
+          name="Account"
+          component={AccountStackScreen}
+          options={{
+            tabBarAccessibilityLabel: tx("Account"),
+            tabBarIcon: tabIcon("account"),
+            tabBarLabel: tx("Account"),
+          }}
+        />
+      </Tabs.Navigator>
+    </>
   );
 }

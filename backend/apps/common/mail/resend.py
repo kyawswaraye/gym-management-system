@@ -13,6 +13,7 @@ RESEND_ENDPOINT_HOST = "api.resend.com"
 RESEND_ENDPOINT_PATH = "/emails"
 RESEND_IDEMPOTENCY_HEADER = "Idempotency-Key"
 APPLICATION_IDEMPOTENCY_HEADER = "X-Idempotency-Key"
+RESEND_USER_AGENT = "GymPilotMM/1.0"
 MIN_IDEMPOTENCY_LENGTH = 1
 MAX_IDEMPOTENCY_LENGTH = 256
 DEFAULT_TIMEOUT_SECONDS = 10
@@ -47,6 +48,9 @@ class EmailBackend(BaseEmailBackend):
             "authorization": f"Bearer {api_key}",
             "content-type": "application/json",
             "accept": "application/json",
+            # Cloudflare in front of api.resend.com answers 403 error 1010
+            # when this header is missing.
+            "user-agent": RESEND_USER_AGENT,
         }
         idempotency = _idempotency_key(message)
         if idempotency is not None:

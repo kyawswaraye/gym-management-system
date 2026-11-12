@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import logging
 import re
+import socket
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
@@ -27,7 +30,9 @@ logger = logging.getLogger(__name__)
 
 _NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _RESPONSE_LIMIT = 1_000_000
+_RETRY_DELAY_SECONDS = 0.2
 _ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+_NOT_SENT = frozenset({errno.ECONNREFUSED, errno.ENETUNREACH, errno.EHOSTUNREACH})
 
 Transport = Callable[[dict[str, object], int], dict[str, object]]
 
@@ -35,9 +40,10 @@ Transport = Callable[[dict[str, object], int], dict[str, object]]
 class ProviderCallError(Exception):
     """A provider failure whose message is the failure class, never a secret."""
 
-    def __init__(self, failure: ProviderFailure) -> None:
+    def __init__(self, failure: ProviderFailure, *, reached_provider: bool = True) -> None:
         super().__init__(failure.value)
         self.failure = failure
+        self.reached_provider = reached_provider
 
 
 @dataclass(frozen=True)
@@ -47,11 +53,22 @@ class FunctionCall:
 
 
 @dataclass(frozen=True)
+class ProviderUsage:
+    prompt_tokens: int | None
+    candidate_tokens: int | None
+    total_tokens: int | None
+
+
+_UNAVAILABLE_USAGE = ProviderUsage(None, None, None)
+
+
+@dataclass(frozen=True)
 class ModelTurn:
     text: str
     calls: tuple[FunctionCall, ...]
     parts: tuple[dict[str, object], ...]
     blocked: bool = False
+    usage: ProviderUsage = _UNAVAILABLE_USAGE
 
 
 def parse_model_turn(payload: Mapping[str, object]) -> ModelTurn:
@@ -59,10 +76,11 @@ def parse_model_turn(payload: Mapping[str, object]) -> ModelTurn:
 
     feedback = payload.get("promptFeedback")
     blocked = isinstance(feedback, Mapping) and bool(feedback.get("blockReason"))
+    usage = _usage(payload)
     candidates = payload.get("candidates")
     if not isinstance(candidates, list) or not candidates:
         if blocked:
-            return ModelTurn("", (), (), blocked=True)
+            return ModelTurn("", (), (), blocked=True, usage=usage)
         raise ProviderCallError(ProviderFailure.PROVIDER)
     candidate = candidates[0]
     if not isinstance(candidate, Mapping):
@@ -100,7 +118,7 @@ def parse_model_turn(payload: Mapping[str, object]) -> ModelTurn:
     text = "".join(texts).strip()
     if text == "" and not calls and not blocked:
         raise ProviderCallError(ProviderFailure.PROVIDER)
-    return ModelTurn(text, tuple(calls), tuple(echoed), blocked=blocked)
+    return ModelTurn(text, tuple(calls), tuple(echoed), blocked=blocked, usage=usage)
 
 
 def generate_content(
@@ -110,7 +128,11 @@ def generate_content(
     system_instruction: str,
     transport: Transport | None = None,
 ) -> ModelTurn:
-    """Call Gemini outside a database transaction. Retries cover transport only."""
+    """Call Gemini outside a database transaction.
+
+    One retry is allowed only when the connection failed before the request
+    was sent. A timeout, an HTTP response, and HTTP 429 are not retried.
+    """
 
     if not assistant_configuration().available:
         raise ProviderCallError(ProviderFailure.CREDENTIAL)
@@ -122,24 +144,29 @@ def generate_content(
     if declarations:
         body["tools"] = [{"functionDeclarations": declarations}]
     sender = transport or (_scripted_transport if e2e_script_enabled() else _post)
-    attempts = gemini_max_retries()
+    retries = gemini_max_retries()
     last = ProviderFailure.PROVIDER
-    for attempt in range(attempts + 1):
+    for attempt in range(retries + 1):
         try:
             payload = sender(body, gemini_timeout_seconds())
         except ProviderCallError as exc:
             last = exc.failure
-            if last not in {ProviderFailure.TIMEOUT, ProviderFailure.NETWORK}:
+            if exc.reached_provider or attempt >= retries:
+                _log_usage(outcome=exc.failure.value, requests=attempt + 1, usage=None)
                 raise
-            if attempt >= attempts:
-                raise
+            _pause_before_retry()
             continue
         try:
-            return parse_model_turn(payload)
+            turn = parse_model_turn(payload)
         except ProviderCallError:
+            _log_usage(outcome=ProviderFailure.PROVIDER.value, requests=attempt + 1, usage=None)
             raise
         except (TypeError, ValueError) as exc:
+            _log_usage(outcome=ProviderFailure.PROVIDER.value, requests=attempt + 1, usage=None)
             raise ProviderCallError(ProviderFailure.PROVIDER) from exc
+        outcome = "blocked" if turn.blocked else "ok"
+        _log_usage(outcome=outcome, requests=attempt + 1, usage=turn.usage)
+        return turn
     raise ProviderCallError(last)
 
 
@@ -173,6 +200,11 @@ def _post(body: dict[str, object], timeout: int) -> dict[str, object]:
         logger.warning("assistant provider status %s", failure.value)
         raise ProviderCallError(failure) from exc
     except urllib.error.URLError as exc:
+        reason = exc.reason if isinstance(exc.reason, BaseException) else None
+        if reason is not None and _request_was_not_sent(reason):
+            raise ProviderCallError(ProviderFailure.NETWORK, reached_provider=False) from exc
+        if isinstance(reason, TimeoutError):
+            raise ProviderCallError(ProviderFailure.TIMEOUT) from exc
         raise ProviderCallError(ProviderFailure.NETWORK) from exc
     if len(downloaded) > _RESPONSE_LIMIT:
         raise ProviderCallError(ProviderFailure.PROVIDER)
@@ -197,3 +229,55 @@ def _http_failure(exc: urllib.error.HTTPError) -> ProviderFailure:
         if isinstance(error, dict) and isinstance(error.get("status"), str):
             status_name = error["status"]
     return classify_provider_failure(status_code=exc.code, provider_status=status_name)
+
+
+def _request_was_not_sent(reason: BaseException) -> bool:
+    """True only when the HTTP request cannot have left this process."""
+
+    if isinstance(reason, TimeoutError):
+        return False
+    if isinstance(reason, ConnectionRefusedError | socket.gaierror):
+        return True
+    return isinstance(reason, OSError) and reason.errno in _NOT_SENT
+
+
+def _pause_before_retry() -> None:
+    time.sleep(_RETRY_DELAY_SECONDS)
+
+
+def _usage(payload: Mapping[str, object]) -> ProviderUsage:
+    raw = payload.get("usageMetadata")
+    if not isinstance(raw, Mapping):
+        return _UNAVAILABLE_USAGE
+    return ProviderUsage(
+        _token_count(raw.get("promptTokenCount")),
+        _token_count(raw.get("candidatesTokenCount")),
+        _token_count(raw.get("totalTokenCount")),
+    )
+
+
+def _token_count(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def _log_usage(*, outcome: str, requests: int, usage: ProviderUsage | None) -> None:
+    """Record counts only. The prompt, tool results, and key stay out of the log."""
+
+    counted = usage or _UNAVAILABLE_USAGE
+    logger.info(
+        "assistant provider usage outcome=%s requests=%s prompt_tokens=%s "
+        "candidate_tokens=%s total_tokens=%s",
+        outcome,
+        requests,
+        _token_text(counted.prompt_tokens),
+        _token_text(counted.candidate_tokens),
+        _token_text(counted.total_tokens),
+    )
+
+
+def _token_text(value: int | None) -> str:
+    if value is None:
+        return "unavailable"
+    return str(value)

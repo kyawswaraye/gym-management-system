@@ -240,6 +240,8 @@ def lint_prometheus_text(text: str) -> list[str]:
             errors.append(f"Prometheus label is too specific: {label}")
     if "?" in text:
         errors.append("Prometheus scrape targets must not include a query string")
+    if "alertmanager:9093" not in text:
+        errors.append("Prometheus must send alerts to the private alertmanager")
     return errors
 
 

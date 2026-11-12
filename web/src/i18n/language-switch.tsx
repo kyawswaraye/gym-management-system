@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { localeCookieValue, type Locale } from "@/i18n/locale";
 import { useLocale, useTx } from "@/i18n/use-tx";
@@ -65,6 +65,16 @@ export function LanguageSwitch({
       >
         MM
       </button>
+    </div>
+  );
+}
+
+export function AuthLayoutLanguageSwitch() {
+  const pathname = usePathname();
+  if (pathname === "/login" || pathname === "/forgot-password") return null;
+  return (
+    <div className="w-full max-w-xs">
+      <LanguageSwitch />
     </div>
   );
 }

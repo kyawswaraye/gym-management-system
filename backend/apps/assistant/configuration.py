@@ -99,11 +99,14 @@ def gemini_timeout_seconds() -> int:
 
 
 def gemini_max_retries() -> int:
-    return _positive_int(str(getattr(settings, "GEMINI_MAX_RETRIES", "2")), 2, 5)
+    """At most one retry. A higher setting stays valid and still means one."""
+
+    configured = _positive_int(str(getattr(settings, "GEMINI_MAX_RETRIES", "1")), 1, 5)
+    return min(configured, 1)
 
 
 def max_steps() -> int:
-    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_STEPS", "12")), 12, 20)
+    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_STEPS", "4")), 4, 20)
 
 
 def max_tool_calls() -> int:

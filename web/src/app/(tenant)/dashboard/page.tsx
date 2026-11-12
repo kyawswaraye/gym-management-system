@@ -39,16 +39,17 @@ export default async function DashboardPage() {
     <section aria-labelledby="dashboard-title">
       <PageHeader
         actions={
-          <div className="flex items-center gap-2 self-start rounded-full border border-primary-line bg-primary-soft px-3 py-1.5 text-caption font-semibold text-primary-hover sm:self-auto">
+          <div className="flex items-center gap-2 self-start rounded-full border border-[rgb(232_196_96/45%)] bg-[rgb(232_196_96/16%)] px-3 py-1.5 text-caption font-semibold text-[#f8e7b0] sm:self-auto">
             <span
               aria-hidden="true"
-              className="size-2 rounded-full bg-primary"
+              className="size-2 rounded-full bg-[#e8c460]"
             />
             <Tx text="Live overview" />
           </div>
         }
         description="Monitor member activity, revenue, expenses, and the health of your gym from one place."
         title="Owner dashboard"
+        tone="premium"
         titleId="dashboard-title"
       />
       <OwnerDashboard />

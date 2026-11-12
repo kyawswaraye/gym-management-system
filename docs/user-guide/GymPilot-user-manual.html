@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="utf-8" />
+<title>GymPilot အသုံးပြုပုံ</title>
+<style>
+@font-face {
+  font-family: "Pyidaungsu";
+  src: url("file:///Users/ksa/Library/Fonts/Pyidaungsu-Regular.ttf") format("truetype");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "Pyidaungsu";
+  src: url("file:///Users/ksa/Library/Fonts/Pyidaungsu-Bold.ttf") format("truetype");
+  font-weight: 700;
+}
+:root {
+  --navy: #071e4a;
+  --navy-2: #12397a;
+  --gold: #e8c460;
+  --ink: #1a1d1f;
+  --muted: #5f676e;
+  --line: #e5e7eb;
+  --canvas: #f4f6f8;
+  --green: #0f7a56;
+  --red: #c81e1e;
+  --amber: #8a5a10;
+}
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+@page { size: A4; margin: 14mm 13mm 16mm; }
+html, body {
+  margin: 0;
+  padding: 0;
+  color: var(--ink);
+  font-family: "Pyidaungsu", "Noto Sans Myanmar", sans-serif;
+  font-size: 12.5pt;
+  line-height: 1.65;
+  background: white;
+}
+h1, h2, h3, h4 { line-height: 1.35; font-weight: 700; margin: 0 0 0.35em; }
+h1 { font-size: 22pt; color: var(--navy); }
+h2 { font-size: 16.5pt; color: var(--navy); margin-top: 0.2em; }
+h3 { font-size: 13.5pt; color: #12397a; margin-top: 0.9em; }
+p { margin: 0.35em 0 0.65em; }
+ol.steps { margin: 0.2em 0 0.8em; padding-left: 1.35em; }
+ol.steps li { margin: 0.28em 0; padding-left: 0.15em; }
+ol.steps strong { color: var(--navy); }
+ul.plain { margin: 0.2em 0 0.7em; padding-left: 1.2em; }
+ul.plain li { margin: 0.2em 0; }
+.chapter { break-before: page; }
+.cover {
+  min-height: 250mm;
+  background: linear-gradient(165deg, #123268 0%, #071e4a 58%, #061433 100%);
+  color: white;
+  border-radius: 8px;
+  padding: 22mm 16mm 16mm;
+  position: relative;
+  overflow: hidden;
+}
+.cover:before {
+  content: "";
+  position: absolute;
+  right: -40mm;
+  top: -30mm;
+  width: 110mm;
+  height: 110mm;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232,196,96,0.28), transparent 68%);
+}
+.kicker { letter-spacing: 0.08em; color: var(--gold); font-size: 12pt; margin-bottom: 10mm; }
+.cover h1 { color: white; font-size: 34pt; margin-bottom: 4mm; }
+.cover .sub { font-size: 15pt; color: #f4efe0; max-width: 140mm; }
+.cover .meta { margin-top: 18mm; color: #d7e2f5; font-size: 12pt; }
+.legend, .note, .next, .warn, table, .shot, .phone-row { break-inside: avoid; }
+.legend, .note, .next, .warn {
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin: 8px 0 12px;
+}
+.legend { background: #fff7f7; border: 1.5px solid #f0b4b4; }
+.note { background: #f4f7fb; border: 1px solid #d5deea; }
+.next { background: #f1f8f4; border: 1px solid #b7dfc8; }
+.warn { background: #fbf7ef; border: 1px solid #e7d3a4; }
+.legend b, .note b, .next b, .warn b { color: var(--navy); }
+table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 11.5pt; }
+th, td { border: 1px solid #d5dbe3; padding: 6px 8px; vertical-align: top; text-align: left; }
+th { background: #12397a; color: white; font-weight: 700; }
+tr:nth-child(even) td { background: #f7f9fb; }
+.toc a { color: var(--navy); text-decoration: none; }
+.toc li { margin: 0.18em 0; }
+.shot {
+  margin: 8px 0 6px;
+  border: 1px solid #cfd6df;
+  border-radius: 12px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 1px 0 rgba(7,30,74,0.04);
+}
+.shot-bar {
+  background: #eef2f6;
+  color: #5f676e;
+  font-size: 9pt;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--line);
+  font-family: "Helvetica Neue", sans-serif;
+}
+.app { display: flex; min-height: 168px; background: var(--canvas); position: relative; }
+.side {
+  width: 148px;
+  flex: none;
+  background: linear-gradient(180deg, #12397a 0%, #071e4a 55%, #061433 100%);
+  color: #f4f7fb;
+  padding: 10px 8px;
+  font-size: 9.5pt;
+}
+.brand { color: var(--gold); font-weight: 700; font-size: 11pt; margin: 2px 6px 8px; }
+.navitem, .navon {
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin: 2px 0;
+}
+.navon { background: rgba(232,196,96,0.28); color: #f8e7b0; font-weight: 700; }
+.folder { opacity: 0.72; font-size: 8.5pt; margin: 7px 8px 2px; }
+.main { flex: 1; padding: 10px 12px 12px; position: relative; min-width: 0; }
+.crumb { color: var(--muted); font-size: 9pt; }
+.main h4 { font-size: 13pt; margin: 0 0 6px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn {
+  display: inline-block;
+  background: var(--green);
+  color: white;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 10pt;
+  font-weight: 700;
+}
+.btn.gold { background: #1e4b94; }
+.btn.ghost { background: white; color: var(--ink); border: 1px solid #d1d5db; font-weight: 400; }
+.btn.danger { background: #b4232c; }
+.field {
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 10pt;
+  color: #3a4148;
+  min-width: 120px;
+}
+.card {
+  position: relative;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-top: 8px;
+}
+.grid2, .grid3, .grid4 { display: grid; gap: 6px; margin-top: 8px; }
+.grid2 { grid-template-columns: 1fr 1fr; }
+.grid3 { grid-template-columns: 1fr 1fr 1fr; }
+.grid4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.stat { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.stat b { display: block; font-size: 12pt; color: var(--navy); }
+.stat span { color: var(--muted); font-size: 8.5pt; }
+table.mini { font-size: 9.5pt; margin: 8px 0 0; }
+table.mini th { background: #f3f5f6; color: var(--ink); }
+.badge-ok, .badge-wait, .badge-no {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 8.5pt;
+}
+.badge-ok { background: #f1f8f4; color: #0c6547; }
+.badge-wait { background: #fbf7ef; color: var(--amber); }
+.badge-no { background: #fbf3f3; color: #9b2330; }
+.mark {
+  position: absolute;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--red);
+  color: white;
+  font-family: "Helvetica Neue", sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px white;
+}
+.ring {
+  position: absolute;
+  z-index: 2;
+  border: 2.5px solid var(--red);
+  border-radius: 10px;
+  pointer-events: none;
+}
+.arrow {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+.cap { font-size: 10pt; color: #3a4148; margin: 0 0 12px; }
+.cap b { color: var(--red); }
+.login {
+  background: linear-gradient(165deg, #123268, #071e4a 60%, #061433);
+  padding: 16px;
+  min-height: 210px;
+  position: relative;
+}
+.panel {
+  width: 280px;
+  margin: 8px auto;
+  background: white;
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+  text-align: center;
+  position: relative;
+}
+.panel h4 { color: #1e4b94; font-size: 16pt; }
+.panel .field { display: block; width: 100%; margin: 6px 0; text-align: left; }
+.panel .btn { width: 100%; margin-top: 6px; }
+.lang {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 9pt;
+}
+.phones { display: flex; gap: 12px; align-items: flex-start; }
+.phone {
+  width: 168px;
+  border: 8px solid #1a1d1f;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #f7f8f9;
+  position: relative;
+  flex: none;
+}
+.phone .top { background: white; padding: 8px 8px 4px; font-weight: 700; font-size: 10pt; color: var(--navy); }
+.phone .body { padding: 6px 8px 8px; font-size: 8.5pt; min-height: 168px; }
+.tabs {
+  display: flex;
+  background: white;
+  border-top: 1px solid var(--line);
+  font-size: 7pt;
+  text-align: center;
+}
+.tabs div { flex: 1; padding: 5px 2px; color: var(--muted); }
+.tabs .on { color: var(--green); font-weight: 700; }
+.small { font-size: 10.5pt; color: #3a4148; }
+footer.foot {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+  color: var(--muted);
+  font-size: 9.5pt;
+}
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="kicker">GYMPILOT</div>
+  <h1>အသုံးပြုပုံ စာအုပ်</h1>
+  <p class="sub">Gym ဝန်ထမ်း၊ ပိုင်ရှင်၊ သင်တန်းဆရာနဲ့ အဖွဲ့ဝင်အတွက်။ တစ်ဆင့်ပြီးမှ နောက်တစ်ဆင့် လုပ်ရမည့်အတိုင်း ရေးထားသည်။</p>
+  <p class="meta">ပုံထဲက အနီရောင်ဝိုင်းက နှိပ်ရမည့်နေရာဖြစ်သည်။<br>အနီရောင်နံပါတ်က အဆင့်နံပါတ်ဖြစ်သည်။<br>မြှားက နောက်ဘယ်ကို ကြည့်ရမည်ကို ပြသည်။</p>
+</section>
+
+<section class="chapter">
+  <h1>ဒီစာအုပ်ကို ဘယ်လိုဖတ်မလဲ</h1>
+  <p>စာကြောင်းတိုတိုနဲ့ ရေးထားသည်။ နံပါတ်စဉ်အတိုင်း လုပ်ပါ။ တစ်ဆင့် မပြီးသေးရင် နောက်တစ်ဆင့်ကို မသွားပါနဲ့။</p>
+  <div class="legend">
+    <b>ပုံကို ဘယ်လိုကြည့်မလဲ။</b>
+    အနီရောင် <b>စက်ဝိုင်း</b> က နှိပ်ရမည့်ခလုတ်ကို ဝိုင်းပြထားသည်။
+    စက်ဝိုင်းဘေးက <b>နံပါတ်</b> က အောက်က အဆင့်နံပါတ်နဲ့ တူသည်။
+    <b>မြှား</b> က ဒီခလုတ်ပြီးရင် နောက်ဘယ်အကွက်ကို ဖြည့်ရမည်ကို ပြသည်။
+    ခလုတ်နာမည်ကို app ထဲက မြန်မာစာအတိုင်း ရေးထားသည်။ ဘာသာစကားကို အင်္ဂလိပ်ထားရင် ခလုတ်က အင်္ဂလိပ်ဖြစ်မည်။ ညာဘက်အပေါ်က <b>ဘာသာစကား</b> မှာ မြန်မာ ပြောင်းပါ။
+  </div>
+  <div class="note">
+    <b>ပုံအကြောင်း။</b>
+    ဒီပုံတွေက Gym ထဲက မျက်နှာပြင်ကို ခလုတ်နာမည်အတိုင်း ဆွဲထားခြင်းဖြစ်သည်။ တကယ်ဝင်ကြည့်ရင် စာရင်းအရေအတွက်နဲ့ နေရာအနည်းငယ် ကွာနိုင်သည်။ နှိပ်ရမည့်ခလုတ်နာမည်က တူသည်။
+  </div>
+  <h2>မာတိကာ</h2>
+  <ol class="toc">
+    <li><a href="#what">GymPilot က ဘာလုပ်ပေးသလဲ</a></li>
+    <li><a href="#who">ဘယ်သူက ဘာလုပ်ရမလဲ</a></li>
+    <li><a href="#words">သိထားရမည့် စကားလုံး</a></li>
+    <li><a href="#day">တစ်နေ့တာ လမ်းကြောင်း</a></li>
+    <li><a href="#login">အကောင့်ဝင်ခြင်း</a></li>
+    <li><a href="#menu">ဘယ်ဘက်မီနူး</a></li>
+    <li><a href="#cash">နေ့အစ ငွေသားစာရင်း ဖွင့်ခြင်း</a></li>
+    <li><a href="#member">အဖွဲ့ဝင်အသစ် ထည့်ခြင်း</a></li>
+    <li><a href="#plan">အသင်းဝင်ကတ် စခြင်း</a></li>
+    <li><a href="#pay">ငွေရှင်းစာရင်း တင်ခြင်း</a></li>
+    <li><a href="#approve">မန်နေဂျာက အတည်ပြုခြင်း</a></li>
+    <li><a href="#checkin">ဝင်မှတ်ခြင်း၊ ထွက်မှတ်ခြင်း</a></li>
+    <li><a href="#qr">QR နဲ့ ကိုယ်တိုင်ဝင်ခြင်း</a></li>
+    <li><a href="#renew">သက်တမ်းတိုးခြင်း</a></li>
+    <li><a href="#pt">PT သင်တန်း</a></li>
+    <li><a href="#class">အတန်း</a></li>
+    <li><a href="#shop">ဆိုင်ပစ္စည်း ရောင်းခြင်း</a></li>
+    <li><a href="#expense">ကုန်ကျစရိတ်</a></li>
+    <li><a href="#salary">လစာ</a></li>
+    <li><a href="#close">နေ့အဆုံး ငွေပိတ်ခြင်း</a></li>
+    <li><a href="#dash">ပင်မစာမျက်နှာနဲ့ အစီရင်ခံစာ</a></li>
+    <li><a href="#assistant">လက်ထောက်</a></li>
+    <li><a href="#staff">ဝန်ထမ်း၊ ရာထူး၊ ပိုင်ရှင်၊ လုံခြုံရေး</a></li>
+    <li><a href="#phone">အဖွဲ့ဝင် ဖုန်းအက်ပ်</a></li>
+    <li><a href="#admin">Gym အသစ် ဖွင့်ပေးသူ</a></li>
+    <li><a href="#wrong">မှားရင် ဘာလုပ်မလဲ</a></li>
+    <li><a href="#faq">မေးလေ့ရှိသော မေးခွန်း</a></li>
+  </ol>
+</section>
+
+<section class="chapter" id="what">
+  <h1>၁။ GymPilot က ဘာလုပ်ပေးသလဲ</h1>
+  <p>GymPilot က Gym တစ်ဆိုင်စာ အလုပ်ကို ကွန်ပျူတာတစ်ခုထဲမှာ စုထားသော စနစ်ဖြစ်သည်။ စာအုပ်သီးသန့်၊ ငွေစာရင်းသီးသန့်၊ ဖုန်းမှတ်စုသီးသန့် မထားရတော့ပါ။</p>
+  <ul class="plain">
+    <li>အဖွဲ့ဝင် ဘယ်သူလဲ ဆိုတာ မှတ်သည်။</li>
+    <li>ဘယ်ပလန်ကို ဘယ်နေ့အထိ ဝယ်ထားလဲ ဆိုတာ မှတ်သည်။</li>
+    <li>ဒီနေ့ ဘယ်အချိန်ဝင်ပြီး ဘယ်အချိန်ထွက်လဲ ဆိုတာ မှတ်သည်။</li>
+    <li>ငွေဘယ်လောက်ပေးပြီးလဲ၊ ပြေစာထွက်မထွက် ဆိုတာ မှတ်သည်။</li>
+    <li>PT နဲ့ အတန်း၊ ကျန်သင်တန်းအရေအတွက်ကို မှတ်သည်။</li>
+    <li>ရေ၊ ဖျော်ရည်၊ ပစ္စည်းလက်ကျန်နဲ့ ရောင်းရငွေကို မှတ်သည်။</li>
+    <li>ကုန်ကျစရိတ်၊ လစာ၊ အမြတ်ကို ပြသည်။</li>
+  </ul>
+  <div class="warn">
+    <b>အရေးကြီးသည်။</b>
+    အဖွဲ့ဝင်အမည် ထည့်ထားရုံနဲ့ Gym ဝင်လို့ မရသေးပါ။ သက်တမ်းရှိပြီး ငွေရှင်းပြီးသား အသင်းဝင်ကတ် ရှိမှ ဝင်ခွင့်ရသည်။
+  </div>
+  <p>Gym တစ်ဆိုင်စီက သီးခြားဖြစ်သည်။ တစ်ဆိုင်က စာရင်းကို နောက်တစ်ဆိုင်မှာ မမြင်ရပါ။ အကောင့်တစ်ခုက Gym အများ ကြည့်ခွင့်ရှိရင်လည်း တစ်ခါဝင်ရင် Gym တစ်ဆိုင်ပဲ ရွေးရသည်။</p>
+</section>
+
+<section class="chapter" id="who">
+  <h1>၂။ ဘယ်သူက ဘာလုပ်ရမလဲ</h1>
+  <table>
+    <tr><th>သူ</th><th>လုပ်ရသော အလုပ်</th><th>မလုပ်ရသော အလုပ်</th></tr>
+    <tr>
+      <td>ဧည့်ကြို</td>
+      <td>အဖွဲ့ဝင်ထည့်သည်။ ကတ်စသည်။ ဝင်မှတ်၊ ထွက်မှတ် လုပ်သည်။ ငွေစာရင်းမူကြမ်းရေးပြီး တင်သည်။ မိမိဖွင့်ထားသော ငွေသားစာရင်းကိုသာ သုံးပြီး နေ့ကုန် ပိတ်သည်။</td>
+      <td>မိမိရေးသော ငွေစာရင်းကို ကိုယ်တိုင် အတည်မပြုရ။ တခြားဧည့်ကြို၏ ငွေသားစာရင်းကို မကြည့်ရ။</td>
+    </tr>
+    <tr>
+      <td>မန်နေဂျာ</td>
+      <td>တင်ထားသော ငွေ၊ ကုန်ကျစရိတ်၊ PT၊ လစာကို စစ်သည်။ မှန်ရင် အတည်ပြုသည်။ မှားရင် အကြောင်းရင်းရေးပြီး ငြင်းသည်။</td>
+      <td>ကိုယ်တိုင်ရေးပြီး ကိုယ်တိုင် အတည်မပြုရ။ တင်သူနဲ့ အတည်ပြုသူ မတူရ။</td>
+    </tr>
+    <tr>
+      <td>ပိုင်ရှင်</td>
+      <td>မန်နေဂျာ လုပ်နိုင်သမျှ လုပ်နိုင်သည်။ ဝင်ငွေ၊ ကုန်ကျစရိတ်၊ အမြတ်ကို ကြည့်သည်။ ဝန်ထမ်း၊ ဆက်တင်၊ ပိုင်ရှင်အသစ်ကို စီမံသည်။</td>
+      <td>ပိုင်ရှင် တစ်ယောက်တည်း မကျန်အောင် နောက်ဆုံးပိုင်ရှင်ကို မဖယ်ရ။</td>
+    </tr>
+    <tr>
+      <td>စာရင်းကိုင်</td>
+      <td>ငွေ၊ ကုန်ကျစရိတ်၊ လစာ ရေးသည်။ နေ့ချုပ်နဲ့ အစီရင်ခံစာကို စစ်သည်။</td>
+      <td>ကိုယ်တိုင် အတည်မပြုရ။</td>
+    </tr>
+    <tr>
+      <td>သင်တန်းဆရာ</td>
+      <td>မိမိတာဝန်ယူထားသော အဖွဲ့ဝင်၊ PT အချိန်၊ အတန်း၊ တက်ရောက်မှု၊ မိမိကော်မရှင်ကို ကြည့်သည်။</td>
+      <td>တခြားဆရာ၏ အဖွဲ့ဝင်စာရင်းကို အားလုံး မကြည့်ရ။</td>
+    </tr>
+    <tr>
+      <td>အဖွဲ့ဝင်</td>
+      <td>ဖုန်းအက်ပ်မှာ မိမိကတ်၊ ငွေ၊ PT၊ အတန်း၊ ကျန်အရေအတွက်ကို ကြည့်သည်။ Gym ဖန်သားပြင်က QR ကို ဖတ်ပြီး ဝင်နိုင်သည်။</td>
+      <td>တခြားအဖွဲ့ဝင်၏ အချက်ကို မမြင်ရ။</td>
+    </tr>
+  </table>
+  <p>ပိုက်ဆံစာရင်းမှာ အလုပ်လေးခု ခွဲထားသည်။ ရောမရေးပါနဲ့။</p>
+  <ol class="steps">
+    <li><strong>ကောင်တာအလုပ်။</strong> ဧည့်ကြိုက မိမိဖွင့်ထားသော ငွေသားစာရင်းနဲ့ ငွေကောက်သည်။</li>
+    <li><strong>မူကြမ်း။</strong> ငွေ၊ ကုန်ကျစရိတ်၊ PT၊ လစာကို အရင် ရေးသည်။ ဒီအချိန်မှာ ငွေမဝင်သေးပါ။</li>
+    <li><strong>တင်ခြင်း။</strong> စာရင်းပြည့်ရင် တင်သည်။ ပြင်လို့ မရတော့ပါ။</li>
+    <li><strong>အတည်ပြုခြင်း။</strong> တခြားမန်နေဂျာ သို့ ပိုင်ရှင်က စစ်ပြီး အတည်ပြုမှ ပြေစာထွက်ပြီး ငွေစာရင်းထဲ ဝင်သည်။</li>
+  </ol>
+</section>
+
+<section class="chapter" id="words">
+  <h1>၃။ သိထားရမည့် စကားလုံး</h1>
+  <table>
+    <tr><th>စကားလုံး</th><th>လူပြောအတိုင်း</th></tr>
+    <tr><td>အဖွဲ့ဝင်</td><td>Gym လာသော လူတစ်ယောက်၏ အမည်စာရင်း</td></tr>
+    <tr><td>အသင်းဝင်မှု</td><td>ဝယ်ထားသော လကတ်။ ဘယ်နေ့မှ ဘယ်နေ့အထိ သုံးလို့ရသည်</td></tr>
+    <tr><td>ဝင်ရောက်မှတ်ရန်</td><td>ဒီနေ့ Gym ထဲ ဝင်ပြီလို့ မှတ်ခြင်း</td></tr>
+    <tr><td>ထွက်ခွာမှတ်ရန်</td><td>ဒီနေ့ ပြန်ထွက်ပြီလို့ မှတ်ခြင်း။ ကတ်ကို ပိတ်တာ မဟုတ်ပါ</td></tr>
+    <tr><td>မူကြမ်း</td><td>မတင်ရသေးသော စာရင်း။ ပြင်လို့ ရသေးသည်။ ငွေမဝင်သေးပါ</td></tr>
+    <tr><td>တင်ပြရန်</td><td>မန်နေဂျာ စစ်အောင် ပို့ခြင်း။ ပို့ပြီးရင် ပြင်လို့ မရပါ</td></tr>
+    <tr><td>အတည်ပြုရန်</td><td>မှန်တယ်လို့ လက်ခံခြင်း။ ဒီမှ ပြေစာထွက်သည်</td></tr>
+    <tr><td>ငြင်းပယ်ရန်</td><td>မှားလို့ ပြန်ပို့ခြင်း။ ဝင်ငွေထဲ မပါပါ</td></tr>
+    <tr><td>ငွေသားစာရင်းကာလ</td><td>ဒီနေ့ ကောင်တာမှာ ဖွင့်ထားသော ငွေအံဆွဲ</td></tr>
+    <tr><td>ပြေစာ</td><td>ငွေအတည်ဖြစ်မှ ထွက်သော အထောက်အထား။ အခွန်ပြေစာ မဟုတ်ပါ</td></tr>
+    <tr><td>PT</td><td>သင်တန်းဆရာနဲ့ တစ်ယောက်ချင်း လေ့ကျင့်ခြင်း</td></tr>
+    <tr><td>ပက်ကေ့ဂျ်</td><td>သင်တန်း အကြိမ်ရေ အစုံ။ ဥပမာ ၁၀ ကြိမ်</td></tr>
+    <tr><td>MFA</td><td>ဖုန်းထဲက ကုဒ် ၆ လုံး။ ပိုင်ရှင်အလုပ်အတွက် ထပ်မံစစ်ခြင်း</td></tr>
+  </table>
+</section>
+
+<section class="chapter" id="day">
+  <h1>၄။ တစ်နေ့တာ လမ်းကြောင်း</h1>
+  <p>ဧည့်ကြိုတစ်ယောက်၏ ပုံမှန်နေ့ကို အရင် ဖတ်ပါ။ နောက်အခန်းတွေက ဒီလမ်းကြောင်းကို တစ်ဆင့်ချင်း ချဲ့ထားခြင်းဖြစ်သည်။</p>
+  <ol class="steps">
+    <li>အကောင့်ဝင်ပါ။ Gym တစ်ဆိုင်ထက်ပိုရင် ဆိုင်ရွေးပါ။</li>
+    <li>ငွေသားနဲ့ ကောက်မယ်ဆိုရင် <strong>ငွေသားစာရင်း</strong> ကို အရင်ဖွင့်ပါ။ အဖွင့်ငွေ ထည့်ပါ။</li>
+    <li>လူလာရင် <strong>အဖွဲ့ဝင်များ</strong> မှာ အမည် သို့ ဖုန်းနဲ့ ရှာပါ။</li>
+    <li>စာရင်းမရှိရင် အဖွဲ့ဝင်အသစ် ထည့်ပါ။</li>
+    <li>ကတ်မရှိရင် သို့ သက်တမ်းကုန်ရင် အသင်းဝင်မှု စပါ။ ငွေစာရင်းကို မူကြမ်းရေးပြီး တင်ပါ။</li>
+    <li>မန်နေဂျာ သို့ ပိုင်ရှင်က အတည်ပြုပါ။ ပြီးမှ ပြေစာထွက်သည်။ ပြီးမှ ဝင်ခွင့်ရသည်။</li>
+    <li>ကတ်ကောင်းနေရင် <strong>ဝင်ရောက်မှုများ</strong> မှာ ဝင်ရောက်မှတ်ပါ။ သို့ အဖွဲ့ဝင်က QR ကို ဖုန်းနဲ့ ဖတ်ပါ။</li>
+    <li>လေ့ကျင့်ပြီးရင် ထွက်ခွာမှတ်ပါ။</li>
+    <li>ရေ၊ ပစ္စည်း ရောင်းရင် လက်လီအရောင်း ရေးပြီး တင်ပါ။ ကုန်ကျရင် ကုန်ကျစရိတ် ရေးပါ။</li>
+    <li>နေ့ကုန်ရင် ကောင်တာငွေကို ရေတွက်ပြီး မိမိဖွင့်ထားသော စာရင်းကို ပိတ်ပါ။</li>
+  </ol>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> နောက်အခန်းက အဆင့် ၁၊ အကောင့်ဝင်ခြင်း ဖြစ်သည်။ အကောင့်မဝင်ရသေးရင် ကျန်အလုပ်တွေ မစပါနဲ့။</div>
+</section>
+
+<section class="chapter" id="login">
+  <h1>၅။ အကောင့်ဝင်ခြင်း</h1>
+  <p>ဝန်ထမ်းတိုင်း ကိုယ်ပိုင် အီးမေးလ်နဲ့ စကားဝှက် သုံးပါ။ တစ်ယောက်စာကို အများမဝေပါနဲ့။ စကားဝှက်ကို အနည်းဆုံး ၁၂ လုံးထားပါ။ အမည်၊ အီးမေးလ်နဲ့ မတူအောင် ရေးပါ။</p>
+
+  <h3>ပထမဆုံး ဝင်ပုံ</h3>
+  <ol class="steps">
+    <li>ပိုင်ရှင်ပေးထားသော GymPilot လိပ်စာကို ဘရောက်ဇာမှာ ဖွင့်ပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ ညာဘက်အပေါ် <strong>ဘာသာစကား</strong> ကို နှိပ်ပြီး မြန်မာ ရွေးပါ။</li>
+    <li>ပုံထဲက <b>၂</b>၊ အီးမေးလ်ကို ရိုက်ပါ။</li>
+    <li>မြှားပြထားသော <b>၃</b>၊ စကားဝှက်ကို ရိုက်ပါ။ မျက်လုံးပုံကို နှိပ်ရင် စကားဝှက်ကို ပြနိုင်၊ ဖျောက်နိုင်သည်။</li>
+    <li><strong>ဝင်ရောက်ရန်</strong> ကို နှိပ်ပါ။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">ဝင်ရောက်ရန် စာမျက်နှာ</div>
+    <div class="login">
+      <div class="lang">ဘာသာစကား ▾</div>
+      <div class="ring" style="top:10px;right:8px;width:92px;height:28px;"></div>
+      <div class="mark" style="top:4px;right:104px;">1</div>
+      <div class="panel">
+        <h4>ဝင်ရောက်ရန်</h4>
+        <p class="small">ခွင့်ပြုထားသော ဝန်ထမ်းအကောင့်ဖြင့် ဝင်ပါ။</p>
+        <div class="field">အီးမေးလ်</div>
+        <div class="ring" style="left:16px;right:16px;top:78px;height:32px;"></div>
+        <div class="mark" style="left:4px;top:84px;">2</div>
+        <div class="field">စကားဝှက်</div>
+        <div class="ring" style="left:16px;right:16px;top:116px;height:32px;"></div>
+        <div class="mark" style="left:4px;top:122px;">3</div>
+        <svg class="arrow" style="left:28px;top:112px;width:20px;height:16px;" viewBox="0 0 20 16">
+          <path d="M10 0 v10" stroke="#c81e1e" stroke-width="2"/>
+          <path d="M5 8 l5 6 l5-6" fill="none" stroke="#c81e1e" stroke-width="2"/>
+        </svg>
+        <div class="btn">ဝင်ရောက်ရန်</div>
+        <p class="small" style="margin-top:8px;color:#1e4b94;">စကားဝှက် မေ့နေပါသည်</p>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> ဘာသာစကား။ <b>၂</b> အီးမေးလ်။ မြှားက <b>၃</b> စကားဝှက်ဆီ ညွှန်သည်။ ပြီးမှ အစိမ်းရောင် ဝင်ရောက်ရန် ကို နှိပ်ပါ။</p>
+
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> Gym တစ်ဆိုင်ပဲ ရှိရင် ပင်မစာမျက်နှာ ရောက်သည်။ ဆက်ပြီး အခန်း ၆ မီနူးကို ကြည့်ပါ။ Gym အများရှိရင် အောက်က အဆင့်ကို ဆက်လုပ်ပါ။</div>
+
+  <h3>Gym အများရှိရင်</h3>
+  <ol class="steps">
+    <li>စာမျက်နှာမှာ ဆိုင်နာမည်တွေ ပေါ်မည်။ လျှို့ဝှက်ကုဒ် မပေါ်ပါ။</li>
+    <li>ဒီနေ့ အလုပ်လုပ်မည့် Gym ကို နှိပ်ပါ။</li>
+    <li><strong>ဆက်လက်လုပ်ဆောင်ရန်</strong> ကို နှိပ်ပါ။</li>
+  </ol>
+  <div class="warn"><b>၅ မိနစ်အတွင်း ရွေးပါ။</b> ကျော်သွားရင် ပြန်ဝင်ရမည်။ တစ်ခါရွေးရင် ထို Gym စာရင်းပဲ မြင်ရသည်။ နောက်ဆိုင်သွားချင်ရင် ထွက်ပြီး ပြန်ဝင်ကာ ဆိုင်အသစ် ရွေးပါ။</div>
+
+  <h3>စကားဝှက် မေ့ရင်</h3>
+  <ol class="steps">
+    <li>ဝင်စာမျက်နှာမှာ <strong>စကားဝှက် မေ့နေပါသည်</strong> ကို နှိပ်ပါ။</li>
+    <li>အီးမေးလ်ကို ရိုက်ပြီး <strong>ပြန်လည်သတ်မှတ်ရန် လင့်ခ် ပို့ရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>အကောင့်ရှိရင် အီးမေးလ် ရောက်မည်။ မရှိလည်း စာမျက်နှာက အတူတူပဲ ပြသည်။ ဒါက ပုံမှန်ဖြစ်သည်။</li>
+    <li>အီးမေးလ်ထဲက လင့်ခ်ကို <strong>၃၀ မိနစ်အတွင်း</strong> ဖွင့်ပါ။ တစ်ခါပဲ သုံးလို့ရသည်။</li>
+    <li>စကားဝှက်အသစ် ရိုက်ပါ။ ထပ်ရိုက်ပြီး <strong>စကားဝှက် ပြန်လည်သတ်မှတ်ရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>ပြီးရင် ဝင်စာမျက်နှာကို ပြန်သွားပြီး စကားဝှက်အသစ်နဲ့ ဝင်ပါ။</li>
+  </ol>
+
+  <h3>ဖုန်းကုဒ် ၆ လုံး တောင်းရင်</h3>
+  <p>ပိုင်ရှင်နဲ့ စနစ်စီမံသူက ဖုန်းထဲက Authenticator အက်ပ် လိုသည်။ ပထမဆုံးဆိုရင် QR ပေါ်မည်။</p>
+  <ol class="steps">
+    <li>ဖုန်းမှာ Google Authenticator သို့ အလားတူအက်ပ် ဖွင့်ပါ။</li>
+    <li>စခရင်က QR ကို ဖတ်ပါ။ ဖတ်လို့မရရင် <strong>ကိုယ်တိုင်ထည့်သွင်းရန် သော့</strong> ကို ရိုက်ပါ။</li>
+    <li>အက်ပ်ပြသော ဂဏန်း ၆ လုံးကို <strong>အထောက်အထားစိစစ်ကုဒ်</strong> နေရာမှာ ရိုက်ပါ။</li>
+    <li><strong>အတည်ပြုရန်</strong> ကို နှိပ်ပါ။</li>
+  </ol>
+  <div class="note">ပိုင်ရှင်က ဝန်ထမ်းဖြုတ်ခြင်း၊ ဆက်တင်ပြောင်းခြင်းလို အရေးကြီးအလုပ်လုပ်တိုင်း ကုဒ်အသစ် တောင်းနိုင်သည်။ ကုဒ်ကို ဘယ်သူ့ကိုမှ မပို့ပါနဲ့။</div>
+
+  <h3>ဖိတ်စာနဲ့ ပထမဆုံးဝင်ခြင်း</h3>
+  <ol class="steps">
+    <li>အီးမေးလ်ထဲက ဖိတ်စာလင့်ခ်ကို ဖွင့်ပါ။</li>
+    <li>ဝန်ထမ်းဆိုရင် အမည်၊ ဖုန်း မှန်မမှန်ကြည့်ပြီး စကားဝှက်အသစ် ထားပါ။</li>
+    <li><strong>ဝန်ထမ်း ဖိတ်ကြားချက်ကို လက်ခံရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>ပိုင်ရှင်ဖိတ်စာဆိုရင် <strong>ပိုင်ရှင် ဖိတ်ကြားချက်ကို လက်ခံရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>ပြီးရင် ဝင်ရောက်ရန် စာမျက်နှာကနေ ပြန်ဝင်ပါ။</li>
+  </ol>
+</section>
+
+<section class="chapter" id="menu">
+  <h1>၆။ ဘယ်ဘက်မီနူး</h1>
+  <p>ဝင်ပြီးရင် ဘယ်ဘက်မှာ မီနူးရှိသည်။ ကိုယ့်အလုပ်နဲ့ မဆိုင်သော စာမျက်နှာက ပုန်းနေသည်။ ဒါကြောင့် လူတိုင်းမှာ တူမည်မဟုတ်ပါ။</p>
+  <div class="shot">
+    <div class="shot-bar">ဝင်ပြီးနောက် ပင်မစာမျက်နှာ</div>
+    <div class="app" style="min-height:250px;">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navon">ပင်မစာမျက်နှာ</div>
+        <div class="navitem">လက်ထောက်</div>
+        <div class="folder">အဖွဲ့ဝင်</div>
+        <div class="navitem">အဖွဲ့ဝင်များ</div>
+        <div class="navitem">အသင်းဝင်မှုများ</div>
+        <div class="navitem">ဝင်ရောက်မှုများ</div>
+        <div class="folder">လေ့ကျင့်ရေး</div>
+        <div class="navitem">ပက်ကေ့ဂျ်များ</div>
+        <div class="navitem">အတန်းများ</div>
+        <div class="folder">ဘဏ္ဍာရေး</div>
+        <div class="navitem">ငွေပေးချေမှုများ</div>
+        <div class="navitem">ငွေသားစာရင်း</div>
+        <div class="folder">ဆက်တင်</div>
+        <div class="navitem">ဝန်ထမ်း</div>
+      </aside>
+      <div class="main">
+        <div class="ring" style="left:-140px;top:28px;width:132px;height:26px;"></div>
+        <div class="mark" style="left:-158px;top:32px;">1</div>
+        <svg class="arrow" style="left:8px;top:78px;width:36px;height:20px;" viewBox="0 0 36 20">
+          <path d="M34 10 H6" stroke="#c81e1e" stroke-width="2"/>
+          <path d="M12 4 L4 10 L12 16" fill="none" stroke="#c81e1e" stroke-width="2"/>
+        </svg>
+        <div class="crumb">ယနေ့</div>
+        <h4>ပင်မစာမျက်နှာ</h4>
+        <div class="grid4">
+          <div class="stat"><span>ဝင်ငွေ</span><b>၀</b></div>
+          <div class="stat"><span>စောင့်ဆိုင်းနေသည်</span><b>၀</b></div>
+          <div class="stat"><span>သက်တမ်းကုန်တော့မည်</span><b>၀</b></div>
+          <div class="stat"><span>ဒီနေ့ ဝင်သူ</span><b>၀</b></div>
+        </div>
+        <p class="small">မြှားက ဘယ်ဘက်မီနူးကို ညွှန်သည်။ အလုပ်စမယ်ဆိုရင် အဲ့ဒီကနေ စာမျက်နှာရွေးပါ။</p>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> ဘယ်ဘက်မီနူး။ ဖုန်းမှာ မီနူးပုန်းနေရင် အပေါ်က မျဉ်းသုံးကြောင်းကို နှိပ်ပါ။</p>
+  <table>
+    <tr><th>မီနူး</th><th>ဘာအတွက်လဲ</th></tr>
+    <tr><td>ပင်မစာမျက်နှာ</td><td>ဒီနေ့ ဝင်ငွေ၊ လာသူ၊ သက်တမ်းကုန်တော့မည့်သူ</td></tr>
+    <tr><td>လက်ထောက်</td><td>စာရိုက်ပြီး မေးနိုင်သည်။ ပြောင်းမယ်ဆိုရင် ကိုယ်တိုင် အတည်ပြုမှ လုပ်သည်</td></tr>
+    <tr><td>အဖွဲ့ဝင်များ</td><td>လူစာရင်း ရှာ၊ ထည့်၊ ပြင်</td></tr>
+    <tr><td>အသင်းဝင်မှုများ</td><td>လကတ် စ၊ သက်တမ်းကြည့်</td></tr>
+    <tr><td>ဝင်ရောက်မှုများ</td><td>ဝင်မှတ်၊ ထွက်မှတ်၊ QR ပြ</td></tr>
+    <tr><td>သင်တန်းဆရာများ</td><td>ဘယ်ဆရာက ဘယ်အဖွဲ့ဝင်ကို ကြည့်မလဲ</td></tr>
+    <tr><td>ပက်ကေ့ဂျ်များ</td><td>PT၊ အတန်း အကြိမ်ရေ ပလန်</td></tr>
+    <tr><td>အဖွဲ့ဝင် ပက်ကေ့ဂျ်များ</td><td>ဘယ်သူ ဘယ်အစုံ ဝယ်ထားလဲ၊ ကျန်ဘယ်လောက်လဲ</td></tr>
+    <tr><td>PT အရောင်း</td><td>PT ငွေစာရင်း</td></tr>
+    <tr><td>ကော်မရှင်များ</td><td>ဆရာခွဲတမ်း</td></tr>
+    <tr><td>PT ကြိုတင်စာရင်းများ</td><td>ဆရာနဲ့ ချိန်းထားသော အချိန်</td></tr>
+    <tr><td>အတန်းများ</td><td>အတန်းအမျိုးအစားနဲ့ အပတ်စဉ်အချိန်</td></tr>
+    <tr><td>ငွေပေးချေမှုများ</td><td>အသင်းဝင်ကြေးနဲ့ အခြားငွေ</td></tr>
+    <tr><td>ငွေသားစာရင်း</td><td>ကောင်တာအံဆွဲ ဖွင့်၊ ပိတ်</td></tr>
+    <tr><td>ကုန်ကျစရိတ်များ</td><td>ငှားရမ်းခ၊ မီး၊ ရေ</td></tr>
+    <tr><td>လစာများ</td><td>ဝန်ထမ်းလစာ</td></tr>
+    <tr><td>ကုန်ပစ္စည်းလက်ကျန်</td><td>ပစ္စည်းစာရင်း၊ လက်ကျန်</td></tr>
+    <tr><td>လက်လီ အရောင်း</td><td>ရေ၊ ပစ္စည်း ရောင်းခြင်း</td></tr>
+    <tr><td>အစီရင်ခံစာများ</td><td>ဝင်ငွေ၊ အမြတ်၊ လာသူ</td></tr>
+    <tr><td>ဆက်တင်</td><td>Gym အမည်၊ အချိန်၊ ငွေကြေး</td></tr>
+    <tr><td>ဝန်ထမ်း</td><td>ဝန်ထမ်းဖိတ်၊ ဖြုတ်</td></tr>
+    <tr><td>ရာထူးများ</td><td>ဘယ်ရာထူးက ဘာလုပ်ခွင့်ရှိလဲ</td></tr>
+    <tr><td>ပိုင်ရှင်များ</td><td>ပိုင်ရှင်ထည့်၊ ဖယ်</td></tr>
+    <tr><td>စစ်ဆေးမှု မှတ်တမ်းများ</td><td>ဘယ်သူ ဘာလုပ်ခဲ့လဲ</td></tr>
+  </table>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> ငွေသားနဲ့ ကောက်မည့်နေ့ဆိုရင် နောက်အခန်း၊ ငွေသားစာရင်း ဖွင့်ခြင်းကို အရင်လုပ်ပါ။ ငွေသားမကောက်ဘဲ မှတ်စုပဲကြည့်မယ်ဆိုရင် အဖွဲ့ဝင်အခန်းကို တိုက်ရိုက်သွားနိုင်သည်။</div>
+</section>
+
+<section class="chapter" id="cash">
+  <h1>၇။ နေ့အစ ငွေသားစာရင်း ဖွင့်ခြင်း</h1>
+  <p>ငွေသားလက်ခံမယ်ဆိုရင် ဒီအဆင့်ကို အရင်လုပ်ပါ။ မဖွင့်ရင် ငွေသားငွေစာရင်းကို အတည်ပြုလို့ မရပါ။ ဘဏ်လွှဲ၊ ကတ် တစ်ခုတည်းဆိုရင် ဒီအဆင့် မလိုတတ်ပါ။</p>
+  <ol class="steps">
+    <li>ဘယ်ဘက်မှာ <strong>ဘဏ္ဍာရေး</strong> ကို နှိပ်ပြီး <strong>ငွေသားစာရင်း</strong> ကို ဖွင့်ပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ <strong>ကာလ ဖွင့်ရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>မြှားပြထားသော <b>၂</b>၊ အံဆွဲထဲက အစငွေကို ရိုက်ပါ။ ဥပမာ မနက်ဖွင့်စဉ် ၅၀၀၀၀ ဘတ် ရှိရင် 50000 လို့ ရိုက်ပါ။</li>
+    <li>သိမ်းပါ။ စာရင်းက <strong>ဖွင့်ထားသည်</strong> ဖြစ်သွားမည်။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">ငွေသားစာရင်း</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navitem">ပင်မစာမျက်နှာ</div>
+        <div class="folder">ဘဏ္ဍာရေး</div>
+        <div class="navitem">ငွေပေးချေမှုများ</div>
+        <div class="navon">ငွေသားစာရင်း</div>
+        <div class="navitem">ကုန်ကျစရိတ်များ</div>
+      </aside>
+      <div class="main">
+        <h4>ငွေသားစာရင်း</h4>
+        <div class="row">
+          <span class="btn">ကာလ ဖွင့်ရန်</span>
+          <span class="badge-wait">ဒီနေ့ မဖွင့်ရသေးပါ</span>
+        </div>
+        <div class="ring" style="left:12px;top:36px;width:108px;height:30px;"></div>
+        <div class="mark" style="left:124px;top:42px;">1</div>
+        <div class="card">
+          <div class="small">အဖွင့် ငွေသား</div>
+          <div class="field" style="margin-top:4px;">50000</div>
+          <div class="ring" style="left:10px;top:34px;width:140px;height:32px;"></div>
+          <div class="mark" style="left:154px;top:40px;">2</div>
+          <svg class="arrow" style="left:118px;top:8px;width:16px;height:28px;" viewBox="0 0 16 28">
+            <path d="M8 0 V20" stroke="#c81e1e" stroke-width="2"/>
+            <path d="M3 16 l5 8 l5-8" fill="none" stroke="#c81e1e" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> ကာလ ဖွင့်ရန်။ မြှားက <b>၂</b> အဖွင့်ငွေနေရာကို ညွှန်သည်။</p>
+  <div class="warn">
+    <b>မှတ်ပါ။</b>
+    ကိုယ်ဝင်ထားသော အကောင့်နဲ့ ကိုယ်ဖွင့်ထားသော စာရင်းပဲ သုံးလို့ရသည်။ နောက်ဧည့်ကြိုဖွင့်ထားသော အံဆွဲကို မမြင်ရပါ။ ဖွင့်ပြီးသား စာရင်းကို ငွေကိုယ်တိုင် တိုးလို့ မရပါ။ ပိုင်ရှင်ကသာ ကိုယ်တိုင်ပြင်ဆင်ခွင့် ရှိသည်။
+  </div>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> အဖွဲ့ဝင်လက်ခံပါ။ နောက်အခန်းသို့ သွားပါ။</div>
+</section>
+
+<section class="chapter" id="member">
+  <h1>၈။ အဖွဲ့ဝင်အသစ် ထည့်ခြင်း</h1>
+  <p>ပထမဆုံးလာသော လူအတွက်သာ ဒီအဆင့် လုပ်ပါ။ အရင်က လာဖူးရင် မထည့်ပါနဲ့။ အမည် သို့ ဖုန်းနဲ့ အရင်ရှာပါ။</p>
+  <ol class="steps">
+    <li><strong>အဖွဲ့ဝင်များ</strong> ကို ဖွင့်ပါ။</li>
+    <li>ရှာဖွေရန် အကွက်မှာ အမည် သို့ ဖုန်းရိုက်ပြီး ရှာပါ။ ရှိပြီးသားဆိုရင် ထိုသူကို ဖွင့်ပါ။ အသစ်မထည့်ပါနဲ့။</li>
+    <li>မရှိရင် ပုံထဲက <b>၁</b>၊ <strong>အဖွဲ့ဝင်ထည့်ရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>မြှားအတိုင်း အမည်၊ ဖုန်းနံပါတ်၊ စရက်ကို ဖြည့်ပါ။ မွေးနေ့၊ အရေးပေါ်လူ၊ ဓာတ်ပုံ ရှိရင် ထည့်ပါ။</li>
+    <li>သိမ်းပါ။ စနစ်က အဖွဲ့ဝင်နံပါတ် ထုတ်ပေးမည်။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">အဖွဲ့ဝင်များ</div>
+    <div class="app" style="min-height:200px;">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="folder">အဖွဲ့ဝင်</div>
+        <div class="navon">အဖွဲ့ဝင်များ</div>
+        <div class="navitem">အသင်းဝင်မှုများ</div>
+      </aside>
+      <div class="main">
+        <div class="row" style="justify-content:space-between;">
+          <h4 style="margin:0;">အဖွဲ့ဝင်များ</h4>
+          <span class="btn">အဖွဲ့ဝင်ထည့်ရန်</span>
+        </div>
+        <div class="ring" style="right:10px;top:8px;width:118px;height:30px;"></div>
+        <div class="mark" style="right:132px;top:14px;">1</div>
+        <div class="field" style="margin-top:10px;width:100%;">ရှာဖွေရန် — အမည် သို့ ဖုန်း</div>
+        <div class="card">
+          <div class="grid2">
+            <div><div class="small">အမည်</div><div class="field">မမလှ</div></div>
+            <div><div class="small">ဖုန်းနံပါတ်</div><div class="field">09……</div></div>
+          </div>
+          <div class="ring" style="left:8px;top:8px;width:92%;height:58px;"></div>
+          <div class="mark" style="left:-6px;top:28px;">2</div>
+          <svg class="arrow" style="right:18px;top:-28px;width:20px;height:30px;" viewBox="0 0 20 30">
+            <path d="M10 0 V22" stroke="#c81e1e" stroke-width="2"/>
+            <path d="M4 16 l6 10 l6-10" fill="none" stroke="#c81e1e" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> အဖွဲ့ဝင်ထည့်ရန်။ မြှားက <b>၂</b> ဖြည့်ရမည့်အကွက်ဆီ ညွှန်သည်။</p>
+  <div class="warn"><b>ဒီအဆင့်မှာ ဝင်ခွင့် မရသေးပါ။</b> အမည်စာရင်းပဲ ရှိသေးသည်။ ကတ်နဲ့ ငွေ အတည်မဖြစ်သေးပါ။</div>
+  <h3>အဟောင်းကို ပြင်ချင်ရင်</h3>
+  <ol class="steps">
+    <li>စာရင်းထဲက လူကို နှိပ်ပါ။</li>
+    <li>ဖုန်း၊ လိပ်စာ၊ ဓာတ်ပုံ ပြောင်းပြီး သိမ်းပါ။</li>
+    <li>မလာတော့သူကို ဖျက်မည့်အစား မှတ်တမ်းသိမ်းပါ။ နောက်မှ ပြန်ဖွင့်လို့ ရသည်။</li>
+  </ol>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> အသင်းဝင်ကတ် စပါ။ နောက်အခန်းသို့ သွားပါ။</div>
+</section>
+
+<section class="chapter" id="plan">
+  <h1>၉။ အသင်းဝင်ကတ် စခြင်း</h1>
+  <p>လူက ၁ လ၊ ၃ လ၊ ၁ နှစ် ထဲက ဘယ်ပလန်ဝယ်မလဲ ရွေးပါ။ စရက်၊ ကုန်ရက်၊ ဈေး၊ လျှော့ဈေး၊ နောက်ဆုံးပေးရမည့်ငွေကို စနစ်က တွက်ပေးသည်။ လက်နဲ့ ပြန်မတွက်ပါနဲ့။</p>
+  <ol class="steps">
+    <li><strong>အသင်းဝင်မှုများ</strong> ကို ဖွင့်ပါ။ သို့ ထိုအဖွဲ့ဝင်စာမျက်နှာကနေ ဆက်သွားပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ <strong>အသင်းဝင်မှု စတင်ရန်</strong> ကို နှိပ်ပါ။</li>
+    <li><b>၂</b> အဖွဲ့ဝင်ကို ရွေးပါ။</li>
+    <li>မြှားအတိုင်း <b>၃</b> ပလန်ကို ရွေးပါ။ စရက်ကို မှန်အောင်ထားပါ။</li>
+    <li>သိမ်းပါ။ ဒီအချိန်မှာ ကတ်က ငွေမရှင်းရသေးဟု ပဲ ရှိသေးသည်။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">အသင်းဝင်မှု စတင်ရန်</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navitem">အဖွဲ့ဝင်များ</div>
+        <div class="navon">အသင်းဝင်မှုများ</div>
+      </aside>
+      <div class="main">
+        <h4>အသင်းဝင်မှု စတင်ရန်</h4>
+        <div class="card">
+          <div class="small">အဖွဲ့ဝင်</div>
+          <div class="field">မမလှ</div>
+          <div class="ring" style="left:10px;top:28px;width:160px;height:30px;"></div>
+          <div class="mark" style="left:174px;top:34px;">2</div>
+          <div class="small" style="margin-top:8px;">အစီအစဉ်</div>
+          <div class="field">၁ လ</div>
+          <div class="ring" style="left:10px;top:78px;width:160px;height:30px;"></div>
+          <div class="mark" style="left:174px;top:84px;">3</div>
+          <svg class="arrow" style="left:70px;top:58px;width:16px;height:22px;" viewBox="0 0 16 22">
+            <path d="M8 0 V14" stroke="#c81e1e" stroke-width="2"/>
+            <path d="M3 12 l5 8 l5-8" fill="none" stroke="#c81e1e" stroke-width="2"/>
+          </svg>
+          <p class="small">စတင်ရက်၊ သက်တမ်းကုန်ရက်၊ ဈေး၊ လျှော့ဈေး၊ ပေးရမည့်ငွေကို စနစ်က ပြမည်။</p>
+        </div>
+        <div style="margin-top:8px;"><span class="btn gold">အသင်းဝင်မှု စတင်ရန်</span></div>
+        <div class="ring" style="left:12px;bottom:10px;width:168px;height:30px;"></div>
+        <div class="mark" style="left:184px;bottom:16px;">1</div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၂</b> လူရွေး။ မြှားက <b>၃</b> ပလန်ဆီ ညွှန်သည်။ <b>၁</b> က စတင်ရန် ခလုတ်။</p>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> ငွေစာရင်းကို ရေးပြီး မန်နေဂျာဆီ တင်ပါ။ နောက်အခန်းဖြစ်သည်။ အတည်မပြုရသေးရင် ဝင်မှတ်လို့ မရသေးပါ။</div>
+</section>
+
+<section class="chapter" id="pay">
+  <h1>၁၀။ ငွေရှင်းစာရင်း တင်ခြင်း</h1>
+  <p>ဧည့်ကြို သို့ စာရင်းကိုင်က ဒီအဆင့်လုပ်သည်။ အတည်ပြုခွင့် မရှိပါ။</p>
+  <ol class="steps">
+    <li><strong>ငွေပေးချေမှုများ</strong> ကို ဖွင့်ပါ။</li>
+    <li>မူကြမ်းအသစ် လုပ်ပါ။ အဖွဲ့ဝင်၊ ပမာဏ၊ နေ့ရက်ကို မှန်အောင်ထားပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ ငွေပေးချေနည်းကို ရွေးပါ။ ငွေသား၊ ဘဏ်လွှဲ၊ ကတ်၊ မိုဘိုင်းငွေ ထဲက တစ်ခု။</li>
+    <li>ငွေသားဆိုရင် ဖွင့်ထားသော ငွေသားစာရင်း ရှိရမည်။ မဖွင့်ရသေးရင် အခန်း ၇ ကို ပြန်သွားပါ။</li>
+    <li>စာရင်းမှန်ရင် မြှားပြထားသော <b>၂</b>၊ <strong>တင်ပြရန်</strong> ကို နှိပ်ပါ။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">ငွေပေးချေမှု မူကြမ်း</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navon">ငွေပေးချေမှုများ</div>
+        <div class="navitem">ငွေသားစာရင်း</div>
+      </aside>
+      <div class="main">
+        <h4>ငွေပေးချေမှု</h4>
+        <div class="card">
+          <div class="row">
+            <span>မမလှ · ၁ လ</span>
+            <span class="badge-wait">မူကြမ်း</span>
+          </div>
+          <div class="small" style="margin-top:6px;">ငွေပေးချေနည်း</div>
+          <div class="field">ငွေသား</div>
+          <div class="ring" style="left:10px;top:52px;width:110px;height:30px;"></div>
+          <div class="mark" style="left:124px;top:58px;">1</div>
+          <div class="row" style="margin-top:8px;">
+            <span class="btn">တင်ပြရန်</span>
+            <span class="btn ghost">မူကြမ်းကို ပြင်ဆင်ရန်</span>
+          </div>
+          <div class="ring" style="left:10px;top:96px;width:78px;height:30px;"></div>
+          <div class="mark" style="left:92px;top:102px;">2</div>
+          <svg class="arrow" style="left:48px;top:78px;width:16px;height:20px;" viewBox="0 0 16 20">
+            <path d="M8 0 V12" stroke="#c81e1e" stroke-width="2"/>
+            <path d="M3 10 l5 8 l5-8" fill="none" stroke="#c81e1e" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> ငွေပေးချေနည်း။ မြှားက <b>၂</b> တင်ပြရန် ဆီ ညွှန်သည်။ တင်ပြီးမှ ပြင်လို့ မရပါ။</p>
+  <div class="warn">
+    <b>တင်ပြီးချိန်မှာ ဒီအရာတွေ မဖြစ်သေးပါ။</b>
+    ပြေစာ မထွက်သေးပါ။ ကတ် ငွေရှင်းပြီး မဖြစ်သေးပါ။ ငွေသားစာရင်းထဲ ငွေမဝင်သေးပါ။ ဝင်ငွေထဲ မပါသေးပါ။
+  </div>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> မန်နေဂျာ သို့ ပိုင်ရှင်ကို ပြောပါ။ သူတို့ အတည်ပြုမှ နောက်အဆင့် ရောက်သည်။ ကိုယ်တိုင် အတည်မပြုနိုင်ပါ။</div>
+</section>
+
+<section class="chapter" id="approve">
+  <h1>၁၁။ မန်နေဂျာက အတည်ပြုခြင်း</h1>
+  <p>ဒီအဆင့်ကို စာရင်းရေးသူ မဟုတ်သော မန်နေဂျာ သို့ ပိုင်ရှင်က လုပ်သည်။ ဧည့်ကြိုအကောင့်နဲ့ ဝင်ထားရင် အတည်ပြုခလုတ် မပေါ်ပါ။</p>
+  <ol class="steps">
+    <li><strong>ငွေပေးချေမှုများ</strong> ကို ဖွင့်ပါ။ စောင့်ဆိုင်းနေသော စာရင်းကို ရှာပါ။</li>
+    <li>လူနာမည်၊ ပလန်၊ ငွေပမာဏ၊ ငွေပေးချေနည်းကို မျက်စိနဲ့ တိုက်ပါ။</li>
+    <li>မှန်ရင် ပုံထဲက <b>၁</b>၊ <strong>အတည်ပြုရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>မှားရင် <b>၂</b>၊ အကြောင်းရင်းရေးပြီး <strong>ငြင်းပယ်ရန်</strong> ကို နှိပ်ပါ။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">အတည်ပြုရန် စောင့်နေသော ငွေ</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navon">ငွေပေးချေမှုများ</div>
+      </aside>
+      <div class="main">
+        <h4>မမလှ · ၁ လ</h4>
+        <div class="card">
+          <div class="row"><span>ပမာဏ 1500</span><span class="badge-wait">စောင့်ဆိုင်းနေသည်</span></div>
+          <p class="small">ငွေသား · ဒီနေ့ · ရေးသူက ဧည့်ကြို</p>
+          <div class="row">
+            <span class="btn">အတည်ပြုရန်</span>
+            <span class="btn danger">ငြင်းပယ်ရန်</span>
+          </div>
+          <div class="ring" style="left:10px;top:62px;width:96px;height:30px;"></div>
+          <div class="mark" style="left:110px;top:68px;">1</div>
+          <div class="ring" style="left:128px;top:62px;width:96px;height:30px;"></div>
+          <div class="mark" style="left:228px;top:68px;">2</div>
+          <svg class="arrow" style="left:150px;top:70px;width:28px;height:14px;" viewBox="0 0 28 14">
+            <path d="M0 7 H20" stroke="#c81e1e" stroke-width="2"/>
+            <path d="M16 2 l8 5 l-8 5" fill="none" stroke="#c81e1e" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> မှန်ရင် အတည်ပြုရန်။ မြှားက <b>၂</b> မှားရင် ငြင်းပယ်ရန် ဆီ ညွှန်သည်။ ငြင်းရင် အကြောင်းရင်း ရေးပါ။</p>
+  <h3>အတည်ပြုပြီးရင် စနစ်က သူ့အလိုလို လုပ်သည်</h3>
+  <ul class="plain">
+    <li>ငွေစာရင်း အတည်ဖြစ်သည်။</li>
+    <li>ပြေစာနံပါတ် ထွက်သည်။ နံပါတ်ကို နောက်မှ ပြန်မသုံးပါ။</li>
+    <li>အသင်းဝင်ကတ် ငွေရှင်းပြီး ဖြစ်သည်။</li>
+    <li>ငွေသားဆိုရင် ဖွင့်ထားသော ငွေသားစာရင်းထဲ ဝင်သည်။</li>
+  </ul>
+  <p>ငြင်းထားသော စာရင်းက ဝင်ငွေထဲ မပါပါ။ ဧည့်ကြိုက ပြင်ပြီး ပြန်တင်နိုင်သည်။</p>
+  <p>ပြေစာပုံနှိပ်ချင်ရင် ငွေစာရင်းထဲက ပြေစာကို ဖွင့်ပြီး ပုံနှိပ်ပါ။ ဒါက ငွေရပြေစာဖြစ်သည်။ အခွန်ဌာန ပြေစာနေရာမှာ အစားမထိုးပါ။</p>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> အဖွဲ့ဝင်ကို ဝင်ရောက်မှတ်ပါ။ နောက်အခန်းဖြစ်သည်။</div>
+</section>
+
+<section class="chapter" id="checkin">
+  <h1>၁၂။ ဝင်မှတ်ခြင်း၊ ထွက်မှတ်ခြင်း</h1>
+  <p>ကောင်တာမှာ လူကို ရှာပြီး ဝင်မှတ်ပေးနိုင်သည်။ အဖွဲ့ဝင်က ဖုန်းနဲ့ QR ဖတ်ပြီးလည်း ဝင်နိုင်သည်။ QR ကို နောက်အခန်းမှာ ရေးထားသည်။</p>
+  <h3>ဝင်မှတ်ပုံ</h3>
+  <ol class="steps">
+    <li><strong>ဝင်ရောက်မှုများ</strong> ကို ဖွင့်ပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ <strong>ကောင်တာဝင်ရောက်မှု</strong> ကို ရွေးပါ။</li>
+    <li><b>၂</b> အမည်၊ ဖုန်း သို့ အဖွဲ့ဝင်နံပါတ်နဲ့ ရှာပါ။</li>
+    <li>မြှားပြထားသော <b>၃</b>၊ <strong>ဝင်ရောက်မှတ်ရန်</strong> ကို နှိပ်ပါ။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">ဝင်ရောက်မှုများ</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navon">ဝင်ရောက်မှုများ</div>
+      </aside>
+      <div class="main">
+        <h4>ဝင်ရောက်မှုများ</h4>
+        <div class="row">
+          <span class="btn gold">ကောင်တာဝင်ရောက်မှု</span>
+          <span class="btn ghost">QR ပြသမှု</span>
+        </div>
+        <div class="ring" style="left:12px;top:36px;width:132px;height:30px;"></div>
+        <div class="mark" style="left:148px;top:42px;">1</div>
+        <div class="field" style="margin-top:8px;width:70%;">ရှာဖွေရန်</div>
+        <div class="ring" style="left:12px;top:74px;width:220px;height:30px;"></div>
+        <div class="mark" style="left:236px;top:80px;">2</div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;">
+            <span>မမလှ · ကတ် ရှိသည်</span>
+            <span class="btn">ဝင်ရောက်မှတ်ရန်</span>
+          </div>
+          <div class="ring" style="right:8px;top:8px;width:118px;height:30px;"></div>
+          <div class="mark" style="right:130px;top:14px;">3</div>
+          <svg class="arrow" style="right:150px;top:16px;width:24px;height:14px;" viewBox="0 0 24 14">
+            <path d="M0 7 H16" stroke="#c81e1e" stroke-width="2"/>
+            <path d="M12 2 l8 5 l-8 5" fill="none" stroke="#c81e1e" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> ကောင်တာစာမျက်နှာ။ <b>၂</b> ရှာရန်။ မြှားက <b>၃</b> ဝင်ရောက်မှတ်ရန် ဆီ ညွှန်သည်။</p>
+  <h3>စနစ်က ငြင်းရင်</h3>
+  <p>အောက်က အကြောင်းတစ်ခုခု ဖြစ်နေသည်။ ဝင်မှတ်ခလုတ်ကို ထပ်မနှိပ်ပါနဲ့။ အကြောင်းကို အရင်ရှင်းပါ။</p>
+  <ul class="plain">
+    <li>အဖွဲ့ဝင်စာရင်း ပိတ်ထားသည်။</li>
+    <li>အသင်းဝင်ကတ် မရှိသေးပါ။</li>
+    <li>ငွေ မအတည်ဖြစ်သေးပါ။ အခန်း ၁၁ ကို ပြန်ကြည့်ပါ။</li>
+    <li>သက်တမ်း ကုန်ပြီးဖြစ်သည်။ ကတ်အသစ် စပါ။</li>
+    <li>ဒီနေ့ ဝင်မှတ်ပြီးသား ဖြစ်သည်။</li>
+  </ul>
+  <h3>ထွက်မှတ်ပုံ</h3>
+  <ol class="steps">
+    <li>ထိုလူ၏ ဒီနေ့ဝင်မှတ်ကို ဖွင့်ပါ။</li>
+    <li><strong>ထွက်ခွာမှတ်ရန်</strong> ကို နှိပ်ပါ။</li>
+  </ol>
+  <div class="note"><b>ထွက်မှတ်ခြင်းက ဒီနေ့လာရောက်မှုကို ပိတ်ခြင်းဖြစ်သည်။</b> လကတ်ကို မပိတ်ပါ။ ကတ်က ကုန်ရက်အထိ ဆက်သုံးလို့ ရသည်။ ထွက်မှတ်မေ့ရင် နောက်နေ့ ပြန်ဝင်မှတ်ချိန်မှာ မနေ့စာရင်းကို စနစ်က ပိတ်ပေးနိုင်သည်။</div>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> လူက လေ့ကျင့်သည်။ ပြီးရင် ထွက်မှတ်ပါ။ ကောင်တာမှာ လူမရှိချင်ရင် နောက်အခန်း QR ကို သုံးပါ။</div>
+</section>
+
+<section class="chapter" id="qr">
+  <h1>၁၃။ QR နဲ့ ကိုယ်တိုင်ဝင်ခြင်း</h1>
+  <p>Gym ဖန်သားပြင်မှာ ပြောင်းနေသော QR တစ်ခု ပြပါ။ အဖွဲ့ဝင်က ဖုန်းအက်ပ်နဲ့ ဖတ်ပြီး ဝင်သည်။ QR ထဲမှာ အမည်၊ ဖုန်း မပါပါ။ ဓာတ်ပုံရိုက်ထားသော QR အဟောင်းကို လက်မခံပါ။</p>
+  <ol class="steps">
+    <li>ကောင်တာကွန်ပျူတာမှာ <strong>ဝင်ရောက်မှုများ</strong> ကို ဖွင့်ပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ <strong>QR ပြသမှု</strong> ကို နှိပ်ပါ။</li>
+    <li>QR ပေါ်လာရင် ဖန်သားပြင်ကို အဖွဲ့ဝင်မြင်သော နေရာမှာ ထားပါ။ ကုဒ်က မကြာခဏ ပြောင်းသည်။</li>
+    <li>အဖွဲ့ဝင်ကို ဖုန်းအက်ပ် ဖွင့်ခိုင်းပါ။ အောက်ခြေ <strong>စကန်ဖတ်ရန်</strong> ကို နှိပ်ခိုင်းပါ။</li>
+    <li>မြှားအတိုင်း ကင်မရာကို စခရင်က QR ဆီ ချိန်ခိုင်းပါ။</li>
+    <li>မအောင်မြင်ရင် ကုဒ်အသစ် တက်တာကို စောင့်ပြီး ထပ်ဖတ်ပါ။ ကင်မရာမရရင် ကောင်တာက ဝင်မှတ်ပေးပါ။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">QR ပြသမှု နဲ့ ဖုန်း</div>
+    <div class="app" style="min-height:190px;">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navon">ဝင်ရောက်မှုများ</div>
+      </aside>
+      <div class="main">
+        <div class="row">
+          <span class="btn ghost">ကောင်တာဝင်ရောက်မှု</span>
+          <span class="btn gold">QR ပြသမှု</span>
+        </div>
+        <div class="ring" style="left:150px;top:8px;width:100px;height:30px;"></div>
+        <div class="mark" style="left:254px;top:14px;">1</div>
+        <div class="card" style="width:120px;height:120px;display:flex;align-items:center;justify-content:center;font-family:Helvetica,sans-serif;">
+          QR
+        </div>
+        <svg class="arrow" style="left:150px;top:70px;width:40px;height:16px;" viewBox="0 0 40 16">
+          <path d="M0 8 H30" stroke="#c81e1e" stroke-width="2"/>
+          <path d="M24 3 l10 5 l-10 5" fill="none" stroke="#c81e1e" stroke-width="2"/>
+        </svg>
+        <p class="small">မြှားက ဖုန်းကင်မရာကို ဒီ QR ဆီ ညွှန်သည်။ ကုဒ်ဟောင်းကို ဓာတ်ပုံရိုက်မထားပါနဲ့။</p>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> QR ပြသမှု။ ဖန်သားပြင်ကို ပွင့်ထားပါ။ အဖွဲ့ဝင်ဖုန်းနည်းကို အခန်း ၂၄ မှာ ထပ်ရေးထားသည်။</p>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> ဝင်မှတ်အောင်မြင်ရင် အဖွဲ့ဝင် လေ့ကျင့်နိုင်သည်။ ထွက်မည့်အခါ အက်ပ်ထဲက ထွက်ခွာမှတ်ရန် သို့ ကောင်တာက ထွက်မှတ်ပေးပါ။</div>
+</section>
+
+<section class="chapter" id="renew">
+  <h1>၁၄။ သက်တမ်းတိုးခြင်း</h1>
+  <p>အဖွဲ့ဝင်အသစ် ပြန်မဖွင့်ပါနဲ့။ လူဟောင်းကို ရှာပြီး ကတ်အသစ် စပါ။</p>
+  <ol class="steps">
+    <li>အဖွဲ့ဝင်ကို ရှာပါ။</li>
+    <li>သက်တမ်းကုန်ပြီ သို့ ကုန်တော့မည် ဆိုရင် <strong>အသင်းဝင်မှု စတင်ရန်</strong> နဲ့ ပလန်အသစ် ရွေးပါ။</li>
+    <li>ငွေစာရင်းကို အခန်း ၁၀ အတိုင်း တင်ပါ။</li>
+    <li>မန်နေဂျာ အတည်ပြုမှ ကတ်အသစ် စသည်။</li>
+    <li>ပြီးမှ ဝင်ရောက်မှတ်ပါ။</li>
+  </ol>
+  <div class="note">
+    အီးမေးလ် ပေးထားသူကို သက်တမ်းကုန်ခါနီး စနစ်က အီးမေးလ်ပို့နိုင်သည်။ အီးမေးလ်မပေးထားရင် မပို့ပါ။ ဖုန်းကို အလိုအလျောက် မပြောင်းပို့ပါ။
+    ဖုန်းအက်ပ်မှာ အကြောင်းကြားချက် ဖွင့်ထားရင် သတိပေးချက် ရနိုင်သည်။
+    ပိုင်ရှင် သို့ မန်နေဂျာက ပွဲ၊ လျှော့ဈေး ကြေညာချက်ကို အဖွဲ့ဝင်အုပ်စုဆီ ပို့နိုင်သည်။ အဖွဲ့ဝင်က ပိတ်ထားရင် မပို့ပါ။
+  </div>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> ပုံမှန်လကတ်ပဲဆိုရင် ဝင်မှတ်ခြင်းကို ပြန်လုပ်ပါ။ PT ဝယ်မယ်ဆိုရင် နောက်အခန်းသို့ သွားပါ။</div>
+</section>
+
+<section class="chapter" id="pt">
+  <h1>၁၅။ PT သင်တန်း</h1>
+  <p>PT ဆိုတာ သင်တန်းဆရာနဲ့ တစ်ယောက်ချင်း လေ့ကျင့်ခြင်းဖြစ်သည်။ အဖွဲ့ဝင်ကို ဆရာတာဝန်ပေးထားရင် စာရင်းမှာ PT လို့ ပေါ်သည်။ ဆရာတာဝန်ပြီးရင် ထိုစာသား ပျောက်သည်။ ဝန်ထမ်းက Yes၊ No ကိုယ်တိုင် ပြောင်းစရာ မလိုပါ။</p>
+
+  <h3>၁။ ပလန်အရင် လုပ်ထားပါ</h3>
+  <ol class="steps">
+    <li><strong>ပက်ကေ့ဂျ်များ</strong> ကို ဖွင့်ပါ။</li>
+    <li><strong>ပက်ကေ့ဂျ် ဖန်တီးရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>အမည်၊ ဈေး၊ အကြိမ်ရေ၊ သက်တမ်းကို ထည့်ပါ။ ဥပမာ PT ၁၀ ကြိမ်။</li>
+    <li>သိမ်းပါ။</li>
+  </ol>
+
+  <h3>၂။ ဆရာကို အဖွဲ့ဝင်နဲ့ ချိတ်ပါ</h3>
+  <ol class="steps">
+    <li><strong>သင်တန်းဆရာများ</strong> ကို ဖွင့်ပါ။</li>
+    <li><strong>တာဝန်ပေးမှု ဖန်တီးရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>ဆရာနဲ့ အဖွဲ့ဝင်ကို ရွေးပြီး သိမ်းပါ။</li>
+  </ol>
+
+  <h3>၃။ ရောင်းချပြီး ငွေတင်ပါ</h3>
+  <ol class="steps">
+    <li><strong>PT အရောင်း</strong> ကို ဖွင့်ပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ <strong>မူကြမ်း ဖန်တီးရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>အဖွဲ့ဝင်၊ ပက်ကေ့ဂျ်၊ ဆရာ၊ ငွေပေးချေနည်းကို ဖြည့်ပါ။</li>
+    <li><strong>အရောင်း တင်ပြရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>မန်နေဂျာက <strong>အရောင်း အတည်ပြုရန်</strong> လုပ်မှ ငွေဝင်သည်။ ပြေစာထွက်သည်။ ကော်မရှင်ကို စနစ်က တွက်သည်။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">PT အရောင်း</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="folder">လေ့ကျင့်ရေး</div>
+        <div class="navitem">ပက်ကေ့ဂျ်များ</div>
+        <div class="navon">PT အရောင်း</div>
+        <div class="navitem">ကော်မရှင်များ</div>
+      </aside>
+      <div class="main">
+        <div class="row" style="justify-content:space-between;">
+          <h4 style="margin:0;">PT အရောင်း</h4>
+          <span class="btn">မူကြမ်း ဖန်တီးရန်</span>
+        </div>
+        <div class="ring" style="right:10px;top:8px;width:130px;height:30px;"></div>
+        <div class="mark" style="right:144px;top:14px;">1</div>
+        <div class="card">
+          <p class="small">အဖွဲ့ဝင်၊ ပက်ကေ့ဂျ်၊ ဆရာ၊ ဈေးကို ဖြည့်ပါ။</p>
+          <span class="btn gold">အရောင်း တင်ပြရန်</span>
+          <div class="ring" style="left:10px;top:36px;width:130px;height:30px;"></div>
+          <div class="mark" style="left:144px;top:42px;">2</div>
+          <svg class="arrow" style="left:70px;top:8px;width:16px;height:28px;" viewBox="0 0 16 28">
+            <path d="M8 0 V18" stroke="#c81e1e" stroke-width="2"/>
+            <path d="M3 14 l5 8 l5-8" fill="none" stroke="#c81e1e" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> မူကြမ်းအသစ်။ မြှားက <b>၂</b> တင်ပြရန် ဆီ ညွှန်သည်။ အတည်ပြုမှ ငွေဝင်သည်။</p>
+  <div class="note">
+    ဥပမာ PT ကြေး ၁၀၀၀၀၀၊ ဆရာကော်မရှင် ၆၀ ရာခိုင်နှုန်းဆိုရင် ဆရာက ၆၀၀၀၀၊ Gym က ၄၀၀၀၀ ရသည်။ ရာခိုင်နှုန်းကို ပလန်မှာ သတ်မှတ်ထားသည့်အတိုင်း စနစ်က တွက်သည်။
+    အတည်ဖြစ်ပြီးရင် <strong>ကော်မရှင်များ</strong> မှာ ကြည့်နိုင်သည်။
+  </div>
+
+  <h3>၄။ အချိန်ချိန်းပါ</h3>
+  <ol class="steps">
+    <li><strong>PT ကြိုတင်စာရင်းများ</strong> ကို ဖွင့်ပါ။</li>
+    <li>ဆရာ၊ အဖွဲ့ဝင်၊ စချိန်၊ ပြီးချိန် ထည့်ပါ။</li>
+    <li>ဆရာတစ်ယောက်ကို အချိန်တစ်ခုမှာ နှစ်နေရာ မချိန်းရပါ။ အဖွဲ့ဝင်လည်း ထိုအတူဖြစ်သည်။</li>
+    <li>လာရင် တက်ရောက်ပြီးလို့ မှတ်ပါ။ မှတ်မှ အကြိမ်ရေ ကျန်သည်။</li>
+    <li>မလာရင် ပျက်ကွက် သို့ ပယ်ဖျက် လို့ မှတ်ပါ။ ပလန်စည်းကမ်းအတိုင်း အကြိမ်ရေ ပြန်ဝင်နိုင်သည်၊ သို့ နုတ်နိုင်သည်။</li>
+  </ol>
+  <p>ကျန်အကြိမ်၊ သုံးပြီးအကြိမ်၊ ကုန်ရက်ကို <strong>အဖွဲ့ဝင် ပက်ကေ့ဂျ်များ</strong> မှာ ကြည့်ပါ။</p>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> အတန်းလိုက် လေ့ကျင့်မယ်ဆိုရင် နောက်အခန်းသို့ သွားပါ။ မလိုရင် နေ့အဆုံးအခန်းမတိုင်ခင် ဆိုင်ပစ္စည်း၊ ကုန်ကျစရိတ် ရှိရင် ထိုအခန်းတွေကို လုပ်ပါ။</div>
+</section>
+
+<section class="chapter" id="class">
+  <h1>၁၆။ အတန်း</h1>
+  <p>အတန်းဆိုတာ လူအများနဲ့ လေ့ကျင့်သော အချိန်ဇယားဖြစ်သည်။ ဥပမာ တနင်္လာ မနက် ၇ နာရီ ယောဂ။</p>
+  <h3>အတန်းအမျိုးအစား လုပ်ပုံ</h3>
+  <ol class="steps">
+    <li><strong>အတန်းများ</strong> ကို ဖွင့်ပါ။</li>
+    <li><strong>အတန်းအမျိုးအစား ဖန်တီးရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>အမည်၊ ကြာချိန်၊ လူအများဆုံးဦးရေ ထည့်ပါ။ သိမ်းပါ။</li>
+  </ol>
+  <h3>အပတ်စဉ်အချိန် ထည့်ပုံ</h3>
+  <ol class="steps">
+    <li><strong>အချိန်ဇယား ဖန်တီးရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>အတန်း၊ ဆရာ၊ နေ့၊ စချိန်၊ ပြီးချိန်၊ နေရာ ထည့်ပါ။</li>
+    <li>သိမ်းပါ။ စနစ်က ထိုအပတ်၏ အတန်းတွေကို ထုတ်ပေးသည်။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">အတန်းများ</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navon">အတန်းများ</div>
+      </aside>
+      <div class="main">
+        <h4>အတန်းများ</h4>
+        <div class="row">
+          <span class="btn">အတန်းအမျိုးအစား ဖန်တီးရန်</span>
+          <span class="btn gold">အချိန်ဇယား ဖန်တီးရန်</span>
+        </div>
+        <div class="ring" style="left:12px;top:36px;width:168px;height:30px;"></div>
+        <div class="mark" style="left:184px;top:42px;">1</div>
+        <div class="ring" style="left:188px;top:36px;width:150px;height:30px;"></div>
+        <div class="mark" style="left:342px;top:42px;">2</div>
+        <svg class="arrow" style="left:168px;top:44px;width:22px;height:14px;" viewBox="0 0 22 14">
+          <path d="M0 7 H14" stroke="#c81e1e" stroke-width="2"/>
+          <path d="M10 2 l8 5 l-8 5" fill="none" stroke="#c81e1e" stroke-width="2"/>
+        </svg>
+        <table class="mini">
+          <tr><th>နေ့</th><th>အတန်း</th><th>ဆရာ</th><th>နေရာ</th></tr>
+          <tr><td>တနင်္လာ</td><td>ယောဂ</td><td>ကိုအောင်</td><td>၁၂ / ၂၀</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> အတန်းအမျိုးအစား အရင်လုပ်ပါ။ မြှားက <b>၂</b> အချိန်ဇယားဆီ ညွှန်သည်။ နေရာပြည့်ရင် နောက်ထပ် လက်မခံပါ။</p>
+  <h3>အဖွဲ့ဝင် ကြိုတင်စာရင်းပုံ</h3>
+  <ol class="steps">
+    <li>အဖွဲ့ဝင်မှာ အတန်းပက်ကေ့ဂျ် ရှိရမည်။ သက်တမ်းကျန်ရမည်။ အကြိမ်ရေ ကျန်ရမည်။</li>
+    <li>ဝန်ထမ်းက ကြိုတင်စာရင်း သွင်းပေးနိုင်သည်။ အဖွဲ့ဝင်က ဖုန်းအက်ပ် <strong>အချိန်ဇယား</strong> မှာ <strong>အတန်း ကြိုတင်စာရင်းသွင်းရန်</strong> ကို နှိပ်နိုင်သည်။</li>
+    <li>ပြည့်သွားရင် ထပ်မသွင်းနိုင်ပါ။</li>
+    <li>တက်ရောက်ပြီးမှ အကြိမ်ရေ နုတ်သည်။</li>
+  </ol>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> အတန်းနေ့ရောက်ရင် တက်ရောက်မှု မှတ်ပါ။ ဆိုင်မှာ ပစ္စည်းရောင်းမယ်ဆိုရင် နောက်အခန်းသို့ သွားပါ။</div>
+</section>
+
+<section class="chapter" id="shop">
+  <h1>၁၇။ ဆိုင်ပစ္စည်း ရောင်းခြင်း</h1>
+  <p>ရေ၊ ဖျော်ရည်၊ လက်အိတ်လို ပစ္စည်းကို ဆိုင်စာရင်းထဲ ထည့်မှ ရောင်းလို့ ရသည်။ လက်ကျန်ကို လူက ရိုက်မထည့်ရပါ။ ဝယ်သွင်း၊ ရောင်းထုတ်၊ ပြန်အပ်၊ ပျက်စီးမှု တစ်ခုချင်းက လက်ကျန်ကို ပြောင်းသည်။</p>
+  <h3>ပစ္စည်းအသစ် ထည့်ပုံ</h3>
+  <ol class="steps">
+    <li><strong>ကုန်ပစ္စည်းလက်ကျန်</strong> ကို ဖွင့်ပါ။</li>
+    <li>ကဏ္ဍမရှိသေးရင် <strong>ကဏ္ဍ ဖန်တီးရန်</strong> ကို အရင်နှိပ်ပါ။ ဥပမာ အချိုရည်။</li>
+    <li><strong>ကုန်ပစ္စည်း ဖန်တီးရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>အမည်၊ ဝယ်ဈေး၊ ရောင်းဈေး၊ ဘားကုဒ် ရှိရင် ထည့်ပါ။ လက်ကျန်နည်းရင် သတိပေးမည့် အရေအတွက် ထည့်ပါ။</li>
+    <li>ဝယ်သွင်းမယ်ဆိုရင် <strong>လက်ကျန်ထည့်ရန်</strong> နဲ့ အရေအတွက်၊ အကြောင်းရင်း ရေးပါ။ လက်ကျန် အနုတ် မဖြစ်ရပါ။</li>
+  </ol>
+  <h3>ရောင်းပုံ</h3>
+  <ol class="steps">
+    <li><strong>လက်လီ အရောင်း</strong> ကို ဖွင့်ပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ မူကြမ်းအသစ် လုပ်ပြီး ပစ္စည်းနဲ့ အရေအတွက် ထည့်ပါ။ လျှော့ဈေး ရှိရင် ထည့်ပါ။</li>
+    <li>အဖွဲ့ဝင်ဆီ ရောင်းရင် လူကို တွဲပါ။ ဧည့်သည်ဆိုရင် မတွဲဘဲ ရောင်းနိုင်သည်။</li>
+    <li>မြှားပြထားသော <b>၂</b>၊ တင်ပြပါ။</li>
+    <li>မန်နေဂျာ အတည်ပြုမှ ပိုက်ဆံဝင်သည်၊ လက်ကျန်ကျသည်၊ ပြေစာထွက်သည်။</li>
+    <li>ငွေသားဆိုရင် ဒီနေ့ ငွေသားစာရင်း ဖွင့်ထားရမည်။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">လက်လီ အရောင်း</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navitem">ကုန်ပစ္စည်းလက်ကျန်</div>
+        <div class="navon">လက်လီ အရောင်း</div>
+      </aside>
+      <div class="main">
+        <h4>လက်လီ အရောင်း</h4>
+        <div class="card">
+          <table class="mini">
+            <tr><th>ပစ္စည်း</th><th>အရေအတွက်</th><th>ဈေး</th></tr>
+            <tr><td>ရေသန့်</td><td>2</td><td>20</td></tr>
+          </table>
+          <div class="ring" style="left:8px;top:8px;right:8px;height:52px;"></div>
+          <div class="mark" style="left:-8px;top:22px;">1</div>
+          <div class="row" style="margin-top:8px;">
+            <span class="btn">တင်ပြရန်</span>
+            <span class="small">အတည်ပြုမှ လက်ကျန်ကျမည်</span>
+          </div>
+          <div class="ring" style="left:10px;top:78px;width:78px;height:28px;"></div>
+          <div class="mark" style="left:92px;top:82px;">2</div>
+          <svg class="arrow" style="left:36px;top:58px;width:16px;height:20px;" viewBox="0 0 16 20">
+            <path d="M8 0 V12" stroke="#c81e1e" stroke-width="2"/>
+            <path d="M3 10 l5 8 l5-8" fill="none" stroke="#c81e1e" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> ရောင်းမည့်ပစ္စည်း။ မြှားက <b>၂</b> တင်ပြရန် ဆီ ညွှန်သည်။ တင်ထားစဉ် လက်ကျန် မကျသေးပါ။</p>
+  <div class="note">လက်ကျန်နည်းသော ပစ္စည်းကို စာရင်းမှာ သီးသန့်ကြည့်နိုင်သည်။ ရောင်းပြီးမှ ပြန်အပ်ရင် အရောင်းထဲက ပြန်အပ်ကို သုံးပါ။ အရေအတွက် တစ်စိတ်တစ်ပိုင်း ပြန်အပ်နိုင်သည်။ ပြန်အပ်ပြီးသားကို အပြည့်ပယ်ဖျက်လို့ မရတော့ပါ။</div>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> ငှားရမ်းခ၊ မီး၊ ရေ လို ကုန်ကျကို မှတ်မယ်ဆိုရင် နောက်အခန်းသို့ သွားပါ။</div>
+</section>
+
+<section class="chapter" id="expense">
+  <h1>၁၈။ ကုန်ကျစရိတ်</h1>
+  <p>Gym က ပေးရသော ငွေကို ဒီမှာ မှတ်သည်။ ငှားရမ်းခ၊ မီး၊ ရေ၊ အင်တာနက်၊ သန့်ရှင်းရေး၊ စက်ပြင်၊ ကြော်ငြာ၊ သောက်ရေ တို့ ပါသည်။ လစာနဲ့ PT ကော်မရှင်ကို ဒီနေရာမှာ ကိုယ်တိုင် အမျိုးအစားရွေးမထည့်ပါနဲ့။ သီးခြားစာမျက်နှာ ရှိသည်။</p>
+  <ol class="steps">
+    <li><strong>ကုန်ကျစရိတ်များ</strong> ကို ဖွင့်ပါ။</li>
+    <li>လိုသော အမျိုးအစား မရှိရင် ခွင့်ရှိသူက <strong>ကဏ္ဍ ဖန်တီးရန်</strong> လုပ်နိုင်သည်။ ပုံသေအမျိုးအစားကို မပြင်ရပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ မူကြမ်းအသစ်လုပ်ပြီး အမျိုးအစား၊ ပမာဏ၊ နေ့ရက်၊ အကြောင်းရင်း ရေးပါ။</li>
+    <li>ပြေစာဓာတ်ပုံ ရှိရင် တင်ပါ။ ပုံဖိုင်ပဲ ရသည်။ အရမ်းကြီးသော ဖိုင်ကို လက်မခံပါ။</li>
+    <li>မြှားအတိုင်း <b>၂</b>၊ တင်ပြပါ။</li>
+    <li>မန်နေဂျာ အတည်ပြုမှ ကုန်ကျစရိတ် အတည်ဖြစ်သည်။ ငွေသားပေးရင် ငွေသားစာရင်းထဲက ကျသည်။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">ကုန်ကျစရိတ်</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navon">ကုန်ကျစရိတ်များ</div>
+      </aside>
+      <div class="main">
+        <h4>ကုန်ကျစရိတ်</h4>
+        <div class="card">
+          <div class="grid2">
+            <div><div class="small">ကဏ္ဍ</div><div class="field">မီး / ရေ</div></div>
+            <div><div class="small">ပမာဏ</div><div class="field">8500</div></div>
+          </div>
+          <div class="ring" style="left:8px;top:8px;right:8px;height:52px;"></div>
+          <div class="mark" style="right:8px;top:-8px;">1</div>
+          <div class="row" style="margin-top:8px;"><span class="btn">တင်ပြရန်</span></div>
+          <div class="ring" style="left:10px;top:74px;width:78px;height:28px;"></div>
+          <div class="mark" style="left:92px;top:78px;">2</div>
+          <svg class="arrow" style="left:40px;top:56px;width:16px;height:18px;" viewBox="0 0 16 18">
+            <path d="M8 0 V10" stroke="#c81e1e" stroke-width="2"/>
+            <path d="M3 8 l5 8 l5-8" fill="none" stroke="#c81e1e" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> ကဏ္ဍနဲ့ ပမာဏ။ မြှားက <b>၂</b> တင်ပြရန် ဆီ ညွှန်သည်။ ငြင်းခံရရင် ငွေမထွက်ပါ။</p>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> လစဉ်လစာပေးမယ်ဆိုရင် နောက်အခန်းသို့ သွားပါ။ မပေးသေးရင် နေ့အဆုံး ပိတ်ခြင်းကို သွားပါ။</div>
+</section>
+
+<section class="chapter" id="salary">
+  <h1>၁၉။ လစာ</h1>
+  <p>လစာကို ဝန်ထမ်းကတ်ထဲက ပုံသေငွေအဖြစ် စနစ်က မယူပါ။ လတိုင်း ပေးမည့်ငွေကို ရေးရသည်။</p>
+  <ol class="steps">
+    <li><strong>လစာများ</strong> ကို ဖွင့်ပါ။</li>
+    <li>လစာကာလ အသစ်ဖွင့်ပါ။ ဘယ်လအတွက်လဲ ရွေးပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ <strong>ဝန်ထမ်းစာကြောင်း ထည့်ရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>လူတစ်ယောက်ချင်း ပေးမည့်ငွေကို ရိုက်ပါ။ ငွေသားလား၊ ဘဏ်လား ရွေးပါ။</li>
+    <li>မြှားအတိုင်း <b>၂</b>၊ အားလုံးစုံရင် တင်ပြပါ။ တင်ပြီးရင် ပြင်လို့ မရပါ။</li>
+    <li>ရေးသူမဟုတ်သော မန်နေဂျာက အတည်ပြုပါ။ လူတိုင်းအတွက် ကုန်ကျစရိတ် တစ်ခါတည်း ဖြစ်သည်။ တစ်ယောက်မှားရင် အားလုံး ပြန်မတင်သေးပါ။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">လစာ</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navon">လစာများ</div>
+      </aside>
+      <div class="main">
+        <h4>ယခုလ လစာ</h4>
+        <span class="btn ghost">ဝန်ထမ်းစာကြောင်း ထည့်ရန်</span>
+        <div class="ring" style="left:12px;top:36px;width:168px;height:28px;"></div>
+        <div class="mark" style="left:184px;top:40px;">1</div>
+        <table class="mini">
+          <tr><th>ဝန်ထမ်း</th><th>ပမာဏ</th><th>နည်း</th></tr>
+          <tr><td>ကိုထွန်း</td><td>400000</td><td>ဘဏ်လွှဲ</td></tr>
+          <tr><td>မမလဲ့</td><td>350000</td><td>ငွေသား</td></tr>
+        </table>
+        <div class="row"><span class="btn">တင်ပြရန်</span></div>
+        <div class="ring" style="left:12px;bottom:12px;width:78px;height:28px;"></div>
+        <div class="mark" style="left:94px;bottom:16px;">2</div>
+        <svg class="arrow" style="left:40px;bottom:40px;width:16px;height:22px;" viewBox="0 0 16 22">
+          <path d="M8 0 V14" stroke="#c81e1e" stroke-width="2"/>
+          <path d="M3 12 l5 8 l5-8" fill="none" stroke="#c81e1e" stroke-width="2"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> လူတစ်ယောက်ချင်း ထည့်ပါ။ မြှားက <b>၂</b> တင်ပြရန် ဆီ ညွှန်သည်။ ငွေသားပေးမည့်သူအတွက် ငွေသားစာရင်း ဖွင့်ထားရမည်။</p>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> နေ့ကုန်ရင် ငွေသားစာရင်းကို ပိတ်ပါ။ နောက်အခန်းဖြစ်သည်။</div>
+</section>
+
+<section class="chapter" id="close">
+  <h1>၂၀။ နေ့အဆုံး ငွေပိတ်ခြင်း</h1>
+  <p>ဧည့်ကြိုက မိမိဖွင့်ထားသော စာရင်းကိုသာ ပိတ်နိုင်သည်။ ပိတ်ပြီးရင် ပြန်မပြင်ရပါ။</p>
+  <ol class="steps">
+    <li>တင်ပြီး မအတည်ဖြစ်သေးသော စာရင်း ကျန်သေးလား ကြည့်ပါ။ ကျန်ရင် မန်နေဂျာကို အရင်ပြောပါ။</li>
+    <li><strong>ငွေသားစာရင်း</strong> ကို ဖွင့်ပါ။</li>
+    <li>ကောင်တာထဲက ငွေသားကို ရေတွက်ပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ ရေတွက်ရသော ငွေကို <strong>အမှန်တကယ် ပိတ်လက်ကျန်</strong> မှာ ရိုက်ပါ။</li>
+    <li>စနစ်ပြသော <strong>မျှော်မှန်း ပိတ်လက်ကျန်</strong> နဲ့ တူမတူ ကြည့်ပါ။</li>
+    <li>မတူရင် မြှားပြထားသော <b>၂</b>၊ ဘာကြောင့်လဲ အကြောင်းရင်း ရေးပါ။</li>
+    <li>ပိတ်ပါ။</li>
+  </ol>
+  <div class="note">
+    ရှိသင့်သော ငွေ = အဖွင့်ငွေ + ငွေသားဝင်ငွေ − ငွေသားကုန်ကျစရိတ် + ပိုင်ရှင် ပြင်ဆင်ထားသော ငွေ။
+    ဒီဂဏန်းကို ဘရောက်ဇာက ရိုက်လို့ မရပါ။ စနစ်က အတည်ဖြစ်ပြီးသား စာရင်းကနေ ပြန်တွက်သည်။
+  </div>
+  <div class="shot">
+    <div class="shot-bar">ငွေသားစာရင်း ပိတ်ခြင်း</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navon">ငွေသားစာရင်း</div>
+      </aside>
+      <div class="main">
+        <h4>ဖွင့်ထားသည်</h4>
+        <div class="grid3">
+          <div class="stat"><span>အဖွင့် ငွေသား</span><b>50000</b></div>
+          <div class="stat"><span>မျှော်မှန်း ပိတ်လက်ကျန်</span><b>73500</b></div>
+          <div class="stat"><span>ကွာခြားချက်</span><b>၀</b></div>
+        </div>
+        <div class="card">
+          <div class="small">အမှန်တကယ် ပိတ်လက်ကျန်</div>
+          <div class="field">73500</div>
+          <div class="ring" style="left:10px;top:26px;width:120px;height:30px;"></div>
+          <div class="mark" style="left:134px;top:32px;">1</div>
+          <div class="small" style="margin-top:6px;">ကွာရင် အကြောင်းရင်း</div>
+          <div class="field">မကွာပါ</div>
+          <div class="ring" style="left:10px;top:78px;width:160px;height:30px;"></div>
+          <div class="mark" style="left:174px;top:84px;">2</div>
+          <svg class="arrow" style="left:60px;top:54px;width:16px;height:24px;" viewBox="0 0 16 24">
+            <path d="M8 0 V16" stroke="#c81e1e" stroke-width="2"/>
+            <path d="M3 12 l5 8 l5-8" fill="none" stroke="#c81e1e" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> လက်တွေ့ရေတွက်သော ငွေ။ မြှားက <b>၂</b> ကွာခြားရင် ရေးရမည့်အကြောင်းရင်းဆီ ညွှန်သည်။</p>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> ပိတ်ပြီးပါက ဒီနေ့ ကောင်တာအလုပ် ပြီးပါပြီ။ ပိုင်ရှင်က နောက်နေ့ ပင်မစာမျက်နှာမှာ စာရင်းကို ပြန်ကြည့်နိုင်သည်။</div>
+</section>
+
+<section class="chapter" id="dash">
+  <h1>၂၁။ ပင်မစာမျက်နှာနဲ့ အစီရင်ခံစာ</h1>
+  <p>ပိုင်ရှင်၊ မန်နေဂျာက ဒီနေ့ Gym ဘယ်လိုလဲ ဆိုတာ ဒီမှာ ကြည့်သည်။ မအတည်ဖြစ်သေးသော စာရင်းနဲ့ ငြင်းထားသော စာရင်းက ဝင်ငွေ၊ အမြတ်ထဲ မပါပါ။</p>
+  <ol class="steps">
+    <li><strong>ပင်မစာမျက်နှာ</strong> ကို ဖွင့်ပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ ယနေ့၊ ယခုအပတ်၊ ယခုလ ထဲက ကာလရွေးပါ။</li>
+    <li>ကတ်လေးကွက်ကို ဖတ်ပါ။ ဝင်ငွေ၊ စောင့်နေသော ငွေ၊ သက်တမ်းကုန်တော့မည့်သူ၊ ဒီနေ့လာသူ။</li>
+    <li>မြှားအတိုင်း အသေးစိတ်လိုရင် <strong>အစီရင်ခံစာများ</strong> ကို ဖွင့်ပါ။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">ပင်မစာမျက်နှာ</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navon">ပင်မစာမျက်နှာ</div>
+        <div class="navitem">အစီရင်ခံစာများ</div>
+      </aside>
+      <div class="main">
+        <div class="row">
+          <h4 style="margin:0;">ပင်မစာမျက်နှာ</h4>
+          <span class="btn ghost">ယနေ့</span>
+          <span class="btn ghost">ယခုအပတ်</span>
+          <span class="btn ghost">ယခုလ</span>
+        </div>
+        <div class="ring" style="left:150px;top:8px;width:210px;height:28px;"></div>
+        <div class="mark" style="left:364px;top:12px;">1</div>
+        <div class="grid4">
+          <div class="stat"><span>စုစုပေါင်း ဝင်ငွေ</span><b>—</b></div>
+          <div class="stat"><span>အတည်ပြုရန် ကျန်</span><b>—</b></div>
+          <div class="stat"><span>သက်တမ်းကုန်တော့မည်</span><b>—</b></div>
+          <div class="stat"><span>လက်ရှိ Gym ထဲ</span><b>—</b></div>
+        </div>
+        <svg class="arrow" style="left:20px;top:78px;width:16px;height:18px;" viewBox="0 0 16 18">
+          <path d="M8 0 V10" stroke="#c81e1e" stroke-width="2"/>
+          <path d="M3 8 l5 8 l5-8" fill="none" stroke="#c81e1e" stroke-width="2"/>
+        </svg>
+        <p class="small">မြှားက ကတ်တွေဆီ ညွှန်သည်။ ဂဏန်းက အတည်ဖြစ်ပြီးသား စာရင်းပဲ ပါသည်။</p>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> ကြည့်မည့်ကာလ။ အောက်က ကတ်တွေက ထိုကာလ၏ အဖြေဖြစ်သည်။</p>
+  <h3>ကတ်တွေက ဘာကို ပြသလဲ</h3>
+  <ul class="plain">
+    <li><strong>ဝင်ငွေ။</strong> အဖွဲ့ဝင်အသစ်၊ သက်တမ်းတိုး၊ PT၊ အတန်း၊ ပစ္စည်း၊ အခြား။ ပစ္စည်းအမြတ်ကို သီးခြားပြသည်။</li>
+    <li><strong>ပေးရန်ကျန်။</strong> သက်တမ်းကျော်ပြီး ငွေမရှင်းရသေးသူ။ အတည်ပြုရန် စောင့်နေသော မူကြမ်းက ဒါနဲ့ မတူပါ။ သီးခြားပြသည်။</li>
+    <li><strong>သက်တမ်းကုန်တော့မည်။</strong> ၃ ရက်၊ ၇ ရက်၊ ၃၀ ရက် အတွင်း ကုန်မည့်သူ။</li>
+    <li><strong>လာရောက်မှု။</strong> ဒီနေ့ လာသော လူဦးရေ၊ ဝင်မှတ်အကြိမ်၊ မထွက်ရသေးသူ။</li>
+  </ul>
+  <p>အသားတင်အမြတ် = စုစုပေါင်းဝင်ငွေ − စုစုပေါင်းကုန်ကျစရိတ်။ ပစ္စည်းအမြတ်က ငှားရမ်းခ၊ လစာ မနုတ်ရသေးသော ပစ္စည်းအမြတ်သာ ဖြစ်သည်။</p>
+  <p>သင်တန်းဆရာပိုင်သော ပင်မစာမျက်နှာက မိမိအဖွဲ့ဝင်၊ မိမိအချိန်၊ မိမိကော်မရှင်ကို ပြသည်။ Gym တစ်ဆိုင်လုံး အမြတ်ကို မပြပါ။</p>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> စာရင်းရှာချင်ရင် လက်ထောက်ကို မေးနိုင်သည်။ နောက်အခန်းဖြစ်သည်။</div>
+</section>
+
+<section class="chapter" id="assistant">
+  <h1>၂၂။ လက်ထောက်</h1>
+  <p>လက်ထောက်က ဒီ Gym အကြောင်းကို စာရိုက်မေးနိုင်သော နေရာဖြစ်သည်။ ကိုယ့်အလုပ်ခွင့်ထက် ပိုသော အချက်ကို မပြပါ။ တခြား Gym ကို မပြပါ။</p>
+  <ol class="steps">
+    <li>ဘယ်ဘက်က <strong>လက်ထောက်</strong> ကို နှိပ်ပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ အောက်က အကွက်မှာ မေးခွန်းကို မြန်မာလို ရိုက်ပါ။ ဥပမာ “ဒီနေ့ ဘယ်သူတွေ ဝင်ထားလဲ”။</li>
+    <li>မြှားပြထားသော <b>၂</b>၊ <strong>ပို့ရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>အဖြေလာရင် ဖတ်ပါ။</li>
+    <li>လက်ထောက်က စာရင်းပြောင်းမယ်ဆိုရင် ချက်ချင်းမပြောင်းပါ။ <strong>ပြောင်းလဲမှုကို အတည်ပြုရန်</strong> ပေါ်မှ နှိပ်ပါ။ မလုပ်ချင်ရင် <strong>ပြောင်းလဲမှုကို ငြင်းပယ်ရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>စကားပြောအသစ် စချင်ရင် <strong>စကားပြောအသစ်</strong> ကို နှိပ်ပါ။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">လက်ထောက်</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="navon">လက်ထောက်</div>
+      </aside>
+      <div class="main">
+        <h4>လက်ထောက်</h4>
+        <p class="small">ဤအားကစားရုံအကြောင်း မေးပါ။ ပြောင်းလဲမှုများကို သင်အတည်ပြုမှသာ လုပ်ဆောင်သည်။</p>
+        <div class="card"><span class="badge-wait">အတည်ပြုရန် စောင့်နေသော ပြောင်းလဲမှု</span>
+          <div class="row" style="margin-top:6px;">
+            <span class="btn">ပြောင်းလဲမှုကို အတည်ပြုရန်</span>
+            <span class="btn ghost">ပြောင်းလဲမှုကို ငြင်းပယ်ရန်</span>
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <div class="field" style="flex:1;">ဒီနေ့ ငွေဘယ်လောက်ဝင်လဲ</div>
+          <span class="btn">ပို့ရန်</span>
+        </div>
+        <div class="ring" style="left:12px;bottom:12px;width:240px;height:30px;"></div>
+        <div class="mark" style="left:0;bottom:40px;">1</div>
+        <div class="ring" style="right:12px;bottom:12px;width:64px;height:30px;"></div>
+        <div class="mark" style="right:80px;bottom:40px;">2</div>
+        <svg class="arrow" style="right:86px;bottom:20px;width:22px;height:14px;" viewBox="0 0 22 14">
+          <path d="M0 7 H14" stroke="#c81e1e" stroke-width="2"/>
+          <path d="M10 2 l8 5 l-8 5" fill="none" stroke="#c81e1e" stroke-width="2"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> မေးခွန်းရိုက်ပါ။ မြှားက <b>၂</b> ပို့ရန် ဆီ ညွှန်သည်။ ပြောင်းလဲမှုပေါ်ရင် အတည်ပြုမှ လုပ်သည်။</p>
+  <div class="warn">လက်ထောက်အဖြေကို ငွေအတည်ပြုခြင်းနေရာမှာ အစားမထိုးပါနဲ့။ ငွေက အခန်း ၁၁ အတိုင်း လူက စစ်ပြီး အတည်ပြုရသည်။</div>
+</section>
+
+<section class="chapter" id="staff">
+  <h1>၂၃။ ဝန်ထမ်း၊ ရာထူး၊ ပိုင်ရှင်၊ လုံခြုံရေး</h1>
+  <p>ဒီအခန်းက ပိုင်ရှင်နဲ့ ခွင့်ရှိသော မန်နေဂျာအတွက် ဖြစ်သည်။</p>
+  <h3>ဝန်ထမ်းခေါ်ပုံ</h3>
+  <ol class="steps">
+    <li><strong>ဝန်ထမ်း</strong> ကို ဖွင့်ပါ။</li>
+    <li>ပုံထဲက <b>၁</b>၊ <strong>ဝန်ထမ်းဖိတ်ခေါ်ရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>အမည်၊ အီးမေးလ်၊ ရာထူး ထည့်ပါ။ ဧည့်ကြို၊ မန်နေဂျာ၊ စာရင်းကိုင်၊ သင်တန်းဆရာ ထဲက မှန်တာ ရွေးပါ။</li>
+    <li>ပို့ပါ။ ထိုသူက အီးမေးလ်ထဲက လင့်ခ်ကို ဖွင့်ပြီး စကားဝှက်ထားမှ ဝင်လို့ ရသည်။ အခန်း ၅ ကို ပြန်ကြည့်ပါ။</li>
+    <li>ထွက်သွားသူကို ဖြုတ်ပါ။ အကောင့်ကို သူများဆီ မလွှဲပါနဲ့။</li>
+  </ol>
+  <div class="shot">
+    <div class="shot-bar">ဝန်ထမ်း</div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand">GymPilot</div>
+        <div class="folder">ဆက်တင်</div>
+        <div class="navon">ဝန်ထမ်း</div>
+        <div class="navitem">ရာထူးများ</div>
+        <div class="navitem">ပိုင်ရှင်များ</div>
+      </aside>
+      <div class="main">
+        <div class="row" style="justify-content:space-between;">
+          <h4 style="margin:0;">ဝန်ထမ်း</h4>
+          <span class="btn">ဝန်ထမ်းဖိတ်ခေါ်ရန်</span>
+        </div>
+        <div class="ring" style="right:10px;top:8px;width:132px;height:30px;"></div>
+        <div class="mark" style="right:146px;top:14px;">1</div>
+        <table class="mini">
+          <tr><th>အမည်</th><th>ရာထူး</th><th>အခြေအနေ</th></tr>
+          <tr><td>ကိုထွန်း</td><td>ဧည့်ကြို</td><td><span class="badge-ok">အသုံးပြုနေသည်</span></td></tr>
+          <tr><td>မမလဲ့</td><td>သင်တန်းဆရာ</td><td><span class="badge-wait">ဖိတ်ကြားထားသည်</span></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>၁</b> ဝန်ထမ်းဖိတ်ခေါ်ရန်။ ဖိတ်ထားသူက လင့်ခ်မဖွင့်ရသေးရင် အခြေအနေက ဖိတ်ကြားထားသည် လို့ ပဲ နေမည်။</p>
+  <h3>ရာထူး</h3>
+  <p><strong>ရာထူးများ</strong> မှာ ဘယ်သူ ဘာလုပ်ခွင့်ရှိလဲ သတ်မှတ်သည်။ ဧည့်ကြိုကို ငွေအတည်ပြုခွင့် မပေးပါနဲ့။ ပေးလိုက်ရင် ရေးသူနဲ့ အတည်ပြုသူ မခွဲတော့ပါ။ အထူးရာထူး လိုရင် <strong>အခန်းကဏ္ဍဖန်တီးရန်</strong> ကို နှိပ်ပြီး လိုသော အလုပ်ပဲ ရွေးပါ။</p>
+  <h3>ပိုင်ရှင်</h3>
+  <ol class="steps">
+    <li><strong>ပိုင်ရှင်များ</strong> ကို ဖွင့်ပါ။ ဖုန်းကုဒ် ၆ လုံး တောင်းနိုင်သည်။</li>
+    <li>ပိုင်ရှင်အသစ်၏ အီးမေးလ်ကို ထည့်ပြီး ဖိတ်ပါ။</li>
+    <li>ထိုသူက ဖိတ်စာလက်ခံမှ ပိုင်ရှင်ဖြစ်သည်။ ပိုင်ရှင်တိုင်း အလုပ်ခွင့် တူသည်။</li>
+    <li>ဖယ်မယ်ဆိုရင် အနည်းဆုံး ပိုင်ရှင်တစ်ယောက် ကျန်ရမည်။</li>
+  </ol>
+  <h3>Gym ဆက်တင်</h3>
+  <p><strong>ဆက်တင်</strong> မှာ Gym အမည်၊ အချိန်ဇုန်၊ ငွေကြေးကို ကြည့်ပါ။ ငွေကြေးကို နောက်မှ ရောမသုံးပါနဲ့။ စာရင်းတစ်ခုထဲမှာ ဘတ်နဲ့ ကျပ် မရောပါ။ Gym အသစ်၏ ပုံမှန်ငွေကြေးက ထိုင်းဘတ်ဖြစ်သည်။</p>
+  <h3>စစ်ဆေးမှု မှတ်တမ်း</h3>
+  <p><strong>စစ်ဆေးမှု မှတ်တမ်းများ</strong> မှာ ဘယ်သူက ဘာပြင်ခဲ့လဲ ကြည့်နိုင်သည်။ ငွေစာရင်း အငြင်းပွားရင် ဒီမှာ ပြန်စစ်ပါ။ မှတ်တမ်းကို ဖျက်လို့ မရပါ။</p>
+  <h3>အကောင့်ထွက်ပုံ</h3>
+  <ol class="steps">
+    <li>အပေါ်က မိမိအမည်ကို နှိပ်ပါ။</li>
+    <li><strong>အကောင့်မှ ထွက်ရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>ကောင်တာကွန်ပျူတာကို တစ်ယောက်တည်း ထားခဲ့ရင် ထွက်ပြီးမှ ထွက်သွားပါ။</li>
+  </ol>
+</section>
+
+<section class="chapter" id="phone">
+  <h1>၂၄။ အဖွဲ့ဝင် ဖုန်းအက်ပ်</h1>
+  <p>အဖွဲ့ဝင်သုံးသော ဖုန်းအက်ပ်က GymPilot MM ဖြစ်သည်။ ဝန်ထမ်းစာမျက်နှာနဲ့ မတူပါ။ မိမိအချက်ပဲ မြင်ရသည်။</p>
+  <h3>ဝင်ပုံ</h3>
+  <ol class="steps">
+    <li>ဖုန်းမှာ GymPilot MM ကို ဖွင့်ပါ။</li>
+    <li>Gym က ချိတ်ပေးထားသော အီးမေးလ်နဲ့ စကားဝှက် ရိုက်ပါ။ သို့ <strong>Google ဖြင့် ဝင်ရောက်ရန်</strong> ကို နှိပ်ပါ။ Google အီးမေးလ်က အဖွဲ့ဝင်အီးမေးလ်နဲ့ တူရမည်။</li>
+    <li><strong>ဝင်ရောက်ရန်</strong> ကို နှိပ်ပါ။</li>
+  </ol>
+  <h3>အောက်ခြေ ခလုတ်ငါးခု</h3>
+  <div class="phones">
+    <div class="phone">
+      <div class="top">ပင်မ</div>
+      <div class="body">
+        <div class="card" style="margin:0;">
+          <div class="small">အသင်းဝင်မှု</div>
+          <b>၁ လ · သက်တမ်းကျန်</b>
+          <div class="small">ကျန်ရှိသောရက်ကို ဒီမှာ ကြည့်ပါ</div>
+        </div>
+        <div class="ring" style="left:10px;top:36px;right:10px;height:62px;"></div>
+        <div class="mark" style="left:4px;top:8px;">1</div>
+      </div>
+      <div class="tabs">
+        <div class="on">ပင်မ</div><div>အချိန်ဇယား</div><div>စကန်</div><div>ဝင်စာ</div><div>အကောင့်</div>
+      </div>
+    </div>
+    <div class="phone">
+      <div class="top">စကန်ဖတ်ရန်</div>
+      <div class="body">
+        <div class="card" style="height:90px;margin:0;display:flex;align-items:center;justify-content:center;">ကင်မရာ</div>
+        <p class="small">Gym ဖန်သားပြင်က ကုဒ်ကို ချိန်ပါ။</p>
+        <div class="ring" style="left:10px;top:36px;right:10px;height:96px;"></div>
+        <div class="mark" style="right:6px;top:8px;">2</div>
+      </div>
+      <div class="tabs">
+        <div>ပင်မ</div><div>အချိန်ဇယား</div><div class="on">စကန်</div><div>ဝင်စာ</div><div>အကောင့်</div>
+      </div>
+    </div>
+    <div style="flex:1;">
+      <p><b>၁ ပင်မ။</b> ကတ်သက်တမ်း၊ ကျန်ရက်၊ PT ရှိမရှိ ကြည့်ပါ။</p>
+      <p><b>အချိန်ဇယား။</b> PT နဲ့ အတန်းချိန်းကို ကြည့်ပါ။ အတန်းပက်ကေ့ဂျ် ကျန်ရင် အတန်းကို ကြိုတင်စာရင်းသွင်းပါ။</p>
+      <p><b>၂ စကန်။</b> ကောင်တာဖန်သားပြင်က QR ကို ဖတ်ပါ။ ကင်မရာခွင့်ပြုချက် တောင်းရင် ခွင့်ပြုပါ။</p>
+      <p><b>ဝင်စာ။</b> သက်တမ်းသတိပေးချက်နဲ့ Gym ကြေညာချက်ကို ဖတ်ပါ။ ဖတ်ပြီးဟု မှတ်နိုင်သည်။ ဒီကနေ စာပြန်ပို့လို့ မရပါ။</p>
+      <p><b>အကောင့်။</b> ကိုယ်ရေးအချက်၊ ငွေမှတ်တမ်း၊ ဝင်မှတ်မှတ်တမ်း၊ ပက်ကေ့ဂျ်၊ အကြောင်းကြားချက်၊ ထွက်ရန် ရှိသည်။</p>
+    </div>
+  </div>
+  <h3>အဖွဲ့ဝင် နေ့စဉ်လုပ်ပုံ</h3>
+  <ol class="steps">
+    <li>Gym ရောက်ရင် အက်ပ်ဖွင့်ပါ။</li>
+    <li><strong>စကန်ဖတ်ရန်</strong> ကို နှိပ်ပါ။</li>
+    <li>ဖန်သားပြင်က လက်ရှိ QR ကို ချိန်ပါ။ အဟောင်းဓာတ်ပုံ မရပါ။</li>
+    <li>ဝင်မှတ်ပြီးကြောင်း ပေါ်ရင် လေ့ကျင့်ပါ။</li>
+    <li>ပြန်ထွက်မယ်ဆိုရင် <strong>ထွက်ခွာမှတ်ရန်</strong> ကို နှိပ်ပါ။ မေ့ရင် နောက်နေ့ ဝင်မှတ်ချိန်မှာ မနေ့စာရင်း ပိတ်သွားနိုင်သည်။</li>
+  </ol>
+  <h3>ကိုယ်ရေးအချက် ပြင်ပုံ</h3>
+  <ol class="steps">
+    <li><strong>အကောင့်</strong> ကို နှိပ်ပါ။</li>
+    <li><strong>ကိုယ်ရေးအချက်အလက်</strong> ကို ဖွင့်ပါ။</li>
+    <li>ဖုန်း၊ လိပ်စာ ပြင်ပြီး <strong>ကိုယ်ရေးအချက်အလက် သိမ်းရန်</strong> ကို နှိပ်ပါ။ အနည်းဆုံး တစ်ခု ပြောင်းမှ သိမ်းလို့ ရသည်။</li>
+    <li>ဓာတ်ပုံပြောင်းရင် <strong>ဓာတ်ပုံ ရွေးရန်</strong> သို့ <strong>ဓာတ်ပုံ ရိုက်ရန်</strong> ကို နှိပ်ပါ။ ဖျက်ရင် <strong>ဓာတ်ပုံ ဖယ်ရှားရန်</strong> ကို နှိပ်ပါ။</li>
+  </ol>
+  <h3>ငွေနဲ့ ကတ် ကြည့်ပုံ</h3>
+  <ol class="steps">
+    <li>အကောင့်ထဲက <strong>အသင်းဝင်မှု</strong> ကို ဖွင့်ပါ။ လက်ရှိကတ်နဲ့ ကုန်ရက်ကို ကြည့်ပါ။</li>
+    <li><strong>ငွေပေးချေမှုများ</strong> ကို ဖွင့်ပါ။ ပေးချေပြီး ဆိုရင် Gym က အတည်ပြုပြီးဖြစ်သည်။ စောင့်ဆိုင်းနေသည် ဆိုရင် ဝန်ထမ်း အတည်မပြုရသေးပါ။</li>
+    <li><strong>ပက်ကေ့ဂျ်များ</strong> မှာ ကျန်လေ့ကျင့်ချိန်ကို ကြည့်ပါ။</li>
+  </ol>
+  <h3>အကြောင်းကြားချက်</h3>
+  <ol class="steps">
+    <li>အကောင့်ထဲက အကြောင်းကြားချက် ဆက်တင်ကို ဖွင့်ပါ။</li>
+    <li>ဖုန်းက ခွင့်ပြုမလား မေးရင် လိုမှ ခွင့်ပြုပါ။ မခွင့်ပြုလည်း ဝင်စာစာရင်းကို အက်ပ်ထဲ ဖတ်လို့ ရသည်။</li>
+    <li>မလိုချင်ရင် ပိတ်ထားနိုင်သည်။ Gym က ထိုရွေးချယ်မှုကို လေးစားရမည်။</li>
+  </ol>
+  <h3>ထွက်ပုံ</h3>
+  <p>အကောင့်ထဲက <strong>အကောင့်မှ ထွက်ရန်</strong> ကို နှိပ်ပါ။ ဖုန်းပျောက်ရင် Gym ကို ပြောပါ။ ဝန်ထမ်းက ချိတ်ဆက်မှုကို ပိတ်ပေးနိုင်သည်။ စကားဝှက်ကိုလည်း ပြန်သတ်မှတ်ပါ။</p>
+</section>
+
+<section class="chapter" id="admin">
+  <h1>၂၅။ Gym အသစ် ဖွင့်ပေးသူ</h1>
+  <p>ဒီအခန်းက Gym တစ်ဆိုင်ချင်း၏ ဧည့်ကြိုအတွက် မဟုတ်ပါ။ Gym အများစီမံသော စနစ်စီမံသူအတွက် ဖြစ်သည်။ ဆိုင်ထဲက ပိုင်ရှင်က ဒီစာမျက်နှာကို မမြင်ရတတ်ပါ။</p>
+  <ol class="steps">
+    <li>စနစ်စီမံသူအကောင့်နဲ့ ဝင်ပါ။ ဖုန်းကုဒ် ၆ လုံး လိုသည်။</li>
+    <li><strong>Gym များ</strong> ကို ဖွင့်ပါ။</li>
+    <li>Gym အသစ်အတွက် အမည်၊ ကုဒ်၊ ပိုင်ရှင်အီးမေးလ် ထည့်ပါ။</li>
+    <li>ဖွင့်ပေးပါ။ ပိုင်ရှင်ဆီ ဖိတ်အီးမေးလ် ရောက်မည်။</li>
+    <li>ပိုင်ရှင်က အခန်း ၅ အတိုင်း ဖိတ်စာလက်ခံပြီး စကားဝှက်ထားပါ။</li>
+    <li>ပြီးရင် ပိုင်ရှင်က ဆိုင်ထဲဝင်ပြီး ဝန်ထမ်းခေါ်သည်၊ ပလန်လုပ်သည်၊ ငွေသားစာရင်း စဖွင့်သည်။</li>
+  </ol>
+  <p><strong>စာရင်းသွင်းမှုများ</strong> မှာ Gym က စနစ်ကို ဘယ်နေ့အထိ သုံးခွင့်ရှိလဲ ကြည့်သည်။ <strong>စစ်ဆေးမှု မှတ်တမ်းများ</strong> မှာ စနစ်အဆင့် လုပ်ဆောင်ချက်ကို ကြည့်သည်။ Gym ထဲက အဖွဲ့ဝင်ငွေကို ဒီနေရာကနေ မပြင်ပါ။</p>
+  <div class="next"><b>ပြီးရင် ဘာလုပ်မလဲ။</b> Gym ပိုင်ရှင်ကို ဒီစာအုပ်၏ အခန်း ၅ ကနေ စဖတ်ခိုင်းပါ။</div>
+</section>
+
+<section class="chapter" id="wrong">
+  <h1>၂၆။ မှားရင် ဘာလုပ်မလဲ</h1>
+  <p>အတည်ဖြစ်ပြီးသား ငွေစာရင်းကို ဖျက်လို့ မရပါ။ ပြန်ပြင်လို့ မရပါ။ မှားရင် အောက်က နည်းအတိုင်း လုပ်ပါ။</p>
+  <table>
+    <tr><th>ဘာဖြစ်နေလဲ</th><th>ဘာလုပ်မလဲ</th></tr>
+    <tr><td>မူကြမ်းမှားသည်။ မတင်ရသေးပါ</td><td>မူကြမ်းကို ပြင်ပါ။ မလိုရင် မူကြမ်းကို ပယ်ဖျက်ပါ။ ငွေမဝင်သေးပါ။</td></tr>
+    <tr><td>တင်ပြီးမှ မှားမှန်းသိသည်။ မအတည်ဖြစ်သေးပါ</td><td>မန်နေဂျာက ငြင်းပါ။ အကြောင်းရင်းရေးပါ။ ပြီးရင် မူကြမ်းအသစ် ပြန်တင်ပါ။</td></tr>
+    <tr><td>အတည်ဖြစ်ပြီးမှ ငွေပမာဏ မှားသည်</td><td>ခွင့်ရှိသူက ထိုငွေကို ပယ်ဖျက်ပါ။ သို့ ပြန်အမ်းပါ။ ပြေစာနံပါတ် အဟောင်းကို ပြန်မသုံးပါ။ ငွေသားဆိုရင် ဖွင့်ထားသော ငွေသားစာရင်း လိုသည်။ ပိတ်ပြီးသား အံဆွဲကို ပြန်မဖွင့်ပါ။</td></tr>
+    <tr><td>ပြေစာစက္ကူပဲ မှားသည်။ ငွေက မှန်သည်</td><td>ပြေစာကိုသာ ပယ်ဖျက်ပါ။ ငွေနဲ့ ဝင်ငွေ မပြောင်းပါ။</td></tr>
+    <tr><td>ပစ္စည်းရောင်းပြီး ပြန်အပ်သည်</td><td>လက်လီအရောင်းထဲက ပြန်အပ်ကို သုံးပါ။ လက်ကျန် ပြန်တက်မည်။</td></tr>
+    <tr><td>လစာအတည်ဖြစ်ပြီးမှ မှားသည်</td><td>လစာကာလကို ခွင့်ရှိသူက ပယ်ဖျက်ပါ။ လူကို ကိုယ်တိုင် ကုန်ကျစရိတ်ထဲက ပယ်မဖျက်ပါနဲ့။</td></tr>
+    <tr><td>ဝင်မှတ် ငြင်းသည်</td><td>အခန်း ၁၂ က အကြောင်းတွေကို စစ်ပါ။ ခလုတ်ကို ထပ်မနှိပ်ပါနဲ့။</td></tr>
+    <tr><td>စကားဝှက် မမှတ်မိပါ</td><td>အခန်း ၅၊ စကားဝှက် မေ့ရင် ကို လုပ်ပါ။</td></tr>
+    <tr><td>စာမျက်နှာ မပေါ်ပါ</td><td>ကိုယ့်ရာထူးမှာ ထိုအလုပ်ခွင့် မရှိခြင်း ဖြစ်နိုင်သည်။ ပိုင်ရှင်ကို ပြောပါ။</td></tr>
+    <tr><td>အင်တာနက် ပြတ်သည်</td><td>စာရင်းကို စက္ကူမှာ ယာယီမှတ်ပါ။ ပြန်ရရင် စနစ်ထဲ ပြန်ထည့်ပါ။ စက္ကူစာရင်းကို အတည်ငွေလို့ မယူဆပါနဲ့။</td></tr>
+  </table>
+  <div class="warn"><b>ကိုယ်ရေးထားသော စာရင်းကို ကိုယ်တိုင် အတည်မပြုပါနဲ့။</b> တင်သူနဲ့ အတည်ပြုသူ လူချင်းမတူရပါ။ ဒါက ငွေမှားမှုကို ကာကွယ်သော စည်းကမ်းဖြစ်သည်။</div>
+</section>
+
+<section class="chapter" id="faq">
+  <h1>၂၇။ မေးလေ့ရှိသော မေးခွန်း</h1>
+  <p><b>အဖွဲ့ဝင်ထည့်ပြီးတာနဲ့ ဝင်လို့ ရပြီလား။</b><br>မရသေးပါ။ ကတ်စပြီး ငွေကို မန်နေဂျာ အတည်ပြုမှ ရသည်။</p>
+  <p><b>ထွက်မှတ်ရင် ကတ်ပါ ပိတ်သွားလား။</b><br>မပိတ်ပါ။ ဒီနေ့လာရောက်မှုပဲ ပိတ်သည်။</p>
+  <p><b>ငွေတင်ပြီးတာနဲ့ ပြေစာရလား။</b><br>မရသေးပါ။ အတည်ပြုမှ ရသည်။</p>
+  <p><b>ဧည့်ကြိုက ကိုယ့်စာရင်းကို ကိုယ်အတည်ပြုလို့ ရလား။</b><br>မရပါ။</p>
+  <p><b>ငွေသားစာရင်း မဖွင့်ဘဲ ငွေသားလက်ခံလို့ ရလား။</b><br>စာရင်းကို ရေးလို့ ရနိုင်သည်။ အတည်ပြုလို့ မရပါ။ အရင်ဖွင့်ပါ။</p>
+  <p><b>နောက်ဧည့်ကြို၏ အံဆွဲကို ဘာလို့ မမြင်ရသလဲ။</b><br>ကိုယ်ဖွင့်ထားသော အံဆွဲပဲ မြင်ရအောင် လုပ်ထားသောကြောင့် ဖြစ်သည်။</p>
+  <p><b>QR ဓာတ်ပုံကို နောက်နေ့ သုံးလို့ ရလား။</b><br>မရပါ။ ကုဒ်က ပြောင်းနေသည်။ ဖန်သားပြင်က လက်ရှိကုဒ်ကို ဖတ်ပါ။</p>
+  <p><b>သက်တမ်းတိုးရင် အဖွဲ့ဝင်အသစ် ထပ်ဖွင့်ရလား။</b><br>မဖွင့်ရပါ။ လူဟောင်းကို ရှာပြီး ကတ်အသစ် စပါ။</p>
+  <p><b>လစာကို ဝန်ထမ်းကတ်ထဲက အလိုအလျောက် ယူသလား။</b><br>မယူပါ။ လတိုင်း ရေးရသည်။</p>
+  <p><b>ပစ္စည်းလက်ကျန်ကို ဂဏန်းပြင်လို့ ရလား။</b><br>တိုက်ရိုက် မပြင်ရပါ။ ဝယ်သွင်း၊ ရောင်း၊ ပြန်အပ်၊ ပျက်စီးမှု လို့ အကြောင်းရင်းနဲ့ မှတ်ရသည်။</p>
+  <p><b>ဘာသာစကား ဘယ်လိုပြောင်းမလဲ။</b><br>ဝင်စာမျက်နှာ ညာဘက်အပေါ်၊ သို့ အကောင့်နေရာက <strong>ဘာသာစကား</strong> ကို နှိပ်ပါ။</p>
+  <p><b>ဖုန်းပျောက်ရင် ဘာလုပ်မလဲ။</b><br>စကားဝှက်ကို ပြန်သတ်မှတ်ပါ။ Gym ကို ပြောပြီး ဖုန်းချိတ်ဆက်မှုကို ပိတ်ခိုင်းပါ။</p>
+  <footer class="foot">
+    GymPilot အသုံးပြုပုံ။ ဝန်ထမ်းနေ့စဉ်အလုပ်အတွက် ရေးထားသည်။ ခလုတ်နာမည်က app ထဲက မြန်မာစာအတိုင်း ဖြစ်သည်။ ငွေစည်းကမ်းပြောင်းရင် ပိုင်ရှင်က ဒီစာအုပ်ကို ပြန်ဖြည့်ပါ။
+  </footer>
+</section>
+
+</body>
+</html>

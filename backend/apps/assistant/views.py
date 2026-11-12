@@ -42,6 +42,12 @@ from apps.assistant.serializers import (
     message_data,
     step_data,
 )
+from apps.assistant.throttling import (
+    AssistantGymReadThrottle,
+    AssistantGymTurnThrottle,
+    AssistantReadThrottle,
+    AssistantTurnThrottle,
+)
 from apps.assistant.turns import confirm_step, reject_step, run_turn, waiting_confirmation
 from apps.common.api.exceptions import RequestRejected
 from apps.common.api.responses import success_response
@@ -58,6 +64,13 @@ def _gym(request: Request) -> Gym:
     return gym
 
 
+def _actor(request: Request) -> GymMembership:
+    actor = getattr(request, "gym_membership", None)
+    if not isinstance(actor, GymMembership) or actor.gym_id != _gym(request).id:
+        raise PermissionDenied()
+    return actor
+
+
 def _reject_idempotency(request: Request) -> None:
     if request.headers.get("Idempotency-Key"):
         raise RequestRejected({"Idempotency-Key": ["Idempotency-Key is not accepted on a read."]})
@@ -66,6 +79,7 @@ def _reject_idempotency(request: Request) -> None:
 class AssistantStatusView(APIView):
     authentication_classes = [StaffJWTAuthentication]
     permission_classes = [IsAuthenticated]
+    throttle_classes = [AssistantReadThrottle, AssistantGymReadThrottle]
 
     @extend_schema(
         operation_id="assistant_status",
@@ -87,6 +101,7 @@ class AssistantStatusView(APIView):
 class ConversationListView(APIView):
     authentication_classes = [StaffJWTAuthentication]
     permission_classes = [IsAuthenticated]
+    throttle_classes = [AssistantReadThrottle, AssistantGymReadThrottle]
 
     @extend_schema(
         operation_id="assistant_conversations_list",
@@ -100,14 +115,16 @@ class ConversationListView(APIView):
     def get(self, request: Request) -> Response:
         _reject_idempotency(request)
         gym = _gym(request)
+        actor = _actor(request)
         query = validated(ConversationListQuerySerializer(data=request.query_params))
-        rows = list_conversations(gym=gym, limit=int(query["limit"]))
+        rows = list_conversations(gym=gym, actor=actor, limit=int(query["limit"]))
         return success_response([conversation_data(row) for row in rows])
 
 
 class ConversationDetailView(APIView):
     authentication_classes = [StaffJWTAuthentication]
     permission_classes = [IsAuthenticated]
+    throttle_classes = [AssistantReadThrottle, AssistantGymReadThrottle]
 
     @extend_schema(
         operation_id="assistant_conversations_read",
@@ -121,16 +138,17 @@ class ConversationDetailView(APIView):
     def get(self, request: Request, id: UUID) -> Response:
         _reject_idempotency(request)
         gym = _gym(request)
-        conversation = get_conversation(gym=gym, conversation_id=id)
+        actor = _actor(request)
+        conversation = get_conversation(gym=gym, actor=actor, conversation_id=id)
         payload = conversation_data(conversation)
         messages = list_messages(gym=gym, conversation=conversation)
         goals = list_goals(gym=gym, conversation=conversation)
         payload["messages"] = [message_data(row) for row in messages]
         payload["goals"] = [goal_summary(row) for row in goals]
-        actor = getattr(request, "gym_membership", None)
+        membership = getattr(request, "gym_membership", None)
         payload["pending_confirmation"] = (
-            waiting_confirmation(gym=gym, conversation=conversation, actor=actor)
-            if isinstance(actor, GymMembership)
+            waiting_confirmation(gym=gym, conversation=conversation, actor=membership)
+            if isinstance(membership, GymMembership)
             else None
         )
         return success_response(payload)
@@ -139,6 +157,7 @@ class ConversationDetailView(APIView):
 class GoalDetailView(APIView):
     authentication_classes = [StaffJWTAuthentication]
     permission_classes = [IsAuthenticated]
+    throttle_classes = [AssistantReadThrottle, AssistantGymReadThrottle]
 
     @extend_schema(
         operation_id="assistant_goals_read",
@@ -152,7 +171,8 @@ class GoalDetailView(APIView):
     def get(self, request: Request, id: UUID) -> Response:
         _reject_idempotency(request)
         gym = _gym(request)
-        goal = get_goal(gym=gym, goal_id=id)
+        actor = _actor(request)
+        goal = get_goal(gym=gym, actor=actor, goal_id=id)
         payload = goal_summary(goal)
         payload["result_summary"] = goal.result_summary
         payload["missing_information"] = list(goal.missing_information)
@@ -194,6 +214,8 @@ class _StaffCommandView(APIView):
 
 
 class AssistantTurnView(_StaffCommandView):
+    throttle_classes = [AssistantTurnThrottle, AssistantGymTurnThrottle]
+
     @extend_schema(
         operation_id="assistant_turns_create",
         request=TurnRequestSerializer,
@@ -221,6 +243,8 @@ class AssistantTurnView(_StaffCommandView):
 
 
 class AssistantConfirmView(_StaffCommandView):
+    throttle_classes = [AssistantTurnThrottle, AssistantGymTurnThrottle]
+
     @extend_schema(
         operation_id="assistant_confirmations_confirm",
         request=ConfirmRequestSerializer,
@@ -240,6 +264,8 @@ class AssistantConfirmView(_StaffCommandView):
 
 
 class AssistantRejectView(_StaffCommandView):
+    throttle_classes = [AssistantTurnThrottle, AssistantGymTurnThrottle]
+
     @extend_schema(
         operation_id="assistant_confirmations_reject",
         request=RejectRequestSerializer,

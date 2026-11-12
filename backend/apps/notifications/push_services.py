@@ -14,6 +14,7 @@ from apps.announcements.models import Announcement
 from apps.common.db.tenant_context import TenantContextError, set_gym_context
 from apps.members.member_device_services import revoke_invalid_token
 from apps.members.models import Member, MemberDevice, Membership
+from apps.members.services import gym_today
 from apps.notifications.models import MAX_NOTIFICATION_ATTEMPTS, Notification, PushAttempt
 from apps.notifications.services import (
     DELIVERY_BATCH_MAX,
@@ -25,6 +26,7 @@ from apps.notifications.services import (
     _require_bounds,
     _warning_days,
     build_expiry_payload,
+    expiry_reminder_still_due,
     in_app_expiry_deduplication_key,
     push_expiry_deduplication_key,
     render_expiry_message,
@@ -42,6 +44,38 @@ from apps.notifications.transport import (
 from apps.tenants.models import Gym, GymSettings
 
 _PUSH_ERRORS = {PROVIDER_UNAVAILABLE, DELIVERY_REJECTED, INVALID_TOKEN}
+_TRANSIENT_PUSH_ERRORS = {PROVIDER_UNAVAILABLE, DELIVERY_REJECTED}
+
+
+def classify_push_fanout(*, eligible: int, accepted: int, retryable: int) -> DeliveryOutcome:
+    """Choose the parent outcome after one device fan-out.
+
+    The parent status set cannot record partial acceptance. ``SENT`` means at
+    least one device was accepted and no eligible device still needs a retry.
+    ``FAILED`` means none were accepted and nothing retryable remains.
+    ``CANCELLED`` means no eligible device remains. ``RETRIED`` leaves the
+    parent ``PENDING``. Acceptance is the FCM HTTP result, not handset display.
+    """
+
+    if eligible < 1:
+        return DeliveryOutcome.CANCELLED
+    if retryable > 0:
+        return DeliveryOutcome.RETRIED
+    if accepted > 0:
+        return DeliveryOutcome.SENT
+    return DeliveryOutcome.FAILED
+
+
+def device_send_is_open(attempt: PushAttempt | None, *, max_attempts: int) -> bool:
+    """True when this device has not accepted the notification and may be tried."""
+
+    if attempt is None:
+        return True
+    if attempt.status == PushAttempt.Status.SENT:
+        return False
+    if attempt.last_error_code == INVALID_TOKEN:
+        return False
+    return attempt.attempt_count < max_attempts
 
 
 @transaction.atomic
@@ -172,6 +206,7 @@ def deliver_next_push_notification(
     gym: Gym,
     max_attempts: int = MAX_NOTIFICATION_ATTEMPTS,
     now: datetime | None = None,
+    today: date | None = None,
 ) -> DeliveryOutcome | None:
     """Lock one due push parent, fan out to consented devices, and commit later."""
 
@@ -200,7 +235,8 @@ def deliver_next_push_notification(
         return None
     if notification.attempt_count >= max_attempts:
         return _fail_parent(notification, now=moment, code=DELIVERY_REJECTED)
-    if _should_cancel(notification, gym=gym):
+    gym_day = today if today is not None else gym_today(gym)
+    if _should_cancel(notification, gym=gym, today=gym_day, now=moment):
         _cancel_parent(notification)
         return DeliveryOutcome.CANCELLED
     devices = list(
@@ -222,12 +258,6 @@ def deliver_next_push_notification(
         _cancel_parent(notification)
         return DeliveryOutcome.CANCELLED
     transport = get_transport()
-    any_success = PushAttempt.objects.filter(
-        gym=gym,
-        notification=notification,
-        status=PushAttempt.Status.SENT,
-    ).exists()
-    called_provider = False
     last_code = DELIVERY_REJECTED
     for device in devices:
         existing = (
@@ -235,8 +265,7 @@ def deliver_next_push_notification(
             .filter(gym=gym, notification=notification, member_device=device)
             .first()
         )
-        if existing is not None and existing.status == PushAttempt.Status.SENT:
-            any_success = True
+        if not device_send_is_open(existing, max_attempts=max_attempts):
             continue
         ciphertext = device.token_ciphertext
         if not ciphertext:
@@ -255,7 +284,6 @@ def deliver_next_push_notification(
                 provider_message_id="",
             )
             continue
-        called_provider = True
         try:
             result = transport.send(
                 PushRequest(
@@ -275,7 +303,6 @@ def deliver_next_push_notification(
             code = PROVIDER_UNAVAILABLE
             provider_message_id = ""
         if code == SENT:
-            any_success = True
             _write_attempt(
                 existing=existing,
                 gym=gym,
@@ -288,8 +315,10 @@ def deliver_next_push_notification(
             continue
         if code == INVALID_TOKEN:
             revoke_invalid_token(device=device)
-        else:
+        elif code in _TRANSIENT_PUSH_ERRORS:
             last_code = code
+        else:
+            last_code = DELIVERY_REJECTED
         _write_attempt(
             existing=existing,
             gym=gym,
@@ -299,23 +328,24 @@ def deliver_next_push_notification(
             code=code if code in _PUSH_ERRORS else DELIVERY_REJECTED,
             provider_message_id="",
         )
-    if any_success:
-        _mark_parent_sent(notification, now=moment)
-        return DeliveryOutcome.SENT
-    still_eligible = MemberDevice.objects.filter(
-        gym=gym,
-        member_id=notification.recipient_member_id,
-        revoked_at__isnull=True,
-        push_consent=True,
-        token_ciphertext__isnull=False,
-    ).exists()
-    if not still_eligible or not called_provider:
+    outcome = _fanout_outcome(gym=gym, notification=notification, max_attempts=max_attempts)
+    if outcome is DeliveryOutcome.CANCELLED:
         _cancel_parent(notification)
-        return DeliveryOutcome.CANCELLED
+        return outcome
+    if outcome is DeliveryOutcome.SENT:
+        _mark_parent_sent(notification, now=moment)
+        return outcome
+    if outcome is DeliveryOutcome.FAILED:
+        if notification.attempt_count < MAX_NOTIFICATION_ATTEMPTS:
+            notification.attempt_count += 1
+        notification.last_error_code = last_code if last_code in _PUSH_ERRORS else DELIVERY_REJECTED
+        return _fail_parent(notification, now=moment, code=notification.last_error_code)
     notification.attempt_count += 1
     notification.provider_id = ""
     notification.sent_at = None
-    notification.last_error_code = last_code
+    notification.last_error_code = (
+        last_code if last_code in _TRANSIENT_PUSH_ERRORS else DELIVERY_REJECTED
+    )
     if notification.attempt_count >= max_attempts:
         notification.status = Notification.Status.FAILED
         notification.failed_at = moment
@@ -401,12 +431,16 @@ def _expiry_defaults(
     return defaults
 
 
-def _should_cancel(notification: Notification, *, gym: Gym) -> bool:
+def _should_cancel(notification: Notification, *, gym: Gym, today: date, now: datetime) -> bool:
     if gym.status != Gym.Status.ACTIVE or notification.gym_id != gym.id:
         return True
     if notification.type == Notification.Type.ANNOUNCEMENT:
         announcement = notification.announcement
-        return announcement is None or announcement.status != Announcement.Status.PUBLISHED
+        if announcement is None or announcement.gym_id != gym.id:
+            return True
+        if announcement.status != Announcement.Status.PUBLISHED:
+            return True
+        return announcement.ends_at is not None and announcement.ends_at <= now
     if notification.type != Notification.Type.MEMBERSHIP_EXPIRY:
         return True
     if not _expiry_email_feature_enabled(gym=gym):
@@ -418,9 +452,80 @@ def _should_cancel(notification: Notification, *, gym: Gym) -> bool:
     member = notification.recipient_member
     if membership is None or member.status != Member.Status.ACTIVE:
         return True
-    if membership.status != Membership.Status.ACTIVE or membership.member_id != member.id:
+    if (
+        membership.gym_id != gym.id
+        or membership.status != Membership.Status.ACTIVE
+        or membership.member_id != member.id
+    ):
         return True
-    return False
+    return _expiry_push_outdated(notification, membership=membership, today=today)
+
+
+def _expiry_push_outdated(
+    notification: Notification,
+    *,
+    membership: Membership,
+    today: date,
+) -> bool:
+    """Cancel when the expiry date, warning day, or gym-local window no longer matches."""
+
+    payload = notification.payload if isinstance(notification.payload, dict) else {}
+    expiry_raw = payload.get("expiry_date")
+    warning_day = payload.get("warning_day")
+    if not isinstance(expiry_raw, str) or expiry_raw != membership.expiry_date.isoformat():
+        return True
+    if isinstance(warning_day, bool) or not isinstance(warning_day, int):
+        return True
+    try:
+        settings_row = GymSettings.objects.get(gym_id=membership.gym_id)
+        configured = _warning_days(settings_row)
+    except (GymSettings.DoesNotExist, ValueError):
+        return True
+    if warning_day not in configured:
+        return True
+    return not expiry_reminder_still_due(
+        expiry_date=membership.expiry_date,
+        today=today,
+        warning_day=warning_day,
+    )
+
+
+def _fanout_outcome(
+    *,
+    gym: Gym,
+    notification: Notification,
+    max_attempts: int,
+) -> DeliveryOutcome:
+    devices = list(
+        MemberDevice.objects.filter(
+            gym=gym,
+            member_id=notification.recipient_member_id,
+            revoked_at__isnull=True,
+            push_consent=True,
+            token_ciphertext__isnull=False,
+        ).order_by("id")
+    )
+    attempts = {
+        row.member_device_id: row
+        for row in PushAttempt.objects.filter(
+            gym=gym,
+            notification=notification,
+            member_device__in=devices,
+        )
+    }
+    accepted = 0
+    retryable = 0
+    for device in devices:
+        attempt = attempts.get(device.id)
+        if attempt is not None and attempt.status == PushAttempt.Status.SENT:
+            accepted += 1
+        elif device_send_is_open(attempt, max_attempts=max_attempts):
+            retryable += 1
+    return classify_push_fanout(
+        eligible=len(devices),
+        accepted=accepted,
+        retryable=retryable,
+    )
 
 
 def _message(notification: Notification, *, gym: Gym) -> tuple[str | None, str | None]:
@@ -454,6 +559,7 @@ def _message(notification: Notification, *, gym: Gym) -> tuple[str | None, str |
         gym_name=str(gym_name),
         gym_email=gym_email if isinstance(gym_email, str) else gym.email,
         gym_phone=gym_phone if isinstance(gym_phone, str) else gym.phone,
+        language="both",
     )
     return subject, body
 
@@ -546,6 +652,7 @@ def _fail_parent(notification: Notification, *, now: datetime, code: str) -> Del
     notification.last_error_code = stored if stored in _PUSH_ERRORS else code
     notification.save(
         update_fields=[
+            "attempt_count",
             "status",
             "failed_at",
             "sent_at",

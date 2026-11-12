@@ -15,7 +15,7 @@ export type CheckInStackParamList = {
 };
 
 export type InboxStackParamList = {
-  Inbox: undefined;
+  Inbox: { notificationId?: string } | undefined;
 };
 
 export type AccountStackParamList = {
@@ -34,6 +34,11 @@ export type MainTabParamList = {
   Home: undefined;
   Schedule: undefined;
   CheckIn: undefined;
-  Inbox: undefined;
+  Inbox:
+    | {
+        screen?: "Inbox";
+        params?: { notificationId?: string };
+      }
+    | undefined;
   Account: undefined;
 };

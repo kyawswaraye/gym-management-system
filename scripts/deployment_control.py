@@ -187,6 +187,9 @@ BANNED_RUNBOOK = (
 )
 FORWARD_BOUNDARY = "forward-only-until-schema-review"
 STOP_BOUNDARY = "stop-forward-fix-or-restore"
+PROMETHEUS_CONFIG_RELATIVE = Path("infra/observability/prometheus")
+PROMETHEUS_SNAPSHOT_NAME = "prometheus-config.previous"
+ALERTMANAGER_TARGET_RE = re.compile(r"[a-z0-9.-]+:[0-9]{2,5}")
 Runner = Callable[..., "CommandResult"]
 
 
@@ -270,6 +273,7 @@ def deployment_steps(
             "verify-postgres-identity",
             "pull-app-digests",
             "start-app",
+            "reload-prometheus",
             "smoke",
             "verify-running-images",
             "write-evidence",
@@ -288,8 +292,10 @@ def deployment_steps(
         "pull-digests",
         "start-postgres",
         backup,
+        "check-prometheus",
         "migrate",
         "start-services",
+        "reload-prometheus",
         "smoke",
         "verify-running-images",
         "write-evidence",
@@ -516,9 +522,7 @@ def verify_image_attestation(
     except json.JSONDecodeError as exc:
         try:
             payload = [
-                json.loads(line)
-                for line in result.stdout.splitlines()
-                if line.strip()
+                json.loads(line) for line in result.stdout.splitlines() if line.strip()
             ]
         except json.JSONDecodeError:
             raise DeployError("attestation verification output is invalid") from exc
@@ -915,6 +919,107 @@ def verify_bundle(path: Path) -> dict[str, Any]:
     return verify_bundle_members(read_bundle(path))
 
 
+def alertmanager_targets(text: str) -> tuple[str, ...]:
+    """Return alertmanager host:port targets declared by a Prometheus config."""
+
+    targets: list[str] = []
+    in_alerting = False
+    in_targets = False
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        if indent == 0 and stripped == "alerting:":
+            in_alerting = True
+            in_targets = False
+            continue
+        if indent == 0 and in_alerting:
+            in_alerting = False
+            in_targets = False
+        if not in_alerting:
+            continue
+        if stripped in {"targets:", "- targets:"}:
+            in_targets = True
+            continue
+        if in_targets and stripped.startswith("- "):
+            value = stripped[2:].strip().strip("'\"")
+            if ALERTMANAGER_TARGET_RE.fullmatch(value) is None:
+                raise DeployError("prometheus alertmanager target is invalid")
+            targets.append(value)
+            continue
+        if in_targets:
+            in_targets = False
+    return tuple(targets)
+
+
+def snapshot_prometheus_config(source_root: Path, snapshot: Path) -> None:
+    """Save the live Prometheus files before a bundle replaces them."""
+
+    origin = source_root / PROMETHEUS_CONFIG_RELATIVE
+    if snapshot.is_symlink() or origin.is_symlink():
+        raise DeployError("prometheus config path is a symlink")
+    temporary = snapshot.with_name(snapshot.name + ".tmp")
+    if temporary.is_symlink():
+        raise DeployError("prometheus snapshot is a symlink")
+    if temporary.exists():
+        shutil.rmtree(temporary)
+    if not origin.exists():
+        if snapshot.exists() and not snapshot.is_symlink():
+            shutil.rmtree(snapshot)
+        return
+    if not origin.is_dir():
+        raise DeployError("prometheus config path is not a directory")
+    _copy_prometheus_tree(origin, temporary)
+    if snapshot.exists():
+        shutil.rmtree(snapshot)
+    temporary.rename(snapshot)
+
+
+def restore_prometheus_config(snapshot: Path, source_root: Path) -> None:
+    """Put the saved Prometheus files back on the live bind-mount path."""
+
+    destination = source_root / PROMETHEUS_CONFIG_RELATIVE
+    if snapshot.is_symlink() or not snapshot.is_dir():
+        raise DeployError("prometheus snapshot is missing")
+    if destination.is_symlink():
+        raise DeployError("prometheus config path is a symlink")
+    temporary = destination.with_name(destination.name + ".restore")
+    if temporary.is_symlink():
+        raise DeployError("prometheus config path is a symlink")
+    if temporary.exists():
+        shutil.rmtree(temporary)
+    _copy_prometheus_tree(snapshot, temporary)
+    if destination.exists():
+        shutil.rmtree(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary.rename(destination)
+
+
+def _copy_prometheus_tree(origin: Path, destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    os.chmod(destination, 0o755)
+    for path in origin.rglob("*"):
+        if path.is_symlink():
+            raise DeployError("prometheus config contains a symlink")
+        relative = path.relative_to(origin)
+        target = destination / relative
+        if (
+            destination.resolve() not in target.resolve().parents
+            and target.resolve() != destination.resolve()
+        ):
+            raise DeployError("prometheus config copy escapes the destination")
+        if path.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            os.chmod(target, 0o755)
+            continue
+        if not path.is_file():
+            raise DeployError("prometheus config contains an unsupported file")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(path.read_bytes())
+        os.chmod(target, 0o644)
+
+
 def extract_bundle(path: Path, destination: Path) -> dict[str, Any]:
     members = read_bundle(path)
     bound = verify_bundle_members(members)
@@ -924,6 +1029,11 @@ def extract_bundle(path: Path, destination: Path) -> dict[str, Any]:
         for child in destination.rglob("*"):
             if child.is_symlink():
                 raise DeployError("bundle destination contains a symlink")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    snapshot_prometheus_config(
+        destination, destination.parent / PROMETHEUS_SNAPSHOT_NAME
+    )
+    if destination.exists():
         shutil.rmtree(destination)
     destination.mkdir(parents=True, exist_ok=True)
     for name, (data, mode) in members.items():
@@ -1010,9 +1120,7 @@ def _reset_secret_owner(path: Path, uid: int, gid: int) -> None:
         ["sudo", "-n", "chmod", "600", "--", str(path)],
     )
     for command in commands:
-        completed = subprocess.run(
-            command, check=False, capture_output=True, text=True
-        )
+        completed = subprocess.run(command, check=False, capture_output=True, text=True)
         if command[2] == "setfacl":
             continue
         if completed.returncode != 0:
@@ -1387,7 +1495,7 @@ def read_active_state(path: Path, target: str) -> dict[str, Any]:
 
 
 def _running_container(project: str, service: str, runner: Runner) -> tuple[str, str]:
-    allowed = {name for name, _key in SERVICE_IMAGE_KEYS}
+    allowed = {name for name, _key in SERVICE_IMAGE_KEYS} | {"scheduler"}
     if service not in allowed or project not in {STAGING_PROJECT, PRODUCTION_PROJECT}:
         raise DeployError("running service is not allowlisted")
     result = runner(
@@ -1429,6 +1537,10 @@ def verify_running_images(
         if image != assert_digest_reference(str(expected[key])):
             raise DeployError("running image is not the expected digest")
         found[service] = image
+    _scheduler_id, scheduler_image = _running_container(project, "scheduler", runner)
+    if scheduler_image != assert_digest_reference(str(expected["API_IMAGE"])):
+        raise DeployError("running scheduler image is not the API digest")
+    found["scheduler"] = scheduler_image
     return found
 
 
@@ -1504,8 +1616,9 @@ def execute_deployment(request: HostRequest, runner: Runner) -> dict[str, Any]:
                 descriptor = acquire_deploy_lock(request.state_dir / "deploy.lock")
                 continue
             if name == "verify-bundle":
+                extracted = extract_bundle(request.bundle, request.state_dir / "src")
                 evidence["bound"] = {
-                    key: extract_bundle(request.bundle, request.state_dir / "src")[key]
+                    key: extracted[key]
                     for key in (
                         "release_sha",
                         "caller_sha",
@@ -1566,6 +1679,12 @@ def execute_deployment(request: HostRequest, runner: Runner) -> dict[str, Any]:
             if name == "check-resources":
                 check_resources(request.free_disk_bytes, request.mem_available_bytes)
                 continue
+            if name == "check-prometheus":
+                _check_prometheus_config(request, evidence, runner)
+                continue
+            if name == "reload-prometheus":
+                _reload_prometheus(request, evidence, runner)
+                continue
             if name in {
                 "pull-digests",
                 "pull-app-digests",
@@ -1610,6 +1729,7 @@ def execute_deployment(request: HostRequest, runner: Runner) -> dict[str, Any]:
             "migrate",
             "start-services",
             "start-app",
+            "reload-prometheus",
         }:
             evidence["rollback_boundary"] = STOP_BOUNDARY
     except smoke.SmokeError as exc:
@@ -1644,6 +1764,225 @@ def _assert_running_script(root: Path) -> None:
         or sibling.read_bytes() != bundled_smoke.read_bytes()
     ):
         raise DeployError("running deployment control does not match the bundle")
+
+
+def _prometheus_dirs(request: HostRequest) -> tuple[Path, Path, Path]:
+    source_root = request.state_dir / "src"
+    return (
+        source_root,
+        source_root / PROMETHEUS_CONFIG_RELATIVE,
+        request.state_dir / PROMETHEUS_SNAPSHOT_NAME,
+    )
+
+
+def _prometheus_image(evidence: Mapping[str, Any]) -> str:
+    images = evidence.get("images")
+    if not isinstance(images, dict):
+        raise DeployError("image overlay is missing")
+    return assert_digest_reference(str(images.get("PROMETHEUS_IMAGE", "")))
+
+
+def _promtool_command(image: str, config_dir: Path) -> tuple[str, ...]:
+    config = config_dir / "prometheus.yml"
+    rules = config_dir / "rules"
+    if (
+        config.is_symlink()
+        or rules.is_symlink()
+        or not config.is_file()
+        or not rules.is_dir()
+    ):
+        raise DeployError("prometheus config is missing")
+    return (
+        "docker",
+        "run",
+        "--rm",
+        "--pull",
+        "never",
+        "--network",
+        "none",
+        "--cap-drop",
+        "ALL",
+        "--entrypoint",
+        "promtool",
+        "-v",
+        f"{config.resolve()}:/etc/prometheus/prometheus.yml:ro",
+        "-v",
+        f"{rules.resolve()}:/etc/prometheus/rules:ro",
+        image,
+        "check",
+        "config",
+        "/etc/prometheus/prometheus.yml",
+    )
+
+
+def _run_promtool(image: str, config_dir: Path, runner: Runner) -> tuple[str, ...]:
+    result = runner(_promtool_command(image, config_dir), timeout=60)
+    output = f"{result.stdout}\n{result.stderr}"
+    if result.returncode != 0 or "SUCCESS" not in output:
+        raise DeployError("prometheus config failed promtool")
+    return alertmanager_targets(
+        (config_dir / "prometheus.yml").read_text(encoding="utf-8")
+    )
+
+
+def _restore_prometheus_after_rejected_config(request: HostRequest) -> None:
+    _source_root, _live, snapshot = _prometheus_dirs(request)
+    if snapshot.is_dir() and not snapshot.is_symlink():
+        restore_prometheus_config(snapshot, request.state_dir / "src")
+
+
+def _check_prometheus_config(
+    request: HostRequest, evidence: Mapping[str, Any], runner: Runner
+) -> None:
+    """Reject a Prometheus file before migration or a container change."""
+
+    _source_root, live, _snapshot = _prometheus_dirs(request)
+    try:
+        _run_promtool(_prometheus_image(evidence), live, runner)
+    except DeployError:
+        _restore_prometheus_after_rejected_config(request)
+        raise
+
+
+def _assert_prometheus_recreate(command: tuple[str, ...]) -> None:
+    if command[-1] != "prometheus":
+        raise DeployError("prometheus reload must target only prometheus")
+    if "--no-deps" not in command or "--force-recreate" not in command:
+        raise DeployError("prometheus reload must recreate only prometheus")
+    forbidden = {
+        "api",
+        "web",
+        "caddy",
+        "scheduler",
+        "postgres",
+        "migrate",
+        "alertmanager",
+        "grafana",
+        "clamav",
+    }
+    if any(part in forbidden for part in command):
+        raise DeployError("prometheus reload must not restart another service")
+
+
+def _recreate_prometheus(request: HostRequest, runner: Runner) -> str:
+    project = project_name(request.target)
+    compose_file = (
+        request.state_dir / "src" / "infra" / "compose" / "docker-compose.prod.yml"
+    )
+    command = compose_argv(
+        project,
+        compose_file,
+        "up",
+        "-d",
+        "--no-deps",
+        "--force-recreate",
+        "--wait",
+        "prometheus",
+    )
+    _assert_prometheus_recreate(command)
+    _run_checked(runner, command, 180)
+    container_id, _image = _running_container(project, "prometheus", runner)
+    return container_id
+
+
+def _alertmanager_urls(document: Mapping[str, Any]) -> tuple[str, ...]:
+    if document.get("status") != "success":
+        raise DeployError("prometheus alertmanager status is not success")
+    data = document.get("data")
+    if not isinstance(data, dict):
+        raise DeployError("prometheus alertmanager payload is missing")
+    active = data.get("activeAlertmanagers")
+    dropped = data.get("droppedAlertmanagers")
+    if not isinstance(active, list) or not isinstance(dropped, list):
+        raise DeployError("prometheus alertmanager lists are missing")
+    if dropped:
+        raise DeployError("prometheus dropped an alertmanager target")
+    urls: list[str] = []
+    for item in active:
+        if not isinstance(item, dict):
+            raise DeployError("prometheus alertmanager entry is invalid")
+        url = item.get("url")
+        if not isinstance(url, str) or not url.startswith("http"):
+            raise DeployError("prometheus alertmanager entry is invalid")
+        urls.append(url)
+    return tuple(urls)
+
+
+def _targets_match(urls: tuple[str, ...], expected: tuple[str, ...]) -> bool:
+    if len(urls) != len(expected):
+        return False
+    return all(
+        any(re.search(rf"(^|//){re.escape(target)}(/|$)", url) for url in urls)
+        for target in expected
+    )
+
+
+def _await_alertmanagers(
+    container_id: str,
+    expected: tuple[str, ...],
+    runner: Runner,
+    sleeper: Callable[[float], None],
+) -> tuple[str, ...]:
+    command = (
+        "docker",
+        "exec",
+        container_id,
+        "/bin/wget",
+        "-q",
+        "-O",
+        "-",
+        "-T",
+        "5",
+        "http://127.0.0.1:9090/api/v1/alertmanagers",
+    )
+    last_error = "prometheus alertmanager target did not become active"
+    for attempt in range(5):
+        result = runner(command, timeout=30)
+        if result.returncode == 0 and result.stdout.strip():
+            try:
+                urls = _alertmanager_urls(json.loads(result.stdout))
+            except (json.JSONDecodeError, DeployError) as exc:
+                last_error = str(exc)
+            else:
+                if _targets_match(urls, expected):
+                    return urls
+                last_error = "prometheus alertmanager target did not become active"
+        if attempt < 4:
+            sleeper(1)
+    raise DeployError(last_error)
+
+
+def _reload_prometheus(
+    request: HostRequest, evidence: dict[str, Any], runner: Runner
+) -> None:
+    """Validate the mounted config, then recreate only Prometheus."""
+
+    _source_root, live, snapshot = _prometheus_dirs(request)
+    image = _prometheus_image(evidence)
+    sleeper = request.sleeper or time.sleep
+    try:
+        expected = _run_promtool(image, live, runner)
+    except DeployError:
+        _restore_prometheus_after_rejected_config(request)
+        raise
+    container_id = _recreate_prometheus(request, runner)
+    try:
+        urls = _await_alertmanagers(container_id, expected, runner, sleeper)
+    except DeployError as exc:
+        if not snapshot.is_dir() or snapshot.is_symlink():
+            raise
+        try:
+            restored = _run_promtool(image, snapshot, runner)
+        except DeployError:
+            raise exc from None
+        restore_prometheus_config(snapshot, request.state_dir / "src")
+        restored_id = _recreate_prometheus(request, runner)
+        urls = _await_alertmanagers(restored_id, restored, runner, sleeper)
+        evidence["prometheus_alertmanagers"] = list(urls)
+        raise DeployError(
+            "prometheus alertmanager target did not become active"
+        ) from exc
+    evidence["prometheus_alertmanagers"] = list(urls)
 
 
 def _execute_compose_step(
@@ -1744,6 +2083,7 @@ def _execute_compose_step(
             "api",
             "web",
             "caddy",
+            "scheduler",
         )
         if "postgres" in command or "migrate" in command:
             raise DeployError("app rollback must not mutate PostgreSQL")
@@ -2609,8 +2949,10 @@ def _public_transfer_error(stderr: str) -> str:
         if item:
             line = item
             break
-    if not line or len(line) > 180 or any(
-        token in line for token in ("PRIVATE", "BEGIN ", "AKIA", "password")
+    if (
+        not line
+        or len(line) > 180
+        or any(token in line for token in ("PRIVATE", "BEGIN ", "AKIA", "password"))
     ):
         return "deployment transfer failed"
     return f"deployment transfer failed: {line}"

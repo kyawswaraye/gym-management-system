@@ -23,6 +23,7 @@ COPY manage.py /app/manage.py
 COPY config /app/config
 COPY apps /app/apps
 COPY docker/healthcheck.py /app/docker/healthcheck.py
+COPY docker/scheduler_healthcheck.py /app/docker/scheduler_healthcheck.py
 
 RUN chown -R api:api /app
 ENV HOME=/tmp

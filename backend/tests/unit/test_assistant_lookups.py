@@ -138,6 +138,17 @@ def test_the_next_burmese_day_uses_the_gym_day() -> None:
     assert payload["effective_from"] == "2026-11-12"
 
 
+def test_the_controlled_gym_day_and_the_next_day() -> None:
+    today_payload: dict[str, object] = {"join_date": "2026-01-01"}
+    tomorrow_payload: dict[str, object] = {"start_date": "2026-01-01"}
+
+    assert _keep_stated_dates(today_payload, "ဒီနေ့", today=date(2026, 11, 12)) is None
+    assert _keep_stated_dates(tomorrow_payload, "မနက်ဖြန်", today=date(2026, 11, 12)) is None
+
+    assert today_payload["join_date"] == "2026-11-12"
+    assert tomorrow_payload["start_date"] == "2026-11-13"
+
+
 def test_tomorrow_in_burmese_is_the_next_gym_day() -> None:
     payload: dict[str, object] = {"starts_at": "2025-08-07T09:30:00+06:30"}
 
@@ -218,6 +229,16 @@ def test_a_member_number_selects_that_person_when_the_model_picked_the_other() -
     assert choice.id == AUNG_TWO.id
     assert choice.error == ""
     assert "MEM-000102" in choice.label
+
+
+def test_a_longer_plan_code_is_not_split_into_a_shorter_code() -> None:
+    yoga = NamedRecord("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01", "Yoga", code="YOGA")
+    yoga_two = NamedRecord("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa02", "Yoga", code="YOGA_2")
+
+    choice = choose_reference(yoga.id, (yoga, yoga_two), "YOGA_2 ကို တပ်ပေး")
+
+    assert choice.id == yoga_two.id
+    assert choice.error == ""
 
 
 def test_two_trainers_with_one_name_stay_unresolved() -> None:
@@ -367,6 +388,13 @@ def test_two_packages_with_one_name_are_not_chosen_by_a_model_id() -> None:
 
 def test_a_package_code_selects_that_package() -> None:
     choice = choose_reference("PT8B", (DESK, DESK_TWO), "package code PT8B")
+
+    assert choice.id == DESK_TWO.id
+    assert choice.error == ""
+
+
+def test_a_package_code_in_the_argument_resolves_when_the_message_omits_it() -> None:
+    choice = choose_reference("PT8B", (DESK, DESK_TWO), "ပက်ကေ့ ရောင်းပေး")
 
     assert choice.id == DESK_TWO.id
     assert choice.error == ""

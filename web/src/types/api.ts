@@ -62,6 +62,9 @@ export type Permission = components["schemas"]["Permission"];
 export type MembershipRole = components["schemas"]["MembershipRole"];
 export type CollectionMeta = components["schemas"]["CollectionMeta"];
 export type Member = components["schemas"]["Member"];
+export type Announcement = components["schemas"]["Announcement"];
+export type AnnouncementWriteRequest =
+  components["schemas"]["AnnouncementWriteRequest"];
 export type MemberCreateRequest = components["schemas"]["MemberCreateRequest"];
 export type MemberUpdateRequest =
   components["schemas"]["PatchedMemberUpdateRequest"];

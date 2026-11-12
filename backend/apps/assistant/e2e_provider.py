@@ -27,6 +27,11 @@ def scripted_response(body: Mapping[str, object]) -> dict[str, object]:
 
     contents = body.get("contents")
     text = _staff_text(contents if isinstance(contents, list) else [])
+    if "simulate provider failure" in text.casefold():
+        from apps.assistant.configuration import ProviderFailure
+        from apps.assistant.provider import ProviderCallError
+
+        raise ProviderCallError(ProviderFailure.QUOTA)
     responses = _responses(contents if isinstance(contents, list) else [])
     if text.startswith("The change is saved."):
         return _text("The change is complete.")

@@ -21,6 +21,10 @@ function memoryStore(
     setDeviceId: async (id) => {
       values.device = id;
     },
+    getPushConsent: async () => values.consent === "1",
+    setPushConsent: async (enabled) => {
+      values.consent = enabled ? "1" : "0";
+    },
     getBiometricGate: async () => false,
     setBiometricGate: async () => undefined,
     getLocale: async () => (values.locale === "mm" ? "mm" : "en"),

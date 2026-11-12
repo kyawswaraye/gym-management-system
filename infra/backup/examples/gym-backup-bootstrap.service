@@ -8,7 +8,7 @@ Documentation=file:docs/runbooks/phase8-increment-3.md
 
 [Service]
 Type=oneshot
-WorkingDirectory=/opt/gym/infra/compose
-ExecStart=/usr/bin/docker compose --env-file /etc/gym/production.env -f docker-compose.prod.yml --profile bootstrap run --rm backup-bootstrap
+WorkingDirectory=/var/lib/gym-deploy/production/src/infra/compose
+ExecStart=/usr/bin/python3 /usr/local/lib/gym-deploy/run-scheduled-backup.py bootstrap
 TimeoutStartSec=4h
 SuccessExitStatus=0

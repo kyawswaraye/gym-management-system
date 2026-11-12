@@ -290,3 +290,54 @@ def test_search_membership_plans_keeps_inactive_plans_and_duplicate_names(
     contract = membership_read_tool_contracts()["search_membership_plans"]
     assert contract.mode == ExecutionMode.READ
     assert contract.definition.permissions == ("memberships.view",)
+
+
+def test_sale_plan_search_drops_inactive_plans(monkeypatch: pytest.MonkeyPatch) -> None:
+    gym = _gym()
+    active = SimpleNamespace(
+        id=uuid4(),
+        code="YOGA",
+        name="Yoga",
+        is_active=True,
+        duration_value=1,
+        duration_unit="MONTH",
+        price=Decimal("50000.00"),
+        currency="THB",
+        description="secret-description",
+    )
+    inactive = SimpleNamespace(
+        id=uuid4(),
+        code="YOGA_2",
+        name="Yoga",
+        is_active=False,
+        duration_value=1,
+        duration_unit="MONTH",
+        price=Decimal("40000.00"),
+        currency="THB",
+        description="hidden",
+    )
+
+    class _Plans:
+        def __init__(self) -> None:
+            self.filters: list[dict[str, object]] = []
+
+        def filter(self, **kwargs: object) -> _Plans:
+            self.filters.append(kwargs)
+            return self
+
+    plans = _Plans()
+
+    def page(queryset: object, **kwargs: object) -> tuple[list[SimpleNamespace], dict[str, object]]:
+        del queryset, kwargs
+        return [active, inactive], {"has_more": False, "next_after": None}
+
+    monkeypatch.setattr(MembershipPlan, "objects", plans)
+    monkeypatch.setattr("apps.assistant.membership_reads.page_membership_plans", page)
+    result = search_membership_plans(
+        _call(gym, {"name": "Yoga", "eligible_for_sale": True, "limit": 25})
+    )
+    rows = result["results"]
+    assert isinstance(rows, list)
+    assert {"is_active": True} in plans.filters
+    assert [row["code"] for row in rows] == ["YOGA"]
+    assert result["ambiguous"] is False

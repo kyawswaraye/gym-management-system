@@ -13,6 +13,7 @@ from apps.notifications.services import (
     PROVIDER_UNAVAILABLE,
     build_expiry_payload,
     delivery_error_code,
+    expiry_reminder_still_due,
     header_safe,
     membership_expiry_deduplication_key,
     render_expiry_message,
@@ -84,6 +85,62 @@ def test_header_safe_message_collapses_injection_and_stays_plain_text() -> None:
     assert "desk@example.test" in body
     assert "+661234567" in body
     assert "<html" not in body.lower()
+
+
+def test_default_template_stays_english_and_both_includes_burmese() -> None:
+    subject, body = render_expiry_message(
+        member_name="Ann",
+        plan_name="Gold Year",
+        expiry_date=date(2026, 10, 17),
+        gym_name="North Gym",
+        gym_email="desk@example.test",
+        gym_phone="+661234567",
+    )
+    assert subject.startswith("Your North Gym membership expires")
+    assert "Hello Ann," in body
+    assert "မင်္ဂလာပါ" not in body
+    both_subject, both_body = render_expiry_message(
+        member_name="Ann",
+        plan_name="Gold Year",
+        expiry_date=date(2026, 10, 17),
+        gym_name="North Gym",
+        gym_email="desk@example.test",
+        gym_phone="+661234567",
+        language="both",
+    )
+    assert both_subject == subject
+    assert "Hello Ann," in both_body
+    assert "မင်္ဂလာပါ Ann၊" in both_body
+    assert "2026-10-17" in both_body
+    assert "ann@example.test" not in both_body
+    my_subject, my_body = render_expiry_message(
+        member_name="Ann",
+        plan_name="Gold Year",
+        expiry_date=date(2026, 10, 17),
+        gym_name="North Gym",
+        gym_email="",
+        gym_phone="",
+        language="my",
+    )
+    assert "ကုန်ဆုံးပါမည်" in my_subject
+    assert "Hello" not in my_body
+
+
+def test_retry_window_keeps_the_same_expiry_and_rejects_a_late_or_early_day() -> None:
+    expiry = date(2026, 10, 24)
+    assert expiry_reminder_still_due(expiry_date=expiry, today=date(2026, 10, 17), warning_day=7)
+    assert expiry_reminder_still_due(expiry_date=expiry, today=date(2026, 10, 18), warning_day=7)
+    assert expiry_reminder_still_due(expiry_date=expiry, today=expiry, warning_day=7)
+    assert not expiry_reminder_still_due(
+        expiry_date=expiry, today=date(2026, 10, 16), warning_day=7
+    )
+    assert not expiry_reminder_still_due(
+        expiry_date=expiry, today=date(2026, 10, 25), warning_day=7
+    )
+    assert expiry_reminder_still_due(expiry_date=expiry, today=expiry, warning_day=0)
+    assert not expiry_reminder_still_due(
+        expiry_date=expiry, today=date(2026, 10, 25), warning_day=0
+    )
 
 
 def test_retry_delay_is_bounded_and_errors_are_stable_codes() -> None:

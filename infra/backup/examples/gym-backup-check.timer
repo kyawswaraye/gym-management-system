@@ -1,11 +1,12 @@
-# Example only. This timer is not installed and is not an RPO measurement.
+# Example only. This timer is not installed until it is copied and enabled.
+# This timer is not an RPO measurement.
 
 [Unit]
-Description=Example gym backup freshness check
+Description=Gym backup freshness check
 
 [Timer]
 OnCalendar=*:0/15
-Persistent=false
+Persistent=true
 Unit=gym-backup-check.service
 
 [Install]

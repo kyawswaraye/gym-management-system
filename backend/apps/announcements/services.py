@@ -309,6 +309,7 @@ def expire_due_announcement(*, gym: Gym, now: datetime) -> bool:
     row.status = Announcement.Status.EXPIRED
     row.expired_at = now
     row.save(update_fields=["status", "expired_at", "updated_at"])
+    _cancel_pending_pushes(gym=gym, announcement_id=row.id)
     _audit(
         gym=gym,
         actor_user=None,

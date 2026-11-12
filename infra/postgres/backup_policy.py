@@ -923,6 +923,13 @@ def publish_backup_metrics(status: Mapping[str, Any]) -> None:
         os.replace(temporary, path)
     except OSError:
         print("backup metrics file was not written", file=sys.stderr)
+        return
+    try:
+        # The scheduler writes scheduler.prom here as uid 10001. The metric
+        # file itself stays 0644. A chmod failure does not undo the backup metric.
+        os.chmod(path.parent, 0o1777)
+    except OSError:
+        print("backup metrics directory was not opened for the scheduler", file=sys.stderr)
 
 
 def terminal_status(result: str) -> dict[str, Any]:
@@ -1601,7 +1608,7 @@ def lint_production_compose(text: str, document: Mapping[str, Any]) -> list[str]
                 errors.append(f"{name} reuses application secret variables: {reused}")
         if service.get("secrets") != [CIPHER_SECRET, ACCESS_SECRET, SECRET_KEY_SECRET]:
             errors.append(f"{name} must mount only the dedicated backup secrets")
-    for forbidden in ("api", "web", "migrate", "caddy", "clamav"):
+    for forbidden in ("api", "web", "migrate", "caddy", "clamav", "scheduler"):
         service = _service_map(document, forbidden) or {}
         if "secrets" in service:
             errors.append(f"{forbidden} must not receive backup secrets")

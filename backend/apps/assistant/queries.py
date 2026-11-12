@@ -7,29 +7,68 @@ from django.http import Http404
 
 from apps.assistant.models import Conversation, Goal, Message, ToolExecution, WorkflowStep
 from apps.common.db.tenant_context import set_gym_context
-from apps.tenants.models import Gym
+from apps.tenants.models import Gym, GymMembership
 
 
 def _scoped(gym: Gym) -> None:
     set_gym_context(gym_id=gym.id)
 
 
-def list_conversations(*, gym: Gym, limit: int) -> QuerySet[Conversation]:
+def may_read_conversation(*, actor: GymMembership, conversation: Conversation) -> bool:
+    """The author can read the chat. An active gym owner can review the gym's chats.
+
+    No other same-gym role receives another staff member's conversation.
+    """
+
+    if conversation.gym_id != actor.gym_id:
+        return False
+    if conversation.created_by_membership_id == actor.id:
+        return True
+    return bool(
+        actor.is_owner
+        and actor.status == GymMembership.Status.ACTIVE
+        and actor.gym_id == conversation.gym_id
+    )
+
+
+def list_conversations(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    limit: int,
+) -> QuerySet[Conversation]:
     _scoped(gym)
-    return Conversation.objects.filter(gym=gym).order_by("-created_at", "id")[:limit]
+    rows = Conversation.objects.filter(gym=gym)
+    if not (
+        actor.is_owner and actor.status == GymMembership.Status.ACTIVE and actor.gym_id == gym.id
+    ):
+        rows = rows.filter(created_by_membership_id=actor.id)
+    return rows.order_by("-created_at", "id")[:limit]
 
 
-def get_conversation(*, gym: Gym, conversation_id: UUID) -> Conversation:
+def get_conversation(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    conversation_id: UUID,
+) -> Conversation:
     _scoped(gym)
     try:
-        return Conversation.objects.get(gym=gym, id=conversation_id)
+        conversation = Conversation.objects.get(gym=gym, id=conversation_id)
     except Conversation.DoesNotExist as exc:
         raise Http404 from exc
+    if not may_read_conversation(actor=actor, conversation=conversation):
+        raise Http404
+    return conversation
 
 
 def list_messages(*, gym: Gym, conversation: Conversation) -> QuerySet[Message]:
     _scoped(gym)
-    return Message.objects.filter(gym=gym, conversation=conversation).order_by("created_at", "id")
+    return (
+        Message.objects.filter(gym=gym, conversation=conversation)
+        .exclude(role=Message.Role.SYSTEM, body__startswith="workflow-state v1\n")
+        .order_by("created_at", "id")
+    )
 
 
 def list_goals(*, gym: Gym, conversation: Conversation) -> QuerySet[Goal]:
@@ -37,12 +76,15 @@ def list_goals(*, gym: Gym, conversation: Conversation) -> QuerySet[Goal]:
     return Goal.objects.filter(gym=gym, conversation=conversation).order_by("created_at", "id")
 
 
-def get_goal(*, gym: Gym, goal_id: UUID) -> Goal:
+def get_goal(*, gym: Gym, actor: GymMembership, goal_id: UUID) -> Goal:
     _scoped(gym)
     try:
-        return Goal.objects.get(gym=gym, id=goal_id)
+        goal = Goal.objects.select_related("conversation").get(gym=gym, id=goal_id)
     except Goal.DoesNotExist as exc:
         raise Http404 from exc
+    if not may_read_conversation(actor=actor, conversation=goal.conversation):
+        raise Http404
+    return goal
 
 
 def list_steps(*, gym: Gym, goal: Goal) -> QuerySet[WorkflowStep]:

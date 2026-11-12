@@ -3,6 +3,7 @@ import * as Keychain from "react-native-keychain";
 export const REFRESH_SERVICE = "com.gymplatform.member.refresh";
 export const INSTALLATION_SERVICE = "com.gymplatform.member.installation";
 export const DEVICE_SERVICE = "com.gymplatform.member.device";
+export const PUSH_CONSENT_SERVICE = "com.gymplatform.member.push-consent";
 export const PREFERENCE_SERVICE = "com.gymplatform.member.preferences";
 export const LOCALE_SERVICE = "com.gymplatform.member.locale";
 
@@ -36,6 +37,8 @@ export type SecureStore = {
   setInstallationId(id: string): Promise<void>;
   getDeviceId(): Promise<string | null>;
   setDeviceId(id: string): Promise<void>;
+  getPushConsent(): Promise<boolean>;
+  setPushConsent(enabled: boolean): Promise<void>;
   getBiometricGate(): Promise<boolean>;
   setBiometricGate(enabled: boolean): Promise<void>;
   getLocale(): Promise<"en" | "mm">;
@@ -113,6 +116,9 @@ export function createSecureStore(
     setInstallationId: (id) => write(INSTALLATION_SERVICE, id),
     getDeviceId: () => read(DEVICE_SERVICE),
     setDeviceId: (id) => write(DEVICE_SERVICE, id),
+    getPushConsent: async () => (await read(PUSH_CONSENT_SERVICE)) === "1",
+    setPushConsent: (enabled) =>
+      write(PUSH_CONSENT_SERVICE, enabled ? "1" : "0"),
     getBiometricGate: async () => (await read(PREFERENCE_SERVICE)) === "1",
     async setBiometricGate(enabled) {
       await write(PREFERENCE_SERVICE, enabled ? "1" : "0");
@@ -132,6 +138,7 @@ export function createSecureStore(
       await port.resetGenericPassword({ service: REFRESH_SERVICE });
       await port.resetGenericPassword({ service: INSTALLATION_SERVICE });
       await port.resetGenericPassword({ service: DEVICE_SERVICE });
+      await port.resetGenericPassword({ service: PUSH_CONSENT_SERVICE });
       await port.resetGenericPassword({ service: PREFERENCE_SERVICE });
     },
   };

@@ -72,8 +72,12 @@ describe("secure storage", () => {
     const store = createSecureStore(keychain);
     await store.setLocale("mm");
     await store.setRefreshToken("refresh-secret");
+    await store.setPushConsent(true);
+    await store.setDeviceId("device-1");
     await store.resetAll();
     expect(await store.getLocale()).toBe("mm");
     expect(await store.getRefreshToken()).toBeNull();
+    expect(await store.getPushConsent()).toBe(false);
+    expect(await store.getDeviceId()).toBeNull();
   });
 });

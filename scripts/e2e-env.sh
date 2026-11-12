@@ -24,9 +24,28 @@ e2e_load_database_env() {
   export MIGRATION_DB_PASSWORD="${MIGRATION_DB_PASSWORD:-${POSTGRES_MIGRATION_PASSWORD:-}}"
   export RUNTIME_DB_USER="${RUNTIME_DB_USER:-${POSTGRES_RUNTIME_USER:-gym_runtime}}"
   export RUNTIME_DB_PASSWORD="${RUNTIME_DB_PASSWORD:-${POSTGRES_RUNTIME_PASSWORD:-}}"
+  if [[ -n "${E2E_DB_HOST:-}" ]]; then
+    export POSTGRES_HOST="${E2E_DB_HOST}"
+  fi
+  if [[ -n "${E2E_DB_PORT:-}" ]]; then
+    export POSTGRES_PORT="${E2E_DB_PORT}"
+  fi
+  if [[ -n "${E2E_POSTGRES_ADMIN_PASSWORD:-}" ]]; then
+    export POSTGRES_ADMIN_PASSWORD="${E2E_POSTGRES_ADMIN_PASSWORD}"
+  fi
+  if [[ -n "${E2E_MIGRATION_DB_PASSWORD:-}" ]]; then
+    export MIGRATION_DB_PASSWORD="${E2E_MIGRATION_DB_PASSWORD}"
+  fi
+  if [[ -n "${E2E_RUNTIME_DB_PASSWORD:-}" ]]; then
+    export RUNTIME_DB_PASSWORD="${E2E_RUNTIME_DB_PASSWORD}"
+  fi
   export DB_HOST="${POSTGRES_HOST}"
   export DB_PORT="${POSTGRES_PORT}"
   export DB_NAME="gym_platform_e2e"
+  if [[ "${E2E_ISOLATED:-}" == "1" && "${POSTGRES_PORT}" == "5432" ]]; then
+    echo "Refusing isolated E2E on the development PostgreSQL port 5432." >&2
+    return 1
+  fi
 
   if [[ -z "${POSTGRES_ADMIN_PASSWORD}" || -z "${MIGRATION_DB_PASSWORD}" || -z "${RUNTIME_DB_PASSWORD}" ]]; then
     echo "E2E needs POSTGRES_ADMIN_PASSWORD, MIGRATION_DB_PASSWORD, and RUNTIME_DB_PASSWORD." >&2

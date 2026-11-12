@@ -1,6 +1,6 @@
 import { LanguageSwitch } from "../i18n/LanguageSwitch";
 import { useTx } from "../i18n/useTx";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { View } from "react-native";
 
@@ -25,6 +25,16 @@ export function SettingsScreen({ navigation }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [biometric, setBiometric] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void store.getBiometricGate().then((saved) => {
+      if (active) setBiometric(saved);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <NestedScreen

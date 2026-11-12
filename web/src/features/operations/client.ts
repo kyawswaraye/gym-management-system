@@ -18,6 +18,7 @@ import type {
   CompleteUploadRequest,
   CompletedFile,
   DownloadUrl,
+  Announcement,
   Member,
   MemberListPage,
   MemberListQuery,
@@ -811,6 +812,21 @@ async function listAllCollection<T extends { id: string }>(
     after = next;
   }
   throw new OperationError(`The ${label} list is too large to load.`);
+}
+
+export async function listAnnouncements(
+  query: {
+    status?: Announcement["status"];
+    limit?: number;
+    after?: string;
+  } = {},
+): Promise<CollectionPage<Announcement>> {
+  const params = collectionParams({
+    ...(query.limit !== undefined ? { limit: query.limit } : {}),
+    ...(query.after !== undefined ? { after: query.after } : {}),
+  });
+  if (query.status) params.set("status", query.status);
+  return collectionGet<Announcement>("announcements", params);
 }
 
 export async function listMembers(

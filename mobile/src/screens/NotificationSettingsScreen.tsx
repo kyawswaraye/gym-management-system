@@ -1,5 +1,5 @@
 import { useTx } from "../i18n/useTx";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 
 import { version } from "../../package.json";
@@ -26,6 +26,16 @@ export function NotificationSettingsScreen() {
   const online = useOnline();
   const [consent, setConsent] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void store.getPushConsent().then((saved) => {
+      if (active) setConsent(saved);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
   const [busy, setBusy] = useState(false);
 
   async function installationId(): Promise<string> {
@@ -68,6 +78,7 @@ export function NotificationSettingsScreen() {
         ? await api.updateDevice(deviceId, buildDeviceUpdate(draft))
         : await api.registerDevice(buildDeviceRegistration(draft));
       await store.setDeviceId(device.id);
+      await store.setPushConsent(device.push_consent);
       setConsent(device.push_consent);
       setMessage(
         device.push_consent

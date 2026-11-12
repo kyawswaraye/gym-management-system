@@ -561,6 +561,7 @@ export function AssistantChat({ membershipId }: { membershipId: string }) {
           {started ? (
             <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
               {messages.map((message) => {
+                if (message.body.startsWith("workflow-state v1")) return null;
                 const own = message.role === "staff";
                 if (own) {
                   return (

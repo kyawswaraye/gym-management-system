@@ -55,6 +55,7 @@ def closed_production_names() -> tuple[str, ...]:
     """Return the names registered after their security tests passed."""
 
     from apps.assistant.activity_tools import ACTIVITY_TOOL_NAMES
+    from apps.assistant.announcement_reads import ANNOUNCEMENT_READ_TOOL_NAMES
     from apps.assistant.booking_tools import BOOKING_TOOL_NAMES
     from apps.assistant.cash_tools import CASH_TOOL_NAMES
     from apps.assistant.class_reads import CLASS_READ_TOOL_NAMES
@@ -70,6 +71,7 @@ def closed_production_names() -> tuple[str, ...]:
     from apps.assistant.payment_reads import PAYMENT_READ_TOOL_NAMES
     from apps.assistant.payment_tools import PAYMENT_TOOL_NAMES
     from apps.assistant.pt_tools import PT_TOOL_NAMES
+    from apps.assistant.report_reads import REPORT_READ_TOOL_NAMES
     from apps.assistant.retail_tools import RETAIL_TOOL_NAMES
     from apps.assistant.salary_tools import SALARY_TOOL_NAMES
     from apps.assistant.schedule_tools import SCHEDULE_TOOL_NAMES
@@ -88,6 +90,8 @@ def closed_production_names() -> tuple[str, ...]:
             | set(OPERATIONS_READ_TOOL_NAMES)
             | set(STAFF_TOOL_NAMES)
             | set(ACTIVITY_TOOL_NAMES)
+            | set(ANNOUNCEMENT_READ_TOOL_NAMES)
+            | set(REPORT_READ_TOOL_NAMES)
             | set(TRAINING_TOOL_NAMES)
             | set(SCHEDULE_TOOL_NAMES)
             | set(BOOKING_TOOL_NAMES)
@@ -120,6 +124,7 @@ def production_registry() -> ToolRegistry:
     """
 
     from apps.assistant.activity_tools import activity_tool_definitions
+    from apps.assistant.announcement_reads import announcement_read_tool_definitions
     from apps.assistant.booking_tools import booking_tool_definitions
     from apps.assistant.cash_tools import cash_tool_definitions
     from apps.assistant.class_reads import class_read_tool_definitions
@@ -135,6 +140,7 @@ def production_registry() -> ToolRegistry:
     from apps.assistant.payment_reads import payment_read_tool_definitions
     from apps.assistant.payment_tools import payment_tool_definitions
     from apps.assistant.pt_tools import pt_tool_definitions
+    from apps.assistant.report_reads import report_read_tool_definitions
     from apps.assistant.retail_tools import retail_tool_definitions
     from apps.assistant.salary_tools import salary_tool_definitions
     from apps.assistant.schedule_tools import schedule_tool_definitions
@@ -149,6 +155,8 @@ def production_registry() -> ToolRegistry:
         *package_read_tool_definitions(),
         *staff_tool_definitions(),
         *activity_tool_definitions(),
+        *announcement_read_tool_definitions(),
+        *report_read_tool_definitions(),
         *training_tool_definitions(),
         *schedule_tool_definitions(),
         *booking_tool_definitions(),

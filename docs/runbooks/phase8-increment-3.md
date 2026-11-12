@@ -76,10 +76,59 @@ archive or backup exits nonzero. A busy lock exits 75. The 900-second WAL
 alarm and 86400-second backup alarm are operational thresholds, not recovery
 evidence.
 
-`infra/backup/examples/` contains host timer and service examples, including a
-one-shot bootstrap service with no timer. They are not installed. They do not
-mount the Docker socket. Backup status is converted to an allowlisted textfile
-by [Phase 8 increment 4](./phase8-increment-4.md). Alert delivery is not claimed.
+`infra/backup/examples/` contains the host unit definitions, including a
+one-shot bootstrap service with no timer. A file in that directory is not a
+running timer. systemd reads the copy under `/etc/systemd/system/`. The units
+do not mount the Docker socket.
+
+`infra/backup/run-scheduled-backup.py` is the command those units run. Install
+that file at `/usr/local/lib/gym-deploy/run-scheduled-backup.py`, outside the
+release tree, so a later deploy can replace `src/` without removing the timer.
+The script reads `/var/lib/gym-deploy/production/active-deployment.json` and
+exports the active image digests, including `API_IMAGE`, `WEB_IMAGE`, and
+`POSTGRES_IMAGE`. It refuses a missing digest and the zero digest stored in
+`/etc/gym/production/compose.env`. It then runs the existing encrypted offsite
+job:
+
+`docker compose --project-name gym-production --env-file /etc/gym/production/compose.env -f /var/lib/gym-deploy/production/src/infra/compose/docker-compose.prod.yml -f /usr/local/lib/gym-deploy/override.yml --profile backup run --rm --no-deps --pull never backup-full`
+
+`backup-diff` and `backup-check` use the same command. `--no-deps` does not
+start the application services. The paths `/opt/gym/infra/compose` and
+`/etc/gym/production.env` are not this host. Do not enable a unit that still
+contains them.
+
+Do not put the bootstrap unit on a timer. Full, differential, and check are
+the schedule: full daily at 02:15 UTC, differential every six hours at minute
+20, and check every 15 minutes. `Persistent=true` runs a calendar event that
+elapsed while the host was off. A check that finds the backup lock busy exits
+75, and the check unit treats 75 as success. A full or differential that exits
+nonzero, including 75, is a failed oneshot. systemd records that failure in
+the journal. The same command writes the textfile metric. Prometheus rules
+read that file. Those rules reach Alertmanager only after the running
+Prometheus process has loaded a configuration that targets
+`alertmanager:9093`. Inbox delivery is not claimed.
+
+Install as root only when `gym-backup-full.service`, `gym-backup-diff.service`,
+`gym-backup-check.service`, and their three timers are absent from
+`/etc/systemd/system/`:
+
+```
+install -m 755 infra/backup/run-scheduled-backup.py /usr/local/lib/gym-deploy/run-scheduled-backup.py
+install -m 644 infra/backup/examples/gym-backup-full.service /etc/systemd/system/
+install -m 644 infra/backup/examples/gym-backup-full.timer /etc/systemd/system/
+install -m 644 infra/backup/examples/gym-backup-diff.service /etc/systemd/system/
+install -m 644 infra/backup/examples/gym-backup-diff.timer /etc/systemd/system/
+install -m 644 infra/backup/examples/gym-backup-check.service /etc/systemd/system/
+install -m 644 infra/backup/examples/gym-backup-check.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now gym-backup-full.timer gym-backup-diff.timer gym-backup-check.timer
+systemctl list-timers 'gym-backup-*'
+```
+
+`systemctl start gym-backup-check.service` is a freshness check. It does not
+take a new full backup. Confirm the next fire with `systemctl list-timers`.
+Backup status is converted to an allowlisted textfile by
+[Phase 8 increment 4](./phase8-increment-4.md).
 
 ## Restore
 

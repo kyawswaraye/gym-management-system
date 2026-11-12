@@ -32,6 +32,11 @@ def _reject_duplicate_query_values(data: Any) -> None:
 class MemberNotificationQuerySerializer(StrictSerializer):
     limit = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
     after = serializers.CharField(required=False, allow_blank=True, max_length=4096, default="")
+    view = serializers.ChoiceField(
+        choices=("active", "history", "all"),
+        required=False,
+        default="active",
+    )
 
     def to_internal_value(self, data: Any) -> dict[str, object]:
         _reject_duplicate_query_values(data)

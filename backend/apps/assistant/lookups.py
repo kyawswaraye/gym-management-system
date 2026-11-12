@@ -93,12 +93,15 @@ def choose_reference(supplied: str, records: Sequence[NamedRecord], staff_text: 
             return Choice(id=pool[0].id, label=pool[0].shown())
         return Choice(error="ambiguous", matches=tuple(pool[:_MATCH_LIMIT]))
 
-    if _by_code(records, supplied):
+    supplied_codes = _by_code(records, supplied)
+    if supplied_codes:
         mentioned = _mentioned(records, staff_text)
         if _ambiguous_named(mentioned):
             return Choice(error="ambiguous", matches=tuple(mentioned[:_MATCH_LIMIT]))
         if len(mentioned) == 1:
             return Choice(id=mentioned[0].id, label=mentioned[0].shown())
+        if len(supplied_codes) == 1:
+            return Choice(id=supplied_codes[0].id, label=supplied_codes[0].shown())
     hits = _dated(_name_hits(records, supplied), dates)
     coded = _by_code(hits, staff_text)
     if len(coded) == 1:
@@ -133,7 +136,8 @@ def resolve_references(
         needed.add("product_id")
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
-        staff_text = _latest_staff_text(gym, conversation)
+        staff_bodies = _staff_bodies(gym, conversation)
+        staff_text = staff_bodies[0] if staff_bodies else ""
         _normalize_numbers(resolved)
         _normalize_line_numbers(resolved)
         unstated = _keep_stated_dates(
@@ -141,6 +145,7 @@ def resolve_references(
             staff_text,
             today=_local_today(gym),
             gym=gym,
+            history=staff_bodies[1:],
         )
         if unstated is not None:
             if unstated.startswith("time:"):
@@ -176,6 +181,7 @@ _DATE_FIELDS = (
     "starts_at",
     "ends_at",
     "start_date",
+    "join_date",
     "business_date",
 )
 _CLOCK_FIELDS = ("starts_at", "ends_at")
@@ -204,11 +210,21 @@ def _keep_stated_dates(
     staff_text: str,
     today: date | None = None,
     gym: Gym | None = None,
+    history: Sequence[str] = (),
 ) -> str | None:
     """Rewrite a date or clock the staff stated. Leave an unstated value unchanged."""
 
     anchor = today or timezone.localdate()
     stated = _stated_day(staff_text, anchor)
+    if stated is None:
+        for earlier in history:
+            earlier_day = _stated_day(earlier, anchor)
+            if earlier_day == "conflict":
+                stated = "conflict"
+                break
+            if isinstance(earlier_day, date):
+                stated = earlier_day
+                break
     clocks = _stated_clocks(staff_text)
     for field in _DATE_FIELDS:
         value = payload.get(field)
@@ -220,6 +236,11 @@ def _keep_stated_dates(
         try:
             date.fromisoformat(raw[:10])
         except ValueError:
+            continue
+        if field == "join_date":
+            if isinstance(stated, date) and raw[:10] != stated.isoformat():
+                replacement = stated.isoformat()
+                payload[field] = replacement if len(raw) == 10 else replacement + raw[10:]
             continue
         if not isinstance(stated, date):
             return field
@@ -257,6 +278,8 @@ def _stated_day(text: str, today: date) -> date | str | None:
         offsets.add(1)
     if re.search(r"\byesterday\b", folded):
         offsets.add(-1)
+    if re.search(r"\bnext week\b", folded):
+        offsets.add(7)
     for token, offset in (
         ("ဒီနေ့", 0),
         ("ယနေ့", 0),
@@ -267,6 +290,8 @@ def _stated_day(text: str, today: date) -> date | str | None:
         ("နောက်နေ့", 1),
         ("မနေ့", -1),
         ("ယမန်နေ့", -1),
+        ("နောက်တစ်ပတ်", 7),
+        ("နောက်အပတ်", 7),
     ):
         if token in text:
             offsets.add(offset)
@@ -576,13 +601,43 @@ def _service_day(value: object, gym: Gym | None = None) -> date | None:
 
 
 def _latest_staff_text(gym: Gym, conversation: Conversation) -> str:
-    message = (
-        Message.objects.filter(gym=gym, conversation=conversation, role=Message.Role.STAFF)
-        .order_by("-created_at")
-        .only("body")
-        .first()
-    )
-    return message.body if message is not None else ""
+    bodies = _staff_bodies(gym, conversation)
+    return bodies[0] if bodies else ""
+
+
+def _staff_bodies(gym: Gym, conversation: Conversation) -> list[str]:
+    rows = Message.objects.filter(
+        gym=gym,
+        conversation=conversation,
+        role=Message.Role.STAFF,
+    ).order_by("-created_at", "-id")[:12]
+    return [row.body for row in rows if row.body.strip()]
+
+
+def relative_day(text: str, today: date) -> date | None:
+    """Return one gym-local day named in the text. A conflict returns none."""
+
+    stated = _stated_day(text, today)
+    return stated if isinstance(stated, date) else None
+
+
+def relative_window(text: str, today: date) -> tuple[date, date] | None:
+    """Return an inclusive gym-local range for a month or week phrase."""
+
+    import calendar
+
+    if "ဒီလ" in text or "this month" in text.casefold():
+        last = calendar.monthrange(today.year, today.month)[1]
+        return date(today.year, today.month, 1), date(today.year, today.month, last)
+    if "နောက်လ" in text or "next month" in text.casefold():
+        year = today.year + 1 if today.month == 12 else today.year
+        month = 1 if today.month == 12 else today.month + 1
+        last = calendar.monthrange(year, month)[1]
+        return date(year, month, 1), date(year, month, last)
+    if "နောက်တစ်ပတ်" in text or "next week" in text.casefold():
+        start = today + timedelta(days=7)
+        return start, start + timedelta(days=6)
+    return None
 
 
 def _members(gym: Gym) -> tuple[NamedRecord, ...]:
@@ -631,6 +686,262 @@ def _plans(gym: Gym) -> tuple[NamedRecord, ...]:
 def _service_packages(gym: Gym) -> tuple[NamedRecord, ...]:
     rows = ServicePackage.objects.filter(gym=gym).order_by("code", "id")
     return tuple(NamedRecord(str(row.id), row.name, label=row.name, code=row.code) for row in rows)
+
+
+@dataclass(frozen=True)
+class PackageChoice:
+    status: str
+    package: ServicePackage | None = None
+    matches: tuple[ServicePackage, ...] = ()
+
+
+_PACKAGE_CODE = re.compile(r"(?<![a-z0-9_])[a-z]{1,12}\d+[a-z0-9]*")
+
+
+def remember_sale_package(
+    gym: Gym,
+    conversation: Conversation,
+    state: dict[str, str],
+) -> None:
+    """Keep one identified PT package on the conversation. Never guess from a description."""
+
+    choice = sale_package_choice(gym, conversation, currency=str(gym.currency))
+    if choice.status == "one" and choice.package is not None:
+        _remember_package(state, choice.package)
+        if not state.get("workflow"):
+            state["workflow"] = "pt"
+        return
+    if choice.status in {"ambiguous", "unavailable", "currency_mismatch"}:
+        state["package_id"] = ""
+        state["package_code"] = ""
+        state["package_name"] = ""
+
+
+def attach_sale_package(
+    gym: Gym,
+    conversation: Conversation,
+    payload: dict[str, object],
+    state: Mapping[str, str],
+) -> tuple[dict[str, str], dict[str, object] | None]:
+    """Put one eligible package id on a PT sale, or ask when it is not unique."""
+
+    currency = _sale_currency(payload, gym)
+    supplied = _uuid_value(payload.get("service_package_id"))
+    choice = sale_package_choice(gym, conversation, currency=currency)
+    if supplied is not None:
+        if sale_package_failure(gym, payload) is not None:
+            return {}, {"error": "package_unavailable"}
+        if choice.status == "one" and choice.package is not None and choice.package.id != supplied:
+            named = choice.package
+            other = _package_by_id(gym, supplied)
+            return {}, _package_ambiguous((named, other) if other is not None else (named,))
+        if choice.status == "ambiguous":
+            return {}, _package_ambiguous(choice.matches)
+        package = _package_by_id(gym, supplied)
+        if package is None:
+            return {}, {"error": "package_unavailable"}
+        _remember_package(state, package)
+        return _package_label(package), None
+    if choice.status == "one" and choice.package is not None:
+        return _bind_package(payload, state, choice.package), None
+    if choice.status == "ambiguous":
+        return {}, _package_ambiguous(choice.matches)
+    if choice.status == "currency_mismatch":
+        return {}, {"error": "currency_mismatch"}
+    if choice.status == "unavailable":
+        return {}, {"error": "package_unavailable"}
+    stored = _eligible_stored_package(gym, state, currency)
+    if stored is not None:
+        return _bind_package(payload, state, stored), None
+    if _conversation_names_package(gym, conversation) or _description_points_at_package(
+        gym, payload
+    ):
+        return {}, {"error": "missing_fields", "fields": ["service_package_id"]}
+    return {}, None
+
+
+def sale_package_failure(gym: Gym, payload: Mapping[str, object]) -> dict[str, object] | None:
+    """Reject a stored package that is missing, foreign, inactive, or not a PT sale."""
+
+    raw = payload.get("service_package_id")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    package_id = _uuid_value(raw)
+    if package_id is None:
+        return {"error": "package_unavailable"}
+    package = _package_by_id(gym, package_id)
+    if package is None or not _sale_eligible(package, _sale_currency(payload, gym)):
+        return {"error": "package_unavailable"}
+    return None
+
+
+def sale_package_choice(gym: Gym, conversation: Conversation, *, currency: str) -> PackageChoice:
+    """Identify a package from staff text and the previous question, never from a description."""
+
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        rows = list(ServicePackage.objects.filter(gym=gym).order_by("code", "id"))
+        staff = _staff_bodies(gym, conversation)
+        assistant = (
+            Message.objects.filter(
+                gym=gym,
+                conversation=conversation,
+                role=Message.Role.ASSISTANT,
+            )
+            .order_by("-created_at", "-id")
+            .only("body")
+            .first()
+        )
+    latest = staff[0] if staff else ""
+    question = assistant.body if assistant is not None else ""
+    older = "\n".join(staff[1:])
+    for kind, text in (("staff", latest), ("assistant", question), ("older", older)):
+        if not text.strip():
+            continue
+        if (
+            kind == "staff"
+            and _talks_about_package(text)
+            and not _match_packages(rows, text)
+            and _unmatched_package_code(text, rows)
+        ):
+            return PackageChoice("unavailable")
+        choice = _choice_from_text(rows, text, currency)
+        if choice.status != "unnamed":
+            return choice
+    return PackageChoice("unnamed")
+
+
+def _choice_from_text(
+    rows: Sequence[ServicePackage],
+    text: str,
+    currency: str,
+) -> PackageChoice:
+    hits = _match_packages(rows, text)
+    if not hits:
+        return PackageChoice("unnamed")
+    if len(hits) > 1:
+        return PackageChoice("ambiguous", matches=tuple(hits))
+    row = hits[0]
+    if not _sale_eligible(row, currency):
+        if row.currency != currency:
+            return PackageChoice("currency_mismatch")
+        return PackageChoice("unavailable")
+    return PackageChoice("one", package=row)
+
+
+def _match_packages(rows: Sequence[ServicePackage], text: str) -> list[ServicePackage]:
+    records = tuple(
+        NamedRecord(str(row.id), row.name, label=row.name, code=row.code or "") for row in rows
+    )
+    coded = _by_code(records, text)
+    chosen = coded if coded else _mentioned(records, text)
+    ids = {record.id for record in chosen}
+    return [row for row in rows if str(row.id) in ids]
+
+
+def _sale_eligible(package: ServicePackage, currency: str) -> bool:
+    return (
+        package.type == ServicePackage.PackageType.PT
+        and package.is_active
+        and package.currency == currency
+    )
+
+
+def _sale_currency(payload: Mapping[str, object], gym: Gym) -> str:
+    currency = payload.get("currency")
+    if isinstance(currency, str) and currency.strip():
+        return currency.strip()
+    return str(gym.currency)
+
+
+def _talks_about_package(text: str) -> bool:
+    return "ပက်ကေ့" in text or "package" in text.casefold()
+
+
+def _unmatched_package_code(text: str, rows: Sequence[ServicePackage]) -> bool:
+    codes = {_fold(row.code) for row in rows if row.code}
+    return any(match.group(0) not in codes for match in _PACKAGE_CODE.finditer(_fold(text)))
+
+
+def _package_by_id(gym: Gym, package_id: UUID) -> ServicePackage | None:
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        return ServicePackage.objects.filter(gym=gym, id=package_id).first()
+
+
+def _eligible_stored_package(
+    gym: Gym,
+    state: Mapping[str, str],
+    currency: str,
+) -> ServicePackage | None:
+    package_id = _uuid_value(state.get("package_id"))
+    if package_id is None:
+        return None
+    package = _package_by_id(gym, package_id)
+    if package is None or not _sale_eligible(package, currency):
+        return None
+    return package
+
+
+def _conversation_names_package(gym: Gym, conversation: Conversation) -> bool:
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        staff = _staff_bodies(gym, conversation)
+        assistant = (
+            Message.objects.filter(
+                gym=gym,
+                conversation=conversation,
+                role=Message.Role.ASSISTANT,
+            )
+            .order_by("-created_at", "-id")
+            .only("body")
+            .first()
+        )
+    question = assistant.body if assistant is not None else ""
+    return any(_talks_about_package(text) for text in (*staff, question))
+
+
+def _description_points_at_package(gym: Gym, payload: Mapping[str, object]) -> bool:
+    description = payload.get("description")
+    if not isinstance(description, str) or not description.strip():
+        return False
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        rows = list(ServicePackage.objects.filter(gym=gym))
+    return bool(_match_packages(rows, description))
+
+
+def _bind_package(
+    payload: dict[str, object],
+    state: Mapping[str, str],
+    package: ServicePackage,
+) -> dict[str, str]:
+    payload["service_package_id"] = str(package.id)
+    _remember_package(state, package)
+    return _package_label(package)
+
+
+def _remember_package(state: Mapping[str, str], package: ServicePackage) -> None:
+    if isinstance(state, dict):
+        state["package_id"] = str(package.id)
+        state["package_code"] = package.code
+        state["package_name"] = package.name
+        if not state.get("workflow"):
+            state["workflow"] = "pt"
+
+
+def _package_label(package: ServicePackage) -> dict[str, str]:
+    return {"service_package_id": f"{package.name} ({package.code})"}
+
+
+def _package_ambiguous(packages: Sequence[ServicePackage]) -> dict[str, object]:
+    return {
+        "error": "ambiguous",
+        "field": "service_package_id",
+        "matches": [
+            {"name": f"{package.name} ({package.code})"} for package in packages if package
+        ],
+    }
 
 
 def _occurrences(gym: Gym) -> tuple[NamedRecord, ...]:
@@ -761,7 +1072,17 @@ def _by_code(records: Sequence[NamedRecord], text: str) -> list[NamedRecord]:
     folded = _fold(text)
     if not folded:
         return []
-    return [record for record in records if record.code and _fold(record.code) in folded]
+    return [
+        record for record in records if record.code and _code_present(_fold(record.code), folded)
+    ]
+
+
+def _code_present(code: str, folded: str) -> bool:
+    """Match a whole code. YOGA must not match inside YOGA_2."""
+
+    if not code:
+        return False
+    return re.search(rf"(?<![a-z0-9_]){re.escape(code)}(?![a-z0-9_])", folded) is not None
 
 
 def _mentioned(records: Sequence[NamedRecord], text: str) -> list[NamedRecord]:
