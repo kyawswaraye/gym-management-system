@@ -11,6 +11,7 @@ acceptance token.
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
+from .base import REST_FRAMEWORK as _REST_FRAMEWORK
 
 DEBUG = False
 # Playwright drives the real tools. This process does not call Gemini.
@@ -72,14 +73,16 @@ if DJANGO_LISTEN_HOST not in {"127.0.0.1", "localhost"}:  # noqa: F405
 
 # The scripted browser smoke sends a burst of assistant turns and confirmations
 # from one owner. Production keeps the tighter rates in base.py.
-_assistant_rates = REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]  # noqa: F405
-REST_FRAMEWORK = {
-    **REST_FRAMEWORK,  # noqa: F405
-    "DEFAULT_THROTTLE_RATES": {
-        **_assistant_rates,
+_rate_table = _REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
+if not isinstance(_rate_table, dict):
+    raise ImproperlyConfigured("Assistant throttle rates are missing")
+_assistant_rates = {str(key): value for key, value in _rate_table.items() if isinstance(value, str)}
+_assistant_rates.update(
+    {
         "assistant_read": "600/60",
         "assistant_turn": "600/60",
         "assistant_gym_read": "600/60",
         "assistant_gym_turn": "600/60",
-    },
-}
+    }
+)
+_REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = _assistant_rates
