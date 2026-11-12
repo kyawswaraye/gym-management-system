@@ -25,7 +25,7 @@ export function AppShell({
   const title = platform ? "GymPilot MM" : gymName;
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="staff-canvas min-h-screen">
       <SessionKeepalive />
       <SidebarFrame
         accountName={accountName}

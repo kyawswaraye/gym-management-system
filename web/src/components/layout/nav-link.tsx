@@ -33,14 +33,14 @@ export function navLinkIsCurrent(
 }
 
 const focusClass =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8c460]";
 
 function navLinkClass(current: boolean, parent: boolean): string {
-  const shared = `shrink-0 rounded-theme-md border px-3 py-2.5 ${parent ? "text-sm/8" : "text-sm"} font-medium text-text transition-colors duration-150 motion-reduce:transition-none ${focusClass}`;
+  const shared = `shrink-0 rounded-xl border px-3 py-2.5 ${parent ? "text-sm/8" : "text-sm"} font-medium transition-colors duration-150 motion-reduce:transition-none ${focusClass}`;
   if (current) {
-    return `${shared} border-primary bg-primary-soft font-semibold text-primary-hover hover:bg-primary-soft`;
+    return `${shared} border-[rgb(232_196_96/70%)] bg-[rgb(232_196_96/28%)] font-semibold text-[#f8e7b0] hover:bg-[rgb(232_196_96/36%)]`;
   }
-  return `${shared} border-transparent hover:bg-inset`;
+  return `${shared} border-transparent text-[rgb(244_247_251/78%)] hover:bg-[rgb(255_255_255/8%)] hover:text-white`;
 }
 
 export function NavLink({

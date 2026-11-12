@@ -2,6 +2,7 @@
 import { useTx } from "@/i18n/use-tx";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
@@ -38,10 +39,10 @@ function SidebarTitle({ title }: { title: string }) {
     return <span className="truncate">{tx(title)}</span>;
   }
   return (
-    <span className="truncate tracking-tight">
+    <span className="truncate tracking-tight text-white">
       {" "}
       {tx("GymPilot")}
-      <span className="ml-1 font-semibold">MM</span>
+      <span className="ml-1 font-semibold text-[#e8c460]">MM</span>
     </span>
   );
 }
@@ -66,7 +67,7 @@ function AccountChevron({ open }: { open: boolean }) {
   return (
     <svg
       aria-hidden="true"
-      className={`size-4 shrink-0 text-muted transition-transform duration-150 motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+      className={`size-4 shrink-0 text-[rgb(244_247_251/55%)] transition-transform duration-150 motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
       fill="none"
       viewBox="0 0 20 20"
     >
@@ -153,22 +154,22 @@ function AccountMenu({
         aria-expanded={menuOpen}
         aria-haspopup="dialog"
         aria-label={`${tx("Account")}, ${accountName}`}
-        className={`flex w-full min-w-0 items-center gap-2 rounded-theme-md p-2 text-left transition-colors motion-reduce:transition-none hover:bg-inset focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${menuOpen ? "bg-inset" : ""}`}
+        className={`flex w-full min-w-0 items-center gap-2 rounded-xl p-2 text-left transition-colors motion-reduce:transition-none hover:bg-[rgb(255_255_255/8%)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8c460] ${menuOpen ? "bg-[rgb(255_255_255/10%)]" : ""}`}
         type="button"
         onClick={toggleMenu}
       >
         <span
           aria-hidden="true"
-          className="grid size-8 shrink-0 place-items-center rounded-full bg-inset text-[13px] font-semibold text-text-secondary"
+          className="grid size-8 shrink-0 place-items-center rounded-full bg-[linear-gradient(145deg,#f8e7b0,#c9a24a)] text-[13px] font-semibold text-[#071e4a]"
         >
           {accountInitial(accountName)}
         </span>
         <span className="min-w-0 flex-1 leading-snug">
-          <span className="block truncate text-sm font-semibold text-text">
+          <span className="block truncate text-sm font-semibold text-white">
             {accountName}
           </span>
           {email ? (
-            <span className="block truncate text-caption text-muted">
+            <span className="block truncate text-caption text-[rgb(244_247_251/62%)]">
               {email}
             </span>
           ) : null}
@@ -226,23 +227,37 @@ export function SidebarFrame({
   children: ReactNode;
 }) {
   const tx = useTx();
+  const assistantPage = usePathname() === "/assistant";
   const [open, setOpen] = useState(true);
+  const [assistantMobileOpen, setAssistantMobileOpen] = useState(false);
+  const mobileOpen = assistantPage ? assistantMobileOpen : open;
+  const fullyClosed = !open && !mobileOpen;
 
-  return (
+  function hideSidebar() {
+    setOpen(false);
+    setAssistantMobileOpen(false);
+  }
+
+  function showSidebar() {
+    setOpen(true);
+    setAssistantMobileOpen(true);
+  }
+
+  const frame = (
     <>
       <aside
-        aria-hidden={open ? undefined : true}
-        className={`relative z-30 bg-surface text-text shadow-none motion-reduce:transition-none max-md:grid max-md:overflow-hidden max-md:border-b max-md:border-border max-md:transition-[grid-template-rows] max-md:duration-300 max-md:ease-in-out md:fixed md:inset-y-0 md:left-0 md:flex md:w-64 md:flex-col md:overflow-hidden md:border-r md:border-border md:transition-transform md:duration-300 md:ease-in-out ${open ? "max-md:grid-rows-[1fr] md:translate-x-0" : "max-md:grid-rows-[0fr] max-md:border-b-0 md:-translate-x-full"}`}
+        aria-hidden={fullyClosed ? true : undefined}
+        className={`app-sidebar relative z-30 text-[rgb(244_247_251/88%)] shadow-[8px_0_32px_rgb(7_30_74/18%)] motion-reduce:transition-none max-md:grid max-md:overflow-hidden max-md:border-b max-md:border-[rgb(255_255_255/10%)] max-md:transition-[grid-template-rows] max-md:duration-300 max-md:ease-in-out md:fixed md:inset-y-0 md:left-0 md:flex md:w-64 md:flex-col md:overflow-hidden md:border-r md:border-[rgb(255_255_255/10%)] md:transition-transform md:duration-300 md:ease-in-out ${mobileOpen ? "max-md:grid-rows-[1fr]" : "max-md:grid-rows-[0fr] max-md:border-b-0"} ${open ? "md:translate-x-0" : "md:-translate-x-full"} ${assistantPage && mobileOpen ? "max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:h-dvh max-md:w-[min(18rem,86vw)] max-md:max-h-none" : ""}`}
         id="app-sidebar"
-        inert={open ? undefined : true}
+        inert={fullyClosed ? true : undefined}
       >
         <div className="flex min-h-0 flex-col overflow-hidden p-6 md:h-full md:min-h-0 md:flex-1">
-          <div className="mb-4 flex min-w-0 shrink-0 items-center gap-2 border-b border-border pb-4">
+          <div className="mb-4 flex min-w-0 shrink-0 items-center gap-2 border-b border-[rgb(255_255_255/10%)] pb-4">
             <Link
               aria-label={
                 title === "GymPilot MM" ? tx("GymPilot MM") : undefined
               }
-              className="flex min-w-0 flex-1 items-center gap-2.5 text-sm font-semibold text-text"
+              className="flex min-w-0 flex-1 items-center gap-2.5 text-sm font-semibold text-white"
               href={homePath}
               title={title}
             >
@@ -274,9 +289,9 @@ export function SidebarFrame({
               aria-controls="app-sidebar"
               aria-expanded="true"
               aria-label={tx("Hide sidebar")}
-              className={`${toggleClass} text-muted hover:bg-inset hover:text-text`}
+              className={`${toggleClass} text-[rgb(244_247_251/70%)] hover:bg-[rgb(255_255_255/10%)] hover:text-white`}
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={hideSidebar}
             >
               <MenuIcon />
             </button>
@@ -284,7 +299,7 @@ export function SidebarFrame({
           <div className="md:min-h-0 md:flex-1 md:overflow-y-auto">
             <SidebarNav entries={navigation} />
           </div>
-          <footer className="mt-auto shrink-0 border-t border-border pt-3">
+          <footer className="mt-auto shrink-0 border-t border-[rgb(255_255_255/10%)] pt-3">
             <AccountMenu
               accountName={accountName}
               email={email}
@@ -293,27 +308,51 @@ export function SidebarFrame({
           </footer>
         </div>
       </aside>
+      {assistantPage && mobileOpen ? (
+        <button
+          aria-hidden="true"
+          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          tabIndex={-1}
+          type="button"
+          onClick={() => setAssistantMobileOpen(false)}
+        />
+      ) : null}
       <button
         aria-controls="app-sidebar"
         aria-expanded="false"
-        aria-hidden={open ? true : undefined}
+        aria-hidden={open && mobileOpen ? true : undefined}
         aria-label={tx("Show sidebar")}
-        className={`${toggleClass} fixed top-3 left-3 z-40 border border-border bg-surface text-text shadow-overlay transition-opacity duration-300 ease-in-out hover:bg-inset motion-reduce:transition-none ${open ? "pointer-events-none opacity-0" : "opacity-100"}`}
-        tabIndex={open ? -1 : 0}
+        className={`${toggleClass} fixed top-3 left-3 z-40 border border-border bg-surface text-text shadow-overlay transition-opacity duration-300 ease-in-out hover:bg-inset motion-reduce:transition-none ${open ? "md:pointer-events-none md:opacity-0" : "md:opacity-100"} ${mobileOpen ? "max-md:pointer-events-none max-md:opacity-0" : "max-md:opacity-100"}`}
+        tabIndex={open && mobileOpen ? -1 : 0}
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={showSidebar}
       >
         <MenuIcon />
       </button>
       <div
-        className={`min-w-0 transition-[margin] duration-300 ease-in-out motion-reduce:transition-none ${open ? "md:ml-64" : ""}`}
+        className={`min-w-0 transition-[margin] duration-300 ease-in-out motion-reduce:transition-none ${open ? "md:ml-64" : ""} ${assistantPage ? "flex min-h-0 flex-1 flex-col" : ""}`}
       >
         <main
-          className={`mx-auto w-full max-w-[100rem] px-5 pb-5 transition-[padding] duration-300 ease-in-out md:px-8 md:pb-8 motion-reduce:transition-none ${open ? "pt-5 md:pt-8" : "pt-16"}`}
+          className={
+            assistantPage
+              ? "flex min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden bg-white p-0"
+              : `mx-auto w-full max-w-[100rem] px-5 pb-5 transition-[padding] duration-300 ease-in-out md:px-8 md:pb-8 motion-reduce:transition-none ${open ? "pt-5 md:pt-8" : "pt-16"}`
+          }
         >
           {children}
         </main>
       </div>
     </>
+  );
+
+  if (!assistantPage) return frame;
+
+  return (
+    <div
+      className="flex h-dvh max-h-dvh flex-col overflow-hidden bg-white"
+      data-app-sidebar={open ? "open" : "closed"}
+    >
+      {frame}
+    </div>
   );
 }

@@ -33,14 +33,14 @@ function activeFolder(
 
 function folderClass(open: boolean, current: boolean): string {
   const shared =
-    "flex w-full items-center justify-between gap-3 rounded-theme-md border px-3 py-2.5 text-left text-sm/8 font-medium text-text transition-colors duration-150 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+    "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left text-sm/8 font-medium text-[rgb(244_247_251/82%)] transition-colors duration-150 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8c460]";
   if (current) {
-    return `${shared} border-primary bg-primary-soft font-semibold text-primary-hover`;
+    return `${shared} border-[rgb(232_196_96/70%)] bg-[rgb(232_196_96/28%)] font-semibold text-[#f8e7b0]`;
   }
   if (open) {
-    return `${shared} border-transparent font-semibold hover:bg-inset`;
+    return `${shared} border-transparent bg-[rgb(255_255_255/6%)] font-semibold text-white hover:bg-[rgb(255_255_255/10%)]`;
   }
-  return `${shared} border-transparent hover:bg-inset`;
+  return `${shared} border-transparent hover:bg-[rgb(255_255_255/8%)] hover:text-white`;
 }
 
 function Chevron({ open }: { open: boolean }) {

@@ -110,6 +110,12 @@ const ALLOWED_TENANT_PATHS = [
   /^\/api\/v1\/memberships\/(?:expiry\/|[0-9a-f-]+\/(?:cancel\/|suspend\/|resume\/)?)?$/,
   ...FINANCE_PATH_PATTERNS,
   ...PHASE5_PATH_PATTERNS,
+  /^\/api\/v1\/assistant\/status\/$/,
+  /^\/api\/v1\/assistant\/conversations\/$/,
+  /^\/api\/v1\/assistant\/conversations\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/$/,
+  /^\/api\/v1\/assistant\/goals\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/$/,
+  /^\/api\/v1\/assistant\/turns\/$/,
+  /^\/api\/v1\/assistant\/confirmations\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(?:confirm|reject)\/$/,
   /^\/api\/v1\/dashboard\/$/,
   ...REPORT_PATH_PATTERNS,
   /^\/api\/v1\/audit-logs\/$/,
@@ -1356,12 +1362,6 @@ async function authenticatedMutationBound(
     });
   }
   const access = request.cookies.get(AUTH_COOKIES.access)?.value;
-  if (!access) {
-    return responseFromUpstream(401, {
-      success: false,
-      error: { code: "AUTHENTICATION_REQUIRED", message: "Please sign in." },
-    });
-  }
   const suppliedKey = request.headers.get("Idempotency-Key");
   const idempotencyKey = idempotencyKeyForMutation(path, method, suppliedKey);
   if (idempotencyKey === "rejected") {
@@ -1395,6 +1395,19 @@ async function authenticatedMutationBound(
         },
         ...(method === "DELETE" ? {} : { body: JSON.stringify(body) }),
       });
+    if (!access) {
+      return refreshAndRetry(
+        request,
+        {
+          success: false,
+          error: {
+            code: "AUTHENTICATION_REQUIRED",
+            message: "Please sign in.",
+          },
+        },
+        perform,
+      );
+    }
     const upstream = await perform(access);
     const upstreamBody = await parseJson(upstream);
     if (
