@@ -69,3 +69,17 @@ if MFA_ENCRYPTION_KEY == FINANCE_IDEMPOTENCY_ENCRYPTION_KEY:  # noqa: F405
     raise ImproperlyConfigured("Finance idempotency encryption must not reuse the MFA key")
 if DJANGO_LISTEN_HOST not in {"127.0.0.1", "localhost"}:  # noqa: F405
     raise ImproperlyConfigured("Django must listen only on a loopback address")
+
+# The scripted browser smoke sends a burst of assistant turns and confirmations
+# from one owner. Production keeps the tighter rates in base.py.
+_assistant_rates = REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]  # noqa: F405
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,  # noqa: F405
+    "DEFAULT_THROTTLE_RATES": {
+        **_assistant_rates,
+        "assistant_read": "600/60",
+        "assistant_turn": "600/60",
+        "assistant_gym_read": "600/60",
+        "assistant_gym_turn": "600/60",
+    },
+}
