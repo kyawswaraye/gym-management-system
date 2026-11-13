@@ -32,6 +32,8 @@ def scripted_response(body: Mapping[str, object]) -> dict[str, object]:
         from apps.assistant.provider import ProviderCallError
 
         raise ProviderCallError(ProviderFailure.QUOTA)
+    if text.casefold().strip(" .?") == "what did the member pay":
+        return _text("Which member? Tell me the member number.")
     responses = _responses(contents if isinstance(contents, list) else [])
     if text.startswith("The change is saved."):
         return _text("The change is complete.")
