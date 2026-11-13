@@ -121,8 +121,7 @@ def search_permissions(call: ReadCall) -> dict[str, object]:
     )
     return {
         "results": [
-            {"code": row.code, "module": row.module, "description": row.description}
-            for row in rows
+            {"code": row.code, "module": row.module, "description": row.description} for row in rows
         ],
         "has_more": bool(meta["has_more"]),
         "next_after": meta["next_after"],
