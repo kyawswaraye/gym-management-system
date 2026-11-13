@@ -43,9 +43,36 @@ def scripted_response(body: Mapping[str, object]) -> dict[str, object]:
         return _text(_REVIEW)
     call = _next_call(text, responses)
     if call is None:
+        clarification = _clarification(text, responses)
+        if clarification is not None:
+            return _text(clarification)
         return _text(_UNGROUNDED)
     name, arguments = call
     return _call(name, arguments)
+
+
+def _clarification(text: str, responses: Mapping[str, Mapping[str, object]]) -> str | None:
+    """Ask when the scripted search found more than one matching record."""
+
+    folded = text.casefold()
+    if "named yoga" in folded and "search_membership_plans" in responses:
+        codes = _strings(responses["search_membership_plans"], "code")
+        if len(codes) > 1:
+            return f"Which plan code? {' '.join(codes)}"
+    if "what did " in folded and " pay" in folded and "search_members" in responses:
+        numbers = _strings(responses["search_members"], "member_number")
+        if len(numbers) > 1:
+            return f"Which member? {' '.join(numbers)}"
+    return None
+
+
+def _strings(body: Mapping[str, object], key: str) -> tuple[str, ...]:
+    values: list[str] = []
+    for row in _rows(body):
+        value = row.get(key)
+        if isinstance(value, str) and value:
+            values.append(value)
+    return tuple(values)
 
 
 def _next_call(

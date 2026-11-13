@@ -274,6 +274,88 @@ def test_e2e_script_reports_completion_only_after_the_server_saved_it() -> None:
     assert part["text"] == "The change is complete."
 
 
+def test_e2e_script_asks_which_plan_when_two_share_a_name() -> None:
+    payload = scripted_response(
+        {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": "Which membership plan is named Yoga?"}],
+                },
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "functionResponse": {
+                                "name": "search_membership_plans",
+                                "response": {
+                                    "result": {
+                                        "results": [
+                                            {"code": "E2EYOGA", "name": "Yoga"},
+                                            {"code": "E2EYOGA2", "name": "Yoga"},
+                                        ]
+                                    }
+                                },
+                            }
+                        }
+                    ],
+                },
+            ]
+        }
+    )
+
+    assert _script_text(payload) == "Which plan code? E2EYOGA E2EYOGA2"
+
+
+def test_e2e_script_asks_which_member_when_two_share_a_name() -> None:
+    payload = scripted_response(
+        {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": "What did E2Etwin Pair pay?"}],
+                },
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "functionResponse": {
+                                "name": "search_members",
+                                "response": {
+                                    "result": {
+                                        "results": [
+                                            {"member_number": "MEM-000010"},
+                                            {"member_number": "MEM-000011"},
+                                        ]
+                                    }
+                                },
+                            }
+                        }
+                    ],
+                },
+            ]
+        }
+    )
+
+    assert _script_text(payload) == "Which member? MEM-000010 MEM-000011"
+
+
+def _script_text(payload: dict[str, object]) -> str:
+    candidates = payload["candidates"]
+    assert isinstance(candidates, list)
+    candidate = candidates[0]
+    assert isinstance(candidate, dict)
+    content = candidate["content"]
+    assert isinstance(content, dict)
+    parts = content["parts"]
+    assert isinstance(parts, list)
+    part = parts[0]
+    assert isinstance(part, dict)
+    text = part["text"]
+    assert isinstance(text, str)
+    return text
+
+
 class _Body:
     def __init__(self, raw: bytes) -> None:
         self.raw = raw
