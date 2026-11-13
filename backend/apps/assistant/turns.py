@@ -473,7 +473,7 @@ def _reply(
                 results=read_results,
                 brief=live_brief,
                 staff_text=staff_text,
-                fallback=proposal is None,
+                fallback=True,
             )
         else:
             corrected = grounded_information_reply(
