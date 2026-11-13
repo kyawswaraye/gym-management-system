@@ -522,6 +522,14 @@ def test_a_read_answer_keeps_only_stored_or_brief_facts() -> None:
         staff_text="Explain revenue",
     )
     assert formatted == "Revenue is 1,500.00 THB."
+    scaled = grounded_read_reply(
+        "The price is 1.00.",
+        results=[{"code": "Monthly_plan", "price": "50000.00", "duration_value": 1}],
+        brief="Live gym brief.",
+        staff_text="How much is the Monthly Plan?",
+    )
+    assert "1.00" not in scaled
+    assert "50000" in scaled
     assert mixed.startswith("Aung Aung paid 80000")
     assert "99999" not in mixed
     assert "Hla" not in mixed

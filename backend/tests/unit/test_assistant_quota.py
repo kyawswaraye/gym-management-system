@@ -147,7 +147,7 @@ def test_a_lookup_still_offers_write_tools(
     assert "create_payment" in seen[0]
     assert "create_member" in seen[0]
     assert result["pending_confirmation"] is None
-    assert result["message"]["body"] == "I still need the member and the amount."
+    assert result["message"]["body"] == "What amount?"
 
 
 def test_a_write_request_keeps_write_declarations_and_the_confirmation(

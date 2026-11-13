@@ -778,6 +778,7 @@ _NOTICE_ERRORS = frozenset(
         "missing_fields",
         "ambiguous",
         "not_found",
+        "already_saved",
         *_GATE_SENTENCES,
     }
 )
@@ -1071,6 +1072,8 @@ def staff_notice(body: Mapping[str, object], staff_text: str) -> str | None:
         return "မပြီးမြောက်ပါ။ ဘာမှ မပြောင်းရသေးပါ။" if burmese else "I could not complete that."
     if error == "not_found":
         return "သိမ်းထားတဲ့ မှတ်တမ်း မတွေ့ပါ။" if burmese else "No stored record matches that."
+    if error == "already_saved":
+        return "ဒီပြောင်းလဲမှု ရှိပြီးသားပါ။" if burmese else "That change is already stored."
     if error == "date_unconfirmed":
         return "ဘယ်ရက်လဲ။" if burmese else "Which date?"
     if error in {"date_invalid", "date_ambiguous"}:
@@ -1080,7 +1083,16 @@ def staff_notice(body: Mapping[str, object], staff_text: str) -> str | None:
     if error == "missing_fields":
         return _missing_question(body.get("fields"), burmese)
     if error == "ambiguous":
-        return _ambiguous_question(body.get("matches"), burmese)
+        field = body.get("field")
+        question = ""
+        if isinstance(field, str):
+            pair = _FIELD_QUESTIONS.get(field)
+            if pair is not None:
+                question = pair[1] if burmese else pair[0]
+        choice = _ambiguous_question(body.get("matches"), burmese)
+        if question and question not in choice:
+            return f"{question} {choice}".strip()
+        return choice
     if error in _GATE_SENTENCES:
         return gate_sentence(error, staff_text, body)
     return None
@@ -1795,6 +1807,8 @@ def _sentence_supported(text: str, allowed_text: str) -> bool:
         return False
     if not _claim_tokens(text) <= _claim_tokens(allowed_text):
         return False
+    if not _scaled_numbers_supported(text, allowed_text):
+        return False
     return all(_name_supported(name, allowed_text) for name in _names(text))
 
 
@@ -1810,7 +1824,7 @@ def _drop_unsupported_claims(text: str, allowed_text: str) -> str:
         if match.group(0) not in allowed:
             spans.append(match.span())
     for match in _CLAIM_NUMBER.finditer(translated):
-        if _canon_number(match.group(0)) not in allowed:
+        if not _scaled_number_supported(match.group(0), allowed_text):
             spans.append(match.span())
     for pattern in (_CLAIM_CODE, _STATUS_RE):
         for match in pattern.finditer(translated):
@@ -2272,6 +2286,27 @@ def _ambiguous_question(matches: object, burmese: bool) -> str:
     if burmese:
         return f"ဘယ်ဟာလဲ။ {shown}"
     return f"Which one? {shown}"
+
+
+def _scaled_numbers_supported(text: str, allowed_text: str) -> bool:
+    """A decimal amount is not proven by an unrelated small integer."""
+
+    return all(
+        _scaled_number_supported(match.group(0), allowed_text)
+        for match in _CLAIM_NUMBER.finditer(exact_code(text))
+    )
+
+
+def _scaled_number_supported(token: str, allowed_text: str) -> bool:
+    canon = _canon_number(token)
+    scaled = "." in token or "," in token
+    for match in _CLAIM_NUMBER.finditer(exact_code(allowed_text)):
+        source = match.group(0)
+        if _canon_number(source) != canon:
+            continue
+        if not scaled or "." in source or "," in source or len(canon) >= 3:
+            return True
+    return False
 
 
 def _canon_number(token: str) -> str:

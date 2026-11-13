@@ -599,7 +599,7 @@ def test_burmese_announcements_reports_and_retail_stock(
     assert "Updated hours" in str(listed["message"]["body"])
     assert "PUBLISHED" in str(listed["message"]["body"])
 
-    mock.push("get_gym_dashboard", {"range": "last_month"})
+    mock.push("get_gym_dashboard", {"range": "this_month"})
     dashboard = _post(
         client,
         headers,

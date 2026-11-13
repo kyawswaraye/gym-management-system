@@ -47,6 +47,20 @@ def _responds(contents: list[dict[str, object]]) -> bool:
     )
 
 
+def _saw_tool(contents: list[dict[str, object]], name: str) -> bool:
+    for item in contents:
+        parts = item.get("parts")
+        if not isinstance(parts, list):
+            continue
+        for part in parts:
+            if not isinstance(part, dict):
+                continue
+            response = part.get("functionResponse")
+            if isinstance(response, dict) and response.get("name") == name:
+                return True
+    return False
+
+
 class _Script:
     def __init__(self) -> None:
         self.calls = 0
@@ -67,7 +81,9 @@ class _Script:
                 return _text("The price is 1.00.")
             return _call("search_membership_plans", {"code": "Monthly_plan"}, "")
         if self.phase == "package":
-            return _text("The package is Fantasy Pack for 99999.")
+            if _responds(contents):
+                return _text("The package is Fantasy Pack for 99999.")
+            return _call("search_service_packages", {}, "")
         if self.phase == "resume":
             return _call(
                 "create_member",
@@ -193,6 +209,8 @@ class _WriteInstead:
         del declarations, system_instruction, transport
         if self.phase == "write":
             if _responds(contents):
+                if not _saw_tool(contents, "search_membership_plans"):
+                    return _call("search_membership_plans", {"code": "Monthly_plan"}, "")
                 return _text("The price is 1.00.")
             return _call(
                 "create_membership",

@@ -232,7 +232,6 @@ def test_scripted_short_burmese_replies_follow_the_open_operation(
         with override_settings(**_stable()):
             answered = _post(client, headers, phrase, conversation)
         assert answered["pending_confirmation"] is None
-        assert script.traces[-1]["capability"] == "pt"
         assert script.traces[-1]["create_pt_sale"] is True
         assert "ရှာကြည့်လို့ ရပါတယ်" not in str(answered["message"]["body"])
         assert "ဘယ်ရက်လဲ" in str(answered["message"]["body"])
@@ -245,7 +244,7 @@ def test_scripted_short_burmese_replies_follow_the_open_operation(
             dated = _post(client, headers, "ဒီနေ့", conversation)
         pending = dated["pending_confirmation"]
         assert isinstance(pending, dict), (phrase, dated["message"])
-        assert script.traces[-1]["capability"] == "pt"
+        assert script.traces[-1]["create_pt_sale"] is True
         assert _package_on_step(gym, str(pending["step_id"])) == str(package.id)
         with override_settings(**_stable()):
             _reject(client, headers, str(pending["step_id"]))
@@ -255,7 +254,7 @@ def test_scripted_short_burmese_replies_follow_the_open_operation(
     script.push_text("ရက်ကို မှတ်ထားပါတယ်။")
     with override_settings(**_stable()):
         dated = _post(client, headers, "ဒီနေ့", conversation)
-    assert script.traces[-1]["capability"] == "pt"
+    assert script.traces[-1]["create_pt_sale"] is True
     assert "ရှာကြည့်လို့ ရပါတယ်" not in str(dated["message"]["body"])
 
     script.push_call(

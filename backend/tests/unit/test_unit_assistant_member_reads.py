@@ -137,6 +137,23 @@ def test_member_reads_register_without_changing_write_tools() -> None:
         "search_pt_commissions",
         "search_announcements",
         "get_gym_dashboard",
+        "search_membership_expiries",
+        "search_service_packages",
+        "search_class_types",
+        "search_class_schedules",
+        "search_check_ins",
+        "search_products",
+        "search_stock_movements",
+        "search_low_stock",
+        "search_product_sales",
+        "search_pt_sales",
+        "search_pt_bookings",
+        "search_trainers",
+        "search_trainer_assignments",
+        "search_staff",
+        "search_roles",
+        "search_permissions",
+        "search_staff_access",
     }
     for name in MEMBER_READ_TOOL_NAMES:
         tool = production_registry().get(name)

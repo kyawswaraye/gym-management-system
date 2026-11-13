@@ -45,6 +45,7 @@ from apps.assistant.knowledge import (
     public_activity,
     short_reply_kind,
     speaks_burmese,
+    staff_notice,
     visible_reply,
 )
 from apps.assistant.lookups import (
@@ -361,6 +362,7 @@ def _reply(
                 break
             contents.append({"role": "model", "parts": [dict(part) for part in turn.parts]})
             responses: list[dict[str, object]] = []
+            clarification = ""
             for call in turn.calls:
                 if calls_used >= max_tool_calls():
                     responses.append(_function_response(call.name, {"error": "step_limit"}))
@@ -384,6 +386,10 @@ def _reply(
                 if outcome is not None:
                     proposal = outcome
                     opened_now = True
+                else:
+                    sentence = _clarification_sentence(body, staff_text)
+                    if sentence:
+                        clarification = sentence
                 responses.append(_function_response(call.name, body))
                 if "result" in body:
                     read_completed = True
@@ -409,6 +415,9 @@ def _reply(
             contents.append({"role": "user", "parts": responses})
             if opened_now:
                 reply = turn.text or _proposal_text(proposal)
+                break
+            if clarification:
+                reply = clarification
                 break
         else:
             limit_reached = True
@@ -1518,6 +1527,23 @@ def _model_declarations(
     return selected
 
 
+def _clarification_sentence(body: Mapping[str, object], staff_text: str) -> str:
+    """Use the tool's validation sentence when the proposal cannot open.
+
+    A missing lookup can be followed by another tool. A date, choice, or
+    inactive record cannot.
+    """
+
+    error = body.get("error")
+    if not isinstance(error, str):
+        status_code = body.get("status")
+        error = status_code if isinstance(status_code, str) else ""
+    if error in {"not_found", "permission_denied", "unavailable"}:
+        return ""
+    sentence = staff_notice(body, staff_text)
+    return sentence or ""
+
+
 def _answer_from_results(
     *,
     contents: list[dict[str, object]],
@@ -1540,7 +1566,7 @@ def _answer_from_results(
                 system_instruction=instruction,
             )
             calls = 1
-            if not turn.blocked:
+            if not turn.blocked and not turn.calls:
                 text = turn.text
         except ProviderCallError:
             logger.info("assistant synthesis failed")

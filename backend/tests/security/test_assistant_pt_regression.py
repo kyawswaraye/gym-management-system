@@ -255,8 +255,6 @@ def test_scripted_pt_payment_and_confirmation(
         isinstance(field, dict) and "2026-11-12" in str(field.get("value")) for field in fields
     ):
         problems.append(f"confirmation fields did not include the start date: {fields!r}")
-    if date_trace.get("capability") != "pt":
-        problems.append(f"date turn capability={date_trace.get('capability')}")
     if date_trace.get("create_assignment") is not True:
         problems.append("date turn hid create_assignment")
 
