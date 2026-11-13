@@ -121,6 +121,8 @@ def page_check_ins(
     open_state: str,
     limit: int,
     after: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> tuple[list[CheckIn], dict[str, Any]]:
     from apps.trainers.selectors import (
         gym_local_date,
@@ -134,6 +136,12 @@ def page_check_ins(
         if not Member.objects.filter(gym=gym, id=member_id).exists():
             raise Http404
     scope = _list_scope(gym_id=gym.id, member_id=member_id, open_state=open_state, limit=limit)
+    if date_from is not None or date_to is not None:
+        scope = {
+            **scope,
+            "date_from": "" if date_from is None else date_from.isoformat(),
+            "date_to": "" if date_to is None else date_to.isoformat(),
+        }
     queryset = scope_to_assigned_members(
         _history_queryset(gym_id=gym.id, member_id=member_id, open_state=open_state),
         gym_id=gym.id,
@@ -141,6 +149,16 @@ def page_check_ins(
         as_of=as_of,
         member_ref="member_id",
     )
+    zone = ZoneInfo(gym.timezone)
+    if date_from is not None:
+        queryset = queryset.filter(
+            check_in_at__gte=datetime.combine(date_from, time.min, tzinfo=zone)
+        )
+    if date_to is not None:
+        next_day = date_to.fromordinal(date_to.toordinal() + 1)
+        queryset = queryset.filter(
+            check_in_at__lt=datetime.combine(next_day, time.min, tzinfo=zone)
+        )
     return _page(queryset, after=after, limit=limit, scope=scope, salt=CHECK_IN_LIST_CURSOR_SALT)
 
 

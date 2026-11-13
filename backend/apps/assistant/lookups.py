@@ -35,7 +35,51 @@ from apps.trainers.models import (
 )
 
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_YMD = re.compile(r"(?<!\d)(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?!\d)")
+_DMY = re.compile(r"(?<!\d)(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})(?!\d)")
 _MATCH_LIMIT = 8
+_EN_MONTHS: tuple[tuple[str, int], ...] = (
+    ("january", 1),
+    ("february", 2),
+    ("march", 3),
+    ("april", 4),
+    ("may", 5),
+    ("june", 6),
+    ("july", 7),
+    ("august", 8),
+    ("september", 9),
+    ("october", 10),
+    ("november", 11),
+    ("december", 12),
+)
+_MY_MONTHS: tuple[tuple[str, int], ...] = (
+    ("ဇန်နဝါရီ", 1),
+    ("ဖေဖော်ဝါရီ", 2),
+    ("မတ်", 3),
+    ("ဧပြီ", 4),
+    ("မေ", 5),
+    ("ဇွန်", 6),
+    ("ဇူလိုင်", 7),
+    ("ဩဂုတ်", 8),
+    ("စက်တင်ဘာ", 9),
+    ("အောက်တိုဘာ", 10),
+    ("နိုဝင်ဘာ", 11),
+    ("ဒီဇင်ဘာ", 12),
+)
+_MONTH_NUMBERS = {name.casefold(): number for name, number in (*_EN_MONTHS, *_MY_MONTHS)}
+_MONTH_NAME = "|".join(
+    re.escape(name)
+    for name, _number in sorted(_MONTH_NUMBERS.items(), key=lambda item: len(item[0]), reverse=True)
+)
+_MONTH_WORD = rf"(?<![A-Za-z\u1000-\u109F])(?:{_MONTH_NAME})(?![A-Za-z\u1000-\u109F])"
+_DAY_MONTH = re.compile(
+    rf"(?<!\d)(\d{{1,2}})\s*({_MONTH_WORD})(?:\s+(\d{{4}}))?(?!\d)",
+    re.IGNORECASE,
+)
+_MONTH_DAY = re.compile(
+    rf"({_MONTH_WORD})\s*(\d{{1,2}})(?:(?:st|nd|rd|th)?\s*,?\s*(\d{{4}}))?(?!\d)",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -70,7 +114,7 @@ def choose_reference(supplied: str, records: Sequence[NamedRecord], staff_text: 
     if len(coded) > 1:
         return Choice(error="ambiguous", matches=tuple(coded[:_MATCH_LIMIT]))
     named = _mentioned(records, staff_text)
-    dates = set(_DATE.findall(f"{staff_text}\n{supplied}"))
+    dates = _explicit_iso_dates(f"{staff_text}\n{supplied}")
     parsed = _uuid_text(supplied)
     if parsed is not None:
         current = next((record for record in records if record.id == parsed), None)
@@ -118,6 +162,8 @@ def resolve_references(
     conversation: Conversation,
     payload: Mapping[str, object],
     permission_codes: frozenset[str] | None = None,
+    stored_date: str = "",
+    require_join: bool = False,
 ) -> tuple[dict[str, object], dict[str, str], dict[str, object] | None]:
     """Return the id payload, card labels, and a tool error when staff must choose."""
 
@@ -146,10 +192,15 @@ def resolve_references(
             today=_local_today(gym),
             gym=gym,
             history=staff_bodies[1:],
+            stored=stored_date,
+            require_join=require_join,
         )
         if unstated is not None:
             if unstated.startswith("time:"):
                 return dict(payload), {}, {"error": "time_unconfirmed", "field": unstated[5:]}
+            problem = _date_problem_body(unstated, stored_date)
+            if problem is not None:
+                return dict(payload), {}, problem
             return dict(payload), {}, {"error": "date_unconfirmed", "field": unstated}
         if not needed:
             return resolved, {}, None
@@ -205,19 +256,32 @@ _MYANMAR_DIGITS = str.maketrans("၀၁၂၃၄၅၆၇၈၉", "0123456789")
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
 
 
+def _history_date_is_a_lookup(text: str) -> bool:
+    """A question about records does not choose a later write's date."""
+
+    from apps.assistant.knowledge import information_question
+
+    return information_question(text)
+
+
 def _keep_stated_dates(
     payload: dict[str, object],
     staff_text: str,
     today: date | None = None,
     gym: Gym | None = None,
     history: Sequence[str] = (),
+    stored: str = "",
+    require_join: bool = False,
 ) -> str | None:
     """Rewrite a date or clock the staff stated. Leave an unstated value unchanged."""
 
     anchor = today or timezone.localdate()
-    stated = _stated_day(staff_text, anchor)
+    current = _stated_day(staff_text, anchor)
+    stated = current
     if stated is None:
         for earlier in history:
+            if _history_date_is_a_lookup(earlier):
+                continue
             earlier_day = _stated_day(earlier, anchor)
             if earlier_day == "conflict":
                 stated = "conflict"
@@ -225,6 +289,11 @@ def _keep_stated_dates(
             if isinstance(earlier_day, date):
                 stated = earlier_day
                 break
+    if stated is None:
+        stated = _iso_day(stored)
+    if current in {"ambiguous", "invalid", "conflict"} and _payload_has_date(payload):
+        return _encoded_date_problem(staff_text, str(current))
+    _normalize_payload_dates(payload)
     clocks = _stated_clocks(staff_text)
     for field in _DATE_FIELDS:
         value = payload.get(field)
@@ -236,11 +305,17 @@ def _keep_stated_dates(
         try:
             date.fromisoformat(raw[:10])
         except ValueError:
+            if isinstance(stated, date) and field not in _CLOCK_FIELDS:
+                payload[field] = stated.isoformat()
             continue
         if field == "join_date":
-            if isinstance(stated, date) and raw[:10] != stated.isoformat():
-                replacement = stated.isoformat()
-                payload[field] = replacement if len(raw) == 10 else replacement + raw[10:]
+            if isinstance(stated, date):
+                if raw[:10] != stated.isoformat():
+                    replacement = stated.isoformat()
+                    payload[field] = replacement if len(raw) == 10 else replacement + raw[10:]
+                continue
+            if require_join or _registration_names_a_plan(staff_text):
+                return field
             continue
         if not isinstance(stated, date):
             return field
@@ -258,18 +333,33 @@ def _keep_stated_dates(
     return _align_clocks(payload, clocks, gym)
 
 
+@dataclass(frozen=True)
+class _CalendarHit:
+    kind: str
+    token: str
+    day: date | None = None
+    first: date | None = None
+    second: date | None = None
+
+
+def calendar_day(text: str, today: date) -> date | str | None:
+    """Return the one calendar day named in text, or ambiguous, invalid, or conflict."""
+
+    return _stated_day(text, today)
+
+
 def _stated_day(text: str, today: date) -> date | str | None:
-    found: list[date] = []
-    for match in _DATE.findall(text):
-        try:
-            found.append(date.fromisoformat(match))
-        except ValueError:
-            continue
+    hits = _calendar_hits(text.translate(_MYANMAR_DIGITS))
+    found = [hit.day for hit in hits if hit.kind == "date" and hit.day is not None]
     unique = list(dict.fromkeys(found))
     if len(unique) > 1:
         return "conflict"
     if len(unique) == 1:
         return unique[0]
+    if any(hit.kind == "ambiguous" for hit in hits):
+        return "ambiguous"
+    if any(hit.kind == "invalid" for hit in hits):
+        return "invalid"
     offsets: set[int] = set()
     folded = text.casefold()
     if re.search(r"\btoday\b", folded):
@@ -302,6 +392,174 @@ def _stated_day(text: str, today: date) -> date | str | None:
     return None
 
 
+def _calendar_hits(text: str) -> list[_CalendarHit]:
+    hits: list[_CalendarHit] = []
+    occupied: list[tuple[int, int]] = []
+    for match in _YMD.finditer(text):
+        hits.append(_ymd_hit(match))
+        occupied.append(match.span())
+    for match in _DMY.finditer(text):
+        if _overlaps(match.span(), occupied):
+            continue
+        hits.append(_dmy_hit(match))
+        occupied.append(match.span())
+    for pattern in (_DAY_MONTH, _MONTH_DAY):
+        for match in pattern.finditer(text):
+            if _overlaps(match.span(), occupied):
+                continue
+            hits.append(_month_hit(match, pattern is _DAY_MONTH))
+            occupied.append(match.span())
+    return hits
+
+
+def _ymd_hit(match: re.Match[str]) -> _CalendarHit:
+    parsed = _real_date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    if parsed is None:
+        return _CalendarHit("invalid", match.group(0))
+    return _CalendarHit("date", match.group(0), parsed)
+
+
+def _dmy_hit(match: re.Match[str]) -> _CalendarHit:
+    first = int(match.group(1))
+    second = int(match.group(2))
+    year = int(match.group(3))
+    token = match.group(0)
+    day_first = _real_date(year, second, first)
+    month_first = _real_date(year, first, second)
+    if day_first is not None and month_first is not None and day_first != month_first:
+        return _CalendarHit("ambiguous", token, first=day_first, second=month_first)
+    if day_first is not None:
+        return _CalendarHit("date", token, day_first)
+    if month_first is not None:
+        return _CalendarHit("date", token, month_first)
+    return _CalendarHit("invalid", token)
+
+
+def _month_hit(match: re.Match[str], day_first: bool) -> _CalendarHit:
+    if day_first:
+        day = int(match.group(1))
+        month_name = match.group(2)
+        year_text = match.group(3)
+    else:
+        month_name = match.group(1)
+        day = int(match.group(2))
+        year_text = match.group(3)
+    month = _MONTH_NUMBERS.get(month_name.casefold())
+    token = match.group(0).strip()
+    if month is None:
+        return _CalendarHit("invalid", token)
+    if not year_text:
+        return _CalendarHit("ambiguous", token)
+    parsed = _real_date(int(year_text), month, day)
+    if parsed is None:
+        return _CalendarHit("invalid", token)
+    return _CalendarHit("date", token, parsed)
+
+
+def _real_date(year: int, month: int, day: int) -> date | None:
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def _overlaps(span: tuple[int, int], occupied: list[tuple[int, int]]) -> bool:
+    return any(start < span[1] and span[0] < end for start, end in occupied)
+
+
+def _explicit_iso_dates(text: str) -> set[str]:
+    return {
+        hit.day.isoformat()
+        for hit in _calendar_hits(text.translate(_MYANMAR_DIGITS))
+        if hit.kind == "date" and hit.day is not None
+    }
+
+
+def _without_calendar_text(text: str) -> str:
+    cleaned = _YMD.sub(" ", text)
+    cleaned = _DMY.sub(" ", cleaned)
+    cleaned = _DAY_MONTH.sub(" ", cleaned)
+    return _MONTH_DAY.sub(" ", cleaned)
+
+
+def _iso_day(value: str) -> date | None:
+    if len(value) < 10:
+        return None
+    try:
+        return date.fromisoformat(value[:10])
+    except ValueError:
+        return None
+
+
+_PLAN_TOKEN = re.compile(r"\b[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+\b")
+
+
+def _registration_names_a_plan(text: str) -> bool:
+    """A membership sale in this message needs the join date from the staff, not the model."""
+
+    folded = text.casefold()
+    if _PLAN_TOKEN.search(text):
+        return True
+    return "membership" in folded or "အသင်းဝင်" in text or "ဝယ်" in text
+
+
+def _payload_has_date(payload: Mapping[str, object]) -> bool:
+    return any(
+        isinstance(payload.get(field), str) and str(payload.get(field)).strip()
+        for field in _DATE_FIELDS
+    )
+
+
+def _encoded_date_problem(text: str, kind: str) -> str:
+    hits = _calendar_hits(text.translate(_MYANMAR_DIGITS))
+    if kind == "conflict":
+        tokens = [hit.token for hit in hits if hit.kind == "date" and hit.token]
+        return "conflict:" + " ".join(tokens)
+    for hit in hits:
+        if hit.kind != kind:
+            continue
+        if kind == "ambiguous" and hit.first is not None and hit.second is not None:
+            return f"ambiguous:{hit.token}:{hit.first.isoformat()}:{hit.second.isoformat()}"
+        return f"{kind}:{hit.token}"
+    return kind
+
+
+def _date_problem_body(unstated: str, stored: str) -> dict[str, object] | None:
+    if unstated.startswith("invalid:"):
+        error = "date_invalid"
+    elif unstated.startswith(("ambiguous:", "conflict:")):
+        error = "date_ambiguous"
+    else:
+        return None
+    parts = unstated.split(":")
+    body: dict[str, object] = {"error": error, "token": parts[1] if len(parts) > 1 else ""}
+    if error == "date_ambiguous" and len(parts) >= 4:
+        body["first"] = parts[2]
+        body["second"] = parts[3]
+    kept = _iso_day(stored)
+    if kept is not None:
+        body["stored"] = kept.isoformat()
+    return body
+
+
+def _normalize_payload_dates(payload: dict[str, object]) -> None:
+    for field in _DATE_FIELDS:
+        value = payload.get(field)
+        if isinstance(value, str):
+            payload[field] = _replace_unambiguous_day(value)
+
+
+def _replace_unambiguous_day(raw: str) -> str:
+    converted = raw.strip().translate(_MYANMAR_DIGITS)
+    match = _YMD.match(converted) or _DMY.match(converted)
+    if match is None:
+        return raw.strip()
+    hit = _ymd_hit(match) if match.re is _YMD else _dmy_hit(match)
+    if hit.kind != "date" or hit.day is None:
+        return raw.strip()
+    return hit.day.isoformat() + converted[match.end() :]
+
+
 def _stated_time(text: str) -> bool:
     return bool(_stated_clocks(text))
 
@@ -311,7 +569,9 @@ def _local_today(gym: Gym) -> date:
 
 
 def _gym_zone(gym: Gym | None) -> ZoneInfo:
-    name = gym.timezone if gym is not None and gym.timezone else "UTC"
+    name = getattr(gym, "timezone", None) if gym is not None else None
+    if not isinstance(name, str) or not name:
+        name = "UTC"
     try:
         return ZoneInfo(name)
     except (ZoneInfoNotFoundError, ValueError, AttributeError):
@@ -322,7 +582,7 @@ def _stated_clocks(text: str) -> tuple[tuple[int, int], ...]:
     """Return clock times the staff actually wrote, in order."""
 
     converted = text.translate(_MYANMAR_DIGITS)
-    cleaned = _DATE.sub(" ", converted)
+    cleaned = _without_calendar_text(converted)
     found: list[tuple[int, int]] = []
     occupied: list[tuple[int, int]] = []
     patterns = (
@@ -589,7 +849,13 @@ def _service_day(value: object, gym: Gym | None = None) -> date | None:
         try:
             return date.fromisoformat(raw[:10])
         except ValueError:
-            return None
+            replaced = _replace_unambiguous_day(raw)
+            if replaced == raw:
+                return None
+            try:
+                return date.fromisoformat(replaced[:10])
+            except ValueError:
+                return None
     try:
         parsed = datetime.fromisoformat(raw)
     except ValueError:
@@ -1921,7 +2187,7 @@ def _line_discount(line: dict[str, object], staff_text: str) -> dict[str, object
 
 def _stated_decimals(text: str) -> tuple[Decimal, ...]:
     converted = text.translate(_MYANMAR_DIGITS)
-    working = _DATE.sub(" ", converted)
+    working = _without_calendar_text(converted)
     working = re.sub(r"\d{1,2}:\d{2}", " ", working)
     working = re.sub(r"\d{1,2}\s*(?:am|pm)\b", " ", working, flags=re.IGNORECASE)
     working = re.sub(r"\d{1,2}\s*နာရီ(?:\s*\d{1,2}\s*မိနစ်)?", " ", working)

@@ -269,9 +269,9 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "")
 GEMINI_TIMEOUT = os.environ.get("GEMINI_TIMEOUT", "30")
 GEMINI_MAX_RETRIES = os.environ.get("GEMINI_MAX_RETRIES", "1")
-ASSISTANT_MAX_STEPS = os.environ.get("ASSISTANT_MAX_STEPS", "4")
-ASSISTANT_MAX_TOOL_CALLS = os.environ.get("ASSISTANT_MAX_TOOL_CALLS", "8")
-ASSISTANT_MAX_EXECUTION_TIME = os.environ.get("ASSISTANT_MAX_EXECUTION_TIME", "20")
+ASSISTANT_MAX_STEPS = os.environ.get("ASSISTANT_MAX_STEPS", "8")
+ASSISTANT_MAX_TOOL_CALLS = os.environ.get("ASSISTANT_MAX_TOOL_CALLS", "16")
+ASSISTANT_MAX_EXECUTION_TIME = os.environ.get("ASSISTANT_MAX_EXECUTION_TIME", "60")
 # Not enforced. The fixed assistant prompt is larger than 8000 tokens.
 # Do not truncate tool declarations or security instructions to meet it.
 ASSISTANT_MAX_CONTEXT_TOKENS = os.environ.get("ASSISTANT_MAX_CONTEXT_TOKENS", "8000")

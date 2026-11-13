@@ -106,15 +106,17 @@ def gemini_max_retries() -> int:
 
 
 def max_steps() -> int:
-    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_STEPS", "4")), 4, 20)
+    """Model rounds in one turn. A higher setting is capped so a loop can still stop."""
+
+    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_STEPS", "8")), 8, 20)
 
 
 def max_tool_calls() -> int:
-    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_TOOL_CALLS", "8")), 8, 20)
+    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_TOOL_CALLS", "16")), 16, 32)
 
 
 def max_execution_seconds() -> int:
-    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_EXECUTION_TIME", "20")), 20, 60)
+    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_EXECUTION_TIME", "60")), 60, 120)
 
 
 def classify_provider_failure(*, status_code: int | None, provider_status: str) -> ProviderFailure:

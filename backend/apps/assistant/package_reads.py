@@ -21,12 +21,28 @@ from apps.assistant.executor import ExecutionMode, ReadCall, ToolContract, execu
 from apps.assistant.prerequisites import FieldRequirement, Prerequisite
 from apps.assistant.registry import ToolDefinition
 from apps.trainers.models import MemberServicePackage, ServicePackage
-from apps.trainers.selectors import get_visible_member_package, page_member_packages
+from apps.trainers.selectors import (
+    get_visible_member_package,
+    page_member_packages,
+    page_service_packages,
+)
 from apps.trainers.serializers import member_package_payload
 from apps.users.serializers import StrictSerializer
 
 SEARCH_PT_PACKAGES = "search_pt_packages"
-PACKAGE_READ_TOOL_NAMES = (SEARCH_PT_PACKAGES,)
+SEARCH_SERVICE_PACKAGES = "search_service_packages"
+PACKAGE_READ_TOOL_NAMES = (SEARCH_PT_PACKAGES, SEARCH_SERVICE_PACKAGES)
+
+
+class ServicePackageReadQuerySerializer(StrictSerializer):
+    code = serializers.CharField(required=False, allow_blank=True, max_length=32)
+    package_type = serializers.ChoiceField(
+        choices=ServicePackage.PackageType.choices,
+        required=False,
+    )
+    is_active = serializers.BooleanField(required=False)
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=25, default=25)
+    after = serializers.CharField(required=False, allow_blank=True, max_length=4096)
 
 
 class PackageReadQuerySerializer(StrictSerializer):
@@ -68,6 +84,43 @@ def execute_registered_read(
         payload=payload,
         read=_READERS[tool_name],
     )
+
+
+def search_service_packages(call: ReadCall) -> dict[str, object]:
+    """Return this gym's sellable package catalog. Granted balances use the other read."""
+
+    if call.gym.id is None or call.actor.id is None:
+        raise ExecutionRejected("The assistant session is incomplete.", code="session")
+    serializer = ServicePackageReadQuerySerializer(data=_without_gym(call.payload))
+    serializer.is_valid(raise_exception=True)
+    query = serializer.validated_data
+    code = str(query.get("code") or "").strip()
+    limit = int(query["limit"])
+    if code:
+        rows = list(
+            ServicePackage.objects.filter(gym_id=call.gym.id, code__iexact=code).order_by(
+                "code", "id"
+            )[:limit]
+        )
+        return {
+            "results": [_catalog_row(row) for row in rows],
+            "has_more": False,
+            "next_after": None,
+        }
+    active = query.get("is_active") if "is_active" in query else None
+    rows, meta = page_service_packages(
+        gym_id=call.gym.id,
+        actor=call.actor,
+        package_type=str(query.get("package_type") or ""),
+        is_active=active if isinstance(active, bool) else None,
+        limit=limit,
+        after=str(query.get("after") or ""),
+    )
+    return {
+        "results": [_catalog_row(row) for row in rows],
+        "has_more": bool(meta["has_more"]),
+        "next_after": meta["next_after"],
+    }
 
 
 def search_pt_packages(call: ReadCall) -> dict[str, object]:
@@ -133,6 +186,20 @@ def _query(payload: Mapping[str, object]) -> dict[str, Any]:
     return dict(serializer.validated_data)
 
 
+def _catalog_row(row: ServicePackage) -> dict[str, object]:
+    return {
+        "code": row.code,
+        "name": row.name,
+        "package_type": row.type,
+        "session_count": row.session_count,
+        "validity_value": row.validity_value,
+        "validity_unit": row.validity_unit,
+        "price": f"{row.price:.2f}",
+        "currency": row.currency,
+        "is_active": "ACTIVE" if row.is_active else "INACTIVE",
+    }
+
+
 def _row(row: MemberServicePackage) -> dict[str, object]:
     payload = member_package_payload(row)
     return {
@@ -169,6 +236,31 @@ def _without_gym(payload: Mapping[str, object]) -> dict[str, object]:
 
 
 _READS = {
+    SEARCH_SERVICE_PACKAGES: _contract(
+        _definition(
+            SEARCH_SERVICE_PACKAGES,
+            "Search the sellable PT and class package catalog in this gym: code, "
+            "name, sessions, and price. Use this for package prices. Granted "
+            "balances and remaining sessions use search_pt_packages.",
+        ),
+        (
+            FieldRequirement("code", "Exact package code. Optional.", required=False),
+            FieldRequirement("package_type", "PT or CLASS. Optional.", required=False),
+            FieldRequirement(
+                "is_active",
+                "Limit to active packages. Optional.",
+                required=False,
+                kind="boolean",
+            ),
+            FieldRequirement(
+                "limit",
+                "Page size from 1 to 25. Optional.",
+                required=False,
+                kind="integer",
+            ),
+            FieldRequirement("after", "Cursor from the previous page. Optional.", required=False),
+        ),
+    ),
     SEARCH_PT_PACKAGES: _contract(
         _definition(
             SEARCH_PT_PACKAGES,
@@ -205,4 +297,7 @@ _READS = {
         ),
     ),
 }
-_READERS = {SEARCH_PT_PACKAGES: search_pt_packages}
+_READERS = {
+    SEARCH_PT_PACKAGES: search_pt_packages,
+    SEARCH_SERVICE_PACKAGES: search_service_packages,
+}

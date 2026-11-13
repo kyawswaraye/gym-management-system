@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Mapping
-from datetime import timedelta
+from datetime import date, timedelta
 from time import monotonic
 from typing import cast
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.db import transaction
 from django.http import Http404
@@ -35,23 +36,16 @@ from apps.assistant.execution import ExecutionRejected
 from apps.assistant.executor import ToolContract
 from apps.assistant.knowledge import (
     assistant_context,
-    complete_stored_reply,
     gate_sentence,
+    grounded_information_reply,
     grounded_read_reply,
-    listing_tools,
-    lookup_refusal,
+    information_question,
     offered_operations,
     operation_workflow,
     public_activity,
-    refuse_write_for_lookup,
     short_reply_kind,
     speaks_burmese,
-    staff_notice,
-    stored_listing_reply,
-    unnamed_member_payment_reply,
-    unsupported_lookup_reply,
     visible_reply,
-    widen_list_filters,
 )
 from apps.assistant.lookups import (
     assignment_gap,
@@ -90,18 +84,17 @@ from apps.assistant.serializers import message_data
 from apps.assistant.workflow_state import (
     absorb_proposal,
     absorb_read,
-    capability_brief,
     completion_sentence,
-    dashboard_arguments,
+    confirmation_reply,
     direct_reply,
     is_state_message,
     load_state,
     provider_notice,
     remember_commit,
-    remember_intent,
+    remember_facts,
     save_state,
-    selling_membership,
     state_brief,
+    stored_date_reply,
 )
 from apps.classes.exceptions import ClassFull, ScheduleConflict
 from apps.common.api.exceptions import CodedAPIException, RequestRejected
@@ -128,82 +121,47 @@ _SYSTEM = (
     "you carry the task to the end. The gym and the staff member are already "
     "chosen. Never ask for or send a gym id. Never send confirmed. Never tell "
     "them which screen, button, or permission to use. "
+    "You choose the tools. The server runs only the tools you call, in this "
+    "gym's session, and does not add a read you skipped. Call every tool the "
+    "question needs, including several at once, then answer from those results "
+    "and the live gym brief. If a result does not contain the fact, say so. "
+    "A question while a confirmation is waiting does not confirm it and does "
+    "not replace it. "
     "Ask only the next fact you cannot look up, one question at a time. Map "
     "everyday words to stored codes yourself, such as month to MONTH. Never "
-    "ask the staff to type a code. The live gym brief already has the staff "
-    "list, members, classes, counts, and today's classes and PT sessions. "
-    "When the staff ask for a member, call search_members or get_member and "
-    "answer from that result. If search_members returns ambiguous, list the "
-    "member numbers and ask which one. Do not choose one. For a membership, "
-    "call search_memberships with that member id. A new membership sale uses "
-    "search_membership_plans with eligible_for_sale true. Offer only ACTIVE "
-    "plans, with code and price. If several active plans share a name, ask "
-    "which code. If the staff names an inactive plan, say it is not available "
-    "for a new sale. Do not offer an inactive plan. For a period total, call "
-    "get_gym_dashboard. For announcements, call search_announcements and keep "
-    "DRAFT, SCHEDULED, PUBLISHED, CANCELLED, and EXPIRED distinct. For a PT or class package "
-    "balance, call search_pt_packages and use its status, dates, and "
-    "remaining_sessions. For a class on today or a stated date, call "
-    "search_class_occurrences with that gym-local date. For a general class or "
-    "booking list, omit date_from and date_to. For who is booked, call "
-    "search_bookings. If search_bookings returns ambiguous, list the member "
-    "numbers and ask which one. Do not choose one. For a retail sale, call "
-    "search_sales and use its stored total_amount, status, and business_date. "
-    "For a general sales or expense list, omit business_date and status and "
-    "return every matching row. For an expense, call search_expenses and use "
-    "its stored amount, status, and business_date. For a salary period, call "
-    "search_salary_periods and use its stored status and period dates. For a "
-    "general salary or cash list, omit business_date and status. For a cash "
-    "session, call search_cash_sessions and include both open and closed "
-    "sessions unless the staff names one status. Use the stored status and "
-    "business date. For a PT commission or its payouts, call "
-    "search_pt_commissions and use the stored commission amounts and payment "
-    "amounts. A payment search row includes its stored entry_type. A refund is "
-    "a payment whose entry_type is REFUND. If that read was not called, do not "
-    "invent the record. Do not invent an amount, member, payment, sale, expense, "
-    "attendance, booking, class time, capacity, booked count, stock quantity, "
-    "salary, commission, payout, closing balance, or date. Counts and today's "
-    "schedule come from the live gym brief. There is no daily shift roster. "
-    "If no read tool can retrieve the record, say that you cannot retrieve "
-    "it. Do not invent the record. Do not call a write tool to answer a "
-    "lookup. A write only proposes a change. Never say that change succeeded "
-    "before the server confirms it. Never repeat a tool name, exception, "
-    "database error, or stack trace. Never ask what else you "
-    "can help with. When "
-    "you have that fact, propose the next change yourself. Do not stop and ask "
-    "what to do next while the task still has a step left. "
-    "Read tools look up records. Use them instead of asking for an id. "
-    "For a member, trainer, class type, class, product, plan, or package, send the name the staff "
-    "said. Never copy an id from another tool. If several records share that "
-    "name, or the tool returns ambiguous, ask which member number, staff "
-    "code, product SKU, plan code, or package code. Do not choose one. "
-    "Send a member number, staff code, SKU, plan code, or package code when the "
-    "staff gives one. If the tool returns date_unconfirmed, ask for the date. "
-    "If the tool returns time_unconfirmed, ask for the time. Do not invent a "
-    "date or a time. A PT sale or PT booking needs an active trainer assignment "
-    "that covers the date. If the tool returns assignment_required, propose "
-    "create_assignment with that exact effective_from. Do not choose another "
-    "date. Propose the sale or booking only after the assignment is saved. "
-    "If creating the assignment returns already_saved, that assignment is already "
-    "saved. Do not propose it again. A metered PT booking needs an active PT "
-    "package with sessions left. If the tool returns package_required, do not "
-    "propose the booking. Say that the member needs a posted PT sale first. "
-    "For an approval, send the record's own id field and do not "
-    "invent record_id or amount. The server supplies the stored amount. "
-    "If a confirmation is already waiting, explain that one change in the "
-    "staff member's language and do not propose another write. "
-    "When the task is finished, say what is done and the one relevant next "
-    "step when one remains. Do not offer an unrelated action. Use the workflow "
-    "state for ids and dates already collected. Do not ask for them again. "
-    "When the staff write in Burmese, reply in Burmese in one or two short "
-    "sentences. Keep stored names, member numbers, SKU codes, plan codes, "
-    "dates, amounts, and statuses exactly as stored. Myanmar digits have the "
-    "same values as Arabic digits. Use the gym timezone for today, tomorrow, "
-    "and yesterday. If a payment question says the member but does not name "
-    "one, ask which member number. Do not list other members' payments. If "
-    "the member name matches more than one member, list the member numbers "
-    "and ask which one. If the member, trainer, date, time, or amount is missing "
-    "or ambiguous, ask one short question. Reply in the staff member's language."
+    "ask the staff to type a code. Pass a date or status filter only when the "
+    "staff named that date or status. For get_gym_dashboard, pass range or both "
+    "dates when the staff names a period. Omitting them returns today only. "
+    "A new membership sale uses search_membership_plans with eligible_for_sale "
+    "true and offers only ACTIVE plans. "
+    "Do not invent an amount, member, payment, sale, expense, attendance, "
+    "booking, class time, capacity, stock quantity, salary, commission, or date. "
+    "Counts and today's schedule come from the live gym brief when they are "
+    "listed there. There is no daily shift roster. If no read tool can retrieve "
+    "the record, say that you cannot retrieve it. Do not invent the record. "
+    "Do not call a write tool to answer a question. A write only proposes a "
+    "change. Never say that change succeeded before the server confirms it. "
+    "Never repeat a tool name, exception, database error, or stack trace. "
+    "Read tools look up records. Use them instead of asking for an id. Send "
+    "the name the staff said. If the tool returns ambiguous, list the choices "
+    "and ask which one. Do not choose one. If the tool returns date_unconfirmed, "
+    "ask for the date. If the tool returns time_unconfirmed, ask for the time. "
+    "Do not invent a date or a time. If the tool returns assignment_required, "
+    "propose that assignment for the date it names, then the sale or booking. "
+    "If it returns package_required, say a posted package is needed first. "
+    "If it returns already_saved, do not propose that same change again. "
+    "For an approval, send the record's own id. The server supplies the stored "
+    "amount. If a confirmation is already waiting, explain that one change and "
+    "do not propose another write. Use the workflow state for ids and dates "
+    "already collected. Do not ask for them again. When the staff write in "
+    "Burmese, reply in Burmese. Keep stored names, numbers, codes, dates, "
+    "amounts, and statuses exactly as stored. Myanmar digits have the same "
+    "values as Arabic digits. Use the gym timezone for today, tomorrow, and "
+    "yesterday. If a member is mentioned but not identified, ask which member. "
+    "Reply in the staff member's language."
+)
+_ANSWER_NOW = (
+    "Answer now from the tool results already in this conversation. Do not call more tools."
 )
 _CONTINUE = (
     "The previous change is saved. Do not propose that same change again. "
@@ -216,11 +174,6 @@ _CONTINUE = (
 _UNAVAILABLE = "The assistant is unavailable."
 _LIMIT = "I could not finish that within the assistant limit."
 _BLOCKED = "I can't help with that request."
-_READ_NUDGE = (
-    "Call the stored read for this list before answering. For a general list, "
-    "omit date_from, date_to, business_date, and status. Do not invent rows, "
-    "dates, or amounts."
-)
 _AGREE = (
     "The staff agreed to the one operation already under discussion. Propose "
     "that change and wait for confirmation. Do not replace it with a member "
@@ -270,6 +223,22 @@ def run_turn(
         if continued is not None:
             return continued
         cue = _AGREE
+    workflow_now = load_state(gym, conversation)
+    remembered = stored_date_reply(message, workflow_now)
+    if remembered is not None:
+        saved = append_message(
+            gym=gym,
+            conversation=conversation,
+            actor=None,
+            role=Message.Role.ASSISTANT,
+            body=remembered[:4000],
+        )
+        return {
+            "conversation_id": conversation.id,
+            "message": message_data(saved),
+            "pending_confirmation": pending,
+            "tool_activity": [],
+        }
     if pending is None:
         stored = direct_reply(message, load_state(gym, conversation))
         if stored is not None:
@@ -286,23 +255,6 @@ def run_turn(
                 "pending_confirmation": None,
                 "tool_activity": [],
             }
-    limit = None if pending is not None else unsupported_lookup_reply(message)
-    if limit is None and pending is None:
-        limit = unnamed_member_payment_reply(message)
-    if limit is not None:
-        saved = append_message(
-            gym=gym,
-            conversation=conversation,
-            actor=None,
-            role=Message.Role.ASSISTANT,
-            body=limit[:4000],
-        )
-        return {
-            "conversation_id": conversation.id,
-            "message": message_data(saved),
-            "pending_confirmation": pending,
-            "tool_activity": [],
-        }
     answered = _reply(
         request=request,
         view=view,
@@ -369,21 +321,21 @@ def _reply(
     calls_used = 0
     model_calls = 0
     reply = ""
-    forced: str | None = None
-    blocked_write = False
     read_completed = False
     read_results: list[Mapping[str, object]] = []
-    completed_reads: dict[str, Mapping[str, object]] = {}
-    attempted_reads: set[str] = set()
-    nudged = False
+    opened_now = False
     limit_reached = False
+    provider_down = False
     if pending is not None:
         instruction += " A confirmation is already waiting. Do not propose another write."
     workflow = load_state(gym, conversation)
-    remember_intent(workflow, staff_text)
+    remember_facts(workflow, staff_text, _conversation_today(gym))
     remember_sale_package(gym, conversation, workflow)
     context = assistant_context(gym, _codes(request), assistant_full_access(request))
-    opening_card = capability_brief(staff_text, workflow)
+    opening_card = (
+        "Answer from the tools you choose and from the live gym brief. "
+        "Workflow state lists facts already collected."
+    )
     instruction += "\n\n" + opening_card
     instruction += "\n" + state_brief(workflow)
     instruction += "\n\n" + context
@@ -391,6 +343,7 @@ def _reply(
     live_brief = context[context.find(marker) :] if marker in context else ""
     try:
         for _step in range(max_steps()):
+            opened_now = False
             if monotonic() >= deadline:
                 reply = reply or _LIMIT
                 break
@@ -404,17 +357,6 @@ def _reply(
                 reply = _BLOCKED
                 break
             if not turn.calls:
-                required = listing_tools(staff_text)
-                if (
-                    required
-                    and proposal is None
-                    and not nudged
-                    and attempted_reads.isdisjoint(required)
-                ):
-                    nudged = True
-                    contents.append({"role": "model", "parts": [{"text": turn.text or ""}]})
-                    contents.append({"role": "user", "parts": [{"text": _READ_NUDGE}]})
-                    continue
                 reply = turn.text or _LIMIT
                 break
             contents.append({"role": "model", "parts": [dict(part) for part in turn.parts]})
@@ -441,40 +383,13 @@ def _reply(
                 )
                 if outcome is not None:
                     proposal = outcome
+                    opened_now = True
                 responses.append(_function_response(call.name, body))
-                if body.get("error") == "not_a_read":
-                    blocked_write = True
-                elif "result" in body:
+                if "result" in body:
                     read_completed = True
                     result = body.get("result")
                     if isinstance(result, Mapping):
                         read_results.append(result)
-                        if not body.get("error"):
-                            attempted_reads.add(call.name)
-                            completed_reads[call.name] = result
-                if call.name:
-                    attempted_reads.add(call.name)
-                notice = staff_notice(body, staff_text)
-                if notice is not None:
-                    forced = notice
-                elif body.get("status") == "already_saved":
-                    from apps.assistant.knowledge import speaks_burmese
-
-                    burmese = speaks_burmese(staff_text)
-                    if call.name == "create_assignment":
-                        forced = (
-                            "ဒီတာဝန်ပေးမှုက ရှိပြီးသားပါ။"
-                            if burmese
-                            else "That trainer assignment is already stored."
-                        )
-                    else:
-                        number = body.get("member_number")
-                        shown = number if isinstance(number, str) else ""
-                        forced = (
-                            f"ဒီအဖွဲ့ဝင် ရှိပြီးသားပါ။ အဖွဲ့ဝင်နံပါတ် {shown}။".strip()
-                            if burmese
-                            else f"That member already exists. Member number {shown}.".strip()
-                        )
                 if body.get("error"):
                     field = body.get("field")
                     safe_field = (
@@ -491,24 +406,23 @@ def _reply(
                         safe_field or "none",
                     )
                 activity.append({"name": call.name, "status": _activity_status(body)})
-                if forced is not None:
-                    break
-            if forced is not None:
-                reply = forced
-                break
             contents.append({"role": "user", "parts": responses})
-            if turn.text and proposal is not None:
-                reply = turn.text
+            if opened_now:
+                reply = turn.text or _proposal_text(proposal)
                 break
-            if proposal is None:
-                ready = complete_stored_reply(staff_text, completed_reads)
-                if ready is not None:
-                    reply = ready
-                    break
         else:
             limit_reached = True
-            reply = reply or _LIMIT
+            reply, extra_calls = _answer_from_results(
+                contents=contents,
+                instruction=instruction,
+                results=read_results,
+                brief=live_brief,
+                staff_text=staff_text,
+                deadline=deadline,
+            )
+            model_calls += extra_calls
     except ProviderCallError as exc:
+        provider_down = True
         logger.info("assistant provider failed: %s", exc.failure.value)
         if provider_fallback is None:
             _log_turn(
@@ -540,32 +454,34 @@ def _reply(
         opening_card=opening_card,
     )
     save_state(gym, conversation, workflow)
-    if reply == "" and forced:
-        reply = forced
-    elif reply == "":
+    if reply in {"", _LIMIT} and not (proposal is not None and information_question(staff_text)):
         summary = proposal["summary"] if proposal is not None else _LIMIT
         reply = summary if isinstance(summary, str) else _LIMIT
-    elif proposal is None and forced:
-        reply = forced
-    elif proposal is None and blocked_write and not read_completed:
-        reply = lookup_refusal(staff_text)
-    if proposal is None and forced is None:
-        listed = stored_listing_reply(staff_text, completed_reads)
-        if listed is not None:
-            reply = listed
-        elif read_completed:
-            reply = grounded_read_reply(
+    if not provider_down and reply not in {_LIMIT, _BLOCKED}:
+        if read_completed:
+            corrected = grounded_read_reply(
                 reply,
                 results=read_results,
                 brief=live_brief,
                 staff_text=staff_text,
+                fallback=proposal is None,
             )
-    reply = visible_reply(
-        reply,
-        confirmed=saved is not None,
-        proposed=proposal is not None,
-        staff_text=staff_text,
-    )
+        else:
+            corrected = grounded_information_reply(
+                reply,
+                brief=live_brief,
+                staff_text=staff_text,
+            )
+        if corrected:
+            reply = corrected
+    if not provider_down:
+        reply = visible_reply(
+            reply,
+            confirmed=saved is not None,
+            proposed=proposal is not None,
+            staff_text=staff_text,
+        )
+    reply = confirmation_reply(reply, proposal, staff_text, workflow)
     recorded = append_message(
         gym=gym,
         conversation=conversation,
@@ -956,24 +872,11 @@ def _handle_call(
     except ValueError:
         return None, {"error": "invalid_arguments"}
     if tool.operation == "read":
-        today = None
-        if name in listing_tools(staff_text) or name == "get_gym_dashboard":
-            from apps.trainers.selectors import gym_local_date
-
-            today = gym_local_date(gym)
-        if name == "get_gym_dashboard" and today is not None:
-            payload = dashboard_arguments(payload, staff_text, today)
-        if name == "search_membership_plans" and selling_membership(staff_text, workflow):
-            payload = dict(payload)
-            payload["eligible_for_sale"] = True
-        payload = widen_list_filters(name, payload, staff_text, today)
         body = _read(request, view, name, payload)
         result = body.get("result")
         if workflow is not None and isinstance(result, Mapping) and "error" not in body:
             absorb_read(workflow, name, result)
         return None, body
-    if refuse_write_for_lookup(staff_text, tool.operation):
-        return None, {"error": "not_a_read"}
     if tool.operation != "write":
         return None, {"error": "unknown_tool"}
     if proposal is not None:
@@ -989,6 +892,8 @@ def _handle_call(
             conversation,
             payload,
             permission_codes=_codes(request),
+            stored_date=(workflow or {}).get("start_date", ""),
+            require_join="member" in (workflow or {}).get("goals", ""),
         )
         if failure is not None:
             return None, failure
@@ -1561,6 +1466,8 @@ def _log_turn(
 ) -> None:
     """Record turn shape only. Prompts, names, and amounts stay out of the log."""
 
+    del opening_card
+
     write_declarations = 0
     read_declarations = 0
     for item in declarations:
@@ -1575,14 +1482,7 @@ def _log_turn(
     tools = ",".join(
         f"{item['name']}:{item.get('status', '')}" for item in activity if item.get("name")
     )
-    if opening_card.startswith("Relevant operation. Personal training"):
-        capability = "pt"
-    elif opening_card.startswith("Relevant operation. Members"):
-        capability = "members"
-    elif opening_card.startswith("Relevant operation. Payments"):
-        capability = "payments"
-    else:
-        capability = "other"
+    capability = workflow.get("workflow") or "none"
     logger.info(
         "assistant turn model_calls=%s tool_calls=%s tools=%s write_declarations=%s "
         "read_declarations=%s limit_reached=%s capability=%s workflow=%s",
@@ -1602,22 +1502,72 @@ def _model_declarations(
     contracts: Mapping[str, ToolContract],
     staff_text: str,
 ) -> list[dict[str, object]]:
-    """Hide write schemas when this lookup is already refused on the server.
+    """Offer every tool this staff member may use.
 
-    The model prompt is not the permission check. ``_handle_call`` still rejects
-    a write that arrives for a lookup.
+    The message text does not hide a tool. Execution still checks permission,
+    entitlement, and the gym on the request.
     """
 
-    lookup_only = refuse_write_for_lookup(staff_text, "write")
+    del staff_text
     selected: list[dict[str, object]] = []
     for name in sorted(offered):
         contract = contracts.get(name)
         if contract is None:
             continue
-        if lookup_only and contract.definition.operation == "write":
-            continue
         selected.append(declaration(contract))
     return selected
+
+
+def _answer_from_results(
+    *,
+    contents: list[dict[str, object]],
+    instruction: str,
+    results: list[Mapping[str, object]],
+    brief: str,
+    staff_text: str,
+    deadline: float,
+) -> tuple[str, int]:
+    """Ask for a final answer after the tool budget, then use the stored rows."""
+
+    calls = 0
+    text = ""
+    if results and monotonic() < deadline:
+        contents.append({"role": "user", "parts": [{"text": _ANSWER_NOW}]})
+        try:
+            turn = generate_content(
+                contents=contents,
+                declarations=[],
+                system_instruction=instruction,
+            )
+            calls = 1
+            if not turn.blocked:
+                text = turn.text
+        except ProviderCallError:
+            logger.info("assistant synthesis failed")
+    if text:
+        return text, calls
+    if results:
+        rendered = grounded_read_reply(
+            "",
+            results=results,
+            brief=brief,
+            staff_text=staff_text,
+        )
+        if rendered:
+            return rendered, calls
+    return "", calls
+
+
+def _conversation_today(gym: Gym) -> date:
+    """Gym-local today. A test double without a timezone uses the active clock."""
+
+    name = getattr(gym, "timezone", None)
+    if not isinstance(name, str) or not name:
+        return timezone.localdate()
+    try:
+        return timezone.now().astimezone(ZoneInfo(name)).date()
+    except (ZoneInfoNotFoundError, ValueError):
+        return timezone.localdate()
 
 
 def _staff_text(history: list[Message]) -> str:
@@ -1688,6 +1638,13 @@ def _contents(messages: list[Message]) -> list[dict[str, object]]:
 
 def _function_response(name: str, body: dict[str, object]) -> dict[str, object]:
     return {"functionResponse": {"name": name, "response": body}}
+
+
+def _proposal_text(proposal: Mapping[str, object] | None) -> str:
+    if proposal is None:
+        return ""
+    summary = proposal.get("summary")
+    return summary if isinstance(summary, str) else ""
 
 
 def _activity_status(body: Mapping[str, object]) -> str:

@@ -137,8 +137,13 @@ def _definition() -> ToolDefinition:
     return ToolDefinition(
         name=GET_GYM_DASHBOARD,
         description=(
-            "Read gym dashboard totals for a gym-local range. "
-            "Financial amounts are omitted without reports.financial."
+            "Read gym dashboard totals for a gym-local range: active members, "
+            "new members, check-ins, expired memberships, revenue, expenses, "
+            "and profit. Pass range when the staff names a period: today, "
+            "this_week, this_month, last_month, this_year, or next_month. "
+            "Or pass both date_from and date_to. If range and dates are omitted, "
+            "the result is today only. Financial amounts are omitted without "
+            "reports.financial."
         ),
         module="reports",
         operation="read",

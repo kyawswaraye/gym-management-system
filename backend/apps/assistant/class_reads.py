@@ -25,11 +25,13 @@ from apps.assistant.execution import ExecutionRejected
 from apps.assistant.executor import ExecutionMode, ReadCall, ToolContract, execute_read_tool
 from apps.assistant.prerequisites import FieldRequirement, Prerequisite
 from apps.assistant.registry import ToolDefinition
-from apps.classes.models import ClassBooking, ClassOccurrence
+from apps.classes.models import ClassBooking, ClassOccurrence, ClassSchedule, ClassType
 from apps.classes.selectors import (
     get_visible_occurrence,
     page_class_bookings,
     page_class_occurrences,
+    page_class_schedules,
+    page_class_types,
 )
 from apps.tenants.models import Gym
 from apps.trainers.selectors import gym_local_date, scope_to_assigned_members
@@ -37,7 +39,14 @@ from apps.users.serializers import StrictSerializer
 
 SEARCH_CLASS_OCCURRENCES = "search_class_occurrences"
 SEARCH_BOOKINGS = "search_bookings"
-CLASS_READ_TOOL_NAMES = (SEARCH_CLASS_OCCURRENCES, SEARCH_BOOKINGS)
+SEARCH_CLASS_TYPES = "search_class_types"
+SEARCH_CLASS_SCHEDULES = "search_class_schedules"
+CLASS_READ_TOOL_NAMES = (
+    SEARCH_CLASS_OCCURRENCES,
+    SEARCH_BOOKINGS,
+    SEARCH_CLASS_TYPES,
+    SEARCH_CLASS_SCHEDULES,
+)
 _BOOKING_CURSOR_SALT = "assistant.class_booking.occurrence.v1"
 
 
@@ -431,6 +440,100 @@ def _cursor_id(token: str, scope: list[str]) -> UUID | None:
         raise ValidationError({"after": ["The cursor is not valid."]}) from exc
 
 
+def search_class_types(call: ReadCall) -> dict[str, object]:
+    if call.gym.id is None or call.actor.id is None:
+        raise ExecutionRejected("The assistant session is incomplete.", code="session")
+    query = _type_query(call.payload)
+    active = query.get("is_active")
+    rows, meta = page_class_types(
+        gym_id=call.gym.id,
+        actor=call.actor,
+        is_active=active if isinstance(active, bool) else None,
+        limit=int(query["limit"]),
+        after=str(query.get("after") or ""),
+    )
+    return {
+        "results": [_type_row(row) for row in rows],
+        "has_more": bool(meta["has_more"]),
+        "next_after": meta["next_after"],
+    }
+
+
+def search_class_schedules(call: ReadCall) -> dict[str, object]:
+    if call.gym.id is None or call.actor.id is None:
+        raise ExecutionRejected("The assistant session is incomplete.", code="session")
+    query = _schedule_query(call.payload)
+    rows, meta = page_class_schedules(
+        gym_id=call.gym.id,
+        actor=call.actor,
+        status=str(query.get("status") or ""),
+        trainer_staff_profile_id=None,
+        class_type_id=None,
+        limit=int(query["limit"]),
+        after=str(query.get("after") or ""),
+    )
+    return {
+        "results": [_schedule_row(row) for row in rows],
+        "has_more": bool(meta["has_more"]),
+        "next_after": meta["next_after"],
+    }
+
+
+class ClassTypeReadQuerySerializer(StrictSerializer):
+    is_active = serializers.BooleanField(required=False)
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=25, default=25)
+    after = serializers.CharField(required=False, allow_blank=True, max_length=4096)
+
+
+class ClassScheduleReadQuerySerializer(StrictSerializer):
+    status = serializers.ChoiceField(choices=ClassSchedule.Status.choices, required=False)
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=25, default=25)
+    after = serializers.CharField(required=False, allow_blank=True, max_length=4096)
+
+
+def _type_query(payload: Mapping[str, object]) -> dict[str, Any]:
+    serializer = ClassTypeReadQuerySerializer(
+        data={key: value for key, value in payload.items() if key != "gym_id"}
+    )
+    serializer.is_valid(raise_exception=True)
+    return dict(serializer.validated_data)
+
+
+def _schedule_query(payload: Mapping[str, object]) -> dict[str, Any]:
+    serializer = ClassScheduleReadQuerySerializer(
+        data={key: value for key, value in payload.items() if key != "gym_id"}
+    )
+    serializer.is_valid(raise_exception=True)
+    return dict(serializer.validated_data)
+
+
+def _type_row(row: ClassType) -> dict[str, object]:
+    return {
+        "id": str(row.id),
+        "code": row.code,
+        "name": row.name,
+        "duration_minutes": row.default_duration_minutes,
+        "capacity": row.default_capacity,
+        "status": "ACTIVE" if row.is_active else "INACTIVE",
+    }
+
+
+def _schedule_row(row: ClassSchedule) -> dict[str, object]:
+    return {
+        "id": str(row.id),
+        "class_type": row.class_type.name,
+        "trainer_name": row.trainer_staff_profile.display_name,
+        "weekdays": ",".join(str(day) for day in row.weekdays),
+        "start_time": row.local_start_time.isoformat(timespec="minutes"),
+        "end_time": row.local_end_time.isoformat(timespec="minutes"),
+        "effective_from": row.effective_from.isoformat(),
+        "effective_until": row.effective_until.isoformat(),
+        "status": row.status,
+        "capacity": row.capacity,
+        "location": row.location,
+    }
+
+
 _READS = {
     SEARCH_CLASS_OCCURRENCES: _contract(
         _definition(
@@ -495,8 +598,48 @@ _READS = {
             FieldRequirement("after", "Cursor from the previous page. Optional.", required=False),
         ),
     ),
+    SEARCH_CLASS_TYPES: _contract(
+        _definition(
+            SEARCH_CLASS_TYPES,
+            "Search class types in this gym. A class type is the catalog name, duration, "
+            "and capacity. It is not a scheduled occurrence.",
+        ),
+        (
+            FieldRequirement("is_active", "True for active types. Optional.", required=False),
+            FieldRequirement(
+                "limit",
+                "Page size from 1 to 25. Optional.",
+                required=False,
+                kind="integer",
+            ),
+            FieldRequirement("after", "Cursor from the previous page. Optional.", required=False),
+        ),
+    ),
+    SEARCH_CLASS_SCHEDULES: _contract(
+        _definition(
+            SEARCH_CLASS_SCHEDULES,
+            "Search class schedule definitions in this gym. A schedule repeats on weekdays. "
+            "It is not one class occurrence.",
+        ),
+        (
+            FieldRequirement(
+                "status",
+                "ACTIVE, ENDED, or CANCELLED. Optional.",
+                required=False,
+            ),
+            FieldRequirement(
+                "limit",
+                "Page size from 1 to 25. Optional.",
+                required=False,
+                kind="integer",
+            ),
+            FieldRequirement("after", "Cursor from the previous page. Optional.", required=False),
+        ),
+    ),
 }
 _READERS = {
     SEARCH_CLASS_OCCURRENCES: search_class_occurrences,
     SEARCH_BOOKINGS: search_bookings,
+    SEARCH_CLASS_TYPES: search_class_types,
+    SEARCH_CLASS_SCHEDULES: search_class_schedules,
 }

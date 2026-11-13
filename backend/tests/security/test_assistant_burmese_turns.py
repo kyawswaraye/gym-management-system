@@ -145,14 +145,38 @@ def _echo_result(contents: list[dict[str, object]]) -> str:
             result = body.get("result", body)
             if not isinstance(result, dict):
                 continue
-            rows = result.get("results")
-            if isinstance(rows, list) and rows and isinstance(rows[0], dict):
-                row = rows[0]
-                for key in ("name", "title", "description", "code"):
-                    value = row.get(key)
-                    if isinstance(value, str) and value.strip():
-                        return value.strip()
+            bits = _stored_bits(result)
+            if bits:
+                return " ".join(bits)
     return ""
+
+
+def _stored_bits(value: object) -> list[str]:
+    """Quote stored facts the way a model does after it reads a tool result."""
+
+    bits: list[str] = []
+
+    def walk(item: object, *, depth: int) -> None:
+        if len(bits) >= 12 or depth > 4:
+            return
+        if isinstance(item, dict):
+            for key, child in item.items():
+                if key.endswith("_id") or key in {"phone", "email", "notes"}:
+                    continue
+                walk(child, depth=depth + 1)
+            return
+        if isinstance(item, list):
+            for child in item[:4]:
+                walk(child, depth=depth + 1)
+            return
+        if isinstance(item, bool) or item is None:
+            return
+        text = str(item).strip()
+        if text and len(text) <= 80:
+            bits.append(text)
+
+    walk(value, depth=0)
+    return bits
 
 
 def _brief_line(brief: str, prefix: str) -> str:

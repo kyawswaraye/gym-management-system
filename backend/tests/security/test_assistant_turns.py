@@ -404,17 +404,20 @@ def test_confirmation_keeps_the_stored_member_name(monkeypatch) -> None:
 
 
 @override_settings(**_settings())
-def test_unsupported_burmese_lookup_does_not_invent_or_call_the_model(monkeypatch) -> None:
+def test_an_unsupported_lookup_is_answered_by_the_model(monkeypatch) -> None:
     _gym, owner = _owner("TN17", "tn17-owner@example.test")
+    called = {"count": 0}
 
-    def fail(**_kwargs: object) -> None:
-        raise AssertionError("model called")
+    def generate(**_kwargs: object) -> ModelTurn:
+        called["count"] += 1
+        body = "စစ်ဆေးမှတ်တမ်းကို မဖတ်နိုင်ပါ။ Aung Aung MEM-000101"
+        return ModelTurn(body, (), ({"text": body},))
 
-    monkeypatch.setattr("apps.assistant.turns.generate_content", fail)
+    monkeypatch.setattr("apps.assistant.turns.generate_content", generate)
     client = APIClient()
     response = client.post(
         "/api/v1/assistant/turns/",
-        {"message": "Aung Aung ရဲ့ ဝင်ရောက်မှတ်တမ်း ပြပါ။ MEM-000101"},
+        {"message": "Aung Aung ရဲ့ စစ်ဆေးမှတ်တမ်း ပြပါ။ MEM-000101"},
         format="json",
         HTTP_AUTHORIZATION=f"Bearer {staff_token(owner)}",
     )
@@ -422,6 +425,7 @@ def test_unsupported_burmese_lookup_does_not_invent_or_call_the_model(monkeypatc
     assert response.status_code == 200, response.json()
     data = response.json()["data"]
     body = data["message"]["body"]
+    assert called["count"] == 1
     assert "မဖတ်နိုင်" in body
     assert "Aung Aung" in body
     assert "MEM-000101" in body

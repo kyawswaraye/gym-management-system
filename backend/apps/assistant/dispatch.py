@@ -22,6 +22,7 @@ from apps.assistant.booking_tools import booking_tool_contracts
 from apps.assistant.booking_tools import execute_registered_tool as execute_booking
 from apps.assistant.cash_tools import cash_tool_contracts
 from apps.assistant.cash_tools import execute_registered_tool as execute_cash
+from apps.assistant.checkin_reads import checkin_read_tool_contracts
 from apps.assistant.class_reads import class_read_tool_contracts
 from apps.assistant.commission_reads import commission_read_tool_contracts
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
@@ -29,6 +30,7 @@ from apps.assistant.executor import ApprovalSnapshot, ToolContract
 from apps.assistant.expense_tools import execute_registered_tool as execute_expense
 from apps.assistant.expense_tools import expense_tool_contracts
 from apps.assistant.finance_reads import finance_read_tool_contracts
+from apps.assistant.inventory_reads import inventory_read_tool_contracts
 from apps.assistant.inventory_tools import execute_registered_tool as execute_inventory
 from apps.assistant.inventory_tools import inventory_tool_contracts
 from apps.assistant.member_reads import member_read_tool_contracts
@@ -45,6 +47,7 @@ from apps.assistant.payment_reads import (
 )
 from apps.assistant.payment_tools import execute_registered_tool as execute_payment
 from apps.assistant.payment_tools import payment_tool_contracts
+from apps.assistant.pt_record_reads import pt_record_read_tool_contracts
 from apps.assistant.pt_tools import execute_registered_tool as execute_pt
 from apps.assistant.pt_tools import pt_tool_contracts
 from apps.assistant.report_reads import report_read_tool_contracts
@@ -54,8 +57,10 @@ from apps.assistant.salary_tools import execute_registered_tool as execute_salar
 from apps.assistant.salary_tools import salary_tool_contracts
 from apps.assistant.schedule_tools import execute_registered_tool as execute_schedule
 from apps.assistant.schedule_tools import schedule_tool_contracts
+from apps.assistant.staff_reads import staff_read_tool_contracts
 from apps.assistant.staff_tools import execute_registered_tool as execute_staff
 from apps.assistant.staff_tools import staff_tool_contracts
+from apps.assistant.trainer_reads import trainer_read_tool_contracts
 from apps.assistant.training_tools import execute_registered_tool as execute_training
 from apps.assistant.training_tools import training_tool_contracts
 from apps.tenants.models import Gym
@@ -75,15 +80,19 @@ def tool_contracts() -> dict[str, ToolContract]:
             member_read_tool_contracts(),
             membership_read_tool_contracts(),
             package_read_tool_contracts(),
+            checkin_read_tool_contracts(),
             class_read_tool_contracts(),
             commission_read_tool_contracts(),
             finance_read_tool_contracts(),
             operations_read_tool_contracts(),
+            staff_read_tool_contracts(),
             staff_tool_contracts(),
             activity_tool_contracts(),
+            trainer_read_tool_contracts(),
             training_tool_contracts(),
             schedule_tool_contracts(),
             booking_tool_contracts(),
+            inventory_read_tool_contracts(),
             inventory_tool_contracts(),
             cash_tool_contracts(),
             payment_tool_contracts(),
@@ -93,6 +102,7 @@ def tool_contracts() -> dict[str, ToolContract]:
             expense_tool_contracts(),
             retail_tool_contracts(),
             salary_tool_contracts(),
+            pt_record_read_tool_contracts(),
             pt_tool_contracts(),
         ):
             loaded.update(group)
@@ -195,12 +205,16 @@ def _load_readers() -> None:
     from apps.assistant.announcement_reads import (
         execute_registered_read as execute_announcement_read,
     )
+    from apps.assistant.checkin_reads import CHECKIN_READ_TOOL_NAMES
+    from apps.assistant.checkin_reads import execute_registered_read as execute_checkin_read
     from apps.assistant.class_reads import CLASS_READ_TOOL_NAMES
     from apps.assistant.class_reads import execute_registered_read as execute_class_read
     from apps.assistant.commission_reads import COMMISSION_READ_TOOL_NAMES
     from apps.assistant.commission_reads import execute_registered_read as execute_commission_read
     from apps.assistant.finance_reads import FINANCE_READ_TOOL_NAMES
     from apps.assistant.finance_reads import execute_registered_read as execute_finance_read
+    from apps.assistant.inventory_reads import INVENTORY_READ_TOOL_NAMES
+    from apps.assistant.inventory_reads import execute_registered_read as execute_inventory_read
     from apps.assistant.member_reads import MEMBER_READ_TOOL_NAMES
     from apps.assistant.member_reads import execute_registered_read as execute_member_read
     from apps.assistant.membership_reads import MEMBERSHIP_READ_TOOL_NAMES
@@ -209,8 +223,14 @@ def _load_readers() -> None:
     from apps.assistant.operations_reads import execute_registered_read as execute_operations_read
     from apps.assistant.package_reads import PACKAGE_READ_TOOL_NAMES
     from apps.assistant.package_reads import execute_registered_read as execute_package_read
+    from apps.assistant.pt_record_reads import PT_RECORD_READ_TOOL_NAMES
+    from apps.assistant.pt_record_reads import execute_registered_read as execute_pt_record_read
     from apps.assistant.report_reads import REPORT_READ_TOOL_NAMES
     from apps.assistant.report_reads import execute_registered_read as execute_report_read
+    from apps.assistant.staff_reads import STAFF_READ_TOOL_NAMES
+    from apps.assistant.staff_reads import execute_registered_read as execute_staff_read
+    from apps.assistant.trainer_reads import TRAINER_READ_TOOL_NAMES
+    from apps.assistant.trainer_reads import execute_registered_read as execute_trainer_read
 
     for name in PAYMENT_READ_TOOL_NAMES:
         _READERS[name] = execute_registered_read
@@ -220,8 +240,18 @@ def _load_readers() -> None:
         _READERS[name] = execute_membership_read
     for name in PACKAGE_READ_TOOL_NAMES:
         _READERS[name] = execute_package_read
+    for name in CHECKIN_READ_TOOL_NAMES:
+        _READERS[name] = execute_checkin_read
     for name in CLASS_READ_TOOL_NAMES:
         _READERS[name] = execute_class_read
+    for name in INVENTORY_READ_TOOL_NAMES:
+        _READERS[name] = execute_inventory_read
+    for name in PT_RECORD_READ_TOOL_NAMES:
+        _READERS[name] = execute_pt_record_read
+    for name in STAFF_READ_TOOL_NAMES:
+        _READERS[name] = execute_staff_read
+    for name in TRAINER_READ_TOOL_NAMES:
+        _READERS[name] = execute_trainer_read
     for name in COMMISSION_READ_TOOL_NAMES:
         _READERS[name] = execute_commission_read
     for name in FINANCE_READ_TOOL_NAMES:

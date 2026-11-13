@@ -10,15 +10,17 @@ constraints include the gym as well.
 from __future__ import annotations
 
 import os
-from datetime import timedelta
+from datetime import datetime, time, timedelta
+from decimal import Decimal
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.db import transaction
 from django.http import Http404
 from django.test import override_settings
 from django.utils import timezone
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 from rest_framework.views import APIView
@@ -35,9 +37,11 @@ from apps.assistant.registry import production_registry
 from apps.assistant.turns import confirm_step, reject_step
 from apps.audit.models import AuditLog
 from apps.common.db.tenant_context import set_gym_context
-from apps.members.models import Member, Payment
+from apps.inventory.services import create_category as create_product_category
+from apps.inventory.services import create_product
+from apps.members.models import CheckIn, Member, Membership, MembershipPlan, Payment
 from apps.members.services import create_member, gym_today
-from apps.tenants.models import Gym, GymMembership, IdempotencyRecord
+from apps.tenants.models import Gym, GymMembership, IdempotencyRecord, Role
 from tests.security.test_assistant_schedule import _enable, _profile
 from tests.security.test_tenant_gym_settings import (
     add_staff,
@@ -172,8 +176,8 @@ def test_every_assistant_tool_rejects_another_gym() -> None:
     tools = [registry.get(name) for name in registry.names()]
     reads = [tool for tool in tools if tool.operation == "read"]
     writes = [tool for tool in tools if tool.operation == "write"]
-    assert len(tools) == 114
-    assert len(reads) == 16
+    assert len(tools) == 131
+    assert len(reads) == 33
     assert len(writes) == 98
     assert set(contracts) == {tool.name for tool in tools}
     assert all(tool.confirmation_required for tool in writes)
@@ -427,3 +431,211 @@ def test_every_assistant_tool_rejects_another_gym() -> None:
     assert stored_keys
     assert rejected_keys.isdisjoint(stored_keys)
     assert rejected_claims.isdisjoint(stored_claims)
+
+
+def _plan(gym: Gym, actor: GymMembership) -> MembershipPlan:
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        return MembershipPlan.objects.create(
+            gym=gym,
+            code="READPLAN",
+            name="Read Plan",
+            duration_value=1,
+            duration_unit=MembershipPlan.DurationUnit.MONTH,
+            price=Decimal("100.00"),
+            currency=gym.currency,
+            created_by_membership_id=actor.id,
+            updated_by_membership_id=actor.id,
+        )
+
+
+def _membership(gym: Gym, actor: GymMembership, member: Member, plan: MembershipPlan) -> Membership:
+    today = gym_today(gym)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        row = Membership.objects.create(
+            gym=gym,
+            member=member,
+            plan=plan,
+            plan_code=plan.code,
+            plan_name=plan.name,
+            duration_value=1,
+            duration_unit=plan.duration_unit,
+            start_date=today,
+            expiry_date=today,
+            list_price=plan.price,
+            discount_amount=Decimal("0.00"),
+            final_amount=plan.price,
+            currency=gym.currency,
+            payment_status=Membership.PaymentStatus.PAID,
+            status=Membership.Status.ACTIVE,
+            revenue_source=Membership.RevenueSource.NEW_MEMBER,
+            created_by_membership_id=actor.id,
+        )
+        CheckIn.objects.create(
+            gym=gym,
+            member=member,
+            membership=row,
+            check_in_at=datetime.combine(today, time(9, 0), tzinfo=ZoneInfo(gym.timezone)),
+            method=CheckIn.Method.MANUAL,
+            recorded_by_membership_id=actor.id,
+            created_by_membership_id=actor.id,
+            eligibility_snapshot={"eligible": True},
+        )
+    return row
+
+
+@override_settings(**jwt_settings())
+def test_new_reads_stay_in_the_session_gym() -> None:
+    gym, owner = _owner("RD01", "rd01-owner@example.test")
+    other, other_owner = _owner("RD02", "rd02-owner@example.test")
+    for current in (gym, other):
+        _enable(current, "members")
+        _enable(current, "memberships")
+        _enable(current, "finance")
+    local = _person(gym, owner, "Expiry", "Local")
+    foreign = _person(other, other_owner, "Expiry", "Foreign")
+    _membership(gym, owner, local, _plan(gym, owner))
+    _membership(other, other_owner, foreign, _plan(other, other_owner))
+    desk = add_staff(gym, email="rd01-desk@example.test", role_key="RECEPTIONIST")
+    _profile(gym, desk, code="LOCAL", name="Local Desk")
+    foreign_desk = add_staff(other, email="rd02-desk@example.test", role_key="RECEPTIONIST")
+    _profile(other, foreign_desk, code="FOREIGN", name="Foreign Desk")
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        category = create_product_category(
+            gym=gym,
+            actor=owner,
+            fields={"code": "BOTTLE", "name": "Bottles"},
+            request_id="req_local_category",
+            ip_address=None,
+            user_agent="",
+        )
+        create_product(
+            gym=gym,
+            actor=owner,
+            fields={
+                "category_id": category.id,
+                "sku": "LOCAL1",
+                "name": "Local Bottle",
+                "unit": "BTL",
+                "sale_price": "10.00",
+                "current_unit_cost": "4.00",
+                "default_unit_cost": "4.00",
+                "low_stock_threshold": "5.000",
+            },
+            request_id="req_local_product",
+            ip_address=None,
+            user_agent="",
+        )
+        set_gym_context(gym_id=other.id)
+        foreign_category = create_product_category(
+            gym=other,
+            actor=other_owner,
+            fields={"code": "BOTTLE", "name": "Bottles"},
+            request_id="req_foreign_category",
+            ip_address=None,
+            user_agent="",
+        )
+        create_product(
+            gym=other,
+            actor=other_owner,
+            fields={
+                "category_id": foreign_category.id,
+                "sku": "FOREIGN1",
+                "name": "Foreign Bottle",
+                "unit": "BTL",
+                "sale_price": "10.00",
+                "current_unit_cost": "4.00",
+                "default_unit_cost": "4.00",
+                "low_stock_threshold": "5.000",
+            },
+            request_id="req_foreign_product",
+            ip_address=None,
+            user_agent="",
+        )
+
+    request = _request(gym, owner)
+    today = gym_today(gym).isoformat()
+    expiries = execute_offered_read(
+        request=request,
+        view=APIView(),
+        tool_name="search_membership_expiries",
+        payload={"gym_id": str(gym.id), "bucket": "today"},
+    )
+    expiry_text = str(expiries)
+    assert "Expiry Local" in expiry_text
+    assert "Expiry Foreign" not in expiry_text
+    assert today in expiry_text
+    visits = execute_offered_read(
+        request=request,
+        view=APIView(),
+        tool_name="search_check_ins",
+        payload={"date_from": today, "date_to": today},
+    )
+    visit_text = str(visits)
+    assert "Expiry Local" in visit_text
+    assert "Expiry Foreign" not in visit_text
+    other_today = gym_today(other).isoformat()
+    other_visits = execute_offered_read(
+        request=_request(other, other_owner),
+        view=APIView(),
+        tool_name="search_check_ins",
+        payload={"date_from": other_today, "date_to": other_today},
+    )
+    assert "Expiry Local" not in str(other_visits)
+    assert "Expiry Foreign" in str(other_visits)
+    with pytest.raises(ExecutionRejected) as mismatch:
+        execute_offered_read(
+            request=request,
+            view=APIView(),
+            tool_name="search_check_ins",
+            payload={"gym_id": str(other.id), "date_from": today, "date_to": today},
+        )
+    assert mismatch.value.code == "gym_mismatch"
+    stock = execute_offered_read(
+        request=request,
+        view=APIView(),
+        tool_name="search_low_stock",
+        payload={},
+    )
+    assert "Local Bottle" in str(stock)
+    assert "Foreign Bottle" not in str(stock)
+    roles = execute_offered_read(
+        request=request,
+        view=APIView(),
+        tool_name="search_roles",
+        payload={"limit": 25},
+    )
+    with transaction.atomic():
+        set_gym_context(gym_id=other.id)
+        foreign_role_ids = {
+            str(row_id) for row_id in Role.objects.filter(gym=other).values_list("id", flat=True)
+        }
+    assert foreign_role_ids.isdisjoint(_ids(roles))
+    staff = execute_offered_read(
+        request=request,
+        view=APIView(),
+        tool_name="search_staff_access",
+        payload={"search": "Local Desk"},
+    )
+    staff_text = str(staff)
+    assert "Local Desk" in staff_text
+    assert "Foreign Desk" not in staff_text
+    assert "rd01-desk@example.test" not in staff_text
+    limited = _request(gym, desk)
+    limited.permission_codes = frozenset({"members.view"})
+    with pytest.raises(PermissionDenied):
+        execute_offered_read(
+            request=limited,
+            view=APIView(),
+            tool_name="search_check_ins",
+            payload={"date_from": today, "date_to": today},
+        )
+    with pytest.raises(PermissionDenied):
+        execute_offered_read(
+            request=limited,
+            view=APIView(),
+            tool_name="search_staff_access",
+            payload={"search": "Local Desk"},
+        )

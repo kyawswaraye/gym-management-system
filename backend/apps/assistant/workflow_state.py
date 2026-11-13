@@ -16,7 +16,12 @@ from uuid import UUID
 
 from django.db import transaction
 
-from apps.assistant.knowledge import short_reply_kind, speaks_burmese
+from apps.assistant.knowledge import (
+    information_question,
+    short_reply_kind,
+    shown_day,
+    speaks_burmese,
+)
 from apps.assistant.models import Conversation, Message
 from apps.common.db.tenant_context import set_gym_context
 from apps.members.models import Member, Membership
@@ -25,6 +30,7 @@ from apps.tenants.models import Gym
 _MARKER = "workflow-state v1\n"
 _KEYS = (
     "workflow",
+    "goals",
     "stage",
     "member_id",
     "member_number",
@@ -43,6 +49,7 @@ _KEYS = (
     "last_reference",
     "next",
     "pending_tool",
+    "parked",
 )
 _NEXT_WORDS = (
     "ဘာဆက်",
@@ -78,7 +85,8 @@ _CAPABILITIES: tuple[tuple[tuple[str, ...], str], ...] = (
     ),
     (
         ("pt", "trainer", "package", "commission", "ကော်မရှင်", "နည်းပြ"),
-        "Personal training. Reads: search_pt_packages, search_pt_commissions. "
+        "Personal training. Reads: search_service_packages for catalog prices, "
+        "search_pt_packages for a member's remaining sessions, search_pt_commissions. "
         "Writes wait for confirmation: create_assignment, create_pt_sale, "
         "submit_pt_sale, approve_pt_sale, reject_pt_sale, create_pt_booking, "
         "attend_pt_booking, cancel_pt_booking. A sale or booking needs an "
@@ -197,18 +205,24 @@ def absorb_read(state: dict[str, str], tool: str, result: Mapping[str, object]) 
         return
     mapped = [row for row in rows if isinstance(row, Mapping)]
     if tool == "search_members" and len(mapped) == 1 and not result.get("ambiguous"):
-        _remember_member_row(state, mapped[0])
+        if not _open_registration(state):
+            _remember_member_row(state, mapped[0])
     elif tool == "get_member" and mapped:
-        _remember_member_row(state, mapped[0])
+        if not _open_registration(state):
+            _remember_member_row(state, mapped[0])
     elif tool == "search_membership_plans" and len(mapped) == 1 and not result.get("ambiguous"):
         row = mapped[0]
-        if str(row.get("status") or "") == "ACTIVE":
+        if str(row.get("status") or "") == "ACTIVE" and _plan_matches(state, row):
             _remember_plan_row(state, row)
     elif tool == "search_memberships" and len(mapped) == 1:
         row = mapped[0]
-        state["membership_id"] = _text(row.get("id"))
-        state["payment_status"] = _text(row.get("payment_status"))
-        state["start_date"] = _text(row.get("start_date")) or state.get("start_date", "")
+        state["membership_id"] = _text(row.get("id")) or state.get("membership_id", "")
+        state["payment_status"] = _text(row.get("payment_status")) or state.get(
+            "payment_status", ""
+        )
+        found_start = _text(row.get("start_date"))
+        if found_start and not _kept_start(state):
+            state["start_date"] = found_start
         if state.get("workflow") == "":
             state["workflow"] = "membership"
 
@@ -285,6 +299,9 @@ def same_created_member(state: Mapping[str, str], payload: Mapping[str, object])
 def direct_reply(text: str, state: Mapping[str, str]) -> str | None:
     """Answer a stored fact without another model call."""
 
+    dated = stored_date_reply(text, state)
+    if dated is not None:
+        return dated
     number = _number_reply(text, state)
     if number is not None:
         return number
@@ -324,32 +341,300 @@ def remember_intent(state: dict[str, str], text: str) -> None:
     """Keep the operation the staff named. A later date must not drop it.
 
     A member lookup stores the person on the same state. That fact is not a
-    switch from personal training to a membership sale.
+    switch from personal training to a membership sale. A request that names
+    membership, class, and PT together stays on member registration first.
     """
 
-    if short_reply_kind(text):
+    if short_reply_kind(text) or _date_followup(text):
+        return
+    if _resumes(text) and state.get("parked"):
+        state["workflow"] = state["parked"]
+        state["parked"] = ""
+        return
+    if information_question(text):
         return
     folded = text.casefold()
-    if _PT_INTENT.search(folded) or "နည်းပြ" in text:
-        state["workflow"] = "pt"
+    wants_pt = bool(_PT_INTENT.search(folded) or "နည်းပြ" in text)
+    wants_class = bool(re.search(r"\bclass\b", folded) or "အတန်း" in text)
+    wants_member = "member" in folded or "အဖွဲ့ဝင်" in text
+    wants_membership = "membership" in folded or "အသင်းဝင်" in text
+    if wants_member and (wants_class or wants_pt):
+        parts = ["member", "membership"]
+        if wants_class:
+            parts.append("class")
+        if wants_pt:
+            parts.append("pt")
+        state["goals"] = ",".join(parts)
+        if not state.get("member_id"):
+            _switch_workflow(state, "member")
+        return
+    if state.get("goals") and not (wants_pt or wants_class or wants_member or wants_membership):
+        return
+    if _registers_member(text) and not state.get("member_id"):
+        _switch_workflow(state, "member")
+        return
+    if wants_pt:
+        _switch_workflow(state, "pt")
         return
     if "ငွေပေး" in text or "payment" in folded or "ပြန်အမ်း" in text:
-        state["workflow"] = "payment"
+        _switch_workflow(state, "payment")
         return
-    if "အသင်းဝင်" in text or "membership" in folded:
-        state["workflow"] = "membership"
+    if wants_membership:
+        _switch_workflow(state, "membership")
+        return
+    if wants_class and state.get("member_id"):
+        _switch_workflow(state, "class")
+
+
+_RESUMES = (
+    "အရင်ဟာ ဆက်လုပ်",
+    "ဆက်လုပ်",
+    "continue that",
+    "go back",
+    "register her",
+    "register him",
+)
+
+
+def _resumes(text: str) -> bool:
+    folded = text.casefold()
+    return any(phrase in text or phrase in folded for phrase in _RESUMES)
+
+
+def _registers_member(text: str) -> bool:
+    folded = text.casefold()
+    if "register" in folded or "စာရင်းသွင်း" in text:
+        return True
+    return "new member" in folded or "အဖွဲ့ဝင်အသစ်" in text or "အဖွဲ့ဝင် အသစ်" in text
+
+
+def _switch_workflow(state: dict[str, str], workflow: str) -> None:
+    """Move to another operation and keep the previous one for a later return."""
+
+    current = state.get("workflow") or ""
+    if current and current != workflow and not state.get("parked"):
+        state["parked"] = current
+    state["workflow"] = workflow
+
+
+def _open_registration(state: Mapping[str, str]) -> bool:
+    return bool(state.get("member_name")) and not state.get("member_id")
+
+
+def _plan_matches(state: Mapping[str, str], row: Mapping[str, Any]) -> bool:
+    stored = state.get("plan_code") or ""
+    found = _text(row.get("code"))
+    return not stored or not found or stored.casefold() == found.casefold()
+
+
+def _kept_start(state: Mapping[str, str]) -> bool:
+    return bool(state.get("start_date")) and state.get("workflow") not in {"", "membership"}
+
+
+_PERSON_NAME = re.compile(r"\b([A-Z][a-z]+(?:[ '-][A-Z][a-z]+)+)\b")
+_PLAN_CODE = re.compile(r"\b([A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+)\b")
+_DATE_QUESTIONS = (
+    "which date",
+    "which start date",
+    "what date",
+    "what start date",
+    "ဘယ်ရက်လဲ",
+    "ဘယ်ရက်က စမလဲ",
+    "ဘယ်နေ့လဲ",
+)
+
+
+def remember_facts(state: dict[str, str], text: str, today: date) -> None:
+    """Keep a name, plan code, and calendar day the staff already gave."""
+
+    from apps.assistant.lookups import calendar_day
+
+    if short_reply_kind(text) or asks_stored_date(text):
+        return
+    found = calendar_day(text, today)
+    if isinstance(found, date) and not information_question(text):
+        state["start_date"] = found.isoformat()
+    if not state.get("member_id") and not state.get("member_name"):
+        named = _PERSON_NAME.search(text)
+        if named is not None:
+            state["member_name"] = named.group(1)
+    if not state.get("plan_id"):
+        code = _PLAN_CODE.search(text)
+        if code is not None:
+            state["plan_code"] = code.group(1)
+
+
+def asks_stored_date(text: str) -> bool:
+    """A short question about the date, with no new date in the same message."""
+
+    from apps.assistant.lookups import calendar_day
+
+    found = calendar_day(text, date.today())
+    if found is not None:
+        return False
+    folded = " ".join(text.casefold().split()).strip("။.!?၊ ")
+    if len(folded) > 40:
+        return False
+    return any(phrase in folded or phrase in text for phrase in _DATE_QUESTIONS)
+
+
+def stored_date_reply(text: str, state: Mapping[str, str]) -> str | None:
+    """Repeat a validated date instead of asking for it again."""
+
+    if not asks_stored_date(text):
+        return None
+    iso = state.get("start_date") or ""
+    if len(iso) < 10:
+        return None
+    detail = ", ".join(
+        part
+        for part in (
+            state.get("member_name") or "",
+            state.get("plan_code") or state.get("plan_name") or "",
+            shown_day(iso),
+        )
+        if part
+    )
+    if speaks_burmese(text):
+        return f"စတင်ရက်က {detail} ပါ။"
+    return f"The date is {detail}."
+
+
+def confirmation_reply(
+    reply: str,
+    proposal: Mapping[str, object] | None,
+    staff_text: str,
+    state: Mapping[str, str],
+) -> str:
+    """Keep the collected name, plan, and date on a confirmation that is not saved yet."""
+
+    if proposal is None:
+        return reply
+    generic = {
+        "That change is not saved until you confirm.",
+        "ဒီပြောင်းလဲမှုကို မသိမ်းရသေးပါ။ အတည်ပြုပြီးမှ သိမ်းပါမယ်။",
+    }
+    if reply.strip() not in generic:
+        return reply
+    facts = _proposal_facts(proposal, state)
+    if not facts:
+        return reply
+    burmese = speaks_burmese(staff_text) or speaks_burmese(reply)
+    shown = "၊ ".join(facts) if burmese else ", ".join(facts)
+    if burmese:
+        return f"{shown}။ {reply.strip()}"
+    return f"{shown}. {reply.strip()}"
+
+
+def _proposal_facts(proposal: Mapping[str, object], state: Mapping[str, str]) -> list[str]:
+    fields = _proposal_fields(proposal)
+    name = _person(fields.get("first_name", ""), fields.get("last_name", "")) or (
+        state.get("member_name") or ""
+    )
+    plan = fields.get("plan_id", "")
+    if _uuid(plan):
+        plan = ""
+    plan = plan or state.get("plan_code") or state.get("plan_name") or ""
+    day = ""
+    for key in ("start_date", "join_date", "service_date", "effective_from", "business_date"):
+        value = fields.get(key, "")
+        if value:
+            day = value
+            break
+    if not day:
+        day = state.get("start_date") or ""
+    shown = shown_day(day) if day else ""
+    return [part for part in (name, plan, shown) if part]
+
+
+def _proposal_fields(proposal: Mapping[str, object]) -> dict[str, str]:
+    listed = proposal.get("fields")
+    if not isinstance(listed, list):
+        return {}
+    found: dict[str, str] = {}
+    for field in listed:
+        if not isinstance(field, Mapping):
+            continue
+        name = field.get("name")
+        value = field.get("value")
+        if isinstance(name, str) and isinstance(value, str) and name and value.strip():
+            found[name] = value.strip()
+    return found
+
+
+def _date_followup(text: str) -> bool:
+    """A date or a date question, without a new operation in the same message."""
+
+    from apps.assistant.lookups import calendar_day
+
+    if asks_stored_date(text):
+        return True
+    if _operation_mention(text):
+        return False
+    folded = text.casefold()
+    if any(
+        token in text
+        for token in (
+            "ဒီနေ့",
+            "ယနေ့",
+            "မနက်ဖြန်",
+            "နက်ဖြန်",
+            "မနေ့",
+            "မနေ့က",
+            "နောက်တစ်ပတ်",
+            "နောက်အပတ်",
+        )
+    ):
+        return True
+    if re.search(r"\b(today|tomorrow|yesterday|next week)\b", folded):
+        return True
+    return isinstance(calendar_day(text, date.today()), date)
+
+
+def _operation_mention(text: str) -> bool:
+    folded = text.casefold()
+    if _PT_INTENT.search(folded) or "နည်းပြ" in text:
+        return True
+    if re.search(r"\bclass\b", folded) or "အတန်း" in text:
+        return True
+    if "member" in folded or "အဖွဲ့ဝင်" in text:
+        return True
+    if "membership" in folded or "အသင်းဝင်" in text:
+        return True
+    if "payment" in folded or "ငွေပေး" in text or "ပြန်အမ်း" in text:
+        return True
+    if "plan" in folded or "အစီအစဉ်" in text:
+        return True
+    return _PLAN_CODE.search(text) is not None
 
 
 def capability_brief(text: str, state: Mapping[str, str]) -> str:
-    blob = f"{text} {state.get('workflow', '')} {state.get('next', '')}"
+    asked = information_question(text)
+    blob = text if asked else f"{text} {state.get('workflow', '')} {state.get('next', '')}"
     folded = blob.casefold()
-    for words, card in _CAPABILITIES:
-        if any(word in folded or word in blob for word in words):
-            return "Relevant operation. " + card
-    return (
+    card = (
         "Relevant operation. Use a registered read before answering a stored "
         "record. A write is only proposed until the server confirms it."
     )
+    for words, description in _CAPABILITIES:
+        if any(word in folded or word in blob for word in words):
+            card = "Relevant operation. " + description
+            break
+    if asked:
+        return (
+            card + " Answer only this question from a read tool or the live gym brief. "
+            "Leave the stored name, date, plan, and workflow in place."
+        )
+    goals = state.get("goals") or ""
+    if "class" in goals or "pt" in goals:
+        card += (
+            " This onboarding is separate steps: register the member, then sell "
+            "the named membership, then class enrollment, then PT. Do not ask "
+            "again for a name, date, or plan already stored. Do not invent a "
+            "class, trainer, package, or schedule. Missing class or PT details "
+            "do not block member registration or the membership sale."
+        )
+    return card
 
 
 def state_brief(state: Mapping[str, str]) -> str:
@@ -449,7 +734,7 @@ def _copy_payload(state: dict[str, str], payload: Mapping[str, object]) -> None:
     package_id = _uuid(payload.get("service_package_id"))
     if package_id:
         state["package_id"] = package_id
-    start = _text(payload.get("start_date"))
+    start = _text(payload.get("start_date")) or _text(payload.get("join_date"))
     if len(start) >= 10:
         state["start_date"] = start[:10]
     name = _person(_text(payload.get("first_name")), _text(payload.get("last_name")))
@@ -457,13 +742,24 @@ def _copy_payload(state: dict[str, str], payload: Mapping[str, object]) -> None:
         state["member_name"] = name
 
 
+def _goal_set(state: Mapping[str, str]) -> set[str]:
+    return {part for part in (state.get("goals") or "").split(",") if part}
+
+
 def _next_for(tool: str, state: Mapping[str, str]) -> str:
+    goals = _goal_set(state)
     if tool == "create_member":
         return "create_membership"
     if tool == "create_membership":
+        if "class" in goals:
+            return "class"
+        if "pt" in goals:
+            return "pt"
         if state.get("payment_status") in {"", "UNPAID", "PARTIAL"}:
             return "create_payment"
         return ""
+    if tool == "create_class_booking" and "pt" in goals:
+        return "pt"
     if tool in {"submit_expense", "submit_salary_period", "submit_payment", "submit_pt_sale"}:
         return "approval"
     if tool in {"create_pt_booking", "create_class_booking", "create_payment"}:
@@ -509,6 +805,14 @@ def _next_sentence(state: Mapping[str, str], burmese: bool) -> str:
         if burmese:
             return "အသင်းဝင်ကို သိမ်းပြီးပါပြီ။ ငွေပေးချေမှု မတင်ရသေးပါ။"
         return "The membership is stored. Payment has not been recorded."
+    if nxt == "class":
+        if burmese:
+            return "အသင်းဝင်ကို သိမ်းပြီးပါပြီ။ အတန်းက သီးခြားပါ။ ဘယ်အတန်းနဲ့ ဘယ်အချိန်လဲ။"
+        return "The membership is stored. Class enrollment is separate. Which class and schedule?"
+    if nxt == "pt":
+        if burmese:
+            return "PT က သီးခြားပါ။ ဘယ်ပက်ကေ့နဲ့ ဘယ်သင်တန်းဆရာလဲ။"
+        return "PT is separate. Which package and trainer?"
     if nxt == "approval":
         if burmese:
             return "တင်ပြီးပါပြီ။ ခွင့်ရှိတဲ့ ဝန်ထမ်းက အတည်ပြုဖို့ ကျန်ပါသေးတယ်။"
@@ -528,20 +832,41 @@ def _done_sentence(state: Mapping[str, str], burmese: bool) -> str:
     name = state.get("member_name") or ""
     number = state.get("member_number") or ""
     tool = state.get("last_tool") or ""
+    goals = _goal_set(state)
     if tool == "create_member" and number:
         if burmese:
-            return f"{name} ကို သိမ်းပြီးပါပြီ။ အဖွဲ့ဝင်နံပါတ် {number}။ အသင်းဝင် အစီအစဉ် တပ်ဆင်နိုင်ပါတယ်။"
-        return (
-            f"{name} is saved. Member number {number}. A membership can be assigned next."
-        ).strip()
+            sentence = f"{name} ကို သိမ်းပြီးပါပြီ။ အဖွဲ့ဝင်နံပါတ် {number}။ အသင်းဝင် အစီအစဉ် တပ်ဆင်နိုင်ပါတယ်။"
+        else:
+            sentence = (
+                f"{name} is saved. Member number {number}. A membership can be assigned next."
+            )
+        if "class" in goals or "pt" in goals:
+            if burmese:
+                sentence += " အတန်းနဲ့ PT က အသင်းဝင်ပြီးမှ သီးခြားလုပ်ပါမယ်။"
+            else:
+                sentence += " Class and PT stay separate after the membership."
+        return sentence.strip()
     if tool == "create_membership":
         plan = state.get("plan_name") or state.get("plan_code") or ""
         start = state.get("start_date") or ""
         if burmese:
-            return f"{name} အတွက် {plan} ကို {start} မှ သိမ်းပြီးပါပြီ။ ငွေပေးချေမှုကို သီးခြား တင်ရပါမယ်။"
-        return (
-            f"The {plan} membership for {name} starts {start}. Payment is still a separate step."
-        ).strip()
+            sentence = f"{name} အတွက် {plan} ကို {start} မှ သိမ်းပြီးပါပြီ။ ငွေပေးချေမှုကို သီးခြား တင်ရပါမယ်။"
+        else:
+            sentence = (
+                f"The {plan} membership for {name} starts {start}. "
+                "Payment is still a separate step."
+            )
+        if "class" in goals:
+            if burmese:
+                sentence += " အတန်းက သီးခြားပါ။ ဘယ်အတန်းနဲ့ ဘယ်အချိန်လဲ။"
+            else:
+                sentence += " Class enrollment is separate. Which class and schedule?"
+        elif "pt" in goals:
+            if burmese:
+                sentence += " PT က သီးခြားပါ။ ဘယ်ပက်ကေ့နဲ့ ဘယ်သင်တန်းဆရာလဲ။"
+            else:
+                sentence += " PT is separate. Which package and trainer?"
+        return sentence.strip()
     if burmese:
         return "သိမ်းပြီးပါပြီ။"
     return "That change is saved."

@@ -14,6 +14,7 @@ from apps.assistant.knowledge import (
     DOMAIN_MAP,
     assistant_context,
     exact_code,
+    fact_tools,
     gate_sentence,
     grounded_read_reply,
     included_sections,
@@ -52,7 +53,7 @@ def test_domain_map_covers_the_gym_records() -> None:
         "retail",
         "stock movements",
         "announcements",
-        "does not send mail",
+        "one-off email",
         "do not invent",
         "no daily shift roster",
         "cannot be retrieved",
@@ -112,22 +113,70 @@ def test_capabilities_follow_registered_tools() -> None:
     assert knowledge_capability("payments") == "read"
     assert knowledge_capability("members") == "read"
     assert {"search_payments", "get_payment", "search_members"} <= reads
-    assert knowledge_capability("checkins") == "write_only"
-    assert knowledge_capability("pt_sales") == "write_only"
-    assert knowledge_capability("inventory") == "write_only"
-    assert not any(registry.get(name).operation == "read" and "check_in" in name for name in reads)
+    assert knowledge_capability("checkins") == "read"
+    assert knowledge_capability("pt_sales") == "read"
+    assert knowledge_capability("inventory") == "read"
+    assert "search_check_ins" in reads
+    assert "search_membership_expiries" in reads
+    assert "search_low_stock" in reads
+    assert "search_staff_access" in reads
     assert knowledge_capability("audit") == "unsupported"
     assert knowledge_capability("roster") == "unsupported"
     assert knowledge_capability("mail") == "unsupported"
+    assert "search_service_packages" in reads
     assert len(writes) == 98
-    assert len(reads) == 16
+    assert len(reads) == 33
+
+
+def test_business_questions_route_to_the_stored_read() -> None:
+    today = date(2026, 11, 14)
+    expected = {
+        "ဒီနေ့ Gym ကို Member ဘယ်နှယောက်လာပြီးပြီလဲ။": ("search_check_ins",),
+        "ဒီလ Membership သက်တမ်းကုန်မယ့်သူတွေ ဘယ်သူတွေလဲ။": ("search_membership_expiries",),
+        "မနေ့က Check-in ဝင်ထားတဲ့သူတွေ ပြပေးပါ။": ("search_check_ins",),
+        "ဘယ် Trainer က Member ဘယ်နှယောက်ကို တာဝန်ယူထားလဲ။": ("search_trainer_assignments",),
+        "ဘယ်သူတွေ PT Package ဝယ်ထားလဲ။": ("search_pt_packages",),
+        "Member တစ်ယောက်ရဲ့ PT Session ဘယ်နှကြိမ်ကျန်လဲ။": ("search_pt_packages",),
+        "ဒီနေ့ Class ဘယ်နှခုရှိလဲ။": ("search_class_occurrences",),
+        "နောက်လာမယ့် Class တွေ ပြပေးပါ။": ("search_class_occurrences",),
+        "Stock နည်းနေတဲ့ Product တွေ ဘာတွေရှိလဲ။": ("search_low_stock",),
+        "ဒီလ ဘယ် Product တွေ အရောင်းအများဆုံးလဲ။": ("search_product_sales",),
+        "Staff တစ်ယောက်ချင်းစီ ဘာ Permission တွေရထားလဲ။": ("search_staff_access",),
+    }
+    for question, tools in expected.items():
+        assert fact_tools(question) == tools
+    money = fact_tools("ဒီလ ဝင်ငွေ၊ အသုံးစရိတ်၊ အမြတ် ဘယ်လောက်ရှိလဲ။")
+    assert "get_gym_dashboard" in money
+    expiry = widen_list_filters(
+        "search_membership_expiries",
+        {},
+        "ဒီလ Membership သက်တမ်းကုန်မယ့်သူတွေ ဘယ်သူတွေလဲ။",
+        today,
+    )
+    assert expiry["expiry_from"] == "2026-11-01"
+    assert expiry["expiry_to"] == "2026-11-30"
+    yesterday = widen_list_filters(
+        "search_check_ins",
+        {},
+        "မနေ့က Check-in ဝင်ထားတဲ့သူတွေ ပြပေးပါ။",
+        today,
+    )
+    assert yesterday["date_from"] == "2026-11-13"
+    assert yesterday["date_to"] == "2026-11-13"
+    workload = widen_list_filters(
+        "search_trainer_assignments",
+        {},
+        "ဘယ် Trainer က Member ဘယ်နှယောက်ကို တာဝန်ယူထားလဲ။",
+        today,
+    )
+    assert workload["summary"] is True
 
 
 def test_an_unsupported_read_does_not_invent_a_record() -> None:
-    reply = unsupported_lookup_reply("Show the check-in history")
+    reply = unsupported_lookup_reply("Show the audit log")
 
     assert reply is not None
-    assert "cannot look up check-in history" in reply
+    assert "Audit records are not available." in reply
     assert "ACTIVE" not in reply
     assert "2026-" not in reply
     assert "saved" not in reply.casefold()
@@ -135,16 +184,17 @@ def test_an_unsupported_read_does_not_invent_a_record() -> None:
     assert unsupported_lookup_reply("Add Ada Lovelace") is None
     assert unsupported_lookup_reply("Approve the payment") is None
     assert unsupported_lookup_reply("How many check-ins today") is None
-    named = unsupported_lookup_reply("Show Aung Aung's check-ins")
+    assert unsupported_lookup_reply("Show the check-in history") is None
+    named = unsupported_lookup_reply("Show Aung Aung's audit trail")
     assert named is not None
-    assert "cannot look up check-in history" in named
+    assert "Audit records are not available." in named
     assert "Aung Aung" in named
     assert "ACTIVE" not in named
     assert unsupported_lookup_reply("Who attended the class") is None
 
 
 def test_a_burmese_unsupported_domain_keeps_exact_tokens() -> None:
-    reply = unsupported_lookup_reply("Aung Aung ရဲ့ ဝင်ရောက်မှတ်တမ်း ပြပါ။ MEM-000101 2026-11-11")
+    reply = unsupported_lookup_reply("Aung Aung ရဲ့ စစ်ဆေးမှတ်တမ်း ပြပါ။ MEM-000101 2026-11-11")
 
     assert reply is not None
     assert "မဖတ်နိုင်" in reply
@@ -156,11 +206,26 @@ def test_a_burmese_unsupported_domain_keeps_exact_tokens() -> None:
     assert "ACTIVE" not in reply
 
 
-def test_a_lookup_does_not_use_a_write_tool(monkeypatch) -> None:
-    def fail(*_args: object, **_kwargs: object) -> None:
-        raise AssertionError("write was prepared")
+def test_a_question_does_not_hide_a_write_tool(monkeypatch) -> None:
+    def resolve(
+        *_args: object, **_kwargs: object
+    ) -> tuple[dict[str, object], dict[str, str], None]:
+        return {}, {}, None
 
-    monkeypatch.setattr("apps.assistant.turns.resolve_references", fail)
+    def absent(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    def opened(**_kwargs: object) -> tuple[dict[str, object], dict[str, object]]:
+        return {"summary": "Check in"}, {"status": "confirmation_required"}
+
+    monkeypatch.setattr("apps.assistant.turns.resolve_references", resolve)
+    monkeypatch.setattr("apps.assistant.turns.unmetered_gate", absent)
+    monkeypatch.setattr("apps.assistant.turns.assignment_gap", absent)
+    monkeypatch.setattr("apps.assistant.turns.existing_assignment", absent)
+    monkeypatch.setattr("apps.assistant.turns.booking_package_gap", absent)
+    monkeypatch.setattr("apps.assistant.turns.proposal_block", absent)
+    monkeypatch.setattr("apps.assistant.turns.missing_fields", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr("apps.assistant.turns._open_proposal", opened)
     proposal, body = _handle_call(
         request=cast(Request, SimpleNamespace()),
         view=APIView(),
@@ -174,10 +239,9 @@ def test_a_lookup_does_not_use_a_write_tool(monkeypatch) -> None:
         staff_text="Aung Aung ရဲ့ ဝင်ရောက်မှတ်တမ်း ပြပါ",
     )
 
-    assert proposal is None
-    assert body == {"error": "not_a_read"}
+    assert proposal is not None
+    assert body["status"] == "confirmation_required"
     assert refuse_write_for_lookup("List payments", "write")
-    assert not refuse_write_for_lookup("List payments", "read")
     assert not refuse_write_for_lookup("Add Ada Lovelace", "write")
 
 
@@ -445,6 +509,23 @@ def test_a_read_answer_keeps_only_stored_or_brief_facts() -> None:
     assert "2026-11-11" in invented
     assert "MEM-000101" in invented
     assert faithful.startswith("Aung Aung")
+    mixed = grounded_read_reply(
+        "Aung Aung paid 80000. Hla Hla paid 99999.",
+        results=stored,
+        brief="Live gym brief. Today is 2026-11-12.",
+        staff_text="Show payments",
+    )
+    formatted = grounded_read_reply(
+        "Revenue is 1,500.00 THB.",
+        results=[{"financial": {"total_revenue": "1500.00"}}],
+        brief="Currency THB.",
+        staff_text="Explain revenue",
+    )
+    assert formatted == "Revenue is 1,500.00 THB."
+    assert mixed.startswith("Aung Aung paid 80000")
+    assert "99999" not in mixed
+    assert "Hla" not in mixed
+    assert "Stored records" not in mixed
     assert counted == "There is 1 ACTIVE member."
     assert empty == "No stored record matches that."
     assert "Aung" not in empty

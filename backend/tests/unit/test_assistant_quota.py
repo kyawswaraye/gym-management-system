@@ -11,9 +11,10 @@ import pytest
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
+from apps.assistant.configuration import ProviderFailure
 from apps.assistant.dispatch import tool_contracts
 from apps.assistant.knowledge import complete_stored_reply
-from apps.assistant.provider import FunctionCall, ModelTurn
+from apps.assistant.provider import FunctionCall, ModelTurn, ProviderCallError
 from apps.assistant.turns import _model_declarations, _reply
 
 _OFFERED = frozenset(
@@ -123,7 +124,7 @@ def _run() -> dict[str, object]:
     )
 
 
-def test_read_only_turns_omit_write_declarations_and_still_refuse_a_write(
+def test_a_lookup_still_offers_write_tools(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seen: list[set[str]] = []
@@ -131,21 +132,22 @@ def test_read_only_turns_omit_write_declarations_and_still_refuse_a_write(
     def generate(**kwargs: object) -> ModelTurn:
         seen.append(_names(kwargs["declarations"]))
         if _responses(kwargs["contents"]):
-            return _text("I created the payment.")
+            return _text("I still need the member and the amount.")
         return _call("create_payment")
 
-    _install(monkeypatch, staff_text="List payments", generate=generate)
+    def handle(**kwargs: object) -> tuple[None, dict[str, object]]:
+        assert kwargs["name"] == "create_payment"
+        return None, {"error": "missing_fields", "fields": ["amount"]}
+
+    _install(monkeypatch, staff_text="List payments", generate=generate, handle=handle)
     result = _run()
 
     assert seen
     assert "search_payments" in seen[0]
-    assert "create_payment" not in seen[0]
-    assert "approve_payment" not in seen[0]
-    assert "create_member" not in seen[0]
-    contracts = tool_contracts()
-    assert all(contracts[name].definition.operation == "read" for name in seen[0])
+    assert "create_payment" in seen[0]
+    assert "create_member" in seen[0]
     assert result["pending_confirmation"] is None
-    assert result["message"]["body"] == "I can look that up. I will not make a change to answer it."
+    assert result["message"]["body"] == "I still need the member and the amount."
 
 
 def test_a_write_request_keeps_write_declarations_and_the_confirmation(
@@ -221,13 +223,15 @@ def test_a_saved_change_follow_up_still_receives_write_declarations(
     assert len(seen) == 1
 
 
-def test_a_complete_list_does_not_ask_gemini_to_phrase_it(
+def test_gemini_phrases_a_list_from_the_tool_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls = {"count": 0}
 
-    def generate(**_kwargs: object) -> ModelTurn:
+    def generate(**kwargs: object) -> ModelTurn:
         calls["count"] += 1
+        if _responses(kwargs["contents"]):
+            return _text("One posted sale for 10.00 on 2026-11-12.")
         return _call("search_sales")
 
     def handle(**kwargs: object) -> tuple[None, dict[str, object]]:
@@ -243,15 +247,12 @@ def test_a_complete_list_does_not_ask_gemini_to_phrase_it(
     _install(monkeypatch, staff_text="List sales", generate=generate, handle=handle)
     result = _run()
 
-    assert calls["count"] == 1
-    body = str(result["message"]["body"])
-    assert "Sales." in body
-    assert "POSTED" in body
-    assert "10.00" in body
+    assert calls["count"] == 2
+    assert result["message"]["body"] == "One posted sale for 10.00 on 2026-11-12."
     assert result["pending_confirmation"] is None
 
 
-def test_a_multi_tool_list_still_calls_each_read_and_skips_the_final_phrase(
+def test_gemini_combines_several_reads_before_answering(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[str] = []
@@ -259,7 +260,7 @@ def test_a_multi_tool_list_still_calls_each_read_and_skips_the_final_phrase(
     def generate(**kwargs: object) -> ModelTurn:
         answered = _responses(kwargs["contents"])
         if len(answered) >= 2:
-            raise AssertionError("final phrasing call")
+            return _text("Yoga is SCHEDULED. MEM-000101 is BOOKED.")
         if not answered:
             calls.append("search_class_occurrences")
             return _call("search_class_occurrences")
@@ -282,10 +283,7 @@ def test_a_multi_tool_list_still_calls_each_read_and_skips_the_final_phrase(
     result = _run()
 
     assert calls == ["search_class_occurrences", "search_bookings"]
-    body = str(result["message"]["body"])
-    assert "Yoga" in body
-    assert "MEM-000101" in body
-    assert "BOOKED" in body
+    assert result["message"]["body"] == "Yoga is SCHEDULED. MEM-000101 is BOOKED."
 
 
 def test_a_single_record_read_still_asks_the_model_to_answer(
@@ -314,15 +312,64 @@ def test_a_single_record_read_still_asks_the_model_to_answer(
     assert result["message"]["body"] == "MEM-000101 is active."
 
 
-def test_declarations_for_a_lookup_exclude_writes_and_a_change_keeps_them() -> None:
+def test_declarations_keep_authorized_reads_and_writes() -> None:
     contracts = tool_contracts()
     lookup = _names(_model_declarations(_OFFERED, contracts, "List payments"))
     change = _names(_model_declarations(_OFFERED, contracts, "Add Ada Lovelace"))
+    assert lookup == change
     assert "search_payments" in lookup
-    assert "create_payment" not in lookup
-    assert "approve_payment" not in lookup
-    assert "create_member" in change
-    assert "search_members" in change
+    assert "create_payment" in lookup
+    assert "approve_payment" in lookup
+    assert "create_member" in lookup
+    assert "search_members" in lookup
+
+
+def test_a_skipped_read_is_not_run_and_an_invention_is_not_shown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called: list[str] = []
+
+    def generate(**_kwargs: object) -> ModelTurn:
+        return _text("Hla Hla paid 99999 on 1999-01-01.")
+
+    def handle(**kwargs: object) -> tuple[None, dict[str, object]]:
+        name = kwargs["name"]
+        assert isinstance(name, str)
+        called.append(name)
+        return None, {"result": {"results": [{"total_amount": "10.00", "status": "POSTED"}]}}
+
+    _install(monkeypatch, staff_text="List payments", generate=generate, handle=handle)
+    result = _run()
+
+    assert called == []
+    body = str(result["message"]["body"])
+    assert "99999" not in body
+    assert "Hla" not in body
+    assert "1999-01-01" not in body
+    assert result["pending_confirmation"] is None
+
+
+def test_a_provider_failure_does_not_run_a_keyword_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called: list[str] = []
+
+    def generate(**_kwargs: object) -> ModelTurn:
+        raise ProviderCallError(ProviderFailure.PROVIDER)
+
+    def handle(**kwargs: object) -> tuple[None, dict[str, object]]:
+        name = kwargs["name"]
+        assert isinstance(name, str)
+        called.append(name)
+        return None, {"result": {"results": [{"total_amount": "10.00"}]}}
+
+    _install(monkeypatch, staff_text="List payments", generate=generate, handle=handle)
+    result = _run()
+
+    assert called == []
+    body = str(result["message"]["body"])
+    assert "10.00" not in body
+    assert "unavailable" in body.casefold()
 
 
 def test_a_partial_list_is_not_treated_as_finished() -> None:
@@ -367,7 +414,9 @@ def test_the_step_limit_stops_without_claiming_success(
     monkeypatch.setattr("apps.assistant.turns.max_steps", lambda: 4)
     result = _run()
 
-    assert calls["count"] == 4
-    assert result["message"]["body"] == "I could not finish that within the assistant limit."
+    assert calls["count"] == 5
+    body = str(result["message"]["body"])
+    assert "MEM-1" in body
+    assert "ACTIVE" in body
     assert result["pending_confirmation"] is None
-    assert "saved" not in str(result["message"]["body"]).casefold()
+    assert "saved" not in body.casefold()

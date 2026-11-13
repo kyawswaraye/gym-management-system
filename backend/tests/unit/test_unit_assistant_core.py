@@ -153,13 +153,13 @@ def test_provider_failures_are_classified_without_a_key_prefix() -> None:
     )
 
 
-def test_step_budget_defaults_to_four_and_retries_stay_at_one() -> None:
-    with override_settings(ASSISTANT_MAX_STEPS="4"):
-        assert max_steps() == 4
+def test_step_budget_defaults_to_eight_and_retries_stay_at_one() -> None:
+    with override_settings(ASSISTANT_MAX_STEPS="8"):
+        assert max_steps() == 8
     with override_settings(ASSISTANT_MAX_STEPS=""):
-        assert max_steps() == 4
+        assert max_steps() == 8
     with override_settings(ASSISTANT_MAX_STEPS="21"):
-        assert max_steps() == 4
+        assert max_steps() == 8
     with override_settings(ASSISTANT_MAX_STEPS="20"):
         assert max_steps() == 20
     with override_settings(ASSISTANT_MAX_STEPS="12"):

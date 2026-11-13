@@ -11,7 +11,7 @@ import logging
 import re
 from collections.abc import Iterable, Mapping
 from datetime import date, datetime, time, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -41,18 +41,27 @@ GymPilot is the staff application for one gym. The signed-in gym and staff
 member are already chosen. Every business row belongs to that gym. Answer from
 this map and from the live gym brief. Do not invent a person, amount, date, or
 count that is not in the brief or in a tool result. Registered reads retrieve
-a member, a membership, a granted package, a payment, a class occurrence, a
-class booking, a retail sale, an expense, a salary period, a cash session,
-a PT commission, an announcement, and a dashboard total. A refund is a payment
-whose entry type is REFUND. A new membership sale uses an active plan. Use
-the tool result for those records. Check-in history, stock movements,
-trainer-assignment lists, PT sale records, and class-schedule definitions
-are not reads. The brief may show a count or today's list. If the
-requested record is not in the brief, say it cannot be retrieved. Changing
-those records is a confirmed write, and a write is not a substitute for a
-read. Mail, files, push notifications, passwords, sessions, audit storage,
-and a daily shift roster are not supported. Say that plainly. Do not invent
-the record. If a brief section is absent, this staff member cannot see it.
+a member, a membership, a membership plan and its price, a sellable PT or
+class package and its price, a granted package and its remaining sessions,
+a payment, a class occurrence, a class booking, a retail sale, an expense,
+a salary period, a cash session, a PT commission, an announcement, and a
+dashboard total for active members, check-ins, revenue, expenses, and profit.
+A refund is a payment whose entry type is REFUND. A new membership sale uses
+an active plan. Use the tool result for those records. Membership expiry is
+the membership end date, not the member status. Check-in history, trainer
+assignments, PT sales, PT bookings, class types, class schedule definitions,
+class occurrences, products, stock movements, low stock, posted product
+sales, staff profiles, roles, and permissions are reads. search_service_packages
+is the sellable catalog. search_pt_packages is a granted package and its
+remaining sessions. search_pt_sales is the sale record. A class schedule
+repeats. A class occurrence is one meeting. Low stock uses each product's
+stored threshold. Changing a record is a confirmed write, and a write is not
+a substitute for a read. Publishing an announcement queues its in-app notices
+and push. Membership expiry email and push run when the gym settings enable
+them. Passwords, sessions, audit storage, and a daily shift roster are not
+supported. Say that plainly. Do not invent the record. If the requested record
+is not in the brief or a tool result, it cannot be retrieved. If a brief
+section is absent, this staff member cannot see it.
 Say so in one sentence and do not reveal the hidden records. Do not ask what
 else to help with. Never send the staff to a screen.
 
@@ -112,9 +121,13 @@ separate, and receipt printer options. Announcements are EVENT, PROMOTION, or
 GENERAL, aimed at all active members, PT clients, or members expiring in 7 or
 30 days, and move DRAFT, SCHEDULED, PUBLISHED, or cancelled.
 
-The assistant does not send mail, push notifications, or files, and it does not
-read passwords, MFA, sessions, or audit storage. It does not invent a record
-when that read is not registered. A write is not saved until the server confirms it.
+Communications. Publishing an announcement queues that announcement's in-app
+notices and push notifications through the announcement service. Membership
+expiry email and membership expiry push are sent by scheduled jobs when the
+gym settings enable them. The assistant does not send a separate one-off email
+or file. Passwords, MFA, sessions, and audit storage are not supported. There
+is no daily shift roster. If the requested record is not in the brief or a tool
+result, it cannot be retrieved. A write is not saved until the server confirms it.
 """.strip()
 
 
@@ -226,7 +239,7 @@ def gym_facts(gym: Gym, codes: frozenset[str], full_access: bool) -> str:
                 + _labeled(
                     ServicePackage.objects.filter(gym=gym)
                     .order_by("name")
-                    .values_list("name", "type", "session_count")[:_NAME_LIMIT]
+                    .values_list("name", "type", "session_count", "price", "currency")[:_NAME_LIMIT]
                 )
             )
             lines.append("Today's PT sessions: " + _today_pt(gym))
@@ -416,9 +429,24 @@ def _labeled(rows: Iterable[tuple[object, ...]]) -> str:
 _READ_DOMAINS = {
     "members": frozenset({"search_members", "get_member"}),
     "plans": frozenset({"search_membership_plans"}),
-    "memberships": frozenset({"search_memberships"}),
-    "packages": frozenset({"search_pt_packages"}),
-    "classes": frozenset({"search_class_occurrences"}),
+    "memberships": frozenset({"search_memberships", "search_membership_expiries"}),
+    "checkins": frozenset({"search_check_ins"}),
+    "assignments": frozenset({"search_trainers", "search_trainer_assignments"}),
+    "pt_sales": frozenset({"search_pt_sales", "search_pt_bookings"}),
+    "packages": frozenset({"search_pt_packages", "search_service_packages"}),
+    "classes": frozenset(
+        {"search_class_occurrences", "search_class_types", "search_class_schedules"}
+    ),
+    "inventory": frozenset(
+        {
+            "search_products",
+            "search_stock_movements",
+            "search_low_stock",
+            "search_product_sales",
+        }
+    ),
+    "staff": frozenset({"search_staff", "search_staff_access"}),
+    "roles": frozenset({"search_roles", "search_permissions"}),
     "bookings": frozenset({"search_bookings"}),
     "sales": frozenset({"search_sales"}),
     "expenses": frozenset({"search_expenses"}),
@@ -429,18 +457,7 @@ _READ_DOMAINS = {
     "announcements": frozenset({"search_announcements"}),
     "reports": frozenset({"get_gym_dashboard"}),
 }
-_WRITE_ONLY_DOMAINS = frozenset(
-    {
-        "checkins",
-        "assignments",
-        "pt_sales",
-        "inventory",
-        "schedules",
-        "staff",
-        "roles",
-        "settings",
-    }
-)
+_WRITE_ONLY_DOMAINS = frozenset({"settings"})
 _UNSUPPORTED_DOMAINS = frozenset({"audit", "mail", "files", "passwords", "notifications", "roster"})
 _GAP_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("roster", ("shift roster", "daily shift", "အဆိုင်း")),
@@ -449,25 +466,6 @@ _GAP_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("mail", ("send mail", "send email", "အီးမေးလ်ပို့", "မေးလ်ပို့")),
     ("files", ("upload a file", "upload file", "ဖိုင်တင်")),
     ("notifications", ("push notification", "အကြောင်းကြားစာ")),
-    (
-        "checkins",
-        (
-            "check-in history",
-            "check in history",
-            "attendance history",
-            "check-in record",
-            "check-in for",
-            "check-ins for",
-            "ဝင်ရောက်မှတ်တမ်း",
-            "တက်ရောက်မှတ်တမ်း",
-            "လာရောက်မှတ်တမ်း",
-        ),
-    ),
-    ("inventory", ("stock movement", "stock history", "adjustment history", "ကုန်လှုပ်ရှား")),
-    ("assignments", ("who is assigned", "assignment list", "assignment history", "တာဝန်ပေးမှု")),
-    ("pt_sales", ("pt sale", "pt sales", "pt အရောင်း")),
-    ("schedules", ("class schedule", "weekly schedule", "အပတ်စဉ်အချိန်ဇယား")),
-    ("roles", ("role list", "permission list", "ခွင့်ပြုချက်စာရင်း")),
 )
 _LOOKUP_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("checkins", ("check-in", "check in", "checkins", "attendance", "ဝင်ရောက်", "တက်ရောက်")),
@@ -484,37 +482,11 @@ _LOOKUP_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("cash", ("cash session", "cashbook", "ငွေသား")),
     ("commissions", ("commission", "ကော်မရှင်")),
     ("inventory", ("stock", "on hand", "sku", "လက်ကျန်")),
+    ("roles", ("permission", "ခွင့်ပြုချက်", "role")),
+    ("staff", ("staff", "ဝန်ထမ်း")),
     ("members", ("member", "အဖွဲ့ဝင်")),
 )
 _LIMITS = {
-    "checkins": (
-        "I cannot look up check-in history. I only have today's check-in count, "
-        "and recording a check-in waits for your confirmation.",
-        "ဝင်ရောက်မှတ်တမ်းကို ကျွန်တော် မဖတ်နိုင်ပါ။ ဒီနေ့ စုစုပေါင်းကိုသာ သိနိုင်ပြီး၊ မှတ်တမ်းတင်ရန် အတည်ပြုချက် လိုပါတယ်။",
-    ),
-    "inventory": (
-        "I cannot read stock movements. I can see on-hand quantity, and a stock "
-        "change waits for your confirmation.",
-        "ကုန်လှုပ်ရှားမှုမှတ်တမ်းကို ကျွန်တော် မဖတ်နိုင်ပါ။ လက်ကျန်ကိုသာ သိနိုင်ပြီး၊ ကုန်ပြောင်းရန် အတည်ပြုချက် လိုပါတယ်။",
-    ),
-    "assignments": (
-        "I cannot read the assignment list. I only have the active count, and "
-        "creating an assignment waits for your confirmation.",
-        "တာဝန်ပေးမှုစာရင်းကို ကျွန်တော် မဖတ်နိုင်ပါ။ အရေအတွက်ကိုသာ သိနိုင်ပြီး၊ တာဝန်ပေးရန် အတည်ပြုချက် လိုပါတယ်။",
-    ),
-    "pt_sales": (
-        "I cannot read a PT sale record. I only have counts by status, and "
-        "creating one waits for your confirmation.",
-        "PT အရောင်းမှတ်တမ်းကို ကျွန်တော် မဖတ်နိုင်ပါ။ အခြေအနေအလိုက် အရေအတွက်ကိုသာ သိနိုင်ပြီး၊ အရောင်းတင်ရန် အတည်ပြုချက် လိုပါတယ်။",
-    ),
-    "schedules": (
-        "I cannot read a class-schedule definition. I can see today's classes.",
-        "အတန်းအချိန်ဇယား အသေးစိတ်ကို ကျွန်တော် မဖတ်နိုင်ပါ။ ဒီနေ့ အတန်းကိုသာ သိနိုင်ပါတယ်။",
-    ),
-    "roles": (
-        "I cannot read the role or permission list. Changing a role waits for your confirmation.",
-        "ခွင့်ပြုချက်စာရင်းကို ကျွန်တော် မဖတ်နိုင်ပါ။ ပြောင်းရန် အတည်ပြုချက် လိုပါတယ်။",
-    ),
     "roster": (
         "A daily shift roster is not available.",
         "နေ့စဉ်အဆိုင်းဇယား မရှိပါ။",
@@ -706,8 +678,6 @@ _WRITE_PHRASES = (
     "တာဝန်ပေးပါ",
     "ငွေချေ",
 )
-_BRIEF = re.compile(r"\b(how many|how much|count|total|today)\b", re.IGNORECASE)
-_HISTORY = ("history", "record", "records", "မှတ်တမ်း")
 _EXACT = re.compile(
     r"\b\d{4}-\d{2}-\d{2}\b|\b[A-Z][A-Z0-9]*-[A-Z0-9]+\b|"
     r"\b[A-Z][a-z]+(?: [A-Z][a-z]+)+\b|\b[A-Z][A-Z0-9]{2,}\b"
@@ -738,7 +708,7 @@ _LEAK_TEXT = (
 )
 _ACTIVITY_STATUS = re.compile(r"^[a-z_]{1,40}$")
 _CLAIM_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
-_CLAIM_NUMBER = re.compile(r"\b\d+(?:\.\d+)?\b")
+_CLAIM_NUMBER = re.compile(r"\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b|\b\d+(?:\.\d+)?\b")
 _CLAIM_CODE = re.compile(r"\b[A-Z][A-Z0-9]*-[A-Z0-9]+\b")
 _CLAIM_NAME = re.compile(r"\b[A-Z][a-z]+(?: [A-Z][a-z]+)+\b")
 _STATUSES = (
@@ -803,6 +773,7 @@ _NOTICE_ERRORS = frozenset(
         "permission_denied",
         "unavailable",
         "date_unconfirmed",
+        "date_ambiguous",
         "time_unconfirmed",
         "missing_fields",
         "ambiguous",
@@ -822,6 +793,32 @@ def knowledge_capability(domain: str) -> str:
     if domain in _UNSUPPORTED_DOMAINS:
         return "unsupported"
     raise KeyError(domain)
+
+
+_MONTH_NAMES = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+
+
+def shown_day(value: str) -> str:
+    """Return a calendar day as 13 November 2026 (2026-11-13)."""
+
+    try:
+        day = date.fromisoformat(value[:10])
+    except ValueError:
+        return value.strip()
+    return f"{day.day} {_MONTH_NAMES[day.month - 1]} {day.year} ({day.isoformat()})"
 
 
 def speaks_burmese(text: str) -> bool:
@@ -857,6 +854,118 @@ def unsupported_lookup_reply(text: str) -> str | None:
     return _with_exact(_sentence(_LIMITS[domain], text), text)
 
 
+def information_question(text: str) -> bool:
+    """A question about stored records, not a request to change them."""
+
+    if _is_change_request(text) or short_reply_kind(text) or _states_intent(text):
+        return False
+    if _asks(text):
+        folded = text.casefold()
+        names_member = "member" in folded or "အဖွဲ့ဝင်" in text
+        names_class = bool(re.search(r"\bclass\b", folded) or "အတန်း" in text)
+        names_pt = bool(re.search(r"(?<![a-z0-9])pt(?![a-z0-9])", folded) or "နည်းပြ" in text)
+        if names_member and (names_class or names_pt) and not _stored_lookup(text):
+            return False
+        return True
+    return _lookup_domain(text) is not None
+
+
+def fact_tools(text: str) -> tuple[str, ...]:
+    """Read tools a factual question needs. A list still uses listing_tools."""
+
+    if not information_question(text):
+        return ()
+    folded = text.casefold()
+    tools: list[str] = []
+    if _mentions_plan(text):
+        tools.append("search_membership_plans")
+    if _mentions_package_catalog(text):
+        tools.append("search_service_packages")
+    if _mentions_granted_package(text):
+        tools.append("search_pt_packages")
+    if _dashboard_question(text) or _member_count_question(text):
+        tools.append("get_gym_dashboard")
+    if _mentions_class_schedule(text):
+        tools.append("search_class_occurrences")
+    if (
+        "booking" in folded
+        or "ဘိုကင်" in text
+        or "who attended" in folded
+        or "class attendance" in folded
+    ):
+        tools.append("search_bookings")
+    if "expense" in folded or "အသုံးစရိတ်" in text or "ကုန်ကျ" in text:
+        tools.append("search_expenses")
+    if "cash" in folded or "cashbook" in folded or "ငွေသား" in text:
+        tools.append("search_cash_sessions")
+    if "announcement" in folded or "ကြေညာ" in text:
+        tools.append("search_announcements")
+    if "salary" in folded or "လစာ" in text:
+        tools.append("search_salary_periods")
+    if ("retail" in folded or "အရောင်း" in text) and not _mentions_product_rank(text):
+        if not _mentions_pt_sale(text):
+            tools.append("search_sales")
+    if ("payment" in folded or "ငွေပေး" in text or "receipt" in folded) and not _mentions_plan(text):
+        tools.append("search_payments")
+    if "commission" in folded or "ကော်မရှင်" in text:
+        tools.append("search_pt_commissions")
+    if _mentions_expiry(text):
+        tools.append("search_membership_expiries")
+    if _mentions_checkin(text):
+        tools.append("search_check_ins")
+    if _mentions_assignment(text):
+        tools.append("search_trainer_assignments")
+    elif _mentions_trainer_list(text):
+        tools.append("search_trainers")
+    if _mentions_pt_sale(text):
+        tools.append("search_pt_sales")
+    if _mentions_pt_booking(text):
+        tools.append("search_pt_bookings")
+    if _mentions_class_type(text):
+        tools.append("search_class_types")
+    if _mentions_schedule(text):
+        tools.append("search_class_schedules")
+    if _mentions_low_stock(text):
+        tools.append("search_low_stock")
+    elif _mentions_stock_movement(text):
+        tools.append("search_stock_movements")
+    elif _mentions_product(text) and not _mentions_product_rank(text):
+        tools.append("search_products")
+    if _mentions_product_rank(text):
+        tools.append("search_product_sales")
+    if _mentions_staff_access(text):
+        tools.append("search_staff_access")
+    elif _mentions_role(text):
+        tools.append("search_roles")
+    elif _mentions_staff(text):
+        tools.append("search_staff")
+    if (
+        ("membership" in folded or "အသင်းဝင်" in text)
+        and not _mentions_plan(text)
+        and not _mentions_expiry(text)
+    ):
+        tools.append("search_memberships")
+    return tuple(dict.fromkeys(tools))
+
+
+def grounded_information_reply(reply: str, *, brief: str, staff_text: str) -> str:
+    """Correct unsupported details. Use the brief only when nothing valid remains."""
+
+    checked = grounded_read_reply(
+        reply,
+        results=(),
+        brief=brief,
+        staff_text=staff_text,
+        fallback=False,
+    )
+    if checked.strip():
+        return checked
+    lines = _relevant_brief_lines(brief, staff_text)
+    if lines:
+        return " ".join(lines)[:1500]
+    return grounded_read_reply(reply, results=(), brief=brief, staff_text=staff_text)
+
+
 def refuse_write_for_lookup(text: str, operation: str) -> bool:
     """A lookup must not be answered by proposing a write."""
 
@@ -864,6 +973,8 @@ def refuse_write_for_lookup(text: str, operation: str) -> bool:
         return False
     if short_reply_kind(text):
         return False
+    if information_question(text):
+        return True
     return _lookup_domain(text) is not None
 
 
@@ -962,6 +1073,8 @@ def staff_notice(body: Mapping[str, object], staff_text: str) -> str | None:
         return "သိမ်းထားတဲ့ မှတ်တမ်း မတွေ့ပါ။" if burmese else "No stored record matches that."
     if error == "date_unconfirmed":
         return "ဘယ်ရက်လဲ။" if burmese else "Which date?"
+    if error in {"date_invalid", "date_ambiguous"}:
+        return _date_problem_sentence(body, burmese, invalid=error == "date_invalid")
     if error == "time_unconfirmed":
         return "အချိန် ဘယ်လောက်လဲ။" if burmese else "What time?"
     if error == "missing_fields":
@@ -1022,13 +1135,22 @@ _STATED_DATE_WORDS = (
     "နောက်လ",
     "နောက်တစ်ပတ်",
 )
-_CLASS_DATE_TOOLS = frozenset({"search_class_occurrences", "search_bookings"})
+_CLASS_DATE_TOOLS = frozenset(
+    {
+        "search_class_occurrences",
+        "search_bookings",
+        "search_check_ins",
+        "search_pt_bookings",
+        "search_product_sales",
+    }
+)
 _BUSINESS_DATE_TOOLS = frozenset(
     {
         "search_sales",
         "search_expenses",
         "search_salary_periods",
         "search_cash_sessions",
+        "search_stock_movements",
     }
 )
 _STATUS_TOOLS = frozenset({"search_sales", "search_expenses", "search_salary_periods"})
@@ -1118,7 +1240,8 @@ def widen_list_filters(
 ) -> dict[str, object]:
     """Drop a silent date or status filter on a general list."""
 
-    if tool_name not in listing_tools(staff_text):
+    allowed = set(listing_tools(staff_text)) | set(fact_tools(staff_text))
+    if tool_name not in allowed:
         return dict(payload)
     updated = dict(payload)
     scope = _date_scope(staff_text)
@@ -1130,6 +1253,30 @@ def widen_list_filters(
 
         window = relative_window(staff_text, today)
         named_day = None if window else relative_day(staff_text, today)
+    if tool_name == "search_membership_expiries":
+        return _expiry_filters(
+            updated,
+            staff_text=staff_text,
+            today=today,
+            scope=scope,
+            window=window,
+            named_day=named_day,
+        )
+    if tool_name == "search_pt_sales":
+        return _service_date_filters(
+            updated,
+            today=today,
+            scope=scope,
+            window=window,
+            named_day=named_day,
+            stated=stated,
+        )
+    if tool_name == "search_trainer_assignments":
+        return _assignment_filters(updated, staff_text)
+    if tool_name == "search_check_ins" and _absent_question(staff_text):
+        return _absence_filters(updated, today=today, window=window, named_day=named_day)
+    if tool_name == "search_bookings" and _attended(staff_text):
+        updated["status"] = "ATTENDED"
     if tool_name in _CLASS_DATE_TOOLS:
         if window is not None:
             updated["date_from"] = window[0].isoformat()
@@ -1146,6 +1293,11 @@ def widen_list_filters(
         elif stated is not None:
             updated["date_from"] = stated
             updated["date_to"] = stated
+        elif (
+            tool_name == "search_class_occurrences" and today is not None and _upcoming(staff_text)
+        ):
+            updated["date_from"] = today.isoformat()
+            updated["date_to"] = (today + timedelta(days=30)).isoformat()
     if tool_name in _BUSINESS_DATE_TOOLS:
         if scope == "open":
             updated.pop("business_date", None)
@@ -1420,6 +1572,8 @@ def _dashboard_question(text: str) -> bool:
     folded = text.casefold()
     if "လက်ကျန်" in text or "on hand" in folded or "sku" in folded:
         return False
+    if _mentions_plan(text) or _mentions_package_catalog(text):
+        return False
     money = any(
         word in folded or word in text
         for word in ("income", "revenue", "profit", "ဝင်ငွေ", "အမြတ်", "ဘယ်လောက်")
@@ -1513,18 +1667,51 @@ def grounded_read_reply(
     results: Iterable[Mapping[str, object]],
     brief: str,
     staff_text: str,
+    fallback: bool = True,
 ) -> str:
-    """Keep a read answer only when its facts are in the result or the brief."""
+    """Drop unsupported amounts, dates, codes, statuses, and names.
+
+    A sentence that still contains a supported fact is kept. The stored-record
+    rendering is used only when every sentence lost its facts.
+    """
 
     stored = tuple(results)
     allowed_text = "\n".join(
         (staff_text, brief, json.dumps(stored, default=str, ensure_ascii=False))
     )
-    claims_ok = _claim_tokens(reply) <= _claim_tokens(allowed_text)
-    names_ok = all(_name_supported(name, allowed_text) for name in _names(reply))
-    if reply.strip() and claims_ok and names_ok:
+    sentences: list[str] = []
+    for sentence in _reply_sentences(reply):
+        if _leaks(sentence):
+            continue
+        corrected = _correct_sentence(sentence, allowed_text)
+        if corrected and not _leaks(corrected):
+            sentences.append(corrected)
+    body = " ".join(sentences).strip()
+    if body:
+        return _with_financial_omission(body, stored, staff_text)
+    if not fallback:
+        return ""
+    return _with_financial_omission(_render_reads(stored, staff_text), stored, staff_text)
+
+
+def _with_financial_omission(
+    reply: str,
+    results: tuple[Mapping[str, object], ...],
+    staff_text: str,
+) -> str:
+    """Say when a dashboard result withheld financial amounts."""
+
+    withheld = any("financial" in result and result.get("financial") is None for result in results)
+    if not withheld:
         return reply
-    return _render_reads(stored, staff_text)
+    note = (
+        "ဒီစာရင်းရဲ့ ငွေကြေးပမာဏကို ကြည့်ခွင့် မရှိပါ။"
+        if speaks_burmese(staff_text)
+        else "You cannot view the financial amounts for that range."
+    )
+    if note in reply:
+        return reply
+    return f"{reply} {note}".strip()
 
 
 def visible_reply(
@@ -1534,20 +1721,123 @@ def visible_reply(
     proposed: bool,
     staff_text: str,
 ) -> str:
-    """Drop leaks and success claims the server did not confirm."""
+    """Remove leaked internals and unconfirmed success claims. Keep the rest."""
 
-    if _leaks(reply):
-        if speaks_burmese(staff_text) or speaks_burmese(reply):
+    burmese = speaks_burmese(staff_text) or speaks_burmese(reply)
+    sentences = _reply_sentences(reply) or ([reply.strip()] if reply.strip() else [])
+    kept: list[str] = []
+    dropped_success = False
+    dropped_leak = False
+    for sentence in sentences:
+        if _leaks(sentence):
+            dropped_leak = True
+            continue
+        unconfirmed = (not confirmed) and (
+            _SUCCESS.search(sentence) is not None or (proposed and _bare_done(sentence))
+        )
+        if unconfirmed:
+            dropped_success = True
+            continue
+        kept.append(sentence)
+    if kept:
+        body = " ".join(kept).strip()
+        if dropped_success:
+            note = _unconfirmed_sentence(burmese)
+            if note not in body:
+                body = f"{body} {note}".strip()
+        return body
+    if dropped_leak:
+        if burmese:
             return "မပြီးမြောက်ပါ။ ဘာမှ မပြောင်းရသေးပါ။"
         return "I could not complete that."
-    if confirmed:
-        return reply
-    false_success = _SUCCESS.search(reply) is not None or (proposed and _bare_done(reply))
-    if false_success:
-        if speaks_burmese(staff_text) or speaks_burmese(reply):
-            return "ဒီပြောင်းလဲမှုကို မသိမ်းရသေးပါ။ အတည်ပြုပြီးမှ သိမ်းပါမယ်။"
-        return "That change is not saved until you confirm."
+    if dropped_success:
+        return _unconfirmed_sentence(burmese)
     return reply
+
+
+def _unconfirmed_sentence(burmese: bool) -> str:
+    if burmese:
+        return "ဒီပြောင်းလဲမှုကို မသိမ်းရသေးပါ။ အတည်ပြုပြီးမှ သိမ်းပါမယ်။"
+    return "That change is not saved until you confirm."
+
+
+def _reply_sentences(text: str) -> list[str]:
+    """Split on sentence endings. A decimal point stays inside the amount."""
+
+    sentences: list[str] = []
+    start = 0
+    for match in _SENTENCE_END.finditer(text):
+        piece = text[start : match.end()].strip()
+        if piece:
+            sentences.append(piece)
+        start = match.end()
+    tail = text[start:].strip()
+    if tail:
+        sentences.append(tail)
+    return sentences
+
+
+def _correct_sentence(sentence: str, allowed_text: str) -> str:
+    """Return the sentence, a trimmed sentence, or empty when its facts are gone."""
+
+    if _sentence_supported(sentence, allowed_text):
+        return sentence
+    corrected = _drop_unsupported_claims(sentence, allowed_text)
+    if not corrected or not _sentence_supported(corrected, allowed_text):
+        return ""
+    if _sentence_facts(sentence) and not _sentence_facts(corrected):
+        return ""
+    return corrected
+
+
+def _sentence_supported(text: str, allowed_text: str) -> bool:
+    if not text.strip():
+        return False
+    if not _claim_tokens(text) <= _claim_tokens(allowed_text):
+        return False
+    return all(_name_supported(name, allowed_text) for name in _names(text))
+
+
+def _sentence_facts(text: str) -> bool:
+    return bool(_claim_tokens(text) or _names(text))
+
+
+def _drop_unsupported_claims(text: str, allowed_text: str) -> str:
+    allowed = _claim_tokens(allowed_text)
+    translated = exact_code(text).replace("၊", "")
+    spans: list[tuple[int, int]] = []
+    for match in _CLAIM_DATE.finditer(translated):
+        if match.group(0) not in allowed:
+            spans.append(match.span())
+    for match in _CLAIM_NUMBER.finditer(translated):
+        if _canon_number(match.group(0)) not in allowed:
+            spans.append(match.span())
+    for pattern in (_CLAIM_CODE, _STATUS_RE):
+        for match in pattern.finditer(translated):
+            if match.group(0) not in allowed:
+                spans.append(match.span())
+    for name in _names(text):
+        if _name_supported(name, allowed_text):
+            continue
+        start = text.find(name)
+        if start >= 0:
+            spans.append((start, start + len(name)))
+    if not spans:
+        return " ".join(text.split())
+    spans.sort()
+    merged: list[tuple[int, int]] = []
+    for start, end in spans:
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    pieces: list[str] = []
+    cursor = 0
+    for start, end in merged:
+        pieces.append(text[cursor:start])
+        cursor = end
+    pieces.append(text[cursor:])
+    return " ".join("".join(pieces).split())
 
 
 def _bare_done(reply: str) -> bool:
@@ -1576,6 +1866,316 @@ def _exact_mentions(text: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(found))
 
 
+_ASKS = re.compile(
+    r"(\?|how many|how much|what about|what is|what's|which |show me|list |who |when did)",
+    re.IGNORECASE,
+)
+_SENTENCE_END = re.compile(r"(?<!\d)\.(?!\d)|[!?။]")
+_ASK_PHRASES = (
+    "ဘယ်လောက်",
+    "ဘယ်နှစ်",
+    "ဘယ်နှခု",
+    "ဘယ်နှယောက်",
+    "ဘယ်နှကြိမ်",
+    "ပြပါ",
+    "ပြပေး",
+    "ရှာပေး",
+    "ဘယ်သူ",
+    "ဘယ်အချိန်",
+    "သက်တမ်း",
+    "နည်းနေ",
+    "အများဆုံး",
+)
+
+
+_INTENT_MARKERS = ("လုပ်မယ်", "တက်မယ်", "ဝယ်မယ်", "ထည့်မယ်")
+
+
+def _states_intent(text: str) -> bool:
+    return any(marker in text for marker in _INTENT_MARKERS)
+
+
+def _stored_lookup(text: str) -> bool:
+    return (
+        _mentions_granted_package(text)
+        or _mentions_package_catalog(text)
+        or _mentions_plan(text)
+        or _mentions_expiry(text)
+        or _mentions_checkin(text)
+        or _mentions_pt_sale(text)
+        or "ကျန်" in text
+        or "ဘယ်လောက်" in text
+        or "ဘယ်နှစ်" in text
+        or "ဘယ်နှကြိမ်" in text
+        or "ဘယ်နှယောက်" in text
+    )
+
+
+def _mentions_expiry(text: str) -> bool:
+    folded = text.casefold()
+    return "expir" in folded or "သက်တမ်း" in text
+
+
+def _mentions_checkin(text: str) -> bool:
+    folded = text.casefold()
+    if "class" in folded or "အတန်း" in text:
+        return False
+    return (
+        "check-in" in folded
+        or "check in" in folded
+        or "checkin" in folded
+        or "ဝင်ရောက်" in text
+        or "တက်ရောက်" in text
+        or "လာရောက်" in text
+        or "လာပြီး" in text
+    )
+
+
+def _mentions_assignment(text: str) -> bool:
+    folded = text.casefold()
+    return "assignment" in folded or "assigned" in folded or "workload" in folded or "တာဝန်" in text
+
+
+def _mentions_trainer_list(text: str) -> bool:
+    folded = text.casefold()
+    return "trainer" in folded or "သင်တန်းဆရာ" in text or "နည်းပြ" in text
+
+
+def _mentions_pt_sale(text: str) -> bool:
+    folded = text.casefold()
+    if "package" in folded or "ပက်ကေ့" in text:
+        return False
+    return ("pt" in folded or "personal training" in folded) and (
+        "sale" in folded or "အရောင်း" in text
+    )
+
+
+def _mentions_pt_booking(text: str) -> bool:
+    folded = text.casefold()
+    return ("pt" in folded or "personal training" in folded) and (
+        "booking" in folded or "booked" in folded or "ဘွတ်ကင်" in text
+    )
+
+
+def _mentions_class_type(text: str) -> bool:
+    folded = text.casefold()
+    return "class type" in folded or "အတန်းအမျိုးအစား" in text
+
+
+def _mentions_schedule(text: str) -> bool:
+    folded = text.casefold()
+    return "schedule" in folded or "အချိန်ဇယား" in text or "recurring class" in folded
+
+
+def _mentions_low_stock(text: str) -> bool:
+    folded = text.casefold()
+    return "low stock" in folded or "နည်းနေ" in text or "ကုန်နည်း" in text
+
+
+def _mentions_stock_movement(text: str) -> bool:
+    folded = text.casefold()
+    return (
+        "stock movement" in folded
+        or "adjustment" in folded
+        or "received" in folded
+        or "ကုန်လှုပ်ရှား" in text
+        or "လက်ခံ" in text
+    )
+
+
+def _mentions_product(text: str) -> bool:
+    folded = text.casefold()
+    return "product" in folded or "stock" in folded or "ကုန်ပစ္စည်း" in text
+
+
+def _mentions_product_rank(text: str) -> bool:
+    folded = text.casefold()
+    return (
+        "best selling" in folded
+        or "top product" in folded
+        or "အရောင်းအများဆုံး" in text
+        or "အရောင်းအကောင်းဆုံး" in text
+    )
+
+
+def _mentions_staff_access(text: str) -> bool:
+    folded = text.casefold()
+    return ("permission" in folded or "ခွင့်ပြုချက်" in text) and ("staff" in folded or "ဝန်ထမ်း" in text)
+
+
+def _mentions_role(text: str) -> bool:
+    folded = text.casefold()
+    return "role" in folded or "ရာထူး" in text
+
+
+def _mentions_staff(text: str) -> bool:
+    folded = text.casefold()
+    return "staff" in folded or "ဝန်ထမ်း" in text
+
+
+def _absent_question(text: str) -> bool:
+    folded = text.casefold()
+    return (
+        "not checked" in folded
+        or "no check-in" in folded
+        or "haven't checked" in folded
+        or "have not checked" in folded
+        or "မလာသေး" in text
+        or "မဝင်ရောက်" in text
+    )
+
+
+def _attended(text: str) -> bool:
+    folded = text.casefold()
+    return "attended" in folded or "who attended" in folded
+
+
+def _upcoming(text: str) -> bool:
+    folded = text.casefold()
+    return "upcoming" in folded or "နောက်လာမယ့်" in text or "coming class" in folded
+
+
+def _expiry_filters(
+    payload: dict[str, object],
+    *,
+    staff_text: str,
+    today: date | None,
+    scope: str,
+    window: tuple[date, date] | None,
+    named_day: date | None,
+) -> dict[str, object]:
+    folded = staff_text.casefold()
+    already = (
+        "already expired" in folded
+        or "expired membership" in folded
+        or "ကုန်ပြီး" in staff_text
+        or "ကုန်သွား" in staff_text
+    )
+    payload.pop("bucket", None)
+    payload.pop("expiry_from", None)
+    payload.pop("expiry_to", None)
+    if window is not None and not already:
+        payload["expiry_from"] = window[0].isoformat()
+        payload["expiry_to"] = window[1].isoformat()
+    elif scope == "today" and today is not None:
+        payload["bucket"] = "today"
+    elif already:
+        payload["bucket"] = "expired"
+    elif named_day is not None:
+        payload["expiry_from"] = named_day.isoformat()
+        payload["expiry_to"] = named_day.isoformat()
+    return payload
+
+
+def _service_date_filters(
+    payload: dict[str, object],
+    *,
+    today: date | None,
+    scope: str,
+    window: tuple[date, date] | None,
+    named_day: date | None,
+    stated: str | None,
+) -> dict[str, object]:
+    payload.pop("service_date_from", None)
+    payload.pop("service_date_to", None)
+    if window is not None:
+        payload["service_date_from"] = window[0].isoformat()
+        payload["service_date_to"] = window[1].isoformat()
+    elif scope == "today" and today is not None:
+        payload["service_date_from"] = today.isoformat()
+        payload["service_date_to"] = today.isoformat()
+    elif named_day is not None:
+        payload["service_date_from"] = named_day.isoformat()
+        payload["service_date_to"] = named_day.isoformat()
+    elif stated is not None:
+        payload["service_date_from"] = stated
+        payload["service_date_to"] = stated
+    return payload
+
+
+def _assignment_filters(payload: dict[str, object], staff_text: str) -> dict[str, object]:
+    folded = staff_text.casefold()
+    if "workload" in folded or "ဘယ်နှယောက်" in staff_text or "how many" in folded:
+        payload["summary"] = True
+    return payload
+
+
+def _absence_filters(
+    payload: dict[str, object],
+    *,
+    today: date | None,
+    window: tuple[date, date] | None,
+    named_day: date | None,
+) -> dict[str, object]:
+    payload.pop("date_from", None)
+    payload.pop("date_to", None)
+    if window is not None:
+        payload["absent_since"] = window[0].isoformat()
+    elif named_day is not None:
+        payload["absent_since"] = named_day.isoformat()
+    elif today is not None:
+        payload["absent_since"] = (today - timedelta(days=30)).isoformat()
+    return payload
+
+
+def _mentions_plan(text: str) -> bool:
+    folded = text.casefold()
+    if "plan" in folded or "အစီအစဉ်" in text:
+        return True
+    return re.search(r"\b[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+\b", text) is not None
+
+
+def _mentions_package_catalog(text: str) -> bool:
+    folded = text.casefold()
+    if "package" not in folded and "ပက်ကေ့" not in text:
+        return False
+    if _mentions_granted_package(text):
+        return False
+    return True
+
+
+def _mentions_granted_package(text: str) -> bool:
+    folded = text.casefold()
+    owned = "ဝယ်ထား" in text or "bought" in folded or "granted" in folded
+    remaining = "remaining" in folded or "လက်ကျန်" in text or "ကျန်" in text
+    named = "package" in folded or "ပက်ကေ့" in text or "session" in folded or "အကြိမ်" in text
+    return named and (remaining or owned)
+
+
+def _member_count_question(text: str) -> bool:
+    folded = text.casefold()
+    counted = "how many" in folded or "ဘယ်နှစ်" in text or "count" in folded or "အရေအတွက်" in text
+    return counted and ("member" in folded or "အဖွဲ့ဝင်" in text)
+
+
+def _mentions_class_schedule(text: str) -> bool:
+    folded = text.casefold()
+    if "package" in folded or "ပက်ကေ့" in text:
+        return False
+    return bool(re.search(r"\bclass", folded) or "အတန်း" in text)
+
+
+def _asks(text: str) -> bool:
+    if _ASKS.search(text):
+        return True
+    return any(phrase in text for phrase in _ASK_PHRASES)
+
+
+def _relevant_brief_lines(brief: str, staff_text: str) -> list[str]:
+    folded = staff_text.casefold()
+    labels: list[str] = []
+    if "plan" in folded or "အစီအစဉ်" in staff_text:
+        labels.append("Membership plans:")
+    if "package" in folded or "ပက်ကေ့" in staff_text or re.search(r"\bpt\b", folded):
+        labels.append("Service packages:")
+    if "trainer" in folded or "နည်းပြ" in staff_text:
+        labels.append("Today's PT sessions:")
+        labels.append("Active trainer assignments:")
+    if not labels:
+        return []
+    return [line.strip() for line in brief.splitlines() if any(label in line for label in labels)]
+
+
 def _is_change_request(text: str) -> bool:
     folded = text.casefold()
     if any(phrase in text or phrase in folded for phrase in _WRITE_PHRASES):
@@ -1584,39 +2184,7 @@ def _is_change_request(text: str) -> bool:
 
 
 def _record_gap(text: str) -> str | None:
-    if _checkin_record(text):
-        return "checkins"
-    domain = _matched_domain(text, _GAP_PATTERNS)
-    if domain is None:
-        return None
-    if domain in {"checkins", "announcements", "assignments", "pt_sales", "schedules"}:
-        if _brief_question(text):
-            return None
-    if domain == "inventory" and _stock_on_hand(text):
-        return None
-    return domain
-
-
-def _checkin_record(text: str) -> bool:
-    folded = text.casefold()
-    if "class attendance" in folded or "who attended" in folded:
-        return False
-    mentioned = "check-in" in folded or "check in" in folded or "ဝင်ရောက်" in text or "တက်ရောက်" in text
-    return mentioned and not _brief_question(text)
-
-
-def _brief_question(text: str) -> bool:
-    folded = text.casefold()
-    if any(token in folded or token in text for token in _HISTORY):
-        return False
-    if _BRIEF.search(text):
-        return True
-    return "ဒီနေ့" in text or "ဘယ်နှစ်" in text or "အရေအတွက်" in text
-
-
-def _stock_on_hand(text: str) -> bool:
-    folded = text.casefold()
-    return "on hand" in folded or "လက်ကျန်" in text or bool(_BRIEF.search(text))
+    return _matched_domain(text, _GAP_PATTERNS)
 
 
 def _lookup_domain(text: str) -> str | None:
@@ -1634,6 +2202,41 @@ def _matched_domain(text: str, patterns: tuple[tuple[str, tuple[str, ...]], ...]
         if any(phrase in folded or phrase in text for phrase in phrases):
             return domain
     return None
+
+
+def _date_problem_sentence(body: Mapping[str, object], burmese: bool, *, invalid: bool) -> str:
+    token = body.get("token")
+    token_text = token.strip() if isinstance(token, str) else ""
+    first = body.get("first")
+    second = body.get("second")
+    stored = body.get("stored")
+    kept = shown_day(stored) if isinstance(stored, str) and stored else ""
+    if not invalid and isinstance(first, str) and isinstance(second, str) and first and second:
+        earlier = shown_day(first)
+        later = shown_day(second)
+        if burmese:
+            problem = f"{token_text} ကို {earlier} သို့မဟုတ် {later} လို့ ဖတ်လို့ရပါတယ်။"
+        else:
+            problem = f"{token_text} can be read as {earlier} or {later}."
+    elif invalid:
+        shown = token_text or "That date"
+        if burmese:
+            problem = f"{shown} က မှန်ကန်တဲ့ ရက်မဟုတ်ပါ။"
+        else:
+            problem = f"{shown} is not a real calendar day."
+    else:
+        shown = token_text or "That date"
+        if burmese:
+            problem = f"{shown} က နေ့ရက် မသေချာပါ။"
+        else:
+            problem = f"{shown} is not one clear calendar day."
+    if kept:
+        if burmese:
+            return f"{problem} သိမ်းထားတဲ့ ရက်က {kept} ပါ။"
+        return f"{problem} The stored date is still {kept}."
+    if burmese:
+        return f"{problem} ဘယ်ရက်လဲ။"
+    return f"{problem} Which date?"
 
 
 def _missing_question(fields: object, burmese: bool) -> str:
@@ -1671,13 +2274,26 @@ def _ambiguous_question(matches: object, burmese: bool) -> str:
     return f"Which one? {shown}"
 
 
+def _canon_number(token: str) -> str:
+    """Compare 1,500 and 1500.00 as the same stored amount."""
+
+    try:
+        number = Decimal(token.replace(",", ""))
+    except InvalidOperation:
+        return token.replace(",", "")
+    rendered = format(number, "f")
+    if "." in rendered:
+        rendered = rendered.rstrip("0").rstrip(".")
+    return rendered
+
+
 def _claim_tokens(*parts: str) -> set[str]:
     tokens: set[str] = set()
     for part in parts:
-        normalized = exact_code(part)
-        flattened = normalized.replace(",", "").replace("၊", "")
+        normalized = exact_code(part).replace("၊", "")
+        flattened = normalized.replace(",", "")
         tokens.update(match.group(0) for match in _CLAIM_DATE.finditer(flattened))
-        tokens.update(match.group(0) for match in _CLAIM_NUMBER.finditer(flattened))
+        tokens.update(_canon_number(match.group(0)) for match in _CLAIM_NUMBER.finditer(normalized))
         tokens.update(match.group(0) for match in _CLAIM_CODE.finditer(normalized))
         tokens.update(match.group(0) for match in _STATUS_RE.finditer(normalized))
     return tokens
@@ -1724,10 +2340,18 @@ def _read_rows(results: tuple[Mapping[str, object], ...]) -> list[Mapping[str, o
 
 def _row_bits(row: Mapping[str, object]) -> list[str]:
     bits: list[str] = []
+    _append_bits(row, bits, depth=0)
+    return bits
+
+
+def _append_bits(row: Mapping[str, object], bits: list[str], *, depth: int) -> None:
     for key in sorted(row):
         if key in _ROW_SKIP or key.endswith("_id"):
             continue
         value = row[key]
+        if isinstance(value, Mapping) and depth < 2:
+            _append_bits(value, bits, depth=depth + 1)
+            continue
         if isinstance(value, bool) or value is None or isinstance(value, list | dict):
             continue
         if not isinstance(value, str | int | float):
@@ -1736,7 +2360,6 @@ def _row_bits(row: Mapping[str, object]) -> list[str]:
         folded = text.casefold()
         if text and len(text) <= 80 and "traceback" not in folded and "select *" not in folded:
             bits.append(text)
-    return bits
 
 
 def _leaks(reply: str) -> bool:

@@ -23,13 +23,24 @@ from apps.assistant.prerequisites import FieldRequirement, Prerequisite
 from apps.assistant.registry import ToolDefinition
 from apps.members.models import Member, Membership, MembershipPlan
 from apps.members.payment_serializers import money_text
-from apps.members.services import gym_today, page_membership_plans, page_memberships
+from apps.members.services import (
+    gym_today,
+    page_membership_expiry,
+    page_membership_plans,
+    page_memberships,
+)
 from apps.trainers.selectors import require_assigned_member, scope_to_assigned_members
 from apps.users.serializers import StrictSerializer
 
 SEARCH_MEMBERSHIPS = "search_memberships"
 SEARCH_MEMBERSHIP_PLANS = "search_membership_plans"
-MEMBERSHIP_READ_TOOL_NAMES = (SEARCH_MEMBERSHIPS, SEARCH_MEMBERSHIP_PLANS)
+SEARCH_MEMBERSHIP_EXPIRIES = "search_membership_expiries"
+MEMBERSHIP_READ_TOOL_NAMES = (
+    SEARCH_MEMBERSHIPS,
+    SEARCH_MEMBERSHIP_PLANS,
+    SEARCH_MEMBERSHIP_EXPIRIES,
+)
+_EXPIRY_BUCKETS = ("today", "expired", "within_3_days", "within_7_days", "within_30_days")
 
 
 class MembershipReadQuerySerializer(StrictSerializer):
@@ -40,6 +51,18 @@ class MembershipReadQuerySerializer(StrictSerializer):
         choices=Membership.PaymentStatus.choices,
         required=False,
     )
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=25, default=25)
+    after = serializers.CharField(required=False, allow_blank=True, max_length=2048)
+
+
+class MembershipExpiryQuerySerializer(StrictSerializer):
+    bucket = serializers.ChoiceField(
+        choices=[(item, item) for item in _EXPIRY_BUCKETS],
+        required=False,
+    )
+    expiry_from = serializers.DateField(required=False)
+    expiry_to = serializers.DateField(required=False)
+    member_id = serializers.UUIDField(required=False)
     limit = serializers.IntegerField(required=False, min_value=1, max_value=25, default=25)
     after = serializers.CharField(required=False, allow_blank=True, max_length=2048)
 
@@ -118,6 +141,54 @@ def search_memberships(call: ReadCall) -> dict[str, object]:
     )
     return {
         "results": [_row(row) for row in rows],
+        "has_more": bool(meta["has_more"]),
+        "next_after": meta["next_after"],
+    }
+
+
+def search_membership_expiries(call: ReadCall) -> dict[str, object]:
+    """Return memberships by expiry date. A member can have more than one row."""
+
+    if call.gym.id is None or call.actor.id is None:
+        raise ExecutionRejected("The assistant session is incomplete.", code="session")
+    serializer = MembershipExpiryQuerySerializer(data=_without_gym(call.payload))
+    serializer.is_valid(raise_exception=True)
+    query = serializer.validated_data
+    bucket = str(query.get("bucket") or "")
+    start = query.get("expiry_from")
+    end = query.get("expiry_to")
+    if not bucket and not isinstance(start, date) and not isinstance(end, date):
+        raise ExecutionRejected("Choose an expiry bucket or a date range.", code="missing_fields")
+    queryset = _visible_memberships(call)
+    member_id = query.get("member_id")
+    if isinstance(member_id, UUID):
+        queryset = queryset.filter(member_id=member_id)
+    if bucket:
+        rows, meta = page_membership_expiry(
+            queryset,
+            gym_id=call.gym.id,
+            bucket=bucket,
+            today=gym_today(call.gym),
+            limit=int(query["limit"]),
+            after=str(query.get("after") or ""),
+        )
+    else:
+        if isinstance(start, date):
+            queryset = queryset.filter(expiry_date__gte=start)
+        if isinstance(end, date):
+            queryset = queryset.filter(expiry_date__lte=end)
+        rows = list(queryset.order_by("expiry_date", "id")[: int(query["limit"])])
+        meta = {"has_more": False, "next_after": None}
+    seen: dict[str, int] = {}
+    rendered = [_expiry_row(row) for row in rows]
+    for item in rendered:
+        key = str(item["member_id"])
+        seen[key] = seen.get(key, 0) + 1
+    for item in rendered:
+        if seen[str(item["member_id"])] > 1:
+            item["duplicate_member"] = "yes"
+    return {
+        "results": rendered,
         "has_more": bool(meta["has_more"]),
         "next_after": meta["next_after"],
     }
@@ -216,6 +287,12 @@ def _plan_row(row: MembershipPlan) -> dict[str, object]:
     }
 
 
+def _expiry_row(row: Membership) -> dict[str, object]:
+    item = _row(row)
+    item["member_name"] = f"{row.member.first_name} {row.member.last_name}".strip()
+    return item
+
+
 def _row(row: Membership) -> dict[str, object]:
     return {
         "id": str(row.id),
@@ -309,8 +386,35 @@ _READS = {
             FieldRequirement("after", "Cursor from the previous page. Optional.", required=False),
         ),
     ),
+    SEARCH_MEMBERSHIP_EXPIRIES: _contract(
+        _definition(
+            SEARCH_MEMBERSHIP_EXPIRIES,
+            "Search memberships expiring in this gym. One member can have more than one "
+            "membership. This is the membership expiry date, not the member record status. "
+            "Use bucket today, expired, within_3_days, within_7_days, or within_30_days, "
+            "or set expiry_from and expiry_to.",
+        ),
+        (
+            FieldRequirement(
+                "bucket",
+                "today, expired, within_3_days, within_7_days, or within_30_days. Optional.",
+                required=False,
+            ),
+            FieldRequirement("expiry_from", "First expiry date. Optional.", required=False),
+            FieldRequirement("expiry_to", "Last expiry date. Optional.", required=False),
+            FieldRequirement("member_id", "Member id. Optional.", required=False),
+            FieldRequirement(
+                "limit",
+                "Page size from 1 to 25. Optional.",
+                required=False,
+                kind="integer",
+            ),
+            FieldRequirement("after", "Cursor from a bucket page. Optional.", required=False),
+        ),
+    ),
 }
 _READERS = {
     SEARCH_MEMBERSHIPS: search_memberships,
     SEARCH_MEMBERSHIP_PLANS: search_membership_plans,
+    SEARCH_MEMBERSHIP_EXPIRIES: search_membership_expiries,
 }
