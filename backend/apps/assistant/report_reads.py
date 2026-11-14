@@ -103,12 +103,7 @@ def get_gym_dashboard(call: ReadCall) -> dict[str, object]:
         "financial": None,
     }
     if financial is not None:
-        result["financial"] = {
-            "total_revenue": financial["total_revenue"],
-            "total_expenses": financial["total_expenses"],
-            "net_profit": financial["net_profit"],
-            "pending_payment_amount": financial["pending_payment_amount"],
-        }
+        result["financial"] = _financial_view(financial)
     return result
 
 
@@ -129,6 +124,51 @@ def _bounds(call: ReadCall, query: Mapping[str, object], today: date) -> tuple[d
     return today, today
 
 
+_FINANCIAL_TEXT = (
+    "new_member_revenue",
+    "renewal_revenue",
+    "pt_revenue",
+    "class_revenue",
+    "product_revenue",
+    "other_revenue",
+    "total_revenue",
+    "total_expenses",
+    "staff_salary_expense",
+    "pt_commission_expense",
+    "net_profit",
+    "pending_payment_amount",
+)
+
+
+def _financial_view(financial: Mapping[str, object]) -> dict[str, object]:
+    """Expose the dashboard's stored categories. Total revenue stays their sum."""
+
+    viewed: dict[str, object] = {key: financial[key] for key in _FINANCIAL_TEXT if key in financial}
+    pending_members = financial.get("pending_payment_member_count")
+    if isinstance(pending_members, int):
+        viewed["pending_payment_member_count"] = pending_members
+    ranked = financial.get("revenue_sources_ranked")
+    if isinstance(ranked, list):
+        viewed["revenue_sources_ranked"] = ranked
+    categories = financial.get("expenses_by_category")
+    if isinstance(categories, list):
+        viewed["expenses_by_category"] = categories
+    products = financial.get("top_product_items")
+    if isinstance(products, list):
+        viewed["top_product_items"] = [_public_product(item) for item in products]
+    return viewed
+
+
+def _public_product(item: object) -> object:
+    if not isinstance(item, Mapping):
+        return item
+    copied = dict(item)
+    product_id = copied.get("product_id")
+    if product_id is not None:
+        copied["product_id"] = str(product_id)
+    return copied
+
+
 def _without_gym(payload: Mapping[str, object]) -> dict[str, object]:
     return {key: value for key, value in payload.items() if key != "gym_id"}
 
@@ -138,12 +178,18 @@ def _definition() -> ToolDefinition:
         name=GET_GYM_DASHBOARD,
         description=(
             "Read gym dashboard totals for a gym-local range: active members, "
-            "new members, check-ins, expired memberships, revenue, expenses, "
-            "and profit. Pass range when the staff names a period: today, "
-            "this_week, this_month, last_month, this_year, or next_month. "
-            "Or pass both date_from and date_to. If range and dates are omitted, "
-            "the result is today only. Financial amounts are omitted without "
-            "reports.financial."
+            "new members, check-ins, expired memberships, and separate stored "
+            "money fields. new_member_revenue, renewal_revenue, pt_revenue, "
+            "class_revenue, product_revenue, and other_revenue are not "
+            "interchangeable. total_revenue is only their sum. Membership "
+            "revenue is new_member_revenue plus renewal_revenue, not "
+            "total_revenue. Also returns total_expenses, net_profit, "
+            "expenses_by_category, and revenue_sources_ranked. Pass range "
+            "when the staff names a period: today, this_week, this_month, "
+            "last_month, this_year, or next_month. Or pass both date_from "
+            "and date_to. If range and dates are omitted, the result is today "
+            "only. For two periods, call this tool once per period. Financial "
+            "amounts are omitted without reports.financial."
         ),
         module="reports",
         operation="read",

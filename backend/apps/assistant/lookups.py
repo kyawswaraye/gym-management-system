@@ -1867,7 +1867,11 @@ def _bind_membership_payment(
 ) -> dict[str, object] | None:
     member_id = _uuid_text(payload.get("member_id"))
     if member_id is None:
-        return {"error": "missing_fields", "fields": ["member_id"]}
+        mentioned = _mentioned(_members(gym), staff_text)
+        if len(mentioned) != 1:
+            return {"error": "missing_fields", "fields": ["member_id"]}
+        member_id = mentioned[0].id
+        payload["member_id"] = member_id
     rows = list(
         Membership.objects.filter(gym=gym, member_id=member_id)
         .select_related("plan")

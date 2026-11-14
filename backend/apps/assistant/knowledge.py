@@ -11,7 +11,7 @@ import logging
 import re
 from collections.abc import Iterable, Mapping
 from datetime import date, datetime, time, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -45,7 +45,11 @@ a member, a membership, a membership plan and its price, a sellable PT or
 class package and its price, a granted package and its remaining sessions,
 a payment, a class occurrence, a class booking, a retail sale, an expense,
 a salary period, a cash session, a PT commission, an announcement, and a
-dashboard total for active members, check-ins, revenue, expenses, and profit.
+dashboard for active members, check-ins, and separate money fields:
+new-member revenue, renewal revenue, PT revenue, class revenue, product
+revenue, other revenue, total revenue, expenses, and profit. Total revenue
+is the sum of those revenue fields. It is not membership revenue unless
+new-member revenue plus renewal revenue equals that sum.
 A refund is a payment whose entry type is REFUND. A new membership sale uses
 an active plan. Use the tool result for those records. Membership expiry is
 the membership end date, not the member status. Check-in history, trainer
@@ -979,7 +983,7 @@ def refuse_write_for_lookup(text: str, operation: str) -> bool:
     return _lookup_domain(text) is not None
 
 
-_AFFIRMATIONS = frozenset({"ထည့်မယ်", "အင်း", "ဟုတ်တယ်", "ရတယ်", "လုပ်ပါ"})
+_AFFIRMATIONS = frozenset({"ထည့်မယ်", "အင်း", "ဟုတ်တယ်", "ရတယ်", "လုပ်ပါ", "yes", "yeah", "ok", "okay"})
 _DECLINES = frozenset({"မထည့်တော့ဘူး", "မလုပ်တော့ဘူး", "မဟုတ်ဘူး"})
 _OFFERED_OPERATIONS = (
     ("create_pt_sale", ("ပက်ကေ့", "package")),
@@ -995,9 +999,10 @@ def short_reply_kind(text: str) -> str:
     """Return affirm, decline, or empty for a reply that only continues the last question."""
 
     token = "".join(text.strip().strip("။.!?၊ ").split())
-    if token in _DECLINES:
+    folded = token.casefold()
+    if token in _DECLINES or folded in _DECLINES:
         return "decline"
-    if token in _AFFIRMATIONS:
+    if token in _AFFIRMATIONS or folded in _AFFIRMATIONS:
         return "affirm"
     return ""
 
@@ -1615,11 +1620,26 @@ def _dashboard_listing(result: Mapping[str, object], staff_text: str) -> str:
         if speaks_burmese(staff_text):
             return "ဒီစာရင်းရဲ့ ငွေကြေးပမာဏကို ကြည့်ခွင့် မရှိပါ။"
         return "You cannot view the financial amounts for that range."
-    revenue = financial.get("total_revenue")
-    expenses = financial.get("total_expenses")
+    fields = (
+        ("new_member_revenue", "New-member revenue", "အသင်းဝင်အသစ်"),
+        ("renewal_revenue", "Renewal revenue", "သက်တမ်းတိုး"),
+        ("pt_revenue", "PT revenue", "PT"),
+        ("class_revenue", "Class revenue", "အတန်း"),
+        ("product_revenue", "Product revenue", "ကုန်ပစ္စည်း"),
+        ("other_revenue", "Other revenue", "အခြား"),
+        ("total_revenue", "Total revenue", "စုစုပေါင်းဝင်ငွေ"),
+        ("total_expenses", "Expenses", "အသုံးစရိတ်"),
+        ("net_profit", "Profit", "အမြတ်"),
+    )
+    parts = [
+        f"{burmese if speaks_burmese(staff_text) else english} {financial.get(key)}"
+        for key, english, burmese in fields
+        if financial.get(key) not in (None, "")
+    ]
+    shown = "။ ".join(parts) if speaks_burmese(staff_text) else ". ".join(parts)
     if speaks_burmese(staff_text):
-        return f"{start} မှ {end}။ ဝင်ငွေ {revenue}။ အသုံးစရိတ် {expenses}။"
-    return f"{start} to {end}. Revenue {revenue}. Expenses {expenses}."
+        return f"{start} မှ {end}။ {shown}။"
+    return f"{start} to {end}. {shown}."
 
 
 def _announcement_listing(result: Mapping[str, object], staff_text: str) -> str:
@@ -1695,7 +1715,8 @@ def grounded_read_reply(
     for sentence in _reply_sentences(reply):
         if _leaks(sentence):
             continue
-        corrected = _correct_sentence(sentence, allowed_text)
+        aligned = _align_financial_claims(sentence, stored)
+        corrected = _correct_sentence(aligned, allowed_text)
         if corrected and not _leaks(corrected):
             sentences.append(corrected)
     body = " ".join(sentences).strip()
@@ -1789,6 +1810,226 @@ def _reply_sentences(text: str) -> list[str]:
     return sentences
 
 
+_CATEGORY_FIELDS = (
+    "new_member_revenue",
+    "renewal_revenue",
+    "pt_revenue",
+    "class_revenue",
+    "product_revenue",
+    "other_revenue",
+    "total_revenue",
+    "total_expenses",
+    "net_profit",
+)
+_MONEY_CUES = (
+    "revenue",
+    "sale",
+    "sales",
+    "income",
+    "profit",
+    "expense",
+    "ဝင်ငွေ",
+    "အရောင်း",
+    "အမြတ်",
+    "အသုံး",
+    "ကုန်ကျ",
+    "အသင်းဝင်",
+    "သက်တမ်းတိုး",
+    "နည်းပြ",
+)
+
+
+def _align_financial_claims(sentence: str, results: tuple[Mapping[str, object], ...]) -> str:
+    """Replace a category amount that contradicts that category's stored field.
+
+    The sentence stays. Only the contradicted amount changes, and only when
+    one dashboard snapshot identifies the category.
+    """
+
+    snapshot = _financial_snapshot(sentence, results)
+    if snapshot is None:
+        return sentence
+    result, financial = snapshot
+    translated = exact_code(sentence)
+    matches = [
+        match
+        for match in _CLAIM_NUMBER.finditer(translated)
+        if not _inside_date(translated, match.start())
+    ]
+    if not matches:
+        return sentence
+    labels = _label_spans(translated)
+    edits: list[tuple[int, int, str]] = []
+    for index, match in enumerate(matches):
+        token = match.group(0)
+        label = _nearest_label(labels, matches, index)
+        if label is None:
+            continue
+        window = _amount_clause(translated, matches, index)
+        if label == "class_revenue" and not _money_window(window):
+            continue
+        if _is_operational_count(token, result) and not _money_window(window):
+            continue
+        if not _money_window(window) and not _matches_stored_money(token, financial):
+            continue
+        expected = _amount_for_label(label, financial)
+        if expected is None or _canon_number(token) == _canon_number(expected):
+            continue
+        edits.append((match.start(), match.end(), expected))
+    updated = sentence
+    for start, end, expected in reversed(edits):
+        updated = updated[:start] + expected + updated[end:]
+    return updated
+
+
+def _financial_snapshot(
+    sentence: str,
+    results: tuple[Mapping[str, object], ...],
+) -> tuple[Mapping[str, object], Mapping[str, object]] | None:
+    snapshots: list[tuple[Mapping[str, object], Mapping[str, object]]] = []
+    for result in results:
+        financial = result.get("financial")
+        if isinstance(financial, Mapping) and any(key in financial for key in _CATEGORY_FIELDS):
+            snapshots.append((result, financial))
+    if len(snapshots) == 1:
+        return snapshots[0]
+    translated = exact_code(sentence)
+    matched = [
+        snapshot for snapshot in snapshots if _range_mentioned(snapshot[0].get("range"), translated)
+    ]
+    if len(matched) == 1:
+        return matched[0]
+    return None
+
+
+def _range_mentioned(period: object, sentence: str) -> bool:
+    if not isinstance(period, Mapping):
+        return False
+    start = period.get("date_from")
+    end = period.get("date_to")
+    return (isinstance(start, str) and start != "" and start in sentence) or (
+        isinstance(end, str) and end != "" and end in sentence
+    )
+
+
+def _money_window(window: str) -> bool:
+    folded = window.casefold()
+    return any(word in folded or word in window for word in _MONEY_CUES)
+
+
+def _matches_stored_money(token: str, financial: Mapping[str, object]) -> bool:
+    canon = _canon_number(token)
+    return any(
+        isinstance(value, str) and _canon_number(value) == canon
+        for value in (financial.get(field) for field in _CATEGORY_FIELDS)
+    )
+
+
+_LABEL_PATTERNS = (
+    ("net_profit", re.compile(r"\bprofit\b|အမြတ်", re.IGNORECASE)),
+    ("total_expenses", re.compile(r"\bexpenses?\b|အသုံး|ကုန်ကျ", re.IGNORECASE)),
+    ("pt_revenue", re.compile(r"(?<![a-z0-9])pt(?![a-z0-9])|နည်းပြ", re.IGNORECASE)),
+    (
+        "class_revenue",
+        re.compile(r"(?<![a-z0-9])class(?![a-z0-9])|အတန်း", re.IGNORECASE),
+    ),
+    ("product_revenue", re.compile(r"\bproducts?\b|\bretail\b|ကုန်ပစ္စည်း", re.IGNORECASE)),
+    ("other_revenue", re.compile(r"\bother revenue\b|အခြား", re.IGNORECASE)),
+    ("renewal_revenue", re.compile(r"\brenewals?\b|သက်တမ်းတိုး", re.IGNORECASE)),
+    (
+        "new_member_revenue",
+        re.compile(r"\bnew[- ]members?\b|လူသစ်|အသင်းဝင်အသစ်", re.IGNORECASE),
+    ),
+    ("membership_revenue", re.compile(r"\bmemberships?\b|အသင်းဝင်", re.IGNORECASE)),
+    ("total_revenue", re.compile(r"\btotal\b|စုစုပေါင်း|အားလုံး", re.IGNORECASE)),
+    ("generic_revenue", re.compile(r"\brevenue\b|\bincome\b|ဝင်ငွေ", re.IGNORECASE)),
+)
+_GENERIC_LABELS = frozenset({"generic_revenue"})
+
+
+def _label_spans(text: str) -> list[tuple[int, int, str]]:
+    found: list[tuple[int, int, str]] = []
+    for label, pattern in _LABEL_PATTERNS:
+        for match in pattern.finditer(text):
+            found.append((match.start(), match.end(), label))
+    kept: list[tuple[int, int, str]] = []
+    for start, end, label in found:
+        covered = any(
+            other_start <= start and other_end >= end and other_end - other_start > end - start
+            for other_start, other_end, _other in found
+        )
+        if not covered:
+            kept.append((start, end, label))
+    return kept
+
+
+def _nearest_label(
+    labels: list[tuple[int, int, str]],
+    amounts: list[re.Match[str]],
+    index: int,
+) -> str | None:
+    if not labels:
+        return None
+    assigned: dict[int, list[str]] = {item: [] for item in range(len(amounts))}
+    for start, end, label in labels:
+        center = (start + end) / 2
+        nearest = min(
+            range(len(amounts)),
+            key=lambda item: abs(amounts[item].start() - center),
+        )
+        assigned[nearest].append(label)
+    unique = list(dict.fromkeys(assigned[index]))
+    specific = [label for label in unique if label not in _GENERIC_LABELS]
+    if len(specific) == 1:
+        return specific[0]
+    if len(unique) == 1:
+        return unique[0]
+    return None
+
+
+def _amount_clause(text: str, amounts: list[re.Match[str]], index: int) -> str:
+    start = amounts[index - 1].end() if index else 0
+    end = amounts[index + 1].start() if index + 1 < len(amounts) else len(text)
+    return text[start:end]
+
+
+def _amount_for_label(label: str, financial: Mapping[str, object]) -> str | None:
+    if label in {"membership_revenue", "generic_revenue"}:
+        if label == "membership_revenue":
+            return _sum_money(financial, "new_member_revenue", "renewal_revenue")
+        value = financial.get("total_revenue")
+        return value if isinstance(value, str) and value else None
+    value = financial.get(label)
+    return value if isinstance(value, str) and value else None
+
+
+def _sum_money(financial: Mapping[str, object], *fields: str) -> str | None:
+    total = Decimal(0)
+    seen = False
+    for field in fields:
+        value = financial.get(field)
+        if not isinstance(value, str) or value == "":
+            continue
+        try:
+            total += Decimal(value)
+        except InvalidOperation:
+            return None
+        seen = True
+    if not seen:
+        return None
+    return format(total.quantize(Decimal("0.01")), "f")
+
+
+def _is_operational_count(token: str, result: Mapping[str, object]) -> bool:
+    if "." in token or "," in token:
+        return False
+    operational = result.get("operational")
+    if not isinstance(operational, Mapping):
+        return False
+    canon = _canon_number(token)
+    return any(str(value) == canon for value in operational.values() if isinstance(value, int))
+
+
 def _correct_sentence(sentence: str, allowed_text: str) -> str:
     """Return the sentence, a trimmed sentence, or empty when its facts are gone."""
 
@@ -1805,7 +2046,8 @@ def _correct_sentence(sentence: str, allowed_text: str) -> str:
 def _sentence_supported(text: str, allowed_text: str) -> bool:
     if not text.strip():
         return False
-    if not _claim_tokens(text) <= _claim_tokens(allowed_text):
+    extra = _claim_tokens(text) - _claim_tokens(allowed_text)
+    if extra and not _extra_are_derived(text, allowed_text, extra):
         return False
     if not _scaled_numbers_supported(text, allowed_text):
         return False
@@ -1824,8 +2066,12 @@ def _drop_unsupported_claims(text: str, allowed_text: str) -> str:
         if match.group(0) not in allowed:
             spans.append(match.span())
     for match in _CLAIM_NUMBER.finditer(translated):
-        if not _scaled_number_supported(match.group(0), allowed_text):
-            spans.append(match.span())
+        percent = _percent_end(translated, match.end()) != match.end()
+        if _number_supported(match.group(0), allowed_text, percent=percent):
+            continue
+        start = _leading_percent_start(translated, match.start())
+        end = _unit_end(translated, match.end())
+        spans.append((start, end))
     for pattern in (_CLAIM_CODE, _STATUS_RE):
         for match in pattern.finditer(translated):
             if match.group(0) not in allowed:
@@ -2291,10 +2537,125 @@ def _ambiguous_question(matches: object, burmese: bool) -> str:
 def _scaled_numbers_supported(text: str, allowed_text: str) -> bool:
     """A decimal amount is not proven by an unrelated small integer."""
 
+    translated = exact_code(text)
     return all(
-        _scaled_number_supported(match.group(0), allowed_text)
-        for match in _CLAIM_NUMBER.finditer(exact_code(text))
+        _number_supported(
+            match.group(0),
+            allowed_text,
+            percent=_percent_end(translated, match.end()) != match.end(),
+        )
+        for match in _CLAIM_NUMBER.finditer(translated)
     )
+
+
+def _number_supported(token: str, allowed_text: str, *, percent: bool) -> bool:
+    """A stored amount, a percent of two stored amounts, or an exact sum of two."""
+
+    if _scaled_number_supported(token, allowed_text):
+        return True
+    if percent:
+        return _derived_percent(token, allowed_text)
+    return _exact_sum(token, allowed_text)
+
+
+def _extra_are_derived(text: str, allowed_text: str, extra: set[str]) -> bool:
+    derived: set[str] = set()
+    translated = exact_code(text)
+    for match in _CLAIM_NUMBER.finditer(translated):
+        token = match.group(0)
+        canon = _canon_number(token)
+        if canon not in extra:
+            continue
+        percent = _percent_end(translated, match.end()) != match.end()
+        if _number_supported(token, allowed_text, percent=percent):
+            derived.add(canon)
+    return extra <= derived
+
+
+def _derived_percent(token: str, allowed_text: str) -> bool:
+    amounts = _money_operands(allowed_text)
+    for index, left in enumerate(amounts):
+        for right in amounts[index + 1 :]:
+            for numerator, denominator in ((left, right), (right, left)):
+                if denominator == 0:
+                    continue
+                share = (numerator / denominator) * Decimal(100)
+                change = ((numerator - denominator) / denominator) * Decimal(100)
+                if _percent_matches(token, share) or _percent_matches(token, change):
+                    return True
+    return False
+
+
+def _exact_sum(token: str, allowed_text: str) -> bool:
+    try:
+        claimed = Decimal(_canon_number(token))
+    except InvalidOperation:
+        return False
+    amounts = list(dict.fromkeys(_money_operands(allowed_text)))
+    for index, left in enumerate(amounts):
+        for right in amounts[index + 1 :]:
+            if left + right == claimed:
+                return True
+    return False
+
+
+def _money_operands(allowed_text: str) -> list[Decimal]:
+    text = exact_code(allowed_text)
+    found: list[Decimal] = []
+    for match in _CLAIM_NUMBER.finditer(text):
+        if _inside_date(text, match.start()):
+            continue
+        raw = match.group(0)
+        canon = _canon_number(raw)
+        if "." not in raw and "," not in raw and len(canon) < 3:
+            continue
+        try:
+            found.append(Decimal(canon))
+        except InvalidOperation:
+            continue
+    return found
+
+
+def _percent_matches(token: str, ratio: Decimal) -> bool:
+    try:
+        claimed = Decimal(_canon_number(token))
+    except InvalidOperation:
+        return False
+    places = len(token.split(".", 1)[1]) if "." in token else 0
+    quantum = Decimal(1).scaleb(-places)
+    return ratio.quantize(quantum, rounding=ROUND_HALF_UP) == claimed
+
+
+def _inside_date(text: str, index: int) -> bool:
+    return any(match.start() <= index < match.end() for match in _CLAIM_DATE.finditer(text))
+
+
+def _percent_end(text: str, end: int) -> int:
+    match = re.match(r"\s*(?:%|percent\b|percentage\b)", text[end:], re.IGNORECASE)
+    if match is None:
+        return end
+    return end + match.end()
+
+
+def _unit_end(text: str, end: int) -> int:
+    percent_end = _percent_end(text, end)
+    if percent_end != end:
+        return percent_end
+    match = re.match(
+        r"\s*(?:minutes?\b|mins?\b|hours?\b|hrs?\b|days?\b|weeks?\b|months?\b|years?\b|sessions?\b)",
+        text[end:],
+        re.IGNORECASE,
+    )
+    if match is None:
+        return end
+    return end + match.end()
+
+
+def _leading_percent_start(text: str, start: int) -> int:
+    match = re.search(r"%\s*$", text[:start])
+    if match is None:
+        return start
+    return match.start()
 
 
 def _scaled_number_supported(token: str, allowed_text: str) -> bool:

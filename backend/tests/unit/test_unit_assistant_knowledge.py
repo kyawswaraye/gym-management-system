@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
@@ -749,3 +750,142 @@ def test_an_unnamed_member_payment_asks_instead_of_listing_rows() -> None:
     assert "MEM-000004" in ambiguous
     assert "15.00" not in ambiguous
     assert "PRODUCT" not in ambiguous
+
+
+_NOVEMBER = {
+    "range": {"date_from": "2026-11-01", "date_to": "2026-11-14"},
+    "operational": {"new_members": 6, "check_ins": 4},
+    "financial": {
+        "new_member_revenue": "1500.00",
+        "renewal_revenue": "0.00",
+        "pt_revenue": "8000.00",
+        "class_revenue": "0.00",
+        "product_revenue": "0.00",
+        "other_revenue": "0.00",
+        "total_revenue": "9500.00",
+        "total_expenses": "5825.00",
+        "net_profit": "3675.00",
+    },
+}
+
+
+def test_total_revenue_is_not_relabeled_as_membership_sales() -> None:
+    membership = grounded_read_reply(
+        "Membership sales are 9,500.",
+        results=[_NOVEMBER],
+        brief="Currency THB.",
+        staff_text="How much are membership sales?",
+    )
+    total = grounded_read_reply(
+        "Total revenue is 9,500.",
+        results=[_NOVEMBER],
+        brief="Currency THB.",
+        staff_text="How much is total revenue?",
+    )
+    training = grounded_read_reply(
+        "PT sales are 8,000.",
+        results=[_NOVEMBER],
+        brief="Currency THB.",
+        staff_text="How much are PT sales?",
+    )
+    classes = grounded_read_reply(
+        "Class revenue is 9,500.",
+        results=[_NOVEMBER],
+        brief="Currency THB.",
+        staff_text="How much is class revenue?",
+    )
+    burmese = grounded_read_reply(
+        "အသင်းဝင်အရောင်း 9500 ဖြစ်တယ်။",
+        results=[_NOVEMBER],
+        brief="Currency THB.",
+        staff_text="အသင်းဝင်အရောင်း ဘယ်လောက်လဲ",
+    )
+    counted = grounded_read_reply(
+        "There are 6 new members.",
+        results=[_NOVEMBER],
+        brief="Currency THB.",
+        staff_text="How many new members?",
+    )
+    miscounted = grounded_read_reply(
+        "New member revenue is 6.",
+        results=[_NOVEMBER],
+        brief="Currency THB.",
+        staff_text="How much is new member revenue?",
+    )
+
+    assert "1500.00" in membership
+    assert "9,500" not in membership
+    assert "9500" not in membership
+    assert total == "Total revenue is 9,500."
+    assert training == "PT sales are 8,000."
+    assert "0.00" in classes
+    assert "9,500" not in classes
+    assert "1500.00" in burmese
+    assert "9500" not in burmese
+    assert counted == "There are 6 new members."
+    assert "1500.00" in miscounted
+    assert re.search(r"\b6\b", miscounted) is None
+
+
+def test_a_derived_percent_stays_and_a_wrong_percent_does_not_leave_a_sign() -> None:
+    stored = [
+        {
+            "results": [
+                {"name": "Maya Htun", "posted_amount": "8000.00", "assignments": 3},
+                {"name": "Hla Hla", "posted_amount": "6400.00", "assignments": 2},
+            ]
+        }
+    ]
+    derived = grounded_read_reply(
+        "Maya Htun is 25% ahead of Hla Hla.",
+        results=stored,
+        brief="Trainer comparison.",
+        staff_text="Compare the trainers",
+    )
+    wrong = grounded_read_reply(
+        "Maya Htun is 30% ahead of Hla Hla.",
+        results=stored,
+        brief="Trainer comparison.",
+        staff_text="Compare the trainers",
+    )
+    added = grounded_read_reply(
+        "Together that is 14400.",
+        results=stored,
+        brief="Trainer comparison.",
+        staff_text="Compare the trainers",
+    )
+    invented = grounded_read_reply(
+        "Together that is 9999.",
+        results=stored,
+        brief="Trainer comparison.",
+        staff_text="Compare the trainers",
+    )
+    duration = grounded_read_reply(
+        "The class lasts 45 minutes.",
+        results=[{"name": "Yoga", "default_duration_minutes": 60}],
+        brief="Classes.",
+        staff_text="How long is the class?",
+    )
+    pending = visible_reply(
+        grounded_read_reply(
+            "Maya Htun is 30% ahead of Hla Hla. The payment is saved.",
+            results=stored,
+            brief="Trainer comparison.",
+            staff_text="Compare the trainers",
+        ),
+        confirmed=False,
+        proposed=True,
+        staff_text="Compare the trainers",
+    )
+
+    assert derived == "Maya Htun is 25% ahead of Hla Hla."
+    assert "%" not in wrong
+    assert "30" not in wrong
+    assert "Maya Htun" in wrong
+    assert "Hla Hla" in wrong
+    assert "14400" in added
+    assert "9999" not in invented
+    assert "45" not in duration
+    assert "%" not in pending
+    assert "is saved" not in pending.casefold()
+    assert "not saved" in pending.casefold()

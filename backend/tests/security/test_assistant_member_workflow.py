@@ -528,6 +528,71 @@ def test_assistant_turns_are_limited_by_membership_and_gym(
     assert _members(gym) == []
 
 
+@override_settings(**_settings())
+def test_a_waiting_confirmation_survives_yes_and_a_provider_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(django_timezone, "now", _Clock())
+    gym, owner = _owner("WF02", "wf02-owner@example.test")
+    _enable(gym, "members")
+    script = _Script()
+    script.mode = "create"
+    monkeypatch.setattr("apps.assistant.turns.generate_content", script)
+    client = APIClient()
+    headers = {"HTTP_AUTHORIZATION": f"Bearer {staff_token(owner)}"}
+
+    proposed = _post(client, headers, {"message": "Kyaw Swar ကို ဒီနေ့ အဖွဲ့ဝင်ဖွင့်ချင်တယ်"})
+    pending = proposed["pending_confirmation"]
+    assert isinstance(pending, dict), proposed
+    step_id = str(pending["step_id"])
+    conversation_id = str(proposed["conversation_id"])
+    assert _members(gym) == []
+
+    calls = script.calls
+    agreed = _post(client, headers, {"message": "yes", "conversation_id": conversation_id})
+    assert script.calls == calls
+    assert agreed["pending_confirmation"] is not None
+    assert _members(gym) == []
+    okay = _post(client, headers, {"message": "okay", "conversation_id": conversation_id})
+    assert script.calls == calls
+    assert okay["pending_confirmation"] is not None
+
+    script.mode = "fail"
+    interrupted = _post(
+        client,
+        headers,
+        {"message": "ဒီနေ့ check-in ဘယ်နှစ်ယောက်လဲ", "conversation_id": conversation_id},
+    )
+    assert interrupted["pending_confirmation"] is not None
+    assert str(interrupted["pending_confirmation"]["step_id"]) == step_id
+    assert _members(gym) == []
+    notice = str(interrupted["message"]["body"])
+    assert "unavailable" in notice.casefold() or "ဆက်မပြောနိုင်" in notice
+
+    rejected = client.post(
+        f"/api/v1/assistant/confirmations/{step_id}/reject/",
+        {},
+        format="json",
+        **headers,
+    )
+    assert rejected.status_code == 200, rejected.json()
+    assert _members(gym) == []
+
+    script.mode = "create"
+    again = _post(
+        client,
+        headers,
+        {"message": "Kyaw Swar ကို ဒီနေ့ အဖွဲ့ဝင်ဖွင့်ချင်တယ်", "conversation_id": conversation_id},
+    )
+    second = again["pending_confirmation"]
+    assert isinstance(second, dict), again
+    created = _confirm(client, headers, str(second["step_id"]))
+    assert created["outcome"] == "committed"
+    replay = _confirm(client, headers, str(second["step_id"]))
+    assert replay["outcome"] == "existing"
+    assert len(_members(gym)) == 1
+
+
 def _throttle_rates(**rates: str) -> dict[str, object]:
     framework = {**settings.REST_FRAMEWORK}
     framework["DEFAULT_THROTTLE_RATES"] = {

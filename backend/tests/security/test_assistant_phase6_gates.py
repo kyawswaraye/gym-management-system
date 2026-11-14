@@ -436,6 +436,41 @@ def test_membership_payment_checks_owner_currency_amount_and_balance() -> None:
 
 
 @override_settings(**jwt_settings())
+def test_membership_payment_binds_the_one_named_member() -> None:
+    gym, owner = _owner("P6M4", "p6m4-owner@example.test")
+    _enable(gym, "finance")
+    member = _member(gym, owner, "Nwe")
+    other = _member(gym, owner, "Hla")
+    plan = _plan(gym, owner, "MONTHLY", price="100.00")
+    sold = _sell(gym, owner, member, plan, gym_today(gym))
+    day = gym_today(gym).isoformat()
+    named = {
+        "purpose": "MEMBERSHIP",
+        "method": "BANK_TRANSFER",
+        "business_date": day,
+        "currency": gym.currency,
+        "amount": "40.00",
+    }
+    both = dict(named)
+
+    bound = proposal_block(gym, owner, "create_payment", named, f"Nwe Client pay 40.00 on {day}")
+    ambiguous = proposal_block(
+        gym,
+        owner,
+        "create_payment",
+        both,
+        f"Nwe Client and Hla Client pay 40.00 on {day}",
+    )
+
+    assert bound is None
+    assert named["member_id"] == str(member.id)
+    assert named["membership_id"] == str(sold.id)
+    assert "member_id" not in both
+    assert ambiguous == {"error": "missing_fields", "fields": ["member_id"]}
+    assert other.id != member.id
+
+
+@override_settings(**jwt_settings())
 def test_class_proposal_checks_capacity_package_and_unmetered_intent() -> None:
     gym, owner = _owner("P6C1", "p6c1-owner@example.test")
     _enable(gym, "pt")
