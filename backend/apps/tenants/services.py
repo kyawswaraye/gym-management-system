@@ -1083,15 +1083,9 @@ def _optional_plan_price(value: Any) -> Decimal | None:
     return _plan_price(value)
 
 
-def _catalog_price(plan: SubscriptionPlan, ai_enabled: bool) -> Decimal:
-    """Return the catalog price for the selected AI option. Never invent one."""
+def _catalog_price(plan: SubscriptionPlan, _ai_enabled: bool) -> Decimal:
+    """The gym plan has one price. AI access does not change it."""
 
-    if ai_enabled:
-        if plan.price_with_ai is None:
-            raise ProvisioningValidationFailed(
-                "Set the plan's AI-enabled price before selling AI access."
-            )
-        return _plan_price(plan.price_with_ai)
     return _plan_price(plan.price)
 
 
@@ -1176,9 +1170,7 @@ def _effective_price_text(gym: Gym) -> str | None:
     plan = gym.subscription_plan
     if plan is None:
         return None
-    if gym.ai_enabled and plan.price_with_ai is None:
-        return None
-    return format(_catalog_price(plan, gym.ai_enabled), "f")
+    return format(_plan_price(plan.price), "f")
 
 
 def admin_gym_detail(gym: Gym) -> dict[str, object]:
@@ -1307,10 +1299,6 @@ def update_gym_from_admin(
     if commercial or ai_changed:
         if plan is None:
             raise ProvisioningValidationFailed("The gym requires a subscription plan.")
-        if next_ai and plan.price_with_ai is None:
-            raise ProvisioningValidationFailed(
-                "Set the plan's AI-enabled price before selling AI access."
-            )
 
     mutable_fields = (
         "name",

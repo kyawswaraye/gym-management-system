@@ -114,6 +114,8 @@ export const platformEn = {
   "Try another status or search.": "Try another status or search.",
   "Unable to load more gyms.": "Unable to load more gyms.",
   "AI Assistant": "AI Assistant",
+  Off: "Off",
+  On: "On",
   "AI access": "AI access",
   "AI access *": "AI access *",
   "AI access change": "AI access change",
@@ -136,8 +138,8 @@ export const platformEn = {
   "Price without AI": "Price without AI",
   Renewal: "Renewal",
   "Selected price": "Selected price",
-  "Set each plan's price without AI and its price with AI. Changing a catalog price does not change recorded charges. Retired plans stay on gyms that already use them.":
-    "Set each plan's price without AI and its price with AI. Changing a catalog price does not change recorded charges. Retired plans stay on gyms that already use them.",
+  "Update a plan's name, price, billing interval, or status. Retired plans stay on gyms that already use them.":
+    "Update a plan's name, price, billing interval, or status. Retired plans stay on gyms that already use them.",
   "Set the AI price before selling AI access.":
     "Set the AI price before selling AI access.",
   "The price matches the selected AI access. An AI-only change records a zero charge and keeps earlier payments.":
@@ -270,6 +272,8 @@ export const platformMm = {
     "အခြား အခြေအနေ သို့မဟုတ် ရှာဖွေမှုကို စမ်းကြည့်ပါ။",
   "Unable to load more gyms.": "နောက်ထပ် Gym များ မရယူနိုင်ပါ။",
   "AI Assistant": "AI လက်ထောက်",
+  Off: "ပိတ်",
+  On: "ဖွင့်",
   "AI access": "AI အသုံးပြုခွင့်",
   "AI access *": "AI အသုံးပြုခွင့် *",
   "AI access change": "AI အသုံးပြုခွင့် ပြောင်းလဲမှု",
@@ -292,8 +296,8 @@ export const platformMm = {
   "Price without AI": "AI မပါ ဈေးနှုန်း",
   Renewal: "သက်တမ်းတိုး",
   "Selected price": "ရွေးထားသော ဈေးနှုန်း",
-  "Set each plan's price without AI and its price with AI. Changing a catalog price does not change recorded charges. Retired plans stay on gyms that already use them.":
-    "အစီအစဉ်တစ်ခုစီအတွက် AI မပါ ဈေးနှုန်းနှင့် AI ပါ ဈေးနှုန်းကို သတ်မှတ်ပါ။ ကတ်တလောက် ဈေးနှုန်းပြောင်းခြင်းသည် မှတ်တမ်းတင်ထားသော ကောက်ခံမှုများကို မပြောင်းပါ။ ရပ်နားထားသော အစီအစဉ်များသည် ၎င်းတို့ကို သုံးပြီးသား Gym များတွင် ဆက်လက်တည်ရှိပါသည်။",
+  "Update a plan's name, price, billing interval, or status. Retired plans stay on gyms that already use them.":
+    "အစီအစဉ်၏ အမည်၊ ဈေးနှုန်း၊ ငွေတောင်းခံကာလ သို့မဟုတ် အခြေအနေကို ပြင်ဆင်ပါ။ ရပ်နားထားသော အစီအစဉ်များသည် ၎င်းတို့ကို သုံးပြီးသား Gym များတွင် ဆက်လက်တည်ရှိပါသည်။",
   "Set the AI price before selling AI access.":
     "AI အသုံးပြုခွင့် မရောင်းမီ AI ဈေးနှုန်းကို သတ်မှတ်ပါ။",
   "The price matches the selected AI access. An AI-only change records a zero charge and keeps earlier payments.":

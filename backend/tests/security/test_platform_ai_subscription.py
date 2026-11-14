@@ -186,7 +186,7 @@ def test_dual_prices_are_snapshotted_and_ai_access_is_per_gym() -> None:
         billing_interval="MONTHLY",
     )
     User.objects.create_user("ai-bare-owner@example.test", PASSWORD)
-    rejected = client.post(
+    bare_sale = client.post(
         "/api/v1/admin/gyms/",
         {
             "gym": {
@@ -209,9 +209,10 @@ def test_dual_prices_are_snapshotted_and_ai_access_is_per_gym() -> None:
         HTTP_IDEMPOTENCY_KEY="ai-bare-sale-0000001",
         **auth(token),
     )
-    assert rejected.status_code == 422
-    assert rejected.json()["error"]["code"] == "PROVISIONING_VALIDATION_FAILED"
-    assert Gym.objects.filter(code="AIBARE").count() == 0
+    assert bare_sale.status_code == 201, bare_sale.content
+    assert bare_sale.json()["data"]["gym"]["ai_enabled"] is True
+    bare_gym = Gym.objects.get(code="AIBARE")
+    assert charges(bare_gym)[0].charged_amount == Decimal("10.00")
 
     without_ai = sell(
         client,
@@ -243,7 +244,7 @@ def test_dual_prices_are_snapshotted_and_ai_access_is_per_gym() -> None:
     assert off_sale.selected_price == Decimal("30.00")
     assert off_sale.discount_amount == Decimal("0.00")
     assert off_sale.payment_reference == ""
-    assert on_sale.charged_amount == Decimal("45.00")
+    assert on_sale.charged_amount == Decimal("30.00")
     assert on_sale.ai_enabled is True
     assert on_sale.price_without_ai == Decimal("30.00")
     assert on_sale.price_with_ai == Decimal("45.00")
@@ -258,7 +259,7 @@ def test_dual_prices_are_snapshotted_and_ai_access_is_per_gym() -> None:
     off_sale.refresh_from_db()
     on_sale.refresh_from_db()
     assert off_sale.charged_amount == Decimal("30.00")
-    assert on_sale.charged_amount == Decimal("45.00")
+    assert on_sale.charged_amount == Decimal("30.00")
     assert on_sale.price_with_ai == Decimal("45.00")
 
     ends_at = timezone.now() + timedelta(days=30)
@@ -274,10 +275,10 @@ def test_dual_prices_are_snapshotted_and_ai_access_is_per_gym() -> None:
         GymSubscriptionCharge.Kind.SALE,
         GymSubscriptionCharge.Kind.RENEWAL,
     ]
-    assert on_rows[0].charged_amount == Decimal("45.00")
-    assert on_rows[1].charged_amount == Decimal("120.00")
+    assert on_rows[0].charged_amount == Decimal("30.00")
+    assert on_rows[1].charged_amount == Decimal("80.00")
     assert on_rows[1].ai_enabled is True
-    assert renewed.json()["data"]["last_charged_amount"] == "120.00"
+    assert renewed.json()["data"]["last_charged_amount"] == "80.00"
 
     enabled = client.patch(
         f"/api/v1/admin/gyms/{off.id}/",
@@ -287,7 +288,7 @@ def test_dual_prices_are_snapshotted_and_ai_access_is_per_gym() -> None:
     )
     assert enabled.status_code == 200, enabled.content
     assert enabled.json()["data"]["ai_enabled"] is True
-    assert enabled.json()["data"]["effective_price"] == "120.00"
+    assert enabled.json()["data"]["effective_price"] == "80.00"
     assert enabled.json()["data"]["last_charged_amount"] == "30.00"
     off_rows = charges(off)
     assert off_rows[0].charged_amount == Decimal("30.00")
@@ -305,7 +306,7 @@ def test_dual_prices_are_snapshotted_and_ai_access_is_per_gym() -> None:
     )
     assert disabled.status_code == 200, disabled.content
     assert disabled.json()["data"]["ai_enabled"] is False
-    assert charges(on)[1].charged_amount == Decimal("120.00")
+    assert charges(on)[1].charged_amount == Decimal("80.00")
     assert charges(on)[2].kind == GymSubscriptionCharge.Kind.ENTITLEMENT_CHANGE
     assert charges(on)[2].charged_amount == Decimal("0.00")
     off.refresh_from_db()

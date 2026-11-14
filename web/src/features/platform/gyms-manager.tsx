@@ -177,10 +177,6 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
       setError(tx("Select an active subscription plan."));
       return;
     }
-    if (includeAi && plan.price_with_ai == null) {
-      setError(tx("Set the AI price before selling AI access."));
-      return;
-    }
     const name = String(values.get("name") ?? "").trim();
     const ownerEmail = String(values.get("owner_email") ?? "").trim();
     const firstName = String(values.get("first_name") ?? "").trim();
@@ -255,13 +251,6 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
       .finally(() => setLoading(false));
   }
 
-  const selectedPlan = subscriptions.find((item) => item.id === salePlanId);
-  const selectedAmount = selectedPlan
-    ? includeAi
-      ? selectedPlan.price_with_ai
-      : selectedPlan.price
-    : null;
-
   return (
     <div className="grid gap-6">
       {canProvision && provisioning ? (
@@ -318,7 +307,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                   </select>
                 </label>
                 <label className="field">
-                  <span>{tx("AI access *")}</span>
+                  <span>{tx("AI Assistant")}</span>
                   <select
                     className="input"
                     disabled={pending}
@@ -327,21 +316,10 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                     }
                     value={includeAi ? "true" : "false"}
                   >
-                    <option value="false">{tx("Not included")}</option>
-                    <option value="true">{tx("Included")}</option>
+                    <option value="false">{tx("Off")}</option>
+                    <option value="true">{tx("On")}</option>
                   </select>
                 </label>
-                <p className="text-sm font-semibold text-slate-800 md:col-span-2">
-                  {tx("Selected price")}
-                  {": "}
-                  {selectedPlan == null || selectedAmount == null
-                    ? selectedPlan == null
-                      ? "—"
-                      : tx("Not configured")
-                    : `${selectedAmount} ${selectedPlan.currency}`}
-                  {" · "}
-                  {includeAi ? tx("Included") : tx("Not included")}
-                </p>
                 <label className="field">
                   <span>{tx("Timezone *")}</span>
                   <input
@@ -658,7 +636,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                           : "bg-slate-200 text-slate-600"
                       }`}
                     >
-                      {gym.ai_enabled ? tx("AI enabled") : tx("AI disabled")}
+                      {gym.ai_enabled ? tx("On") : tx("Off")}
                     </span>
                   </td>
                   <td className="px-5 py-4 font-medium text-slate-700">

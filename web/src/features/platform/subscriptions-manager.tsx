@@ -92,7 +92,6 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
     const update = buildSubscriptionUpdate(plan, {
       name: String(values.get("name") ?? ""),
       price: String(values.get("price") ?? ""),
-      priceWithAi: String(values.get("price_with_ai") ?? ""),
       billingInterval: String(values.get("billing_interval") ?? ""),
       status: String(values.get("status") ?? ""),
     });
@@ -193,10 +192,6 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
                   </th>
                   <th className="px-5 py-3" scope="col">
                     {" "}
-                    {tx("Price with AI")}{" "}
-                  </th>
-                  <th className="px-5 py-3" scope="col">
-                    {" "}
                     {tx("Currency")}{" "}
                   </th>
                   <th className="px-5 py-3" scope="col">
@@ -213,7 +208,7 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
                   <tr
                     aria-label={tx("{code} plan", { code: plan.code })}
                     className="bg-white hover:bg-slate-50"
-                    key={`${plan.id}:${plan.name}:${plan.status}:${plan.price}:${plan.price_with_ai ?? ""}:${plan.billing_interval}`}
+                    key={`${plan.id}:${plan.name}:${plan.status}:${plan.price}:${plan.billing_interval}`}
                     role="article"
                   >
                     <td className="px-5 py-4">
@@ -227,9 +222,6 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
                     </td>
                     <td className="px-5 py-4 font-semibold text-slate-800 tabular-nums">
                       {plan.price}
-                    </td>
-                    <td className="px-5 py-4 font-semibold text-slate-800 tabular-nums">
-                      {plan.price_with_ai ?? tx("Not configured")}
                     </td>
                     <td className="px-5 py-4 font-medium text-slate-700">
                       {tx(plan.currency)}
@@ -302,18 +294,6 @@ export function SubscriptionsManager({ canManage }: { canManage: boolean }) {
                   mode={{ kind: "decimal", scale: 2 }}
                   name="price"
                   required
-                />
-              </label>
-              <label className="field">
-                <span>
-                  {tx("AI price for")} {plan.code}
-                </span>
-                <DigitInput
-                  className="input"
-                  defaultValue={plan.price_with_ai ?? ""}
-                  disabled={pendingId !== null}
-                  mode={{ kind: "decimal", scale: 2 }}
-                  name="price_with_ai"
                 />
               </label>
               <label className="field">

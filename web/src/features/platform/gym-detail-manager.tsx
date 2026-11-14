@@ -26,12 +26,6 @@ import type {
 const panelClass =
   "w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6";
 
-const CHARGE_KIND: Record<string, string> = {
-  SALE: "Sale",
-  RENEWAL: "Renewal",
-  ENTITLEMENT_CHANGE: "AI access change",
-};
-
 function Fact({ label, value }: { label: string; value: string }) {
   const tx = useTx();
   return (
@@ -192,11 +186,6 @@ export function GymDetailManager({
         values.get("subscription_ends_at"),
       );
       request.ai_enabled = String(values.get("ai_enabled") ?? "") === "true";
-      const chosen = plans.find((plan) => plan.id === planId);
-      if (request.ai_enabled && chosen?.price_with_ai == null) {
-        setError(tx("Set the AI price before selling AI access."));
-        return;
-      }
     }
     setPending(true);
     try {
@@ -354,20 +343,7 @@ export function GymDetailManager({
               <Fact label="Plan" value={gym.subscription_plan_name ?? ""} />
               <Fact
                 label="AI Assistant"
-                value={gym.ai_enabled ? tx("AI enabled") : tx("AI disabled")}
-              />
-              <Fact
-                label="Price without AI"
-                value={gym.price_without_ai ?? ""}
-              />
-              <Fact label="Price with AI" value={gym.price_with_ai ?? ""} />
-              <Fact
-                label="Effective subscription price"
-                value={gym.effective_price ?? ""}
-              />
-              <Fact
-                label="Last charged amount"
-                value={gym.last_charged_amount ?? ""}
+                value={gym.ai_enabled ? tx("On") : tx("Off")}
               />
               <Fact
                 label="Subscription starts"
@@ -393,84 +369,6 @@ export function GymDetailManager({
               />
               <Fact label="City" value={myanmarPlaceText(gym.city, locale)} />
             </dl>
-          </section>
-
-          <section className={panelClass} aria-labelledby="gym-billing-title">
-            <h2 id="gym-billing-title" className="text-xl font-bold">
-              {tx("Billing history")}
-            </h2>
-            <p className="muted mt-2 text-sm">
-              {tx(
-                "The price matches the selected AI access. An AI-only change records a zero charge and keeps earlier payments.",
-              )}
-            </p>
-            {gym.subscription_charges.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-600">
-                {tx("No billing history.")}
-              </p>
-            ) : (
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[48rem] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                      <th className="px-3 py-2" scope="col">
-                        {tx("Billing")}
-                      </th>
-                      <th className="px-3 py-2" scope="col">
-                        {tx("Plan")}
-                      </th>
-                      <th className="px-3 py-2" scope="col">
-                        {tx("AI access")}
-                      </th>
-                      <th className="px-3 py-2" scope="col">
-                        {tx("Selected price")}
-                      </th>
-                      <th className="px-3 py-2" scope="col">
-                        {tx("Discount")}
-                      </th>
-                      <th className="px-3 py-2" scope="col">
-                        {tx("Charged")}
-                      </th>
-                      <th className="px-3 py-2" scope="col">
-                        {tx("Payment reference")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {gym.subscription_charges.map((charge) => (
-                      <tr key={charge.id}>
-                        <td className="px-3 py-3 font-semibold text-slate-900">
-                          {tx(CHARGE_KIND[charge.kind] ?? charge.kind)}
-                          <span className="mt-1 block text-xs font-medium text-slate-500">
-                            {formatAppDateTime(charge.created_at)}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-slate-700">
-                          {charge.plan_name}
-                        </td>
-                        <td className="px-3 py-3 text-slate-700">
-                          {charge.ai_enabled
-                            ? tx("Included")
-                            : tx("Not included")}
-                        </td>
-                        <td className="px-3 py-3 tabular-nums text-slate-800">
-                          {charge.selected_price} {charge.currency}
-                        </td>
-                        <td className="px-3 py-3 tabular-nums text-slate-800">
-                          {charge.discount_amount}
-                        </td>
-                        <td className="px-3 py-3 font-semibold tabular-nums text-slate-900">
-                          {charge.charged_amount} {charge.currency}
-                        </td>
-                        <td className="px-3 py-3 text-slate-700">
-                          {charge.payment_reference || "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </section>
 
           <section
@@ -662,7 +560,7 @@ export function GymDetailManager({
                           </select>
                         </label>
                         <label className="field">
-                          <span>{tx("AI access *")}</span>
+                          <span>{tx("AI Assistant")}</span>
                           <select
                             className="input"
                             name="ai_enabled"
@@ -672,28 +570,10 @@ export function GymDetailManager({
                             }
                             disabled={pending}
                           >
-                            <option value="false">{tx("Not included")}</option>
-                            <option value="true">{tx("Included")}</option>
+                            <option value="false">{tx("Off")}</option>
+                            <option value="true">{tx("On")}</option>
                           </select>
                         </label>
-                        <p className="text-sm font-semibold text-slate-800 md:col-span-2">
-                          {tx("Selected price")}
-                          {": "}
-                          {(() => {
-                            const plan = plans.find(
-                              (item) => item.id === salePlanId,
-                            );
-                            if (!plan) return "—";
-                            const amount = saleAi
-                              ? plan.price_with_ai
-                              : plan.price;
-                            return amount == null
-                              ? tx("Not configured")
-                              : `${amount} ${plan.currency}`;
-                          })()}
-                          {" · "}
-                          {saleAi ? tx("Included") : tx("Not included")}
-                        </p>
                         <label className="field">
                           <span>{tx("Subscription status")}</span>
                           <select
