@@ -115,9 +115,7 @@ def test_a_message_without_a_date_keeps_the_model_date_for_confirmation() -> Non
     )
 
     registration: dict[str, object] = {"join_date": "2026-11-13"}
-    assert (
-        _keep_stated_dates(registration, "Wint War, Monthly_plan ဝယ်မယ်။", today=_TODAY) is None
-    )
+    assert _keep_stated_dates(registration, "Wint War, Monthly_plan ဝယ်မယ်။", today=_TODAY) is None
     assert registration["join_date"] == "2026-11-13"
 
     plain: dict[str, object] = {"join_date": "2026-11-11"}

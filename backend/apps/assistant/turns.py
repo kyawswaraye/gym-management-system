@@ -203,11 +203,7 @@ def run_turn(
         actor=actor,
         conversation=conversation,
         instruction=_SYSTEM,
-        cue=(
-            "The previous confirmation expired and nothing was saved."
-            if expired
-            else ""
-        ),
+        cue=("The previous confirmation expired and nothing was saved." if expired else ""),
         provider_fallback=_UNAVAILABLE,
     )
     if answered is None:

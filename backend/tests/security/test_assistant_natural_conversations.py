@@ -283,11 +283,7 @@ def test_a_staff_member_corrects_the_name_sells_and_pays_part(
         set_gym_context(gym_id=gym.id)
         members = list(Member.objects.filter(gym=gym))
         wrong = [item for item in members if item.first_name == "Mya"]
-        saved = [
-            item
-            for item in members
-            if item.first_name == "Hla" and item.last_name == "Hla"
-        ]
+        saved = [item for item in members if item.first_name == "Hla" and item.last_name == "Hla"]
         memberships = list(
             Membership.objects.filter(gym=gym, member__in=saved).select_related("plan")
         )
