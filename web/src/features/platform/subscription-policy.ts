@@ -27,6 +27,7 @@ export function compareSubscriptionPlans(
 export type SubscriptionDraft = {
   name: string;
   price: string;
+  priceWithAi?: string;
   billingInterval: string;
   status: string;
 };
@@ -68,6 +69,21 @@ export function buildSubscriptionUpdate(
   const body: PlatformSubscriptionUpdate = {};
   if (name !== current.name) body.name = name;
   if (price !== current.price) body.price = price;
+  if (draft.priceWithAi !== undefined) {
+    const trimmed = draft.priceWithAi.trim();
+    if (!trimmed) {
+      if (current.price_with_ai != null) body.price_with_ai = null;
+    } else {
+      const aiPrice = normalizePlanPrice(trimmed);
+      if (!aiPrice) {
+        return {
+          ok: false,
+          message: "Enter a nonnegative price with up to 2 decimal places.",
+        };
+      }
+      if (aiPrice !== current.price_with_ai) body.price_with_ai = aiPrice;
+    }
+  }
   if (billingInterval !== current.billing_interval) {
     body.billing_interval = billingInterval;
   }

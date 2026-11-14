@@ -148,6 +148,7 @@ def test_member_reads_register_without_changing_write_tools() -> None:
         "search_product_sales",
         "search_pt_sales",
         "search_pt_bookings",
+        "search_pt_trainer_sales",
         "search_trainers",
         "search_trainer_assignments",
         "search_staff",

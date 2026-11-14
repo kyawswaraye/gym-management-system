@@ -51,7 +51,7 @@ def test_dashboard_counts_match_explicit_status_groups() -> None:
     assert set(GYM_STATUS_COUNT_FIELDS) == {"total", *Gym.Status.values}
     assert set(GYM_SUBSCRIPTION_COUNT_FIELDS) == set(Gym.SubscriptionStatus.values)
     assert set(PLAN_STATUS_COUNT_FIELDS) == set(SubscriptionPlan.Status.values)
-    assert PLAN_METADATA_FIELDS == ("name", "status", "price", "billing_interval")
+    assert PLAN_METADATA_FIELDS == ("name", "status", "price", "price_with_ai", "billing_interval")
 
 
 def test_dashboard_serializer_drops_business_and_pii_fields() -> None:
@@ -163,6 +163,7 @@ def test_subscription_list_output_includes_status_and_excludes_usage() -> None:
         name="Trial",
         status="ACTIVE",
         price="0.00",
+        price_with_ai=None,
         currency="THB",
         billing_interval="TRIAL",
         created_at="2026-10-17T00:00:00Z",
@@ -178,6 +179,7 @@ def test_subscription_list_output_includes_status_and_excludes_usage() -> None:
         "name",
         "status",
         "price",
+        "price_with_ai",
         "currency",
         "billing_interval",
     }

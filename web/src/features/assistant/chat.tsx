@@ -163,6 +163,7 @@ function SendIcon() {
 export function AssistantChat({ membershipId }: { membershipId: string }) {
   const tx = useTx();
   const [available, setAvailable] = useState<boolean | null>(null);
+  const [notEntitled, setNotEntitled] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -178,14 +179,13 @@ export function AssistantChat({ membershipId }: { membershipId: string }) {
   useEffect(() => {
     let cancelled = false;
     loadStatus()
-      .then((status) => {
-        if (!cancelled) setAvailable(status.available);
-      })
-      .catch(() => {
-        if (!cancelled) setAvailable(false);
-      });
-    loadConversations()
-      .then(async (rows) => {
+      .then(async (status) => {
+        if (cancelled) return;
+        const blocked = status.reasons.includes("not_entitled");
+        setNotEntitled(blocked);
+        setAvailable(status.available);
+        if (blocked) return;
+        const rows = await loadConversations();
         if (cancelled) return;
         const mine = rows.filter(
           (row) => row.created_by_membership_id === membershipId,
@@ -201,7 +201,9 @@ export function AssistantChat({ membershipId }: { membershipId: string }) {
         setPending(detail.pending_confirmation);
         setActivity([]);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!cancelled) setAvailable(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -335,7 +337,16 @@ export function AssistantChat({ membershipId }: { membershipId: string }) {
 
   const dock = (
     <div className="grid gap-3">
-      {available === false ? (
+      {notEntitled ? (
+        <p
+          className="rounded-xl bg-[#fff1f1] px-3 py-2 text-sm text-[#b4232c]"
+          role="alert"
+        >
+          {tx(
+            "AI Assistant is not included in this gym's subscription. Ask your GymPilot administrator to enable it.",
+          )}
+        </p>
+      ) : available === false ? (
         <p
           className="rounded-xl bg-[#fff1f1] px-3 py-2 text-sm text-[#b4232c]"
           role="alert"
@@ -438,7 +449,7 @@ export function AssistantChat({ membershipId }: { membershipId: string }) {
           rows={1}
           maxLength={4000}
           placeholder={tx("Ask anything")}
-          disabled={busy || available === false}
+          disabled={busy || available === false || notEntitled}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
@@ -451,7 +462,9 @@ export function AssistantChat({ membershipId }: { membershipId: string }) {
           type="submit"
           className="mb-1.5 grid size-8 shrink-0 place-items-center rounded-full bg-[#0d0d0d] text-white disabled:bg-[#f4f4f4] disabled:text-[#8e8ea0]"
           aria-label={tx("Send")}
-          disabled={busy || available === false || draft.trim() === ""}
+          disabled={
+            busy || available === false || notEntitled || draft.trim() === ""
+          }
         >
           <SendIcon />
         </button>

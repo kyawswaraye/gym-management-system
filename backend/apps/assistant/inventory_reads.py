@@ -213,6 +213,8 @@ def _product_row(row: Product) -> dict[str, object]:
         "name": row.name,
         "unit": row.unit,
         "sale_price": money_text(row.sale_price),
+        "current_unit_cost": money_text(row.current_unit_cost),
+        "inventory_value": money_text((quantity * row.current_unit_cost).quantize(Decimal("0.01"))),
         "quantity_on_hand": format_quantity(quantity),
         "low_stock_threshold": format_quantity(row.low_stock_threshold),
         "status": "ACTIVE" if row.is_active else "INACTIVE",
@@ -268,8 +270,10 @@ _READS = {
     SEARCH_PRODUCTS: _contract(
         _definition(
             SEARCH_PRODUCTS,
-            "Search products in this gym. Includes the stored on-hand quantity and "
-            "the product's own low-stock threshold.",
+            "Search products in this gym. Includes the stored on-hand quantity, "
+            "current_unit_cost, and inventory_value. inventory_value is "
+            "quantity_on_hand multiplied by current_unit_cost. It is not a "
+            "separate stored total and it is not historical.",
             "inventory.view",
         ),
         (

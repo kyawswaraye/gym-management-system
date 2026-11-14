@@ -110,6 +110,7 @@ class SubscriptionPlan(UUIDTimestampModel):
     name = models.CharField(max_length=100)
     status = models.CharField(max_length=10, choices=Status, default=Status.ACTIVE)
     price = models.DecimalField(max_digits=18, decimal_places=2)
+    price_with_ai = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=3, default="THB")
     billing_interval = models.CharField(max_length=20)
     features = models.ManyToManyField(Feature, through="SubscriptionPlanFeature")
@@ -168,12 +169,72 @@ class Gym(UUIDTimestampModel):
     )
     subscription_starts_at = models.DateTimeField(null=True, blank=True)
     subscription_ends_at = models.DateTimeField(null=True, blank=True)
+    ai_enabled = models.BooleanField(default=False)
 
     class Meta:
         db_table = "tenants_gym"
         constraints = [
             models.CheckConstraint(condition=~models.Q(name=""), name="gym_name_nonblank_ck"),
             models.CheckConstraint(condition=~models.Q(code=""), name="gym_code_nonblank_ck"),
+        ]
+        indexes = [models.Index(fields=["ai_enabled"], name="gym_ai_enabled_idx")]
+
+
+class GymSubscriptionCharge(UUIDTimestampModel):
+    """Append-only snapshot of one platform subscription sale or entitlement change.
+
+    Prices are copied at recording time. Later catalog edits do not rewrite them.
+    """
+
+    class Kind(models.TextChoices):
+        SALE = "SALE"
+        RENEWAL = "RENEWAL"
+        ENTITLEMENT_CHANGE = "ENTITLEMENT_CHANGE"
+
+    gym = models.ForeignKey(Gym, on_delete=models.PROTECT, related_name="subscription_charges")
+    kind = models.CharField(max_length=24, choices=Kind.choices)
+    subscription_plan = models.ForeignKey(SubscriptionPlan, on_delete=models.PROTECT)
+    plan_code = models.CharField(max_length=32)
+    plan_name = models.CharField(max_length=100)
+    billing_interval = models.CharField(max_length=20)
+    ai_enabled = models.BooleanField()
+    price_without_ai = models.DecimalField(max_digits=18, decimal_places=2)
+    price_with_ai = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    selected_price = models.DecimalField(max_digits=18, decimal_places=2)
+    discount_amount = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0.00"))
+    charged_amount = models.DecimalField(max_digits=18, decimal_places=2)
+    currency = models.CharField(max_length=3)
+    period_starts_at = models.DateTimeField(null=True, blank=True)
+    period_ends_at = models.DateTimeField(null=True, blank=True)
+    payment_reference = models.CharField(max_length=64, blank=True, default="")
+    recorded_by_user_id = models.UUIDField(null=True, blank=True)
+
+    class Meta:
+        db_table = "tenants_gym_subscription_charge"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(price_without_ai__gte=0),
+                name="subscription_charge_price_without_ai_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(price_with_ai__isnull=True) | models.Q(price_with_ai__gte=0),
+                name="subscription_charge_price_with_ai_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(selected_price__gte=0),
+                name="subscription_charge_selected_price_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(discount_amount__gte=0),
+                name="subscription_charge_discount_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(charged_amount__gte=0),
+                name="subscription_charge_charged_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["gym", "-created_at"], name="subscription_charge_gym_idx"),
         ]
 
 

@@ -25,6 +25,7 @@ from apps.assistant.cash_tools import execute_registered_tool as execute_cash
 from apps.assistant.checkin_reads import checkin_read_tool_contracts
 from apps.assistant.class_reads import class_read_tool_contracts
 from apps.assistant.commission_reads import commission_read_tool_contracts
+from apps.assistant.entitlement import require_gym_ai
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
 from apps.assistant.executor import ApprovalSnapshot, ToolContract
 from apps.assistant.expense_tools import execute_registered_tool as execute_expense
@@ -119,6 +120,9 @@ def execute_offered_read(
 ) -> Mapping[str, object]:
     """Run one registered read. The payload does not choose the gym."""
 
+    gym = getattr(request, "gym", None)
+    if isinstance(gym, Gym):
+        require_gym_ai(gym)
     reader = _READERS.get(tool_name)
     if reader is None:
         raise ExecutionRejected("This tool is not registered.", code="unknown_tool")
@@ -143,6 +147,9 @@ def execute_confirmed_write(
 ) -> ExecutionResult:
     """Run one registered write through its existing executor."""
 
+    gym = getattr(request, "gym", None)
+    if isinstance(gym, Gym):
+        require_gym_ai(gym)
     writer = _WRITERS.get(tool_name)
     if writer is None:
         raise ExecutionRejected("This tool is not registered.", code="unknown_tool")

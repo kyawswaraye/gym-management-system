@@ -20,7 +20,7 @@ export default async function SuperAdminSubscriptionsPage() {
   return (
     <section aria-labelledby="platform-subscriptions-title">
       <PageHeader
-        description="Update a plan's name, price, billing interval, or status. Retired plans stay on gyms that already use them."
+        description="Set each plan's price without AI and its price with AI. Changing a catalog price does not change recorded charges. Retired plans stay on gyms that already use them."
         eyebrow="GymPilot MM"
         title="Subscriptions"
         titleId="platform-subscriptions-title"

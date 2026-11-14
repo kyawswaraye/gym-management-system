@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.assistant.configuration import assistant_configuration
+from apps.assistant.entitlement import gym_ai_entitled, require_gym_ai
 from apps.assistant.queries import (
     get_conversation,
     get_goal,
@@ -91,10 +92,14 @@ class AssistantStatusView(APIView):
     )
     def get(self, request: Request) -> Response:
         _reject_idempotency(request)
-        _gym(request)
+        gym = _gym(request)
         configuration = assistant_configuration()
+        entitled = gym_ai_entitled(gym.id)
+        reasons = list(configuration.reasons)
+        if not entitled:
+            reasons.append("not_entitled")
         return success_response(
-            {"available": configuration.available, "reasons": list(configuration.reasons)}
+            {"available": configuration.available and entitled, "reasons": reasons}
         )
 
 
@@ -115,6 +120,7 @@ class ConversationListView(APIView):
     def get(self, request: Request) -> Response:
         _reject_idempotency(request)
         gym = _gym(request)
+        require_gym_ai(gym)
         actor = _actor(request)
         query = validated(ConversationListQuerySerializer(data=request.query_params))
         rows = list_conversations(gym=gym, actor=actor, limit=int(query["limit"]))
@@ -138,6 +144,7 @@ class ConversationDetailView(APIView):
     def get(self, request: Request, id: UUID) -> Response:
         _reject_idempotency(request)
         gym = _gym(request)
+        require_gym_ai(gym)
         actor = _actor(request)
         conversation = get_conversation(gym=gym, actor=actor, conversation_id=id)
         payload = conversation_data(conversation)
@@ -171,6 +178,7 @@ class GoalDetailView(APIView):
     def get(self, request: Request, id: UUID) -> Response:
         _reject_idempotency(request)
         gym = _gym(request)
+        require_gym_ai(gym)
         actor = _actor(request)
         goal = get_goal(gym=gym, actor=actor, goal_id=id)
         payload = goal_summary(goal)
@@ -230,7 +238,7 @@ class AssistantTurnView(_StaffCommandView):
     )
     def post(self, request: Request) -> Response:
         _reject_idempotency(request)
-        _gym(request)
+        require_gym_ai(_gym(request))
         body = validated(TurnRequestSerializer(data=request.data))
         conversation_id = body.get("conversation_id")
         result = run_turn(
@@ -258,7 +266,7 @@ class AssistantConfirmView(_StaffCommandView):
     )
     def post(self, request: Request, id: UUID) -> Response:
         _reject_idempotency(request)
-        _gym(request)
+        require_gym_ai(_gym(request))
         validated(ConfirmRequestSerializer(data=request.data))
         return success_response(confirm_step(request=request, view=self, step_id=id))
 
@@ -279,6 +287,6 @@ class AssistantRejectView(_StaffCommandView):
     )
     def post(self, request: Request, id: UUID) -> Response:
         _reject_idempotency(request)
-        _gym(request)
+        require_gym_ai(_gym(request))
         validated(RejectRequestSerializer(data=request.data))
         return success_response(reject_step(request=request, view=self, step_id=id))

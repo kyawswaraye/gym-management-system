@@ -127,6 +127,7 @@ class AdminGymListCreateView(APIView):
         values = query.validated_data
         search = str(values.get("search", "")).strip()
         gym_status = values.get("status")
+        ai_filter = values.get("ai")
         limit = int(values["limit"])
 
         queryset = Gym.objects.select_related("subscription_plan").order_by("-created_at", "-id")
@@ -138,6 +139,10 @@ class AdminGymListCreateView(APIView):
             )
         if gym_status:
             queryset = queryset.filter(status=gym_status)
+        if ai_filter == "enabled":
+            queryset = queryset.filter(ai_enabled=True)
+        elif ai_filter == "disabled":
+            queryset = queryset.filter(ai_enabled=False)
         if after := values.get("after"):
             try:
                 cursor = signing.loads(
@@ -145,7 +150,11 @@ class AdminGymListCreateView(APIView):
                     salt="admin-gym-list",
                     max_age=24 * 60 * 60,
                 )
-                if cursor.get("search") != search or cursor.get("status") != gym_status:
+                if (
+                    cursor.get("search") != search
+                    or cursor.get("status") != gym_status
+                    or cursor.get("ai") != ai_filter
+                ):
                     raise signing.BadSignature
                 created_at = datetime.fromisoformat(cursor["created_at"])
                 gym_id = uuid.UUID(cursor["id"])
@@ -167,6 +176,7 @@ class AdminGymListCreateView(APIView):
                     "id": str(last.id),
                     "search": search,
                     "status": gym_status,
+                    "ai": ai_filter,
                 },
                 salt="admin-gym-list",
                 compress=True,
@@ -184,6 +194,7 @@ class AdminGymListCreateView(APIView):
                     row.subscription_plan.name if row.subscription_plan else None
                 ),
                 "subscription_status": row.subscription_status,
+                "ai_enabled": row.ai_enabled,
                 "created_at": row.created_at,
             }
             for row in rows
@@ -328,6 +339,7 @@ class AdminGymDetailView(APIView):
                 "subscription_status",
                 "subscription_starts_at",
                 "subscription_ends_at",
+                "ai_enabled",
             }
             submitted = set(self.request.data)
             required = []

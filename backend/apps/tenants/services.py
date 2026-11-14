@@ -46,6 +46,7 @@ from apps.tenants.models import (
     GymMembershipRole,
     GymProvisioningRequest,
     GymSettings,
+    GymSubscriptionCharge,
     Role,
     RolePermission,
     StaffInvitation,
@@ -783,6 +784,7 @@ def _provisioning_response(
             "timezone": gym.timezone,
             "currency": gym.currency,
             "subscription_plan_id": str(gym.subscription_plan_id),
+            "ai_enabled": gym.ai_enabled,
             "subscription_status": gym.subscription_status,
             "subscription_starts_at": (
                 gym.subscription_starts_at.isoformat() if gym.subscription_starts_at else None
@@ -864,6 +866,7 @@ def provision_gym_from_admin(
     if replayed:
         return AdminProvisioningResult(data=dict(record.response_body), replayed=True)
 
+    set_platform_admin_context()
     code = str(gym_data.get("code") or "").strip().upper()
     if not code:
         code = resolve_code(
@@ -891,6 +894,8 @@ def provision_gym_from_admin(
         raise ProvisioningValidationFailed(
             "Gym currency must match the subscription plan currency."
         )
+    ai_enabled = bool(gym_data.get("ai_enabled", False))
+    selected_price = _catalog_price(plan, ai_enabled)
 
     starts_at = gym_data.get("subscription_starts_at")
     ends_at = gym_data.get("subscription_ends_at")
@@ -921,6 +926,7 @@ def provision_gym_from_admin(
                 ),
                 subscription_starts_at=starts_at,
                 subscription_ends_at=ends_at,
+                ai_enabled=ai_enabled,
             )
     except IntegrityError as exc:
         raise ProvisioningConflict("The gym code is already in use.") from exc
@@ -979,6 +985,17 @@ def provision_gym_from_admin(
         entitlements.append(entitlement)
     categories = _seed_categories(gym=gym, actor_membership=membership)
     _seed_receipt_sequence(gym=gym, settings=settings, actor_membership=membership)
+    _record_subscription_charge(
+        gym=gym,
+        plan=plan,
+        kind=GymSubscriptionCharge.Kind.SALE,
+        ai_enabled=ai_enabled,
+        selected_price=selected_price,
+        charged_amount=selected_price,
+        period_starts_at=starts_at,
+        period_ends_at=ends_at,
+        actor=actor,
+    )
 
     invitation: StaffInvitation | None = None
     plaintext_token = ""
@@ -1001,6 +1018,8 @@ def provision_gym_from_admin(
     audit_details: dict[str, Any] = {
         "gym_code": gym.code,
         "subscription_plan_id": str(plan.id),
+        "ai_enabled": ai_enabled,
+        "charged_amount": format(selected_price, "f"),
         "owner_user_id": str(owner.id),
         "send_invitation": send_invitation,
     }
@@ -1058,6 +1077,110 @@ def provision_gym_from_admin(
     return AdminProvisioningResult(data=response_data, replayed=False)
 
 
+def _optional_plan_price(value: Any) -> Decimal | None:
+    if value is None:
+        return None
+    return _plan_price(value)
+
+
+def _catalog_price(plan: SubscriptionPlan, ai_enabled: bool) -> Decimal:
+    """Return the catalog price for the selected AI option. Never invent one."""
+
+    if ai_enabled:
+        if plan.price_with_ai is None:
+            raise ProvisioningValidationFailed(
+                "Set the plan's AI-enabled price before selling AI access."
+            )
+        return _plan_price(plan.price_with_ai)
+    return _plan_price(plan.price)
+
+
+def _record_subscription_charge(
+    *,
+    gym: Gym,
+    plan: SubscriptionPlan,
+    kind: str,
+    ai_enabled: bool,
+    selected_price: Decimal,
+    charged_amount: Decimal,
+    period_starts_at: datetime | None,
+    period_ends_at: datetime | None,
+    actor: Any,
+) -> GymSubscriptionCharge:
+    """Store the prices in effect now. This row is never updated."""
+
+    return GymSubscriptionCharge.objects.create(
+        gym=gym,
+        kind=kind,
+        subscription_plan=plan,
+        plan_code=plan.code,
+        plan_name=plan.name,
+        billing_interval=plan.billing_interval,
+        ai_enabled=ai_enabled,
+        price_without_ai=_plan_price(plan.price),
+        price_with_ai=_optional_plan_price(plan.price_with_ai),
+        selected_price=_plan_price(selected_price),
+        discount_amount=_plan_price(Decimal("0.00")),
+        charged_amount=_plan_price(charged_amount),
+        currency=plan.currency,
+        period_starts_at=period_starts_at,
+        period_ends_at=period_ends_at,
+        payment_reference="",
+        recorded_by_user_id=getattr(actor, "id", None),
+    )
+
+
+def _charge_row(row: GymSubscriptionCharge) -> dict[str, object]:
+    return {
+        "id": str(row.id),
+        "kind": row.kind,
+        "plan_code": row.plan_code,
+        "plan_name": row.plan_name,
+        "billing_interval": row.billing_interval,
+        "ai_enabled": row.ai_enabled,
+        "price_without_ai": format(_plan_price(row.price_without_ai), "f"),
+        "price_with_ai": (
+            None if row.price_with_ai is None else format(_plan_price(row.price_with_ai), "f")
+        ),
+        "selected_price": format(_plan_price(row.selected_price), "f"),
+        "discount_amount": format(_plan_price(row.discount_amount), "f"),
+        "charged_amount": format(_plan_price(row.charged_amount), "f"),
+        "currency": row.currency,
+        "period_starts_at": row.period_starts_at.isoformat() if row.period_starts_at else None,
+        "period_ends_at": row.period_ends_at.isoformat() if row.period_ends_at else None,
+        "payment_reference": row.payment_reference,
+        "created_at": row.created_at.isoformat(),
+    }
+
+
+def _subscription_charge_rows(gym: Gym) -> list[dict[str, object]]:
+    rows = GymSubscriptionCharge.objects.filter(gym=gym).order_by("-created_at", "-id")[:50]
+    return [_charge_row(row) for row in rows]
+
+
+def _last_charged_amount(gym: Gym) -> str | None:
+    row = (
+        GymSubscriptionCharge.objects.filter(
+            gym=gym,
+            kind__in=(GymSubscriptionCharge.Kind.SALE, GymSubscriptionCharge.Kind.RENEWAL),
+        )
+        .order_by("-created_at", "-id")
+        .first()
+    )
+    if row is None:
+        return None
+    return format(_plan_price(row.charged_amount), "f")
+
+
+def _effective_price_text(gym: Gym) -> str | None:
+    plan = gym.subscription_plan
+    if plan is None:
+        return None
+    if gym.ai_enabled and plan.price_with_ai is None:
+        return None
+    return format(_catalog_price(plan, gym.ai_enabled), "f")
+
+
 def admin_gym_detail(gym: Gym) -> dict[str, object]:
     return {
         "id": str(gym.id),
@@ -1086,6 +1209,18 @@ def admin_gym_detail(gym: Gym) -> dict[str, object]:
         "subscription_ends_at": (
             gym.subscription_ends_at.isoformat() if gym.subscription_ends_at else None
         ),
+        "ai_enabled": gym.ai_enabled,
+        "price_without_ai": (
+            format(_plan_price(gym.subscription_plan.price), "f") if gym.subscription_plan else None
+        ),
+        "price_with_ai": (
+            None
+            if gym.subscription_plan is None or gym.subscription_plan.price_with_ai is None
+            else format(_plan_price(gym.subscription_plan.price_with_ai), "f")
+        ),
+        "effective_price": _effective_price_text(gym),
+        "last_charged_amount": _last_charged_amount(gym),
+        "subscription_charges": _subscription_charge_rows(gym),
         "created_at": gym.created_at.isoformat(),
         "updated_at": gym.updated_at.isoformat(),
     }
@@ -1165,6 +1300,17 @@ def update_gym_from_admin(
     ends_at = data.get("subscription_ends_at", gym.subscription_ends_at)
     if starts_at and ends_at and ends_at <= starts_at:
         raise ProvisioningValidationFailed("Subscription end must be after its start.")
+    next_ai = bool(data["ai_enabled"]) if "ai_enabled" in data else gym.ai_enabled
+    period_changed = starts_at != gym.subscription_starts_at or ends_at != gym.subscription_ends_at
+    commercial = plan_changed or period_changed
+    ai_changed = next_ai != gym.ai_enabled
+    if commercial or ai_changed:
+        if plan is None:
+            raise ProvisioningValidationFailed("The gym requires a subscription plan.")
+        if next_ai and plan.price_with_ai is None:
+            raise ProvisioningValidationFailed(
+                "Set the plan's AI-enabled price before selling AI access."
+            )
 
     mutable_fields = (
         "name",
@@ -1193,6 +1339,9 @@ def update_gym_from_admin(
         if getattr(gym, field) != value:
             setattr(gym, field, value)
             changed_fields.append(field)
+    if ai_changed:
+        gym.ai_enabled = next_ai
+        changed_fields.append("ai_enabled")
     if plan_changed and plan is not None:
         gym.subscription_plan = plan
         changed_fields.append("subscription_plan")
@@ -1200,6 +1349,37 @@ def update_gym_from_admin(
         gym.save(update_fields=[*changed_fields, "updated_at"])
         if plan_changed and plan is not None:
             _reconcile_plan_entitlements(gym=gym, plan=plan)
+        if commercial or ai_changed:
+            assert plan is not None
+            selected = _catalog_price(plan, gym.ai_enabled)
+            prior_sale = GymSubscriptionCharge.objects.filter(
+                gym=gym,
+                kind__in=(
+                    GymSubscriptionCharge.Kind.SALE,
+                    GymSubscriptionCharge.Kind.RENEWAL,
+                ),
+            ).exists()
+            if commercial:
+                kind = (
+                    GymSubscriptionCharge.Kind.RENEWAL
+                    if prior_sale
+                    else GymSubscriptionCharge.Kind.SALE
+                )
+                charged = selected
+            else:
+                kind = GymSubscriptionCharge.Kind.ENTITLEMENT_CHANGE
+                charged = Decimal("0.00")
+            _record_subscription_charge(
+                gym=gym,
+                plan=plan,
+                kind=kind,
+                ai_enabled=gym.ai_enabled,
+                selected_price=selected,
+                charged_amount=charged,
+                period_starts_at=gym.subscription_starts_at,
+                period_ends_at=gym.subscription_ends_at,
+                actor=actor,
+            )
         if gym.subscription_status in {
             Gym.SubscriptionStatus.PAST_DUE,
             Gym.SubscriptionStatus.CANCELLED,
@@ -1295,7 +1475,7 @@ def transition_gym_from_admin(
 GYM_STATUS_COUNT_FIELDS = ("total", "PENDING", "ACTIVE", "SUSPENDED", "CLOSED")
 GYM_SUBSCRIPTION_COUNT_FIELDS = ("TRIAL", "ACTIVE", "PAST_DUE", "CANCELLED")
 PLAN_STATUS_COUNT_FIELDS = ("ACTIVE", "RETIRED")
-PLAN_METADATA_FIELDS = ("name", "status", "price", "billing_interval")
+PLAN_METADATA_FIELDS = ("name", "status", "price", "price_with_ai", "billing_interval")
 _ELIGIBLE_SUBSCRIPTION_STATUSES = (
     Gym.SubscriptionStatus.TRIAL,
     Gym.SubscriptionStatus.ACTIVE,
@@ -1349,8 +1529,11 @@ def _plan_price(value: Any) -> Decimal:
 
 
 def _plan_audit_value(field: str, value: Any) -> Any:
-    if field == "price":
-        return format(_plan_price(value), "f")
+    if field in {"price", "price_with_ai"}:
+        priced = _optional_plan_price(value)
+        if priced is None:
+            return None
+        return format(priced, "f")
     return value
 
 
@@ -1372,8 +1555,17 @@ def update_subscription_plan_from_admin(
     for field in PLAN_METADATA_FIELDS:
         if field not in data:
             continue
-        value = _plan_price(data[field]) if field == "price" else data[field]
-        current = _plan_price(getattr(plan, field)) if field == "price" else getattr(plan, field)
+        value: Any
+        current: Any
+        if field == "price":
+            value = _plan_price(data[field])
+            current = _plan_price(getattr(plan, field))
+        elif field == "price_with_ai":
+            value = _optional_plan_price(data[field])
+            current = _optional_plan_price(getattr(plan, field))
+        else:
+            value = data[field]
+            current = getattr(plan, field)
         if current != value:
             changes[field] = value
     if not changes:

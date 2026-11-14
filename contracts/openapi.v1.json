@@ -173,6 +173,19 @@
                     },
                     {
                         "in": "query",
+                        "name": "ai",
+                        "schema": {
+                            "enum": [
+                                "enabled",
+                                "disabled"
+                            ],
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "description": "* `enabled` - enabled\n* `disabled` - disabled"
+                    },
+                    {
+                        "in": "query",
                         "name": "limit",
                         "schema": {
                             "type": "integer",
@@ -25197,6 +25210,39 @@
                         "format": "date-time",
                         "nullable": true
                     },
+                    "ai_enabled": {
+                        "type": "boolean"
+                    },
+                    "price_without_ai": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$",
+                        "nullable": true
+                    },
+                    "price_with_ai": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$",
+                        "nullable": true
+                    },
+                    "effective_price": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$",
+                        "nullable": true
+                    },
+                    "last_charged_amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$",
+                        "nullable": true
+                    },
+                    "subscription_charges": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AdminSubscriptionCharge"
+                        }
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time"
@@ -25209,19 +25255,25 @@
                 "required": [
                     "address_line1",
                     "address_line2",
+                    "ai_enabled",
                     "city",
                     "code",
                     "country_code",
                     "created_at",
                     "currency",
+                    "effective_price",
                     "email",
                     "id",
+                    "last_charged_amount",
                     "legal_name",
                     "name",
                     "phone",
                     "postal_code",
+                    "price_with_ai",
+                    "price_without_ai",
                     "region",
                     "status",
+                    "subscription_charges",
                     "subscription_ends_at",
                     "subscription_plan_id",
                     "subscription_plan_name",
@@ -25357,6 +25409,9 @@
                         "type": "string",
                         "format": "date-time",
                         "nullable": true
+                    },
+                    "ai_enabled": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
@@ -25446,12 +25501,16 @@
                     "subscription_status": {
                         "type": "string"
                     },
+                    "ai_enabled": {
+                        "type": "boolean"
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time"
                     }
                 },
                 "required": [
+                    "ai_enabled",
                     "code",
                     "created_at",
                     "currency",
@@ -25703,11 +25762,15 @@
                         "type": "string",
                         "format": "date-time",
                         "nullable": true
+                    },
+                    "ai_enabled": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
                     "address_line1",
                     "address_line2",
+                    "ai_enabled",
                     "city",
                     "code",
                     "country_code",
@@ -25832,6 +25895,12 @@
                         "format": "decimal",
                         "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
                     },
+                    "price_with_ai": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$",
+                        "nullable": true
+                    },
                     "currency": {
                         "type": "string"
                     },
@@ -25846,7 +25915,96 @@
                     "id",
                     "name",
                     "price",
+                    "price_with_ai",
                     "status"
+                ]
+            },
+            "AdminSubscriptionCharge": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "plan_code": {
+                        "type": "string"
+                    },
+                    "plan_name": {
+                        "type": "string"
+                    },
+                    "billing_interval": {
+                        "type": "string"
+                    },
+                    "ai_enabled": {
+                        "type": "boolean"
+                    },
+                    "price_without_ai": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "price_with_ai": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$",
+                        "nullable": true
+                    },
+                    "selected_price": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "discount_amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "charged_amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "period_starts_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "period_ends_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "payment_reference": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "ai_enabled",
+                    "billing_interval",
+                    "charged_amount",
+                    "created_at",
+                    "currency",
+                    "discount_amount",
+                    "id",
+                    "kind",
+                    "payment_reference",
+                    "period_ends_at",
+                    "period_starts_at",
+                    "plan_code",
+                    "plan_name",
+                    "price_with_ai",
+                    "price_without_ai",
+                    "selected_price"
                 ]
             },
             "AdminSubscriptionDetail": {
@@ -25869,6 +26027,12 @@
                         "type": "string",
                         "format": "decimal",
                         "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$"
+                    },
+                    "price_with_ai": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,16}(?:\\.\\d{0,2})?$",
+                        "nullable": true
                     },
                     "currency": {
                         "type": "string"
@@ -25893,6 +26057,7 @@
                     "id",
                     "name",
                     "price",
+                    "price_with_ai",
                     "status",
                     "updated_at"
                 ]
@@ -35335,6 +35500,9 @@
                         "type": "string",
                         "format": "date-time",
                         "nullable": true
+                    },
+                    "ai_enabled": {
+                        "type": "boolean"
                     }
                 }
             },
@@ -35353,6 +35521,12 @@
                         "type": "string",
                         "format": "decimal",
                         "pattern": "^(?:0|[1-9]\\d{0,15})(?:\\.\\d{1,2})?$"
+                    },
+                    "price_with_ai": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^(?:0|[1-9]\\d{0,15})(?:\\.\\d{1,2})?$",
+                        "nullable": true
                     },
                     "billing_interval": {
                         "type": "string",

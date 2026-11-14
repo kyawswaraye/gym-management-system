@@ -56,7 +56,16 @@ FORBIDDEN_DASHBOARD_SQL = (
     "members_payment",
     "users_user",
 )
-LIST_FIELDS = {"id", "code", "name", "status", "price", "currency", "billing_interval"}
+LIST_FIELDS = {
+    "id",
+    "code",
+    "name",
+    "status",
+    "price",
+    "price_with_ai",
+    "currency",
+    "billing_interval",
+}
 DETAIL_FIELDS = LIST_FIELDS | {"created_at", "updated_at"}
 PII = {
     "email": "hidden-owner@example.test",

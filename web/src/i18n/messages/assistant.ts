@@ -15,6 +15,8 @@ export const assistantEn = {
   "Previous 7 days": "Previous 7 days",
   "Reject change": "Reject change",
   Send: "Send",
+  "AI Assistant is not included in this gym's subscription. Ask your GymPilot administrator to enable it.":
+    "AI Assistant is not included in this gym's subscription. Ask your GymPilot administrator to enable it.",
   "The assistant is unavailable.": "The assistant is unavailable.",
   "The change is complete.": "The change is complete.",
   "The change was rejected.": "The change was rejected.",
@@ -40,6 +42,8 @@ export const assistantMm = {
   "Previous 7 days": "လွန်ခဲ့သော ၇ ရက်",
   "Reject change": "ပြောင်းလဲမှုကို ငြင်းပယ်ရန်",
   Send: "ပို့ရန်",
+  "AI Assistant is not included in this gym's subscription. Ask your GymPilot administrator to enable it.":
+    "ဤ Gym ၏ အသင်းဝင်မှုတွင် AI လက်ထောက် မပါဝင်ပါ။ GymPilot စီမံသူကို ဖွင့်ပေးရန် တောင်းဆိုပါ။",
   "The assistant is unavailable.": "လက်ထောက်ကို အသုံးမပြုနိုင်ပါ။",
   "The change is complete.": "ပြောင်းလဲမှု ပြီးပါပြီ။",
   "The change was rejected.": "ပြောင်းလဲမှုကို ငြင်းပယ်ပြီးပါပြီ။",

@@ -132,7 +132,7 @@ def test_file_migrations_are_linear_and_follow_the_tenants_leaf() -> None:
     ]
     assert ("files", "0005_member_self_actors") in nodes[("files", "0006_product_image")]
     assert _leaves(nodes)["files"] == [("files", "0006_product_image")]
-    assert _leaves(nodes)["tenants"] == [("tenants", "0038_platform_admin_gym_updates")]
+    assert _leaves(nodes)["tenants"] == [("tenants", "0039_gym_ai_subscription_prices")]
     assert nodes[("tenants", "0022_check_in_challenge_permission")] == [
         ("tenants", "0021_security_definer_least_privilege")
     ]

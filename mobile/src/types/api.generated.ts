@@ -3684,6 +3684,16 @@ export interface components {
       subscription_starts_at: string | null;
       /** Format: date-time */
       subscription_ends_at: string | null;
+      ai_enabled: boolean;
+      /** Format: decimal */
+      price_without_ai: string | null;
+      /** Format: decimal */
+      price_with_ai: string | null;
+      /** Format: decimal */
+      effective_price: string | null;
+      /** Format: decimal */
+      last_charged_amount: string | null;
+      subscription_charges: components["schemas"]["AdminSubscriptionCharge"][];
       /** Format: date-time */
       created_at: string;
       /** Format: date-time */
@@ -3719,6 +3729,7 @@ export interface components {
       subscription_starts_at?: string | null;
       /** Format: date-time */
       subscription_ends_at?: string | null;
+      ai_enabled?: boolean;
     };
     /**
      * @description * `TRIAL` - TRIAL
@@ -3750,6 +3761,7 @@ export interface components {
       subscription_plan_id: string | null;
       subscription_plan_name: string | null;
       subscription_status: string;
+      ai_enabled: boolean;
       /** Format: date-time */
       created_at: string;
     };
@@ -3826,6 +3838,7 @@ export interface components {
       subscription_starts_at: string | null;
       /** Format: date-time */
       subscription_ends_at: string | null;
+      ai_enabled: boolean;
     };
     AdminProvisionedMembership: {
       /** Format: uuid */
@@ -3860,8 +3873,37 @@ export interface components {
       status: components["schemas"]["SubscriptionPlanStatusEnum"];
       /** Format: decimal */
       price: string;
+      /** Format: decimal */
+      price_with_ai: string | null;
       currency: string;
       billing_interval: string;
+    };
+    AdminSubscriptionCharge: {
+      /** Format: uuid */
+      id: string;
+      kind: string;
+      plan_code: string;
+      plan_name: string;
+      billing_interval: string;
+      ai_enabled: boolean;
+      /** Format: decimal */
+      price_without_ai: string;
+      /** Format: decimal */
+      price_with_ai: string | null;
+      /** Format: decimal */
+      selected_price: string;
+      /** Format: decimal */
+      discount_amount: string;
+      /** Format: decimal */
+      charged_amount: string;
+      currency: string;
+      /** Format: date-time */
+      period_starts_at: string | null;
+      /** Format: date-time */
+      period_ends_at: string | null;
+      payment_reference: string;
+      /** Format: date-time */
+      created_at: string;
     };
     AdminSubscriptionDetail: {
       /** Format: uuid */
@@ -3871,6 +3913,8 @@ export interface components {
       status: components["schemas"]["SubscriptionPlanStatusEnum"];
       /** Format: decimal */
       price: string;
+      /** Format: decimal */
+      price_with_ai: string | null;
       currency: string;
       billing_interval: string;
       /** Format: date-time */
@@ -6641,12 +6685,15 @@ export interface components {
       subscription_starts_at?: string | null;
       /** Format: date-time */
       subscription_ends_at?: string | null;
+      ai_enabled?: boolean;
     };
     PatchedAdminSubscriptionUpdateRequest: {
       name?: string;
       status?: components["schemas"]["SubscriptionPlanStatusEnum"];
       /** Format: decimal */
       price?: string;
+      /** Format: decimal */
+      price_with_ai?: string | null;
       billing_interval?: string;
     };
     PatchedAnnouncementPatchRequest: {
@@ -8689,6 +8736,11 @@ export interface operations {
     parameters: {
       query?: {
         after?: string;
+        /**
+         * @description * `enabled` - enabled
+         *     * `disabled` - disabled
+         */
+        ai?: "enabled" | "disabled";
         limit?: number;
         search?: string;
         /**

@@ -50,6 +50,14 @@ new-member revenue, renewal revenue, PT revenue, class revenue, product
 revenue, other revenue, total revenue, expenses, and profit. Total revenue
 is the sum of those revenue fields. It is not membership revenue unless
 new-member revenue plus renewal revenue equals that sum.
+search_pt_trainer_sales ranks posted PT sales by trainer using stored
+gross fees. search_products includes quantity_on_hand, current_unit_cost,
+and inventory_value. inventory_value is those two stored fields multiplied.
+There is no separate stored inventory-value total. get_gym_dashboard
+net_profit is total_revenue minus total_expenses from that tool. Do not
+guess a profit, a comparison, or a ranking the tool did not return.
+The assistant cannot change this gym's AI subscription. That entitlement
+is stored by the platform and is not a tool argument.
 A refund is a payment whose entry type is REFUND. A new membership sale uses
 an active plan. Use the tool result for those records. Membership expiry is
 the membership end date, not the member status. Check-in history, trainer
@@ -436,7 +444,7 @@ _READ_DOMAINS = {
     "memberships": frozenset({"search_memberships", "search_membership_expiries"}),
     "checkins": frozenset({"search_check_ins"}),
     "assignments": frozenset({"search_trainers", "search_trainer_assignments"}),
-    "pt_sales": frozenset({"search_pt_sales", "search_pt_bookings"}),
+    "pt_sales": frozenset({"search_pt_sales", "search_pt_bookings", "search_pt_trainer_sales"}),
     "packages": frozenset({"search_pt_packages", "search_service_packages"}),
     "classes": frozenset(
         {"search_class_occurrences", "search_class_types", "search_class_schedules"}

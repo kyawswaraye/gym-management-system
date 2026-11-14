@@ -126,7 +126,7 @@ def test_capabilities_follow_registered_tools() -> None:
     assert knowledge_capability("mail") == "unsupported"
     assert "search_service_packages" in reads
     assert len(writes) == 98
-    assert len(reads) == 33
+    assert len(reads) == 34
 
 
 def test_business_questions_route_to_the_stored_read() -> None:

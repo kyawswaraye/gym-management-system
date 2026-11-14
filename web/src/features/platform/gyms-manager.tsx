@@ -32,6 +32,12 @@ const STATUS_FILTERS = [
   { value: "CLOSED", label: "Closed" },
 ] as const;
 
+const AI_FILTERS = [
+  { value: "", label: "All AI access" },
+  { value: "enabled", label: "AI enabled" },
+  { value: "disabled", label: "AI disabled" },
+] as const;
+
 const STATUS_TONE: Record<string, string> = {
   ACTIVE: "bg-emerald-100 text-emerald-700",
   PENDING: "bg-sky-100 text-sky-800",
@@ -80,6 +86,9 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
   );
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [aiAccess, setAiAccess] = useState("");
+  const [salePlanId, setSalePlanId] = useState("");
+  const [includeAi, setIncludeAi] = useState(false);
   const [nextAfter, setNextAfter] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
@@ -90,10 +99,11 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
   const idempotencyKey = useRef<string | null>(null);
 
   const loadGyms = useCallback(
-    async (query = "", after?: string, gymStatus = "") => {
+    async (query = "", after?: string, gymStatus = "", ai = "") => {
       const parameters = new URLSearchParams();
       if (query.trim()) parameters.set("search", query.trim());
       if (gymStatus) parameters.set("status", gymStatus);
+      if (ai) parameters.set("ai", ai);
       if (after) parameters.set("after", after);
       const suffix = parameters.size ? `?${parameters.toString()}` : "";
       const body = await platformGetCollection<PlatformGym>(
@@ -145,7 +155,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
     setError(null);
     setLoading(true);
     try {
-      await loadGyms(search, undefined, status);
+      await loadGyms(search, undefined, status, aiAccess);
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "Unable to load gyms.",
@@ -165,6 +175,10 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
     const plan = subscriptions.find((item) => item.id === planId);
     if (!plan) {
       setError(tx("Select an active subscription plan."));
+      return;
+    }
+    if (includeAi && plan.price_with_ai == null) {
+      setError(tx("Set the AI price before selling AI access."));
       return;
     }
     const name = String(values.get("name") ?? "").trim();
@@ -191,6 +205,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
         currency: plan.currency,
         subscription_plan_id: plan.id,
         subscription_status: "TRIAL",
+        ai_enabled: includeAi,
       },
       owner: {
         email: ownerEmail,
@@ -211,9 +226,11 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
       );
       idempotencyKey.current = null;
       setAddress({ region: "", city: "" });
+      setSalePlanId("");
+      setIncludeAi(false);
       setProvisioning(false);
       form.reset();
-      await loadGyms(search, undefined, status);
+      await loadGyms(search, undefined, status, aiAccess);
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -229,7 +246,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
     setStatus(next);
     setError(null);
     setLoading(true);
-    void loadGyms(search, undefined, next)
+    void loadGyms(search, undefined, next, aiAccess)
       .catch((reason: unknown) => {
         setError(
           reason instanceof Error ? reason.message : "Unable to load gyms.",
@@ -238,13 +255,24 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
       .finally(() => setLoading(false));
   }
 
+  const selectedPlan = subscriptions.find((item) => item.id === salePlanId);
+  const selectedAmount = selectedPlan
+    ? includeAi
+      ? selectedPlan.price_with_ai
+      : selectedPlan.price
+    : null;
+
   return (
     <div className="grid gap-6">
       {canProvision && provisioning ? (
         <FormDialog
           description="Creates the gym, initial Owner, roles, and required defaults atomically. An Owner setup email is sent to the address below. No password or invitation link is shown here."
           onClose={() => {
-            if (!pending) setProvisioning(false);
+            if (!pending) {
+              setSalePlanId("");
+              setIncludeAi(false);
+              setProvisioning(false);
+            }
           }}
           onSubmit={submit}
           pending={pending}
@@ -278,6 +306,8 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                     name="subscription_plan_id"
                     required
                     disabled={pending || subscriptions.length === 0}
+                    onChange={(event) => setSalePlanId(event.target.value)}
+                    value={salePlanId}
                   >
                     <option value="">{tx("Select a plan")}</option>
                     {subscriptions.map((plan) => (
@@ -287,6 +317,31 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                     ))}
                   </select>
                 </label>
+                <label className="field">
+                  <span>{tx("AI access *")}</span>
+                  <select
+                    className="input"
+                    disabled={pending}
+                    onChange={(event) =>
+                      setIncludeAi(event.target.value === "true")
+                    }
+                    value={includeAi ? "true" : "false"}
+                  >
+                    <option value="false">{tx("Not included")}</option>
+                    <option value="true">{tx("Included")}</option>
+                  </select>
+                </label>
+                <p className="text-sm font-semibold text-slate-800 md:col-span-2">
+                  {tx("Selected price")}
+                  {": "}
+                  {selectedPlan == null || selectedAmount == null
+                    ? selectedPlan == null
+                      ? "—"
+                      : tx("Not configured")
+                    : `${selectedAmount} ${selectedPlan.currency}`}
+                  {" · "}
+                  {includeAi ? tx("Included") : tx("Not included")}
+                </p>
                 <label className="field">
                   <span>{tx("Timezone *")}</span>
                   <input
@@ -427,6 +482,8 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
               className="button button-create"
               onClick={() => {
                 setAddress({ region: "", city: "" });
+                setSalePlanId("");
+                setIncludeAi(false);
                 setProvisioning(true);
               }}
               type="button"
@@ -454,6 +511,43 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                   }
                   key={filter.label}
                   onClick={() => applyStatus(filter.value)}
+                  type="button"
+                >
+                  {tx(filter.label)}
+                </button>
+              );
+            })}
+          </div>
+          <div
+            aria-label={tx("AI access")}
+            className="flex flex-wrap gap-2"
+            role="group"
+          >
+            {AI_FILTERS.map((filter) => {
+              const selected = aiAccess === filter.value;
+              return (
+                <button
+                  aria-pressed={selected}
+                  className={
+                    selected
+                      ? "rounded-full border border-slate-900 bg-slate-900 px-3.5 py-1.5 text-sm font-bold text-white"
+                      : "rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  }
+                  key={filter.label}
+                  onClick={() => {
+                    setAiAccess(filter.value);
+                    setError(null);
+                    setLoading(true);
+                    void loadGyms(search, undefined, status, filter.value)
+                      .catch((reason: unknown) => {
+                        setError(
+                          reason instanceof Error
+                            ? reason.message
+                            : "Unable to load gyms.",
+                        );
+                      })
+                      .finally(() => setLoading(false));
+                  }}
                   type="button"
                 >
                   {tx(filter.label)}
@@ -512,6 +606,10 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                 </th>
                 <th className="px-5 py-3" scope="col">
                   {" "}
+                  {tx("AI Assistant")}{" "}
+                </th>
+                <th className="px-5 py-3" scope="col">
+                  {" "}
                   {tx("Currency")}{" "}
                 </th>
               </tr>
@@ -552,6 +650,17 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
                   <td className="px-5 py-4">
                     <StatusBadge value={gym.subscription_status} />
                   </td>
+                  <td className="px-5 py-4">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
+                        gym.ai_enabled
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-200 text-slate-600"
+                      }`}
+                    >
+                      {gym.ai_enabled ? tx("AI enabled") : tx("AI disabled")}
+                    </span>
+                  </td>
                   <td className="px-5 py-4 font-medium text-slate-700">
                     {tx(gym.currency)}
                   </td>
@@ -579,7 +688,7 @@ export function GymsManager({ canProvision }: { canProvision: boolean }) {
               disabled={loading}
               onClick={() => {
                 setLoading(true);
-                void loadGyms(search, nextAfter, status)
+                void loadGyms(search, nextAfter, status, aiAccess)
                   .catch((reason: unknown) =>
                     setError(
                       reason instanceof Error

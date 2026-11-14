@@ -44,6 +44,7 @@ class AdminGymInputSerializer(StrictSerializer):
     )
     subscription_starts_at = serializers.DateTimeField(required=False, allow_null=True)
     subscription_ends_at = serializers.DateTimeField(required=False, allow_null=True)
+    ai_enabled = serializers.BooleanField(required=False)
 
     def validate_timezone(self, value: str) -> str:
         try:
@@ -82,6 +83,7 @@ class AdminGymProvisionRequestSerializer(StrictSerializer):
 class AdminGymListQuerySerializer(StrictSerializer):
     search = serializers.CharField(required=False, allow_blank=True, max_length=100)
     status = serializers.ChoiceField(choices=list(Gym.Status), required=False)
+    ai = serializers.ChoiceField(choices=("enabled", "disabled"), required=False)
     limit = serializers.IntegerField(default=25, min_value=1, max_value=100)
     after = serializers.CharField(required=False, max_length=512)
 
@@ -96,6 +98,26 @@ class AdminGymListItemSerializer(serializers.Serializer):
     subscription_plan_id = serializers.UUIDField(allow_null=True)
     subscription_plan_name = serializers.CharField(allow_null=True)
     subscription_status = serializers.CharField()
+    ai_enabled = serializers.BooleanField()
+    created_at = serializers.DateTimeField()
+
+
+class AdminSubscriptionChargeSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    kind = serializers.CharField()
+    plan_code = serializers.CharField()
+    plan_name = serializers.CharField()
+    billing_interval = serializers.CharField()
+    ai_enabled = serializers.BooleanField()
+    price_without_ai = serializers.DecimalField(max_digits=18, decimal_places=2)
+    price_with_ai = serializers.DecimalField(max_digits=18, decimal_places=2, allow_null=True)
+    selected_price = serializers.DecimalField(max_digits=18, decimal_places=2)
+    discount_amount = serializers.DecimalField(max_digits=18, decimal_places=2)
+    charged_amount = serializers.DecimalField(max_digits=18, decimal_places=2)
+    currency = serializers.CharField()
+    period_starts_at = serializers.DateTimeField(allow_null=True)
+    period_ends_at = serializers.DateTimeField(allow_null=True)
+    payment_reference = serializers.CharField(allow_blank=True)
     created_at = serializers.DateTimeField()
 
 
@@ -120,6 +142,12 @@ class AdminGymDetailSerializer(serializers.Serializer):
     subscription_status = serializers.CharField()
     subscription_starts_at = serializers.DateTimeField(allow_null=True)
     subscription_ends_at = serializers.DateTimeField(allow_null=True)
+    ai_enabled = serializers.BooleanField()
+    price_without_ai = serializers.DecimalField(max_digits=18, decimal_places=2, allow_null=True)
+    price_with_ai = serializers.DecimalField(max_digits=18, decimal_places=2, allow_null=True)
+    effective_price = serializers.DecimalField(max_digits=18, decimal_places=2, allow_null=True)
+    last_charged_amount = serializers.DecimalField(max_digits=18, decimal_places=2, allow_null=True)
+    subscription_charges = AdminSubscriptionChargeSerializer(many=True)
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
 
@@ -146,6 +174,7 @@ class AdminGymPatchSerializer(StrictSerializer):
     )
     subscription_starts_at = serializers.DateTimeField(required=False, allow_null=True)
     subscription_ends_at = serializers.DateTimeField(required=False, allow_null=True)
+    ai_enabled = serializers.BooleanField(required=False)
 
     def validate_timezone(self, value: str) -> str:
         try:
@@ -290,6 +319,7 @@ class AdminSubscriptionSerializer(serializers.Serializer):
     name = serializers.CharField()
     status = serializers.ChoiceField(choices=SubscriptionPlan.Status.choices)
     price = serializers.DecimalField(max_digits=18, decimal_places=2)
+    price_with_ai = serializers.DecimalField(max_digits=18, decimal_places=2, allow_null=True)
     currency = serializers.CharField()
     billing_interval = serializers.CharField()
 
@@ -300,6 +330,7 @@ class AdminSubscriptionDetailSerializer(serializers.Serializer):
     name = serializers.CharField()
     status = serializers.ChoiceField(choices=SubscriptionPlan.Status.choices)
     price = serializers.DecimalField(max_digits=18, decimal_places=2)
+    price_with_ai = serializers.DecimalField(max_digits=18, decimal_places=2, allow_null=True)
     currency = serializers.CharField()
     billing_interval = serializers.CharField()
     created_at = serializers.DateTimeField()
@@ -325,6 +356,7 @@ class AdminSubscriptionUpdateSerializer(StrictSerializer):
     name = serializers.CharField(required=False, allow_blank=False, max_length=100)
     status = serializers.ChoiceField(choices=SubscriptionPlan.Status.choices, required=False)
     price = NonNegativePriceField(required=False)
+    price_with_ai = NonNegativePriceField(required=False, allow_null=True)
     billing_interval = serializers.RegexField(
         r"^[A-Z][A-Z0-9_]{0,19}$",
         required=False,
@@ -390,6 +422,7 @@ class AdminProvisionedGymSerializer(serializers.Serializer):
     subscription_status = serializers.CharField()
     subscription_starts_at = serializers.DateTimeField(allow_null=True)
     subscription_ends_at = serializers.DateTimeField(allow_null=True)
+    ai_enabled = serializers.BooleanField()
 
 
 class AdminProvisionedUserSerializer(serializers.Serializer):

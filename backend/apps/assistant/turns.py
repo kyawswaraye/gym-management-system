@@ -32,6 +32,7 @@ from apps.assistant.dispatch import (
     execute_offered_read,
     tool_contracts,
 )
+from apps.assistant.entitlement import require_gym_ai
 from apps.assistant.execution import ExecutionRejected
 from apps.assistant.executor import ToolContract
 from apps.assistant.knowledge import (
@@ -209,6 +210,7 @@ def run_turn(
     if not assistant_configuration().available:
         raise AssistantUnavailable()
     gym, actor = _session(request)
+    require_gym_ai(gym)
     conversation = _conversation(gym, actor, conversation_id, message)
     append_message(
         gym=gym,
@@ -515,6 +517,7 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
     """Revalidate the stored proposal and run the existing write executor."""
 
     gym, actor = _session(request)
+    require_gym_ai(gym)
     goal, step = _owned_step(gym, actor, step_id)
     if step.status == WorkflowStep.Status.SUCCEEDED:
         return _confirmation_result(gym, goal, step, "existing", "That change is already complete.")
@@ -800,6 +803,7 @@ def reject_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str, 
 
     del view
     gym, actor = _session(request)
+    require_gym_ai(gym)
     goal, step = _owned_step(gym, actor, step_id)
     if step.status == WorkflowStep.Status.CANCELLED:
         return _confirmation_result(gym, goal, step, "cancelled", "The change was rejected.")

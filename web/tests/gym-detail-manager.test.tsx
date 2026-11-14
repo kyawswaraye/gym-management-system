@@ -46,6 +46,12 @@ const gym: PlatformGymDetail = {
   subscription_status: "ACTIVE",
   subscription_starts_at: null,
   subscription_ends_at: null,
+  ai_enabled: false,
+  price_without_ai: "0.00",
+  price_with_ai: null,
+  effective_price: "0.00",
+  last_charged_amount: null,
+  subscription_charges: [],
   created_at: "2026-09-30T00:00:00Z",
   updated_at: "2026-09-30T00:00:00Z",
 };

@@ -1774,6 +1774,7 @@ def test_openapi_documents_platform_dashboard_and_subscription_update() -> None:
         "name",
         "status",
         "price",
+        "price_with_ai",
         "currency",
         "billing_interval",
     }
@@ -1785,6 +1786,7 @@ def test_openapi_documents_platform_dashboard_and_subscription_update() -> None:
         "name",
         "status",
         "price",
+        "price_with_ai",
         "currency",
         "billing_interval",
         "created_at",
@@ -1792,7 +1794,13 @@ def test_openapi_documents_platform_dashboard_and_subscription_update() -> None:
     }
     update_properties = schemas["PatchedAdminSubscriptionUpdateRequest"]["properties"]
     status_schema = schemas[update_properties["status"]["$ref"].rsplit("/", 1)[-1]]
-    assert set(update_properties) == {"name", "status", "price", "billing_interval"}
+    assert set(update_properties) == {
+        "name",
+        "status",
+        "price",
+        "price_with_ai",
+        "billing_interval",
+    }
     assert set(status_schema["enum"]) == {"ACTIVE", "RETIRED"}
 
 

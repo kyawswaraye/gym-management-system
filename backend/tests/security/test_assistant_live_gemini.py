@@ -490,6 +490,14 @@ def test_live_gemini_answers_the_remaining_reads(monkeypatch: pytest.MonkeyPatch
         roles = say("List the roles.", conversation)
         assert "role" in _tools(roles)
         assert roles["pending_confirmation"] is None
+
+        trainers_sales = say(
+            "ဘယ် Trainer က PT အများဆုံးရောင်းထားလဲ? Answer from posted sales only.",
+            conversation,
+        )
+        assert "search_pt_trainer_sales" in _tools(trainers_sales)
+        assert _empty_or_zero(str(trainers_sales["message"]["body"]))
+        assert trainers_sales["pending_confirmation"] is None
         assert _counts(gym) == (1, 1, 0, 0)
     except AssertionError as exc:
         raise AssertionError(f"{exc}\n" + "\n".join(transcript)) from None

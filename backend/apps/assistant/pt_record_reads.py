@@ -8,9 +8,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from django.db.models import Count, Sum
 from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.views import APIView
@@ -26,7 +28,8 @@ from apps.users.serializers import StrictSerializer
 
 SEARCH_PT_SALES = "search_pt_sales"
 SEARCH_PT_BOOKINGS = "search_pt_bookings"
-PT_RECORD_READ_TOOL_NAMES = (SEARCH_PT_SALES, SEARCH_PT_BOOKINGS)
+SEARCH_PT_TRAINER_SALES = "search_pt_trainer_sales"
+PT_RECORD_READ_TOOL_NAMES = (SEARCH_PT_SALES, SEARCH_PT_BOOKINGS, SEARCH_PT_TRAINER_SALES)
 
 
 class PTSaleReadQuerySerializer(StrictSerializer):
@@ -180,6 +183,62 @@ def _sale_query(payload: Mapping[str, object]) -> dict[str, Any]:
     return dict(serializer.validated_data)
 
 
+class PTTrainerSaleQuerySerializer(StrictSerializer):
+    date_from = serializers.DateField(required=False)
+    date_to = serializers.DateField(required=False)
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=25, default=25)
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        start = attrs.get("date_from")
+        end = attrs.get("date_to")
+        if isinstance(start, date) and isinstance(end, date) and end < start:
+            raise serializers.ValidationError({"date_to": ["Must be on or after date_from."]})
+        return attrs
+
+
+def search_pt_trainer_sales(call: ReadCall) -> dict[str, object]:
+    """Rank posted PT sales by trainer. Drafts and voids are not sales."""
+
+    if call.gym.id is None:
+        raise ExecutionRejected("The assistant session is incomplete.", code="session")
+    serializer = PTTrainerSaleQuerySerializer(data=_without_gym(call.payload))
+    serializer.is_valid(raise_exception=True)
+    query = serializer.validated_data
+    queryset = PTSale.objects.filter(
+        gym_id=call.gym.id,
+        member__gym_id=call.gym.id,
+        trainer_staff_profile__gym_id=call.gym.id,
+        status=PTSale.Status.POSTED,
+    )
+    start = query.get("date_from")
+    end = query.get("date_to")
+    if isinstance(start, date):
+        queryset = queryset.filter(service_date__gte=start)
+    if isinstance(end, date):
+        queryset = queryset.filter(service_date__lte=end)
+    grouped = (
+        queryset.values("trainer_staff_profile_id", "trainer_staff_profile__display_name")
+        .annotate(
+            posted_sale_count=Count("id"),
+            posted_gross_fee=Sum("gross_fee"),
+        )
+        .order_by("-posted_gross_fee", "trainer_staff_profile__display_name")[: int(query["limit"])]
+    )
+    return {
+        "results": [
+            {
+                "trainer_staff_profile_id": str(row["trainer_staff_profile_id"]),
+                "trainer_name": row["trainer_staff_profile__display_name"],
+                "posted_sale_count": int(row["posted_sale_count"]),
+                "posted_gross_fee": money_text(row["posted_gross_fee"] or Decimal("0")),
+            }
+            for row in grouped
+        ],
+        "has_more": False,
+        "next_after": None,
+    }
+
+
 def _booking_query(payload: Mapping[str, object]) -> dict[str, Any]:
     serializer = PTBookingReadQuerySerializer(data=_without_gym(payload))
     serializer.is_valid(raise_exception=True)
@@ -235,8 +294,29 @@ _READS = {
             *_PAGE,
         ),
     ),
+    SEARCH_PT_TRAINER_SALES: _contract(
+        _definition(
+            SEARCH_PT_TRAINER_SALES,
+            "Rank this gym's posted PT sales by trainer. Each row is one trainer's "
+            "posted sale count and the sum of stored gross fees. Drafts, rejected "
+            "sales, and voids are excluded. Compare trainers from this result. "
+            "Do not guess a ranking.",
+            "pt.sales.view",
+        ),
+        (
+            FieldRequirement("date_from", "First service date. Optional.", required=False),
+            FieldRequirement("date_to", "Last service date. Optional.", required=False),
+            FieldRequirement(
+                "limit",
+                "Page size from 1 to 25. Optional.",
+                required=False,
+                kind="integer",
+            ),
+        ),
+    ),
 }
 _READERS = {
     SEARCH_PT_SALES: search_pt_sales,
     SEARCH_PT_BOOKINGS: search_pt_bookings,
+    SEARCH_PT_TRAINER_SALES: search_pt_trainer_sales,
 }

@@ -207,6 +207,9 @@ MESSAGES: dict[str, str] = {
     "The assignment cannot change from its current state.": "တာဝန်ပေးမှုသည် လက်ရှိအခြေအနေမှ ပြောင်း၍မရပါ။",
     "The assignment dates overlap another active assignment.": "တာဝန်ပေးရက်များသည် အခြားအသုံးပြုနေသော တာဝန်ပေးမှုနှင့် ထပ်နေသည်။",
     "The assistant is unavailable.": "လက်ထောက်ကို အသုံးမပြုနိုင်ပါ။",
+    "AI Assistant is not included in this gym's subscription.": (
+        "ဤ Gym ၏ အသင်းဝင်မှုတွင် AI လက်ထောက် မပါဝင်ပါ။"
+    ),
     "The booking cannot accept this command.": "ဤကြိုတင်စာရင်းသည် ဤလုပ်ဆောင်ချက်ကို လက်မခံပါ။",
     "The business date cannot be after today.": "လုပ်ငန်းရက်သည် ယနေ့ထက် နောက်မကျရ။",
     "The business date cannot be before the original business date.": "လုပ်ငန်းရက်သည် မူလလုပ်ငန်းရက်ထက် စောမရ။",

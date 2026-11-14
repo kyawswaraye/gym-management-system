@@ -19,6 +19,7 @@ const active: PlatformSubscription = {
   name: "Growth",
   status: "ACTIVE",
   price: "10.00",
+  price_with_ai: null,
   currency: "THB",
   billing_interval: "MONTHLY",
 };
@@ -29,6 +30,7 @@ const retired: PlatformSubscription = {
   name: "Legacy",
   status: "RETIRED",
   price: "0.00",
+  price_with_ai: null,
   currency: "THB",
   billing_interval: "TRIAL",
 };
