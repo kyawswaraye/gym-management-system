@@ -176,8 +176,8 @@ def test_every_assistant_tool_rejects_another_gym() -> None:
     tools = [registry.get(name) for name in registry.names()]
     reads = [tool for tool in tools if tool.operation == "read"]
     writes = [tool for tool in tools if tool.operation == "write"]
-    assert len(tools) == 132
-    assert len(reads) == 34
+    assert len(tools) == 134
+    assert len(reads) == 36
     assert len(writes) == 98
     assert set(contracts) == {tool.name for tool in tools}
     assert all(tool.confirmation_required for tool in writes)

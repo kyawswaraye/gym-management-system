@@ -164,6 +164,11 @@ _SYSTEM = (
     "amounts, and statuses exactly as stored. Myanmar digits have the same "
     "values as Arabic digits. Use the gym timezone for today, tomorrow, and "
     "yesterday. If a member is mentioned but not identified, ask which member. "
+    "A question about one member, one day, or a comparison may need several "
+    "reads. Use ids already stored in workflow state. get_gym_dashboard is the "
+    "range total. get_gym_report is one official daily report of at most 31 "
+    "days. get_trainer_dashboard is only the signed-in trainer's own book. Do "
+    "not send another trainer's id to it. "
     "Reply in the staff member's language."
 )
 _ANSWER_NOW = (

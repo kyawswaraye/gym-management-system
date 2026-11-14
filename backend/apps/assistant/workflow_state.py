@@ -50,6 +50,13 @@ _KEYS = (
     "next",
     "pending_tool",
     "parked",
+    "payment_id",
+    "product_id",
+    "trainer_id",
+    "pt_sale_id",
+    "pt_booking_id",
+    "occurrence_id",
+    "class_booking_id",
 )
 _NEXT_WORDS = (
     "ဘာဆက်",
@@ -199,7 +206,26 @@ def is_state_message(message: Message) -> bool:
     return message.role == Message.Role.SYSTEM and message.body.startswith(_MARKER)
 
 
+_SINGLE_IDS = {
+    "search_payments": "payment_id",
+    "search_products": "product_id",
+    "search_trainers": "trainer_id",
+    "search_pt_sales": "pt_sale_id",
+    "search_pt_bookings": "pt_booking_id",
+    "search_class_occurrences": "occurrence_id",
+    "search_bookings": "class_booking_id",
+}
+
+
 def absorb_read(state: dict[str, str], tool: str, result: Mapping[str, object]) -> None:
+    if tool == "get_payment":
+        payment_id = _uuid(result.get("record_id"))
+        if payment_id:
+            state["payment_id"] = payment_id
+        member_id = _uuid(result.get("member_id"))
+        if member_id and not _open_registration(state):
+            state["member_id"] = member_id
+        return
     rows = result.get("results")
     if not isinstance(rows, list):
         return
@@ -225,6 +251,22 @@ def absorb_read(state: dict[str, str], tool: str, result: Mapping[str, object]) 
             state["start_date"] = found_start
         if state.get("workflow") == "":
             state["workflow"] = "membership"
+    elif tool == "search_service_packages" and len(mapped) == 1 and not result.get("ambiguous"):
+        _remember_package_row(state, mapped[0])
+    elif tool in _SINGLE_IDS and len(mapped) == 1 and not result.get("ambiguous"):
+        found = _uuid(mapped[0].get("id"))
+        if found:
+            state[_SINGLE_IDS[tool]] = found
+
+
+def _remember_package_row(state: dict[str, str], row: Mapping[str, Any]) -> None:
+    found = _text(row.get("code"))
+    stored = state.get("package_code") or ""
+    if found and (not stored or stored.casefold() == found.casefold()):
+        state["package_code"] = found
+        name = _text(row.get("name"))
+        if name:
+            state["package_name"] = name
 
 
 def absorb_proposal(

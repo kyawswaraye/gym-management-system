@@ -501,3 +501,63 @@ def test_live_gemini_answers_the_remaining_reads(monkeypatch: pytest.MonkeyPatch
         assert _counts(gym) == (1, 1, 0, 0)
     except AssertionError as exc:
         raise AssertionError(f"{exc}\n" + "\n".join(transcript)) from None
+
+
+@override_settings(**_settings())
+def test_live_gemini_connects_domains_and_reads_the_official_report(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live = _live_settings()
+    gym, owner, client, headers = _gym(monkeypatch, "GV05")
+    for feature in ("members", "memberships", "pt", "reports", "finance", "classes"):
+        _enable(gym, feature)
+    assert isinstance(owner, GymMembership)
+    _seed_business_rows(gym, owner)
+    transcript: list[str] = []
+
+    def say(message: str, conversation: str = "") -> dict[str, object]:
+        payload: dict[str, object] = {"message": message}
+        if conversation:
+            payload["conversation_id"] = conversation
+        turn: dict[str, object] = {}
+        for attempt in range(3):
+            with override_settings(**live):
+                turn = _post(client, headers, payload)
+            if "assistant" not in _tools(turn) or attempt == 2:
+                break
+            time.sleep(5)
+        body = str(turn["message"]["body"]).replace("\n", " ")
+        transcript.append(f"USER: {message}")
+        transcript.append(f"ASSISTANT: {body[:700]} TOOLS: {_tools(turn) or 'none'}")
+        return turn
+
+    try:
+        difference = say("Membership နဲ့ class package ဘာကွာလဲ?")
+        conversation = str(difference["conversation_id"])
+        difference_body = str(difference["message"]["body"])
+        assert difference["pending_confirmation"] is None
+        assert "class" in difference_body.casefold() or "အတန်း" in difference_body
+        assert "membership" in difference_body.casefold() or "အသင်း" in difference_body
+        assert "50000" not in difference_body
+
+        compared = say("ဒီလ အရင်လထက် ဝင်ငွေတက်လား?", conversation)
+        compared_tools = _tools(compared)
+        assert compared_tools.count("dashboard") >= 1
+        assert compared["pending_confirmation"] is None
+
+        report = say(
+            "ဒီနေ့ official check-in report ရဲ့ စုစုပေါင်းကို ပြပါ။",
+            conversation,
+        )
+        assert "official gym report" in _tools(report)
+        assert report["pending_confirmation"] is None
+
+        together = say("Wint War ရဲ့ membership နဲ့ ဒီနေ့ check-in ကို အတူတူ ပြပါ။", conversation)
+        together_tools = _tools(together)
+        together_body = str(together["message"]["body"])
+        assert "membership" in together_tools or "Read Plan" in together_body
+        assert "check-in" in together_tools or "check in" in together_tools or "1" in together_body
+        assert together["pending_confirmation"] is None
+        assert _counts(gym) == (1, 1, 0, 0)
+    except AssertionError as exc:
+        raise AssertionError(f"{exc}\n" + "\n".join(transcript)) from None

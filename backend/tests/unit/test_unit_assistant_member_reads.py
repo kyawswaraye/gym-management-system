@@ -155,6 +155,8 @@ def test_member_reads_register_without_changing_write_tools() -> None:
         "search_roles",
         "search_permissions",
         "search_staff_access",
+        "get_gym_report",
+        "get_trainer_dashboard",
     }
     for name in MEMBER_READ_TOOL_NAMES:
         tool = production_registry().get(name)

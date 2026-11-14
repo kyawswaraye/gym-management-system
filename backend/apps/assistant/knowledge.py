@@ -133,6 +133,35 @@ separate, and receipt printer options. Announcements are EVENT, PROMOTION, or
 GENERAL, aimed at all active members, PT clients, or members expiring in 7 or
 30 days, and move DRAFT, SCHEDULED, PUBLISHED, or cancelled.
 
+Connected records. One member can have memberships, payments, check-ins, class
+bookings, a trainer assignment, PT sales, granted packages, and retail
+purchases. When a question needs more than one of those, call each read. A
+membership plan is gym access for a duration and price. A membership is one
+member's purchased term, with its own status, dates, and payment status. A
+class is a scheduled group meeting and is not a membership. A class package is
+a block of class sessions. A PT package is a block of personal-training
+sessions with one trainer. The platform subscription is what this gym pays for
+GymPilot and is not a member membership. Suspending a membership freezes that
+term. There is no command that extends a membership's dates. A renewal is a
+new membership. Unpaid and partial memberships are the member debt. The
+dashboard field pending_payment_amount is that outstanding membership money.
+A payment purpose is MEMBERSHIP, PT, PRODUCT, CLASS, or OTHER, and the payment
+belongs to the member and transaction named on the row. Dashboard revenue is
+split into new_member_revenue, renewal_revenue, pt_revenue, class_revenue,
+product_revenue, and other_revenue. Expenses use this gym's expense categories.
+A stock purchase is a PURCHASE movement. A product sale is a retail sale that
+posts a SALE movement and a PRODUCT payment. A trainer may teach classes and
+deliver personal training. Compare two periods by calling get_gym_dashboard
+once for each period. get_gym_report returns official daily rows for at most
+31 days: period, cash_book, profit_loss, product_sales, membership_expiry,
+check_ins, pt_sessions, classes, stock_movements, and inventory. On profit_loss,
+net profit is total revenue minus total expenses. Product cost is reported
+beside that profit and is not subtracted again. get_trainer_dashboard is only
+the signed-in trainer's own sessions. A question about why attendance differs
+uses the stored check-ins, class occurrences, class bookings, and PT bookings
+for that day. State only the differences those results show. Do not invent a
+cause.
+
 Communications. Publishing an announcement queues that announcement's in-app
 notices and push notifications through the announcement service. Membership
 expiry email and membership expiry push are sent by scheduled jobs when the
@@ -307,7 +336,10 @@ def _settings(gym: Gym) -> list[str]:
             f"Settings: member numbers start {settings.member_number_prefix}. "
             f"Finance approval is {approval}. "
             f"Class cancellation cutoff {settings.class_cancellation_cutoff_minutes} minutes. "
-            f"A class no-show {consume} a session."
+            f"A class no-show {consume} a session. "
+            f"Membership expiry warnings on days {settings.membership_expiry_warning_days}. "
+            f"Expiry email is {'on' if settings.membership_expiry_email_enabled else 'off'}. "
+            f"Expiry push is {'on' if settings.membership_expiry_push_enabled else 'off'}."
         )
     ]
 
@@ -467,7 +499,7 @@ _READ_DOMAINS = {
     "commissions": frozenset({"search_pt_commissions"}),
     "payments": frozenset({"search_payments", "get_payment"}),
     "announcements": frozenset({"search_announcements"}),
-    "reports": frozenset({"get_gym_dashboard"}),
+    "reports": frozenset({"get_gym_dashboard", "get_gym_report", "get_trainer_dashboard"}),
 }
 _WRITE_ONLY_DOMAINS = frozenset({"settings"})
 _UNSUPPORTED_DOMAINS = frozenset({"audit", "mail", "files", "passwords", "notifications", "roster"})

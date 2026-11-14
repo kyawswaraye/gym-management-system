@@ -55,6 +55,37 @@ def test_a_member_lookup_does_not_turn_a_pt_date_into_a_membership() -> None:
     assert capability_brief("Soe Soe", state).startswith("Relevant operation. Personal training")
 
 
+def test_one_unambiguous_read_keeps_that_record_id() -> None:
+    state: dict[str, str] = {"workflow": "payment"}
+    payment = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    absorb_read(
+        state,
+        "search_payments",
+        {"results": [{"id": payment, "purpose": "MEMBERSHIP"}]},
+    )
+    assert state["payment_id"] == payment
+    assert state["workflow"] == "payment"
+    absorb_read(
+        state,
+        "search_products",
+        {"results": [{"id": payment}, {"id": "cccccccc-cccc-cccc-cccc-cccccccccccc"}]},
+    )
+    assert "product_id" not in state
+    absorb_read(
+        state,
+        "get_payment",
+        {"record_id": payment, "member_id": "dddddddd-dddd-dddd-dddd-dddddddddddd"},
+    )
+    assert state["member_id"] == "dddddddd-dddd-dddd-dddd-dddddddddddd"
+    absorb_read(
+        state,
+        "search_service_packages",
+        {"results": [{"code": "PT3", "name": "Three sessions"}]},
+    )
+    assert state["package_code"] == "PT3"
+    assert state["package_name"] == "Three sessions"
+
+
 def test_short_reply_keeps_the_operation_named_by_the_previous_question() -> None:
     assert short_reply_kind("ထည့်မယ်။") == "affirm"
     assert short_reply_kind("အင်း") == "affirm"

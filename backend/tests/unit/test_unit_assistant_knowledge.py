@@ -61,6 +61,10 @@ def test_domain_map_covers_the_gym_records() -> None:
         "not a substitute for a read",
         "not supported",
         "not saved until the server confirms",
+        "not a member membership",
+        "get_gym_report",
+        "pending_payment_amount",
+        "do not invent a cause",
     ):
         assert phrase.casefold() in text
     assert "do not say a tool is missing" not in text
@@ -78,6 +82,8 @@ def test_turn_answers_lists_from_the_brief() -> None:
     assert "do not invent a date" in text
     assert "do not choose one" in text
     assert "when the staff write in burmese" in text
+    assert "get_gym_report" in text
+    assert "get_trainer_dashboard" in text
     assert "myanmar digits have the" in text
     assert "never say a tool is missing" not in text
 
@@ -126,7 +132,7 @@ def test_capabilities_follow_registered_tools() -> None:
     assert knowledge_capability("mail") == "unsupported"
     assert "search_service_packages" in reads
     assert len(writes) == 98
-    assert len(reads) == 34
+    assert len(reads) == 36
 
 
 def test_business_questions_route_to_the_stored_read() -> None:
