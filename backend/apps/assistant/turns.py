@@ -40,13 +40,7 @@ from apps.assistant.knowledge import (
     gate_sentence,
     grounded_information_reply,
     grounded_read_reply,
-    information_question,
-    offered_operations,
-    operation_workflow,
     public_activity,
-    short_reply_kind,
-    speaks_burmese,
-    staff_notice,
     visible_reply,
 )
 from apps.assistant.lookups import (
@@ -88,15 +82,13 @@ from apps.assistant.workflow_state import (
     absorb_read,
     completion_sentence,
     confirmation_reply,
-    direct_reply,
     is_state_message,
     load_state,
+    note_verified,
     provider_notice,
     remember_commit,
-    remember_facts,
     save_state,
     state_brief,
-    stored_date_reply,
 )
 from apps.classes.exceptions import ClassFull, ScheduleConflict
 from apps.common.api.exceptions import CodedAPIException, RequestRejected
@@ -119,77 +111,56 @@ from apps.users.permissions import IsActiveOwner, RequiresEntitlements
 logger = logging.getLogger(__name__)
 
 _SYSTEM = (
-    "You are the gym assistant. The staff member cannot operate the system, so "
-    "you carry the task to the end. The gym and the staff member are already "
-    "chosen. Never ask for or send a gym id. Never send confirmed. Never tell "
-    "them which screen, button, or permission to use. "
-    "You choose the tools. The server runs only the tools you call, in this "
-    "gym's session, and does not add a read you skipped. Call every tool the "
-    "question needs, including several at once, then answer from those results "
-    "and the live gym brief. If a result does not contain the fact, say so. "
-    "A question while a confirmation is waiting does not confirm it and does "
-    "not replace it. "
-    "Ask only the next fact you cannot look up, one question at a time. Map "
-    "everyday words to stored codes yourself, such as month to MONTH. Never "
-    "ask the staff to type a code. Pass a date or status filter only when the "
-    "staff named that date or status. For get_gym_dashboard, pass range or both "
-    "dates when the staff names a period. Omitting them returns today only. "
-    "Report each dashboard money field by its own stored amount. "
-    "total_revenue is only the sum of the revenue fields. Do not call it "
-    "membership revenue unless new_member_revenue plus renewal_revenue "
-    "equals that sum. "
-    "A new membership sale uses search_membership_plans with eligible_for_sale "
-    "true and offers only ACTIVE plans. "
-    "Do not invent an amount, member, payment, sale, expense, attendance, "
-    "booking, class time, capacity, stock quantity, salary, commission, or date. "
-    "Counts and today's schedule come from the live gym brief when they are "
-    "listed there. There is no daily shift roster. If no read tool can retrieve "
-    "the record, say that you cannot retrieve it. Do not invent the record. "
-    "Do not call a write tool to answer a question. A write only proposes a "
-    "change. Never say that change succeeded before the server confirms it. "
-    "Never repeat a tool name, exception, database error, or stack trace. "
-    "Read tools look up records. Use them instead of asking for an id. Send "
-    "the name the staff said. If the tool returns ambiguous, list the choices "
-    "and ask which one. Do not choose one. If the tool returns date_unconfirmed, "
-    "ask for the date. If the tool returns time_unconfirmed, ask for the time. "
-    "Do not invent a date or a time. If the tool returns assignment_required, "
-    "propose that assignment for the date it names, then the sale or booking. "
-    "If it returns package_required, say a posted package is needed first. "
-    "If it returns already_saved, do not propose that same change again. "
-    "For an approval, send the record's own id. The server supplies the stored "
-    "amount. If a confirmation is already waiting, explain that one change and "
-    "do not propose another write. Use the workflow state for ids and dates "
-    "already collected. Do not ask for them again. When the staff write in "
-    "Burmese, reply in Burmese. Keep stored names, numbers, codes, dates, "
-    "amounts, and statuses exactly as stored. Myanmar digits have the same "
-    "values as Arabic digits. Use the gym timezone for today, tomorrow, and "
-    "yesterday. If a member is mentioned but not identified, ask which member. "
-    "A question about one member, one day, or a comparison may need several "
-    "reads. Use ids already stored in workflow state. get_gym_dashboard is the "
-    "range total. get_gym_report is one official daily report of at most 31 "
-    "days. get_trainer_dashboard is only the signed-in trainer's own book. Do "
-    "not send another trainer's id to it. "
-    "Reply in the staff member's language."
+    "You are the GymPilot assistant for the signed-in gym and staff member. "
+    "Understand what the person is trying to do from the conversation, the "
+    "verified references, and the tool results. People phrase the same request "
+    "differently, change their minds, ask side questions, and return to earlier "
+    "work. Follow the meaning. "
+    "You choose which tools to call and in what order. The server runs only the "
+    "tools you call, in this gym, and does not add a read you skipped. The live "
+    "gym brief is a partial snapshot. Call a read when the question needs a "
+    "complete, filtered, or current record. If a result does not contain the "
+    "fact, say that you cannot retrieve it. Do not invent the record. Do not "
+    "call a write tool to answer a question. Do not invent an amount, person, "
+    "payment, sale, expense, "
+    "attendance, booking, class time, capacity, stock quantity, salary, "
+    "commission, or date. "
+    "A write only proposes a change. Never say that change is saved before the "
+    "server confirms it. Chat text never confirms a waiting change. The staff "
+    "uses the confirmation control. If a confirmation is already waiting, do "
+    "not propose another write. Call cancel_pending_confirmation when the staff "
+    "member wants that prepared change dropped. That does not delete a saved "
+    "record. "
+    "Never ask for or send a gym id. Never send confirmed. Never repeat a tool "
+    "name, exception, database error, or stack trace. Never tell the staff "
+    "which screen to open. "
+    "Read tools look up records. Send the name or number the staff used. If a "
+    "tool returns ambiguous, list the choices and ask which one. Do not choose. "
+    "A tool error is a fact: ask for what is missing or continue from that "
+    "result. Do not invent the missing fact. For an approval or rejection, send "
+    "the record's own id. The server supplies the stored amount. The record "
+    "must already be submitted and waiting. If the tool says not_pending, "
+    "submit that record first. "
+    "Verified references are ids and values the server stored from tool results "
+    "and confirmed writes. Use them instead of guessing an id from a name. A "
+    "person may still correct a fact or mean a different record. "
+    "There is no daily shift roster. Passwords, sessions, and audit storage are "
+    "not available. Keep stored names, numbers, codes, dates, amounts, and "
+    "statuses exactly as stored. Myanmar digits have the same values as Arabic "
+    "digits. Use the gym timezone for relative days. Reply in the staff "
+    "member's language."
 )
 _ANSWER_NOW = (
     "Answer now from the tool results already in this conversation. Do not call more tools."
 )
 _CONTINUE = (
     "The previous change is saved. Do not propose that same change again. "
-    "Do not propose a trainer assignment that already exists. "
-    "If the request is finished, say that it is done in the staff member's "
-    "language. If one relevant next step remains, say that step. Do not offer "
-    "an unrelated action. If a different step is still required, ask the one "
-    "missing fact or propose that different change."
+    "Continue only the work this conversation still needs."
 )
 _UNAVAILABLE = "The assistant is unavailable."
 _LIMIT = "I could not finish that within the assistant limit."
 _BLOCKED = "I can't help with that request."
-_AGREE = (
-    "The staff agreed to the one operation already under discussion. Propose "
-    "that change and wait for confirmation. Do not replace it with a member "
-    "lookup. Do not say the change is already saved."
-)
+_CANCEL = "cancel_pending_confirmation"
 
 
 class AssistantUnavailable(CodedAPIException):
@@ -198,7 +169,7 @@ class AssistantUnavailable(CodedAPIException):
     default_detail = "The assistant is unavailable."
 
 
-_HISTORY = 12
+_HISTORY = 24
 _READ_LIMIT = 12000
 _GOAL_TTL = timedelta(hours=24)
 
@@ -224,49 +195,7 @@ def run_turn(
         role=Message.Role.STAFF,
         body=message,
     )
-    pending_step = _waiting_step(gym, conversation, actor)
-    pending = _pending_card(pending_step)
-    kind = short_reply_kind(message)
-    if kind == "decline":
-        return _decline_reply(gym, conversation, message, pending_step)
-    cue = ""
-    if kind == "affirm":
-        continued = _affirm_reply(gym, conversation, message, pending_step)
-        if continued is not None:
-            return continued
-        cue = _AGREE
-    workflow_now = load_state(gym, conversation)
-    remembered = stored_date_reply(message, workflow_now)
-    if remembered is not None:
-        saved = append_message(
-            gym=gym,
-            conversation=conversation,
-            actor=None,
-            role=Message.Role.ASSISTANT,
-            body=remembered[:4000],
-        )
-        return {
-            "conversation_id": conversation.id,
-            "message": message_data(saved),
-            "pending_confirmation": pending,
-            "tool_activity": [],
-        }
-    if pending is None:
-        stored = direct_reply(message, load_state(gym, conversation))
-        if stored is not None:
-            saved = append_message(
-                gym=gym,
-                conversation=conversation,
-                actor=None,
-                role=Message.Role.ASSISTANT,
-                body=stored[:4000],
-            )
-            return {
-                "conversation_id": conversation.id,
-                "message": message_data(saved),
-                "pending_confirmation": None,
-                "tool_activity": [],
-            }
+    expired = _drop_expired(gym, conversation, actor)
     answered = _reply(
         request=request,
         view=view,
@@ -274,7 +203,11 @@ def run_turn(
         actor=actor,
         conversation=conversation,
         instruction=_SYSTEM,
-        cue=cue,
+        cue=(
+            "The previous confirmation expired and nothing was saved."
+            if expired
+            else ""
+        ),
         provider_fallback=_UNAVAILABLE,
     )
     if answered is None:
@@ -300,7 +233,7 @@ def _continue_task(
         actor=actor,
         conversation=conversation,
         instruction=_SYSTEM + " " + _CONTINUE,
-        cue="The change is saved. Continue only if a different step is still required.",
+        cue="The change is saved.",
         provider_fallback=None,
         saved=saved,
     )
@@ -324,8 +257,10 @@ def _reply(
     contracts = tool_contracts()
     staff_text = _staff_text(history)
     declarations = _model_declarations(offered, contracts, staff_text)
+    declarations.append(_cancel_declaration())
     contents = _contents(history)
     if cue:
+        instruction += "\n" + cue
         contents.append({"role": "user", "parts": [{"text": cue}]})
     activity: list[dict[str, str]] = []
     proposal = pending
@@ -341,18 +276,18 @@ def _reply(
     if pending is not None:
         instruction += " A confirmation is already waiting. Do not propose another write."
     workflow = load_state(gym, conversation)
-    remember_facts(workflow, staff_text, _conversation_today(gym))
     remember_sale_package(gym, conversation, workflow)
     context = assistant_context(gym, _codes(request), assistant_full_access(request))
     opening_card = (
-        "Answer from the tools you choose and from the live gym brief. "
-        "Workflow state lists facts already collected."
+        "Verified references come from tool results and confirmed writes. "
+        "Conversation history is what was said. A waiting confirmation is not saved."
     )
     instruction += "\n\n" + opening_card
     instruction += "\n" + state_brief(workflow)
     instruction += "\n\n" + context
     marker = "Live gym brief"
     live_brief = context[context.find(marker) :] if marker in context else ""
+    seen_errors: set[tuple[str, str]] = set()
     try:
         for _step in range(max_steps()):
             opened_now = False
@@ -373,7 +308,7 @@ def _reply(
                 break
             contents.append({"role": "model", "parts": [dict(part) for part in turn.parts]})
             responses: list[dict[str, object]] = []
-            clarification = ""
+            repeated_error = False
             for call in turn.calls:
                 if calls_used >= max_tool_calls():
                     responses.append(_function_response(call.name, {"error": "step_limit"}))
@@ -394,13 +329,18 @@ def _reply(
                     staff_text=staff_text,
                     workflow=workflow,
                 )
-                if outcome is not None:
+                if body.get("status") in {"cancelled", "expired"}:
+                    proposal = None
+                elif outcome is not None:
                     proposal = outcome
                     opened_now = True
-                else:
-                    sentence = _clarification_sentence(body, staff_text)
-                    if sentence:
-                        clarification = sentence
+                error_code = body.get("error")
+                if isinstance(error_code, str) and error_code:
+                    key = (call.name, error_code)
+                    if key in seen_errors:
+                        repeated_error = True
+                    seen_errors.add(key)
+                note_verified(workflow, call.name, body)
                 responses.append(_function_response(call.name, body))
                 if "result" in body:
                     read_completed = True
@@ -427,8 +367,8 @@ def _reply(
             if opened_now:
                 reply = turn.text or _proposal_text(proposal)
                 break
-            if clarification:
-                reply = clarification
+            if repeated_error:
+                reply = turn.text or reply or _LIMIT
                 break
         else:
             limit_reached = True
@@ -474,22 +414,23 @@ def _reply(
         opening_card=opening_card,
     )
     save_state(gym, conversation, workflow)
-    if reply in {"", _LIMIT} and not (proposal is not None and information_question(staff_text)):
+    if reply in {"", _LIMIT}:
         summary = proposal["summary"] if proposal is not None else _LIMIT
         reply = summary if isinstance(summary, str) else _LIMIT
     if not provider_down and reply not in {_LIMIT, _BLOCKED}:
+        ground = _grounding_text(history, workflow, live_brief)
         if read_completed:
             corrected = grounded_read_reply(
                 reply,
                 results=read_results,
-                brief=live_brief,
+                brief=ground,
                 staff_text=staff_text,
                 fallback=True,
             )
         else:
             corrected = grounded_information_reply(
                 reply,
-                brief=live_brief,
+                brief=ground,
                 staff_text=staff_text,
             )
         if corrected:
@@ -661,10 +602,7 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
             instruction=_SYSTEM,
             cue=(
                 "The sale or booking was not saved. That trainer is not assigned "
-                "to the member on the service date. Propose create_assignment now "
-                "with the exact effective_from from assignment_required. Do not "
-                "choose an earlier date. Do not propose the sale or booking again "
-                "until the assignment is saved."
+                "to the member on the service date."
             ),
             provider_fallback=_confirmation_text(gym, goal.conversation, "assignment"),
             saved=None,
@@ -717,14 +655,10 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
             instruction=_SYSTEM,
             cue=(
                 "The booking was not saved. The member has no active class package "
-                "with sessions left for that class. Do not propose the booking again. "
-                "Say that a class package is required first, in the staff member's "
-                "language, in one sentence."
+                "with sessions left for that class."
                 if class_booking
                 else "The booking was not saved. The member has no active PT package "
-                "with sessions left on that date. Do not propose the booking again. "
-                "Say that a posted PT sale is required first, in the staff member's "
-                "language, in one sentence."
+                "with sessions left on that date."
             ),
             provider_fallback=_confirmation_text(
                 gym,
@@ -883,6 +817,8 @@ def _handle_call(
     staff_text: str = "",
     workflow: dict[str, str] | None = None,
 ) -> tuple[dict[str, object] | None, dict[str, object]]:
+    if name == _CANCEL:
+        return None, _cancel_pending(gym, conversation, actor)
     if name not in offered:
         return None, {"error": "unknown_tool"}
     contract = tool_contracts().get(name)
@@ -902,7 +838,14 @@ def _handle_call(
     if tool.operation != "write":
         return None, {"error": "unknown_tool"}
     if proposal is not None:
-        return None, {"status": "waiting"}
+        return None, {
+            "status": "waiting",
+            "saved": False,
+            "detail": (
+                "A confirmation is already waiting. This message did not "
+                "confirm it, and nothing was saved."
+            ),
+        }
     if tool.approval_required:
         prepared, failure = _prepare_approval(gym, tool, payload)
         if failure is not None:
@@ -995,7 +938,14 @@ def _open_proposal(
         expires_at=timezone.now() + _GOAL_TTL,
     )
     if opened is None:
-        return None, {"status": "waiting"}
+        return None, {
+            "status": "waiting",
+            "saved": False,
+            "detail": (
+                "A confirmation is already waiting. This message did not "
+                "confirm it, and nothing was saved."
+            ),
+        }
     goal, step = opened
     card = public_pending(required, step_id=step.id, goal_id=goal.id, tool_name=tool.name)
     response: dict[str, object] = {"status": "confirmation_required", "summary": summary}
@@ -1021,6 +971,8 @@ def _prepare_approval(
         snapshot = loader(gym, source_id)
     except ExecutionRejected:
         return payload, {"error": "not_found"}
+    if snapshot.status not in {"", "PENDING_APPROVAL"}:
+        return payload, {"error": "not_pending", "status": snapshot.status}
     return with_snapshot(payload, snapshot), None
 
 
@@ -1182,91 +1134,15 @@ def _pending_card(pair: tuple[Goal, WorkflowStep] | None) -> dict[str, object] |
     return public_pending(raw, step_id=step.id, goal_id=goal.id, tool_name=step.tool_name)
 
 
-def _decline_reply(
-    gym: Gym,
-    conversation: Conversation,
-    message: str,
-    pair: tuple[Goal, WorkflowStep] | None,
-) -> dict[str, object]:
+def _drop_expired(gym: Gym, conversation: Conversation, actor: GymMembership) -> bool:
+    """Close a confirmation whose time has passed. The message text is not read."""
+
+    pair = _waiting_step(gym, conversation, actor)
     if pair is None:
-        return _stored_reply(
-            gym,
-            conversation,
-            _spoken(message, "There is no change waiting.", "စောင့်နေတဲ့ ပြောင်းလဲမှု မရှိပါ။"),
-            None,
-        )
+        return False
     goal, step = pair
-    if goal.expires_at <= timezone.now():
-        return _expire_reply(gym, conversation, message, goal, step)
-    _cancel_operation(gym, conversation, "cancelled")
-    close_goal(
-        gym=gym,
-        goal=goal,
-        step=step,
-        status=Goal.Status.CANCELLED,
-        step_status=WorkflowStep.Status.CANCELLED,
-        summary="rejected",
-    )
-    return _stored_reply(gym, conversation, gate_sentence("rejected", message), None)
-
-
-def _affirm_reply(
-    gym: Gym,
-    conversation: Conversation,
-    message: str,
-    pair: tuple[Goal, WorkflowStep] | None,
-) -> dict[str, object] | None:
-    """Continue one discussed operation. A waiting card is not executed here."""
-
-    if pair is not None:
-        goal, step = pair
-        if goal.expires_at <= timezone.now():
-            return _expire_reply(gym, conversation, message, goal, step)
-        return _stored_reply(
-            gym,
-            conversation,
-            _spoken(
-                message,
-                "Use the confirmation to save it. Nothing is saved yet.",
-                "အတည်ပြုချက်ကို နှိပ်မှ သိမ်းပါမယ်။ မသိမ်းရသေးပါ။",
-            ),
-            _pending_card(pair),
-        )
-    question = _latest_assistant(gym, conversation)
-    offered = offered_operations(question)
-    if len(offered) > 1:
-        return _stored_reply(
-            gym,
-            conversation,
-            _spoken(message, "Which change should I continue?", "ဘယ်အရာကို ဆက်လုပ်မလဲ။"),
-            None,
-        )
-    state = load_state(gym, conversation)
-    tool = offered[0] if offered else _active_operation(state)
-    if tool and state.get("last_outcome") == "saved" and state.get("last_tool") == tool:
-        tool = ""
-    if not tool:
-        return _stored_reply(
-            gym,
-            conversation,
-            _spoken(message, "What should I add?", "ဘာကို ထည့်မလဲ။"),
-            None,
-        )
-    workflow = operation_workflow(tool)
-    if workflow:
-        state["workflow"] = workflow
-    state["next"] = tool
-    save_state(gym, conversation, state)
-    return None
-
-
-def _expire_reply(
-    gym: Gym,
-    conversation: Conversation,
-    message: str,
-    goal: Goal,
-    step: WorkflowStep,
-) -> dict[str, object]:
+    if goal.expires_at > timezone.now():
+        return False
     _cancel_operation(gym, conversation, "expired")
     close_goal(
         gym=gym,
@@ -1276,35 +1152,52 @@ def _expire_reply(
         step_status=WorkflowStep.Status.CANCELLED,
         summary="expired",
     )
-    return _stored_reply(
-        gym,
-        conversation,
-        _spoken(
-            message,
-            "This confirmation has expired. Nothing was saved.",
-            "ဒီအတည်ပြုချက်က သက်တမ်းကုန်ပါပြီ။ ဘာမှ မသိမ်းပါ။",
+    return True
+
+
+def _cancel_declaration() -> dict[str, object]:
+    return {
+        "name": _CANCEL,
+        "description": (
+            "Drop the confirmation waiting in this conversation. Call this when "
+            "the staff member does not want that prepared change. This does not "
+            "confirm a change and does not delete a saved record. If nothing is "
+            "waiting, the result says so."
         ),
-        None,
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }
+
+
+def _cancel_pending(
+    gym: Gym,
+    conversation: Conversation,
+    actor: GymMembership,
+) -> dict[str, object]:
+    pair = _waiting_step(gym, conversation, actor)
+    if pair is None:
+        return {"status": "nothing_waiting"}
+    goal, step = pair
+    if goal.expires_at <= timezone.now():
+        _cancel_operation(gym, conversation, "expired")
+        close_goal(
+            gym=gym,
+            goal=goal,
+            step=step,
+            status=Goal.Status.EXPIRED,
+            step_status=WorkflowStep.Status.CANCELLED,
+            summary="expired",
+        )
+        return {"status": "expired"}
+    _cancel_operation(gym, conversation, "cancelled")
+    close_goal(
+        gym=gym,
+        goal=goal,
+        step=step,
+        status=Goal.Status.CANCELLED,
+        step_status=WorkflowStep.Status.CANCELLED,
+        summary="rejected",
     )
-
-
-def _active_operation(state: Mapping[str, str]) -> str:
-    if state.get("last_outcome") in {"cancelled", "expired"}:
-        return ""
-    if state.get("stage") in {"cancelled", "expired"}:
-        return ""
-    last = state.get("last_tool") or ""
-    nxt = state.get("next") or ""
-    pending = state.get("pending_tool") or ""
-    if state.get("stage") == "completed" or state.get("last_outcome") == "saved":
-        if nxt and nxt not in {last, "approval"}:
-            return nxt
-        return ""
-    if pending and pending != "approval":
-        return pending
-    if nxt and nxt != "approval":
-        return nxt
-    return ""
+    return {"status": "cancelled"}
 
 
 def _cancel_operation(gym: Gym, conversation: Conversation, stage: str) -> None:
@@ -1315,52 +1208,11 @@ def _cancel_operation(gym: Gym, conversation: Conversation, stage: str) -> None:
     save_state(gym, conversation, state)
 
 
-def _stored_reply(
-    gym: Gym,
-    conversation: Conversation,
-    body: str,
-    pending: dict[str, object] | None,
-) -> dict[str, object]:
-    saved = append_message(
-        gym=gym,
-        conversation=conversation,
-        actor=None,
-        role=Message.Role.ASSISTANT,
-        body=body[:4000],
-    )
-    return {
-        "conversation_id": conversation.id,
-        "message": message_data(saved),
-        "pending_confirmation": pending,
-        "tool_activity": [],
-    }
-
-
-def _spoken(text: str, english: str, burmese: str) -> str:
-    return burmese if speaks_burmese(text) else english
-
-
 def _latest_staff(gym: Gym, conversation: Conversation) -> str:
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         row = (
             Message.objects.filter(gym=gym, conversation=conversation, role=Message.Role.STAFF)
-            .order_by("-created_at", "-id")
-            .only("body")
-            .first()
-        )
-    return row.body if row is not None else ""
-
-
-def _latest_assistant(gym: Gym, conversation: Conversation) -> str:
-    with transaction.atomic():
-        set_gym_context(gym_id=gym.id)
-        row = (
-            Message.objects.filter(
-                gym=gym,
-                conversation=conversation,
-                role=Message.Role.ASSISTANT,
-            )
             .order_by("-created_at", "-id")
             .only("body")
             .first()
@@ -1540,23 +1392,6 @@ def _model_declarations(
     return selected
 
 
-def _clarification_sentence(body: Mapping[str, object], staff_text: str) -> str:
-    """Use the tool's validation sentence when the proposal cannot open.
-
-    A missing lookup can be followed by another tool. A date, choice, or
-    inactive record cannot.
-    """
-
-    error = body.get("error")
-    if not isinstance(error, str):
-        status_code = body.get("status")
-        error = status_code if isinstance(status_code, str) else ""
-    if error in {"not_found", "permission_denied", "unavailable"}:
-        return ""
-    sentence = staff_notice(body, staff_text)
-    return sentence or ""
-
-
 def _answer_from_results(
     *,
     contents: list[dict[str, object]],
@@ -1614,6 +1449,17 @@ def _staff_text(history: list[Message]) -> str:
         if message.role == Message.Role.STAFF and message.body.strip():
             return message.body
     return ""
+
+
+def _grounding_text(history: list[Message], workflow: Mapping[str, str], brief: str) -> str:
+    """Facts the reply may repeat: this gym's brief, verified refs, and what staff said."""
+
+    said = [
+        message.body.strip()[:500]
+        for message in history
+        if message.role == Message.Role.STAFF and message.body.strip()
+    ]
+    return "\n".join((brief, state_brief(workflow), *said[-12:]))
 
 
 def _safe_error_code(code: str) -> str:

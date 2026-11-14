@@ -741,7 +741,7 @@ _APPROVE = RegisteredTool(
     contract=_contract(
         _definition(
             "approve_retail_sale",
-            "Approve a retail sale",
+            "Approve a submitted retail sale that is waiting for approval",
             "retail.approve",
             approval=True,
         ),
@@ -763,7 +763,7 @@ _REJECT = RegisteredTool(
     contract=_contract(
         _definition(
             "reject_retail_sale",
-            "Reject a retail sale",
+            "Reject a submitted retail sale that is waiting for approval",
             "retail.approve",
             approval=True,
         ),

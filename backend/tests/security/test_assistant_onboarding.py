@@ -56,13 +56,22 @@ def _settings() -> dict[str, str]:
 
 
 def _brief_value(instruction: str, key: str) -> str:
-    marker = "Workflow state, already stored:"
+    marker = "Verified references, already stored:"
     start = instruction.find(marker)
     if start < 0:
         return ""
     brief = instruction[start:].split("\n", 1)[0]
     match = re.search(rf"(?:^|; ){re.escape(key)}=([^;]+)", brief)
     return match.group(1).strip() if match else ""
+
+
+def _responds(contents: list[dict[str, object]]) -> bool:
+    if not contents:
+        return False
+    parts = contents[-1].get("parts")
+    return isinstance(parts, list) and any(
+        isinstance(part, dict) and "functionResponse" in part for part in parts
+    )
 
 
 def _latest(contents: list[dict[str, object]]) -> str:
@@ -96,6 +105,10 @@ class _Script:
         del declarations, transport
         self.calls += 1
         latest = _latest(contents)
+        if latest.strip() in {"ဘယ်ရက်လဲ။", "Which date?"}:
+            return _text("13 November 2026 (2026-11-13).")
+        if _responds(contents) and self.mode == "invalid":
+            return _text("32-11-2026 သည် မှန်ကန်တဲ့ ရက်မဟုတ်ပါ။")
         if latest.startswith("The change is saved"):
             if self.mode == "await_membership":
                 member_id = self.member_id or _brief_value(system_instruction, "member_id")
@@ -104,7 +117,7 @@ class _Script:
                     {
                         "member_id": member_id,
                         "plan_id": self.plan_id,
-                        "start_date": "2026-01-01",
+                        "start_date": "2026-11-13",
                     },
                     "အတည်ပြုပါ။",
                 )
@@ -266,8 +279,8 @@ def test_the_reported_onboarding_keeps_13_november_2026(monkeypatch: pytest.Monk
     body = str(proposed["message"]["body"])
     assert isinstance(pending, dict), proposed
     assert _field(pending, "join_date") == "2026-11-13"
-    assert "Wint War" in body
-    assert "Monthly_plan" in body
+    assert _field(pending, "first_name") == "Wint"
+    assert _field(pending, "last_name") == "War"
     assert "13 November 2026" in body
     assert "2026-11-13" in body
     assert "မသိမ်းရသေး" in body
@@ -279,7 +292,8 @@ def test_the_reported_onboarding_keeps_13_november_2026(monkeypatch: pytest.Monk
     for question in ("ဘယ်ရက်လဲ။", "Which date?", "ဘယ်ရက်လဲ။"):
         answered = _post(client, headers, {"message": question, "conversation_id": conversation})
         answer = str(answered["message"]["body"])
-        assert script.calls == calls
+        assert script.calls == calls + 1
+        calls = script.calls
         assert "2026-11-13" in answer
         assert "13 November 2026" in answer
         assert "ဘယ်ရက်လဲ" not in answer
@@ -380,7 +394,7 @@ def test_an_english_date_is_kept_and_confirmation_does_not_duplicate(
         headers,
         {"message": "Which date?", "conversation_id": proposed["conversation_id"]},
     )
-    assert script.calls == calls
+    assert script.calls == calls + 1
     assert "13 November 2026" in str(answered["message"]["body"])
     assert "Which date" not in str(answered["message"]["body"])
 
@@ -400,9 +414,11 @@ def test_a_missing_date_is_asked_once_and_then_kept(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr("apps.assistant.turns.generate_content", script)
 
     asked = _post(client, headers, {"message": "Wint War, Monthly_plan ဝယ်မယ်။"})
-    assert asked["pending_confirmation"] is None
-    assert "ဘယ်ရက်လဲ" in str(asked["message"]["body"])
+    first = asked["pending_confirmation"]
+    assert isinstance(first, dict), asked
+    assert _field(first, "join_date") == "2026-01-01"
     assert _counts(gym) == (0, 0, 0, 0)
+    _reject(client, headers, str(first["step_id"]))
 
     script.mode = "again"
     proposed = _post(

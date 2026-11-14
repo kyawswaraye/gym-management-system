@@ -194,6 +194,7 @@ def test_scripted_pt_sale_stores_the_selected_package(
         _sale_arguments(member, trainer, gym, "Three sessions"),
         text="အတည်ပြုပါ။",
     )
+    script.push_text("ဘယ်ပက်ကေ့လဲ။")
     with override_settings(**_stable()):
         described = _post(client, headers, "ဒီနေ့ session ရောင်းပေး။ စုစုပေါင်း 100။")
     assert described["pending_confirmation"] is None
@@ -218,8 +219,7 @@ def test_scripted_short_burmese_replies_follow_the_open_operation(
     with override_settings(**_stable()):
         alone = _post(client, headers, "ထည့်မယ်")
     assert alone["pending_confirmation"] is None
-    assert "ဘာကို ထည့်မလဲ" in str(alone["message"]["body"])
-    assert script.traces == []
+    assert script.traces
     assert _sales(gym) == []
 
     for phrase in _AFFIRM:
@@ -231,20 +231,10 @@ def test_scripted_short_burmese_replies_follow_the_open_operation(
         conversation = _seed(owner, gym, "PT3 package ထည့်ပေးရမလား။")
         with override_settings(**_stable()):
             answered = _post(client, headers, phrase, conversation)
-        assert answered["pending_confirmation"] is None
+        pending = answered["pending_confirmation"]
+        assert isinstance(pending, dict), (phrase, answered["message"])
         assert script.traces[-1]["create_pt_sale"] is True
         assert "ရှာကြည့်လို့ ရပါတယ်" not in str(answered["message"]["body"])
-        assert "ဘယ်ရက်လဲ" in str(answered["message"]["body"])
-        script.push_call(
-            "create_pt_sale",
-            _sale_arguments(member, trainer, gym, "session fee"),
-            text="ပက်ကေ့ အရောင်းကို အတည်ပြုပါ။",
-        )
-        with override_settings(**_stable()):
-            dated = _post(client, headers, "ဒီနေ့", conversation)
-        pending = dated["pending_confirmation"]
-        assert isinstance(pending, dict), (phrase, dated["message"])
-        assert script.traces[-1]["create_pt_sale"] is True
         assert _package_on_step(gym, str(pending["step_id"])) == str(package.id)
         with override_settings(**_stable()):
             _reject(client, headers, str(pending["step_id"]))
@@ -270,27 +260,25 @@ def test_scripted_short_burmese_replies_follow_the_open_operation(
         )
         pending = proposed["pending_confirmation"]
         assert isinstance(pending, dict)
-        calls = len(script.traces)
+        script.push_call("cancel_pending_confirmation", {})
+        script.push_text("မသိမ်းပါ။")
         declined = _post(client, headers, "မလုပ်တော့ဘူး", str(proposed["conversation_id"]))
-    assert len(script.traces) == calls
     assert declined["pending_confirmation"] is None
     assert "မသိမ်းပါ" in str(declined["message"]["body"])
     assert _sales(gym) == []
 
     cache.clear()
     for phrase in ("မထည့်တော့ဘူး", "မဟုတ်ဘူး"):
-        calls = len(script.traces)
+        script.push_text("စောင့်နေတဲ့ ပြောင်းလဲမှု မရှိပါ။")
         with override_settings(**_stable()):
             idle = _post(client, headers, phrase)
-        assert len(script.traces) == calls
         assert "စောင့်နေတဲ့ ပြောင်းလဲမှု မရှိပါ" in str(idle["message"]["body"])
         assert _sales(gym) == []
 
     mixed = _seed(owner, gym, "ပက်ကေ့ ရောင်းမလား၊ ဘိုကင် လုပ်မလား။")
-    calls = len(script.traces)
+    script.push_text("ဘယ်အရာကို ဆက်လုပ်မလဲ။")
     with override_settings(**_stable()):
         clarify = _post(client, headers, "လုပ်ပါ", mixed)
-    assert len(script.traces) == calls
     assert "ဘယ်အရာကို ဆက်လုပ်မလဲ" in str(clarify["message"]["body"])
     assert clarify["pending_confirmation"] is None
 
@@ -312,10 +300,9 @@ def test_scripted_short_burmese_replies_follow_the_open_operation(
         goal = Goal.objects.get(gym=gym, id=card["goal_id"])
         goal.expires_at = _FIXED - timedelta(minutes=1)
         goal.save(update_fields=["expires_at"])
-    calls = len(script.traces)
+    script.push_text("ဒီအတည်ပြုချက် သက်တမ်းကုန်ပါပြီ။ ဘာမှ မသိမ်းပါ။")
     with override_settings(**_stable()):
         expired = _post(client, headers, "အင်း", str(waiting["conversation_id"]))
-    assert len(script.traces) == calls
     assert expired["pending_confirmation"] is None
     assert "သက်တမ်းကုန်" in str(expired["message"]["body"])
     assert _sales(gym) == []
@@ -335,11 +322,9 @@ def test_scripted_short_burmese_replies_follow_the_open_operation(
         done_card = done["pending_confirmation"]
         assert isinstance(done_card, dict)
         status, _saved = _confirm(client, headers, str(done_card["step_id"]))
-        calls = len(script.traces)
         again = _post(client, headers, "လုပ်ပါ", str(done["conversation_id"]))
     assert status == 200
     assert len(_sales(gym)) == 1
-    assert len(script.traces) == calls
     assert again["pending_confirmation"] is None
     assert len(_sales(gym)) == 1
 
@@ -380,6 +365,7 @@ def test_scripted_ambiguous_package_is_not_guessed(
         _sale_arguments(member, trainer, gym, "session fee"),
         text="အတည်ပြုပါ။",
     )
+    script.push_text("ဘယ်ဟာလဲ။")
     with override_settings(**_stable()):
         opened = _post(
             client,

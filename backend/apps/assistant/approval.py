@@ -83,7 +83,9 @@ def salary_snapshot(gym: Gym, raw_id: object) -> ApprovalSnapshot:
     period_id = _required_id(raw_id)
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
-        period = SalaryPeriod.objects.filter(gym_id=gym.id, id=period_id).only("id").first()
+        period = (
+            SalaryPeriod.objects.filter(gym_id=gym.id, id=period_id).only("id", "status").first()
+        )
         if period is None:
             raise _mismatch()
         total = StaffSalaryLine.objects.filter(
@@ -91,7 +93,11 @@ def salary_snapshot(gym: Gym, raw_id: object) -> ApprovalSnapshot:
             salary_period_id=period.id,
         ).aggregate(total=Sum("amount"))["total"]
     amount = Decimal("0.00") if total is None else total
-    return ApprovalSnapshot(record_id=str(period.id), amount=money_text(amount))
+    return ApprovalSnapshot(
+        record_id=str(period.id),
+        amount=money_text(amount),
+        status=str(period.status),
+    )
 
 
 def _amount_snapshot(
@@ -106,7 +112,11 @@ def _amount_snapshot(
         row: Any = cast(Any, model).objects.filter(gym_id=gym.id, id=record_id).first()
     if row is None:
         raise _mismatch()
-    return ApprovalSnapshot(record_id=str(row.id), amount=money_text(getattr(row, amount_attr)))
+    return ApprovalSnapshot(
+        record_id=str(row.id),
+        amount=money_text(getattr(row, amount_attr)),
+        status=str(getattr(row, "status", "")),
+    )
 
 
 def _required_id(value: object) -> UUID:

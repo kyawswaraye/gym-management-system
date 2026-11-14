@@ -52,7 +52,7 @@ def test_a_supplied_day_month_year_replaces_the_model_date() -> None:
     assert payload["start_date"] == "2026-11-13"
 
 
-def test_a_later_question_keeps_the_date_from_history() -> None:
+def test_a_later_message_does_not_copy_a_date_phrase_from_history() -> None:
     payload: dict[str, object] = {"start_date": "2026-01-01"}
 
     assert (
@@ -64,7 +64,7 @@ def test_a_later_question_keeps_the_date_from_history() -> None:
         )
         is None
     )
-    assert payload["start_date"] == "2026-11-13"
+    assert payload["start_date"] == "2026-01-01"
 
     english: dict[str, object] = {"start_date": "2025-01-01"}
     assert (
@@ -76,7 +76,7 @@ def test_a_later_question_keeps_the_date_from_history() -> None:
         )
         is None
     )
-    assert english["start_date"] == "2026-11-13"
+    assert english["start_date"] == "2025-01-01"
 
 
 def test_a_lookup_that_says_today_does_not_become_the_join_date() -> None:
@@ -90,22 +90,23 @@ def test_a_lookup_that_says_today_does_not_become_the_join_date() -> None:
             history=("Today's payments.", "Any expenses today?"),
             require_join=True,
         )
-        == "join_date"
+        is None
     )
     assert payload["join_date"] == "2026-01-01"
 
 
-def test_a_stored_date_is_reused_when_the_message_has_none() -> None:
+def test_a_stored_date_is_not_stamped_over_the_model_date() -> None:
     payload: dict[str, object] = {"start_date": "2026-01-01"}
 
     assert _keep_stated_dates(payload, "Monthly_plan", today=_TODAY, stored="2026-11-13") is None
 
-    assert payload["start_date"] == "2026-11-13"
+    assert payload["start_date"] == "2026-01-01"
 
 
-def test_a_missing_date_is_asked_once_and_an_unstated_member_date_is_not_invented() -> None:
+def test_a_message_without_a_date_keeps_the_model_date_for_confirmation() -> None:
     missing: dict[str, object] = {"start_date": "2026-11-13"}
-    assert _keep_stated_dates(missing, "Monthly plan ရောင်းပေးပါ", today=_TODAY) == "start_date"
+    assert _keep_stated_dates(missing, "Monthly plan ရောင်းပေးပါ", today=_TODAY) is None
+    assert missing["start_date"] == "2026-11-13"
     assert (
         staff_notice(
             {"error": "date_unconfirmed", "field": "start_date"}, "Monthly plan ရောင်းပေးပါ"
@@ -115,9 +116,9 @@ def test_a_missing_date_is_asked_once_and_an_unstated_member_date_is_not_invente
 
     registration: dict[str, object] = {"join_date": "2026-11-13"}
     assert (
-        _keep_stated_dates(registration, "Wint War, Monthly_plan ဝယ်မယ်။", today=_TODAY)
-        == "join_date"
+        _keep_stated_dates(registration, "Wint War, Monthly_plan ဝယ်မယ်။", today=_TODAY) is None
     )
+    assert registration["join_date"] == "2026-11-13"
 
     plain: dict[str, object] = {"join_date": "2026-11-11"}
     assert _keep_stated_dates(plain, "Add Ada Lovelace", today=_TODAY) is None

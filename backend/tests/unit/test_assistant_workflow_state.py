@@ -121,7 +121,7 @@ def test_yangon_relative_days_and_a_later_confirmation_keep_today() -> None:
     assert window == (date(2026, 11, 1), date(2026, 11, 30))
     payload = {"start_date": "2026-01-01"}
     assert _keep_stated_dates(payload, "ဟုတ်ကဲ့", _TODAY, history=("ဒီနေ့ join date",)) is None
-    assert payload["start_date"] == "2026-11-12"
+    assert payload["start_date"] == "2026-01-01"
 
 
 def test_saved_member_answers_the_number_and_the_next_step() -> None:

@@ -77,13 +77,11 @@ def test_turn_answers_lists_from_the_brief() -> None:
     assert "do not call a write tool" in text
     assert "before the server confirms" in text
     assert "no daily shift roster" in text
-    assert "date_unconfirmed" in text
-    assert "time_unconfirmed" in text
-    assert "do not invent a date" in text
-    assert "do not choose one" in text
-    assert "when the staff write in burmese" in text
-    assert "get_gym_report" in text
-    assert "get_trainer_dashboard" in text
+    assert "do not invent" in text
+    assert "do not choose" in text
+    assert "reply in the staff member's language" in text
+    assert "get_gym_report" in DOMAIN_MAP.casefold()
+    assert "get_trainer_dashboard" in DOMAIN_MAP.casefold()
     assert "myanmar digits have the" in text
     assert "never say a tool is missing" not in text
 
@@ -320,14 +318,9 @@ def test_burmese_dates_ask_instead_of_inventing_one() -> None:
         "မနက်ဖြန် booking လုပ်ပေးပါ",
         today=date(2026, 11, 11),
     )
-    time_notice = staff_notice(
-        {"error": "time_unconfirmed", "field": "starts_at"},
-        "မနက်ဖြန် booking လုပ်ပေးပါ",
-    )
 
-    assert time_field == "time:starts_at"
-    assert time_notice == "အချိန် ဘယ်လောက်လဲ။"
-    assert "09:00" not in (time_notice or "")
+    assert time_field is None
+    assert missing_time["starts_at"] == "2026-11-12T09:00:00+06:30"
 
 
 def test_missing_or_ambiguous_facts_ask_without_internal_names() -> None:
@@ -434,12 +427,20 @@ def test_a_change_is_not_called_saved_before_the_server_confirms() -> None:
         proposed=True,
         staff_text="ငွေချေမယ်",
     )
+    registered = visible_reply(
+        "အဖွဲ့ဝင်အသစ် Nwe Nwe ကို အောင်မြင်စွာ မှတ်ပုံတင်လိုက်ပါပြီ။",
+        confirmed=False,
+        proposed=True,
+        staff_text="yes",
+    )
 
     assert waiting == "That change is not saved until you confirm."
     assert "is saved" not in waiting
     assert done == "That change is not saved until you confirm."
     assert kept == "The member is saved."
     assert "မသိမ်းရသေး" in burmese
+    assert "မသိမ်းရသေး" in registered
+    assert "အောင်မြင်" not in registered
     leaked = visible_reply(
         "SELECT * FROM payments",
         confirmed=False,

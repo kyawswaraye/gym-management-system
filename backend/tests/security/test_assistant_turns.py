@@ -21,6 +21,7 @@ from apps.assistant.provider import FunctionCall, ModelTurn
 from apps.assistant.turns import confirm_step, run_turn
 from apps.common.db.tenant_context import set_gym_context
 from apps.members.models import Member
+from apps.members.payment_services import submit_payment
 from apps.tenants.models import Gym
 from tests.security.test_assistant_payment_reads import _draft, _owner
 from tests.security.test_assistant_schedule import _enable
@@ -310,8 +311,25 @@ def test_approval_confirmation_uses_the_stored_amount_and_rechecks_permission(
     request.user = owner.user
     request.gym = gym
     request.gym_membership = owner
-    request.permission_codes = frozenset({"payments.approve", "payments.view"})
+    request.permission_codes = frozenset({"payments.approve", "payments.view", "payments.submit"})
     request.request_id = "req_turn"
+    refused = run_turn(
+        request=request,
+        view=APIView(),
+        message="Approve the payment",
+        conversation_id=None,
+    )
+    assert refused["pending_confirmation"] is None
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        submit_payment(
+            gym=gym,
+            actor=owner,
+            payment_id=payment.id,
+            request_id="req_submit_for_approval",
+            ip_address=None,
+            user_agent="",
+        )
     result = run_turn(
         request=request,
         view=APIView(),

@@ -85,6 +85,7 @@ class ApprovalSnapshot:
 
     record_id: str
     amount: str
+    status: str = ""
 
 
 @dataclass(frozen=True)

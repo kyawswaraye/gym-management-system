@@ -981,7 +981,12 @@ _CANCEL_BOOKING = RegisteredTool(
 )
 _APPROVE_SALE = RegisteredTool(
     contract=_contract(
-        _definition("approve_pt_sale", "Approve a PT sale", "pt.sales.approve", approval=True),
+        _definition(
+            "approve_pt_sale",
+            "Approve a submitted PT sale that is waiting for approval",
+            "pt.sales.approve",
+            approval=True,
+        ),
         (
             FieldRequirement("pt_sale_id", "PT sale"),
             FieldRequirement("record_id", "Stored sale"),
@@ -998,7 +1003,12 @@ _APPROVE_SALE = RegisteredTool(
 )
 _REJECT_SALE = RegisteredTool(
     contract=_contract(
-        _definition("reject_pt_sale", "Reject a PT sale", "pt.sales.approve", approval=True),
+        _definition(
+            "reject_pt_sale",
+            "Reject a submitted PT sale that is waiting for approval",
+            "pt.sales.approve",
+            approval=True,
+        ),
         (
             FieldRequirement("pt_sale_id", "PT sale"),
             FieldRequirement("record_id", "Stored sale"),

@@ -795,7 +795,12 @@ _VOID_RECEIPT = RegisteredTool(
 )
 _APPROVE = RegisteredTool(
     contract=_contract(
-        _definition("approve_payment", "Approve a payment", "payments.approve", approval=True),
+        _definition(
+            "approve_payment",
+            "Approve a submitted payment that is waiting for approval",
+            "payments.approve",
+            approval=True,
+        ),
         (
             FieldRequirement("payment_id", "Payment"),
             FieldRequirement("record_id", "Stored payment"),
@@ -812,7 +817,12 @@ _APPROVE = RegisteredTool(
 )
 _REJECT = RegisteredTool(
     contract=_contract(
-        _definition("reject_payment", "Reject a payment", "payments.approve", approval=True),
+        _definition(
+            "reject_payment",
+            "Reject a submitted payment that is waiting for approval",
+            "payments.approve",
+            approval=True,
+        ),
         (
             FieldRequirement("payment_id", "Payment"),
             FieldRequirement("record_id", "Stored payment"),

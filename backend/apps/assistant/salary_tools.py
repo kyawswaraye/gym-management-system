@@ -689,7 +689,7 @@ _APPROVE = RegisteredTool(
     contract=_contract(
         _definition(
             "approve_salary_period",
-            "Approve a salary period",
+            "Approve a submitted salary period that is waiting for approval",
             "salaries.approve",
             approval=True,
         ),
@@ -711,7 +711,7 @@ _REJECT = RegisteredTool(
     contract=_contract(
         _definition(
             "reject_salary_period",
-            "Reject a salary period",
+            "Reject a submitted salary period that is waiting for approval",
             "salaries.approve",
             approval=True,
         ),

@@ -66,6 +66,19 @@ def _latest_parts(contents: list[dict[str, object]]) -> list[object]:
     return parts if isinstance(parts, list) else []
 
 
+def _last_error(contents: list[dict[str, object]]) -> bool:
+    for part in _latest_parts(contents):
+        if not isinstance(part, dict):
+            continue
+        response = part.get("functionResponse")
+        if not isinstance(response, dict):
+            continue
+        body = response.get("response")
+        if isinstance(body, dict) and body.get("error"):
+            return True
+    return False
+
+
 def _responded(contents: list[dict[str, object]]) -> bool:
     return any(
         isinstance(part, dict) and "functionResponse" in part for part in _latest_parts(contents)
@@ -76,6 +89,7 @@ class _Script:
     def __init__(self) -> None:
         self.mode = "text"
         self.member_id = ""
+        self.member_number = ""
         self.plan_id = ""
         self.inactive_id = ""
         self.calls = 0
@@ -97,6 +111,9 @@ class _Script:
         )
         if latest.startswith("The change is saved"):
             raise ProviderCallError(ProviderFailure.QUOTA)
+        if self.mode == "explain":
+            text = f"Member number {self.member_number}."
+            return ModelTurn(text, (), ({"text": text},))
         if self.mode == "fail":
             raise ProviderCallError(ProviderFailure.QUOTA)
         if _responded(contents):
@@ -110,6 +127,9 @@ class _Script:
                     },
                 )
             elif self.mode == "inactive":
+                if _last_error(contents):
+                    text = "ဒီအစီအစဉ်ကို အသုံးမပြုနိုင်ပါ။"
+                    return ModelTurn(text, (), ({"text": text},))
                 call = FunctionCall(
                     "create_membership",
                     {
@@ -271,13 +291,14 @@ def test_kyaw_swar_membership_survives_a_provider_failure(monkeypatch: pytest.Mo
     assert "ဘာမှ အသစ် မသိမ်းရသေးပါ" not in failed_body
     assert len(_members(gym)) == 1
 
+    script.mode = "explain"
+    script.member_number = member.member_number
     calls_before_next = script.calls
     nxt = _post(client, headers, {"message": "ဘာဆက်လုပ်ရမလဲ", "conversation_id": conversation_id})
-    assert script.calls == calls_before_next
+    assert script.calls == calls_before_next + 1
     next_body = nxt["message"]["body"]
     assert isinstance(next_body, str)
     assert member.member_number in next_body
-    assert "အသင်းဝင်" in next_body
 
     script.mode = "inactive"
     refused = _post(
@@ -340,13 +361,15 @@ def test_kyaw_swar_membership_survives_a_provider_failure(monkeypatch: pytest.Mo
     assert isinstance(assigned_body, str)
     assert "Yoga" in assigned_body or "YOGA" in assigned_body
 
+    script.mode = "explain"
+    script.member_number = member.member_number
     calls_before_number = script.calls
     number = _post(
         client,
         headers,
         {"message": "Kyaw Swar ရဲ့ အဖွဲ့ဝင်နံပါတ် ပြပါ", "conversation_id": conversation_id},
     )
-    assert script.calls == calls_before_number
+    assert script.calls == calls_before_number + 1
     number_body = number["message"]["body"]
     assert isinstance(number_body, str)
     assert member.member_number in number_body
@@ -550,12 +573,15 @@ def test_a_waiting_confirmation_survives_yes_and_a_provider_failure(
 
     calls = script.calls
     agreed = _post(client, headers, {"message": "yes", "conversation_id": conversation_id})
-    assert script.calls == calls
+    assert script.calls > calls
     assert agreed["pending_confirmation"] is not None
+    assert agreed["pending_confirmation"]["step_id"] == step_id
     assert _members(gym) == []
+    calls = script.calls
     okay = _post(client, headers, {"message": "okay", "conversation_id": conversation_id})
-    assert script.calls == calls
+    assert script.calls > calls
     assert okay["pending_confirmation"] is not None
+    assert okay["pending_confirmation"]["step_id"] == step_id
 
     script.mode = "fail"
     interrupted = _post(

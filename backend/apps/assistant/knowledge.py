@@ -74,8 +74,8 @@ them. Passwords, sessions, audit storage, and a daily shift roster are not
 supported. Say that plainly. Do not invent the record. If the requested record
 is not in the brief or a tool result, it cannot be retrieved. If a brief
 section is absent, this staff member cannot see it.
-Say so in one sentence and do not reveal the hidden records. Do not ask what
-else to help with. Never send the staff to a screen.
+Say that plainly and do not reveal the hidden records. Never send the staff
+to a screen.
 
 People. A member is the customer: number, name, phone, email, gender, birth
 date, join date, status ACTIVE, EXPIRED, SUSPENDED, CANCELLED, or ARCHIVED.
@@ -216,7 +216,11 @@ def gym_facts(gym: Gym, codes: frozenset[str], full_access: bool) -> str:
 
     visible = included_sections(codes, full_access)
     lines = [
-        "Live gym brief. These are stored records, not examples.",
+        (
+            "Live gym brief. Partial snapshot of stored records, not a complete "
+            "list and not examples. Call a read when a complete or filtered "
+            "record is needed."
+        ),
         (
             f"Gym: {gym.name}. Timezone {gym.timezone}. Currency {gym.currency}. "
             f"Status {gym.status}."
@@ -732,7 +736,8 @@ _AMOUNT = re.compile(r"\d+(?:\.\d+)?")
 _SUCCESS = re.compile(
     r"(\bis saved\b|\bhas been saved\b|\bwas saved\b|\bsuccessfully\b|"
     r"\bi saved\b|\bi've saved\b|\bi have saved\b|"
-    r"သိမ်းပြီး|ပြီးပါပြီ|အောင်မြင်ပါပြီ|မှတ်ပြီးပါပြီ)",
+    r"\bregistered\b|\bcreated\b|\bcompleted\b|"
+    r"သိမ်းပြီး|ပြီးပါပြီ|အောင်မြင်ပါပြီ|အောင်မြင်စွာ|မှတ်ပြီးပါပြီ|ပါပြီ)",
     re.IGNORECASE,
 )
 _LEAK_TEXT = (
@@ -1733,6 +1738,23 @@ def _mapping_rows(result: Mapping[str, object]) -> list[Mapping[str, object]]:
     return [row for row in listed if isinstance(row, Mapping)]
 
 
+def _with_equivalent_dates(text: str) -> str:
+    """Let a stored day support the same day written in another form."""
+
+    from apps.assistant.lookups import _calendar_hits
+
+    extra: list[str] = []
+    for hit in _calendar_hits(text.translate(_MYANMAR_DIGITS)):
+        if hit.kind != "date" or hit.day is None:
+            continue
+        day = hit.day
+        extra.append(day.isoformat())
+        extra.append(f"{day.day} {_MONTH_NAMES[day.month - 1]} {day.year}")
+    if not extra:
+        return text
+    return text + "\n" + " ".join(extra)
+
+
 def grounded_read_reply(
     reply: str,
     *,
@@ -1748,8 +1770,8 @@ def grounded_read_reply(
     """
 
     stored = tuple(results)
-    allowed_text = "\n".join(
-        (staff_text, brief, json.dumps(stored, default=str, ensure_ascii=False))
+    allowed_text = _with_equivalent_dates(
+        "\n".join((staff_text, brief, json.dumps(stored, default=str, ensure_ascii=False)))
     )
     sentences: list[str] = []
     for sentence in _reply_sentences(reply):

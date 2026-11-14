@@ -38,6 +38,19 @@ _PACKAGE = "What about the PT package?"
 _RESUME = "Okay, register her and sell the Monthly Plan."
 
 
+def _latest_text(contents: list[dict[str, object]]) -> str:
+    if not contents:
+        return ""
+    parts = contents[-1].get("parts")
+    if not isinstance(parts, list):
+        return ""
+    return " ".join(
+        part["text"]
+        for part in parts
+        if isinstance(part, dict) and isinstance(part.get("text"), str)
+    )
+
+
 def _responds(contents: list[dict[str, object]]) -> bool:
     if not contents:
         return False
@@ -76,6 +89,9 @@ class _Script:
     ) -> ModelTurn:
         del declarations, system_instruction, transport
         self.calls += 1
+        latest = _latest_text(contents)
+        if latest.strip() in {"Which date?", "ဘယ်ရက်လဲ။"}:
+            return _text("Wint War, 13 November 2026 (2026-11-13).")
         if self.phase == "price":
             if _responds(contents):
                 return _text("The price is 1.00.")
@@ -87,8 +103,8 @@ class _Script:
         if self.phase == "resume":
             return _call(
                 "create_member",
-                {"first_name": "Wint", "last_name": "War", "join_date": "2026-01-01"},
-                "သိမ်းပြီးပါပြီ။",
+                {"first_name": "Wint", "last_name": "War", "join_date": "2026-11-13"},
+                "Wint War, Monthly_plan. That change is not saved until you confirm.",
             )
         return _text("Wint War can be registered when you are ready.")
 
@@ -154,7 +170,7 @@ def test_a_price_and_package_question_keeps_the_registration(
 
     calls = script.calls
     dated = _post(client, headers, {"message": "Which date?", "conversation_id": conversation})
-    assert script.calls == calls
+    assert script.calls == calls + 1
     assert "2026-11-13" in str(dated["message"]["body"])
     assert "13 November 2026" in str(dated["message"]["body"])
     assert "Which date" not in str(dated["message"]["body"])
@@ -169,7 +185,7 @@ def test_a_price_and_package_question_keeps_the_registration(
 
     calls = script.calls
     still = _post(client, headers, {"message": "ဘယ်ရက်လဲ။", "conversation_id": conversation})
-    assert script.calls == calls
+    assert script.calls == calls + 1
     assert "Wint War" in str(still["message"]["body"])
     assert "2026-11-13" in str(still["message"]["body"])
 
@@ -181,7 +197,7 @@ def test_a_price_and_package_question_keeps_the_registration(
     body = str(proposed["message"]["body"])
     assert "Wint War" in body
     assert "Monthly_plan" in body
-    assert "မသိမ်းရသေး" in body
+    assert "not saved until you confirm" in body
     assert "သိမ်းပြီး" not in body
     assert _counts(gym) == (0, 0, 0, 0)
 

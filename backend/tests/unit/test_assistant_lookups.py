@@ -110,7 +110,7 @@ def test_an_unstated_assignment_date_is_not_replaced() -> None:
 
     field = _keep_stated_dates(payload, "Aung Aung ကို Maya Htun နဲ့ Desk PT ရောင်း")
 
-    assert field == "effective_from"
+    assert field is None
     assert payload["effective_from"] == "2025-01-24"
 
 
@@ -215,7 +215,7 @@ def test_an_unstated_clock_time_is_not_kept() -> None:
 
     field = _keep_stated_dates(payload, "မနက်ဖြန် booking လုပ်ပေးပါ", today=date(2026, 11, 11))
 
-    assert field == "time:starts_at"
+    assert field is None
     assert payload["starts_at"] == "2026-11-12T10:00:00+06:30"
 
 
@@ -446,7 +446,7 @@ def test_an_unstated_start_date_is_not_invented() -> None:
 
     field = _keep_stated_dates(payload, "Monthly plan ရောင်းပေးပါ")
 
-    assert field == "start_date"
+    assert field is None
     assert payload["start_date"] == "2026-11-12"
 
 

@@ -256,14 +256,6 @@ _MYANMAR_DIGITS = str.maketrans("၀၁၂၃၄၅၆၇၈၉", "0123456789")
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
 
 
-def _history_date_is_a_lookup(text: str) -> bool:
-    """A question about records does not choose a later write's date."""
-
-    from apps.assistant.knowledge import information_question
-
-    return information_question(text)
-
-
 def _keep_stated_dates(
     payload: dict[str, object],
     staff_text: str,
@@ -273,55 +265,49 @@ def _keep_stated_dates(
     stored: str = "",
     require_join: bool = False,
 ) -> str | None:
-    """Rewrite a date or clock the staff stated. Leave an unstated value unchanged."""
+    """Use a day or clock this message states. Keep a valid model value otherwise.
 
+    An explicit day in this message replaces a different model day. An
+    ambiguous, invalid, or conflicting day is rejected. A clock without a day
+    does not become today. When this message states neither, the model's ISO
+    value stays and the confirmation card shows it. Earlier messages are not
+    scanned for a date phrase.
+    """
+
+    del history, stored, require_join
     anchor = today or timezone.localdate()
     current = _stated_day(staff_text, anchor)
-    stated = current
-    if stated is None:
-        for earlier in history:
-            if _history_date_is_a_lookup(earlier):
-                continue
-            earlier_day = _stated_day(earlier, anchor)
-            if earlier_day == "conflict":
-                stated = "conflict"
-                break
-            if isinstance(earlier_day, date):
-                stated = earlier_day
-                break
-    if stated is None:
-        stated = _iso_day(stored)
     if current in {"ambiguous", "invalid", "conflict"} and _payload_has_date(payload):
         return _encoded_date_problem(staff_text, str(current))
+    stated = current if isinstance(current, date) else None
     _normalize_payload_dates(payload)
     clocks = _stated_clocks(staff_text)
+    if clocks and stated is None and _payload_has_date(payload):
+        for field in _CLOCK_FIELDS:
+            value = payload.get(field)
+            if isinstance(value, str) and value.strip():
+                return field
+        return "start_date"
     for field in _DATE_FIELDS:
         value = payload.get(field)
         if not isinstance(value, str):
             continue
         raw = value.strip()
         if len(raw) < 10:
+            if stated is not None and field not in _CLOCK_FIELDS:
+                payload[field] = stated.isoformat()
             continue
         try:
             date.fromisoformat(raw[:10])
         except ValueError:
-            if isinstance(stated, date) and field not in _CLOCK_FIELDS:
+            if stated is not None and field not in _CLOCK_FIELDS:
                 payload[field] = stated.isoformat()
-            continue
-        if field == "join_date":
-            if isinstance(stated, date):
-                if raw[:10] != stated.isoformat():
-                    replacement = stated.isoformat()
-                    payload[field] = replacement if len(raw) == 10 else replacement + raw[10:]
-                continue
-            if require_join or _registration_names_a_plan(staff_text):
+            elif field not in _CLOCK_FIELDS:
                 return field
             continue
-        if not isinstance(stated, date):
-            return field
-        if field in _CLOCK_FIELDS and not clocks:
-            return f"time:{field}"
-        if field in _CLOCK_FIELDS and "T" in raw and gym is not None:
+        if stated is None:
+            continue
+        if field in _CLOCK_FIELDS and clocks and "T" in raw and gym is not None:
             shifted = _shift_local_day(raw, stated, gym)
             if shifted is None:
                 return field
@@ -330,7 +316,9 @@ def _keep_stated_dates(
         if raw[:10] == stated.isoformat():
             continue
         payload[field] = stated.isoformat() if len(raw) == 10 else stated.isoformat() + raw[10:]
-    return _align_clocks(payload, clocks, gym)
+    if clocks:
+        return _align_clocks(payload, clocks, gym)
+    return None
 
 
 @dataclass(frozen=True)
@@ -489,18 +477,6 @@ def _iso_day(value: str) -> date | None:
         return date.fromisoformat(value[:10])
     except ValueError:
         return None
-
-
-_PLAN_TOKEN = re.compile(r"\b[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+\b")
-
-
-def _registration_names_a_plan(text: str) -> bool:
-    """A membership sale in this message needs the join date from the staff, not the model."""
-
-    folded = text.casefold()
-    if _PLAN_TOKEN.search(text):
-        return True
-    return "membership" in folded or "အသင်းဝင်" in text or "ဝယ်" in text
 
 
 def _payload_has_date(payload: Mapping[str, object]) -> bool:

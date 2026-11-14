@@ -57,6 +57,7 @@ _KEYS = (
     "pt_booking_id",
     "occurrence_id",
     "class_booking_id",
+    "verified",
 )
 _NEXT_WORDS = (
     "ဘာဆက်",
@@ -679,11 +680,61 @@ def capability_brief(text: str, state: Mapping[str, str]) -> str:
     return card
 
 
+_BRIEF_SKIP = frozenset({"verified", "next", "goals", "workflow", "parked"})
+
+
+def note_verified(state: dict[str, str], tool: str, body: Mapping[str, object]) -> None:
+    """Keep a short verified result for the next turn. This is not chat text."""
+
+    try:
+        existing = json.loads(state.get("verified") or "[]")
+    except json.JSONDecodeError:
+        existing = []
+    if not isinstance(existing, list):
+        existing = []
+    existing.append({"tool": tool, "outcome": _compact_body(body)})
+    encoded = json.dumps(existing[-6:], default=str, ensure_ascii=False)
+    state["verified"] = encoded[:4000]
+
+
+def _compact_body(body: Mapping[str, object]) -> dict[str, object]:
+    kept: dict[str, object] = {}
+    for key, value in body.items():
+        if key not in {"error", "status", "field", "summary", "result"}:
+            continue
+        kept[key] = _compact_value(value, 0)
+    return kept
+
+
+def _compact_value(value: object, depth: int) -> object:
+    if depth > 2:
+        return "..."
+    if isinstance(value, Mapping):
+        trimmed: dict[str, object] = {}
+        for index, (key, item) in enumerate(value.items()):
+            if index >= 12:
+                break
+            trimmed[str(key)[:40]] = _compact_value(item, depth + 1)
+        return trimmed
+    if isinstance(value, list):
+        return [_compact_value(item, depth + 1) for item in value[:5]]
+    if isinstance(value, str) and len(value) > 180:
+        return value[:180]
+    if isinstance(value, str | int | float | bool) or value is None:
+        return value
+    return str(value)[:180]
+
+
 def state_brief(state: Mapping[str, str]) -> str:
-    if not state:
-        return "Workflow state: none yet."
-    parts = [f"{key}={state[key]}" for key in _KEYS if state.get(key)]
-    return "Workflow state, already stored: " + "; ".join(parts)
+    parts = [f"{key}={state[key]}" for key in _KEYS if key not in _BRIEF_SKIP and state.get(key)]
+    if parts:
+        lines = ["Verified references, already stored: " + "; ".join(parts)]
+    else:
+        lines = ["Verified references: none yet."]
+    verified = state.get("verified") or ""
+    if verified and verified != "[]":
+        lines.append("Recent tool results: " + verified)
+    return "\n".join(lines)
 
 
 def dashboard_arguments(
@@ -784,29 +835,11 @@ def _copy_payload(state: dict[str, str], payload: Mapping[str, object]) -> None:
         state["member_name"] = name
 
 
-def _goal_set(state: Mapping[str, str]) -> set[str]:
-    return {part for part in (state.get("goals") or "").split(",") if part}
-
-
 def _next_for(tool: str, state: Mapping[str, str]) -> str:
-    goals = _goal_set(state)
-    if tool == "create_member":
-        return "create_membership"
-    if tool == "create_membership":
-        if "class" in goals:
-            return "class"
-        if "pt" in goals:
-            return "pt"
-        if state.get("payment_status") in {"", "UNPAID", "PARTIAL"}:
-            return "create_payment"
-        return ""
-    if tool == "create_class_booking" and "pt" in goals:
-        return "pt"
-    if tool in {"submit_expense", "submit_salary_period", "submit_payment", "submit_pt_sale"}:
-        return "approval"
-    if tool in {"create_pt_booking", "create_class_booking", "create_payment"}:
-        return ""
-    return state.get("next", "")
+    """A saved write does not choose the staff member's next operation."""
+
+    del tool, state
+    return ""
 
 
 def _number_reply(text: str, state: Mapping[str, str]) -> str | None:
@@ -866,49 +899,35 @@ def _next_sentence(state: Mapping[str, str], burmese: bool) -> str:
     return "Tell me the one fact still needed for the next step."
 
 
+_SUBMITTED = frozenset(
+    {
+        "submit_expense",
+        "submit_salary_period",
+        "submit_payment",
+        "submit_pt_sale",
+        "submit_retail_sale",
+    }
+)
+
+
 def _done_sentence(state: Mapping[str, str], burmese: bool) -> str:
-    if state.get("next") == "approval":
+    if state.get("next") == "approval" or state.get("last_tool") in _SUBMITTED:
         if burmese:
             return "တင်ပြီးပါပြီ။ ခွင့်ရှိတဲ့ ဝန်ထမ်းက အတည်ပြုဖို့ ကျန်ပါသေးတယ်။"
         return "It is submitted. An authorized staff member still has to approve it."
     name = state.get("member_name") or ""
     number = state.get("member_number") or ""
     tool = state.get("last_tool") or ""
-    goals = _goal_set(state)
     if tool == "create_member" and number:
         if burmese:
-            sentence = f"{name} ကို သိမ်းပြီးပါပြီ။ အဖွဲ့ဝင်နံပါတ် {number}။ အသင်းဝင် အစီအစဉ် တပ်ဆင်နိုင်ပါတယ်။"
-        else:
-            sentence = (
-                f"{name} is saved. Member number {number}. A membership can be assigned next."
-            )
-        if "class" in goals or "pt" in goals:
-            if burmese:
-                sentence += " အတန်းနဲ့ PT က အသင်းဝင်ပြီးမှ သီးခြားလုပ်ပါမယ်။"
-            else:
-                sentence += " Class and PT stay separate after the membership."
-        return sentence.strip()
+            return f"{name} ကို သိမ်းပြီးပါပြီ။ အဖွဲ့ဝင်နံပါတ် {number}။"
+        return f"{name} is saved. Member number {number}."
     if tool == "create_membership":
         plan = state.get("plan_name") or state.get("plan_code") or ""
         start = state.get("start_date") or ""
         if burmese:
-            sentence = f"{name} အတွက် {plan} ကို {start} မှ သိမ်းပြီးပါပြီ။ ငွေပေးချေမှုကို သီးခြား တင်ရပါမယ်။"
-        else:
-            sentence = (
-                f"The {plan} membership for {name} starts {start}. "
-                "Payment is still a separate step."
-            )
-        if "class" in goals:
-            if burmese:
-                sentence += " အတန်းက သီးခြားပါ။ ဘယ်အတန်းနဲ့ ဘယ်အချိန်လဲ။"
-            else:
-                sentence += " Class enrollment is separate. Which class and schedule?"
-        elif "pt" in goals:
-            if burmese:
-                sentence += " PT က သီးခြားပါ။ ဘယ်ပက်ကေ့နဲ့ ဘယ်သင်တန်းဆရာလဲ။"
-            else:
-                sentence += " PT is separate. Which package and trainer?"
-        return sentence.strip()
+            return f"{name} အတွက် {plan} ကို {start} မှ သိမ်းပြီးပါပြီ။"
+        return f"The {plan} membership for {name} starts {start}."
     if burmese:
         return "သိမ်းပြီးပါပြီ။"
     return "That change is saved."

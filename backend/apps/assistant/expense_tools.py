@@ -730,7 +730,12 @@ _VOID = RegisteredTool(
 )
 _APPROVE = RegisteredTool(
     contract=_contract(
-        _definition("approve_expense", "Approve an expense", "expenses.approve", approval=True),
+        _definition(
+            "approve_expense",
+            "Approve a submitted expense that is waiting for approval",
+            "expenses.approve",
+            approval=True,
+        ),
         (
             FieldRequirement("expense_id", "Expense"),
             FieldRequirement("record_id", "Stored expense"),
@@ -747,7 +752,12 @@ _APPROVE = RegisteredTool(
 )
 _REJECT = RegisteredTool(
     contract=_contract(
-        _definition("reject_expense", "Reject an expense", "expenses.approve", approval=True),
+        _definition(
+            "reject_expense",
+            "Reject a submitted expense that is waiting for approval",
+            "expenses.approve",
+            approval=True,
+        ),
         (
             FieldRequirement("expense_id", "Expense"),
             FieldRequirement("record_id", "Stored expense"),
