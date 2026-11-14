@@ -616,6 +616,7 @@ def _seed_owner_gym(
     gym.currency = "THB"
     gym.subscription_plan = None
     gym.subscription_status = Gym.SubscriptionStatus.TRIAL
+    gym.ai_enabled = True
     gym.save(
         update_fields=[
             "name",
@@ -625,6 +626,7 @@ def _seed_owner_gym(
             "currency",
             "subscription_plan",
             "subscription_status",
+            "ai_enabled",
             "updated_at",
         ]
     )

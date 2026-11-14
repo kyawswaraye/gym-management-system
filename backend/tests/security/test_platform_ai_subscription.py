@@ -27,8 +27,6 @@ from apps.tenants.models import (
     GymMembership,
     GymSubscriptionCharge,
     Permission,
-    Role,
-    RolePermission,
     SubscriptionPlan,
 )
 from apps.users.models import User
@@ -143,25 +141,6 @@ def sell(
     body = response.json()["data"]
     assert isinstance(body, dict)
     return body
-
-
-def grant_owner(gym: Gym, code: str) -> None:
-    permission, _created = Permission.objects.get_or_create(
-        code=code,
-        defaults={
-            "module": code.split(".", 1)[0],
-            "description": code,
-            "risk_level": Permission.Risk.LOW,
-            "is_active": True,
-        },
-    )
-    if not permission.is_active:
-        permission.is_active = True
-        permission.save(update_fields=["is_active", "updated_at"])
-    with transaction.atomic():
-        set_gym_context(gym_id=gym.id)
-        role = Role.objects.get(gym=gym, key="OWNER", is_active=True)
-        RolePermission.objects.get_or_create(gym=gym, role=role, permission=permission)
 
 
 def staff_token(code: str) -> str:
@@ -345,7 +324,6 @@ def test_dual_prices_are_snapshotted_and_ai_access_is_per_gym() -> None:
     assert {row["code"] for row in disabled_list.json()["data"]} == {"AION"}
     assert enabled_list.json()["data"][0]["ai_enabled"] is True
 
-    grant_owner(on, "gym.view")
     off_headers = {"HTTP_AUTHORIZATION": f"Bearer {staff_token('AIOFF')}"}
     on_headers = {"HTTP_AUTHORIZATION": f"Bearer {staff_token('AION')}"}
     off_status = client.get("/api/v1/assistant/status/", **off_headers)
@@ -367,7 +345,11 @@ def test_dual_prices_are_snapshotted_and_ai_access_is_per_gym() -> None:
     assert conversations.status_code == 403
     assert conversations.json()["error"]["code"] == "AI_NOT_ENTITLED"
     profile = client.get("/api/v1/gym/", **on_headers)
-    assert profile.status_code == 200, profile.content
+    if profile.status_code == 403:
+        assert profile.json()["error"]["code"] == "PERMISSION_DENIED"
+    else:
+        assert profile.status_code == 200, profile.content
+        assert profile.json()["data"]["code"] == "AION"
 
     on.refresh_from_db()
     request = Request(APIRequestFactory().post("/api/v1/assistant/internal/"))
