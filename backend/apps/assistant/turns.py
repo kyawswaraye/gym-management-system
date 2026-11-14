@@ -205,6 +205,7 @@ def run_turn(
         instruction=_SYSTEM,
         cue=("The previous confirmation expired and nothing was saved." if expired else ""),
         provider_fallback=_UNAVAILABLE,
+        staff_message=message,
     )
     if answered is None:
         raise AssistantUnavailable()
@@ -246,12 +247,13 @@ def _reply(
     cue: str,
     provider_fallback: str | None,
     saved: tuple[str, Mapping[str, object]] | None = None,
+    staff_message: str = "",
 ) -> dict[str, object] | None:
     pending = _waiting(gym, conversation, actor)
     history = _history(gym, conversation)
     offered = _offered(request)
     contracts = tool_contracts()
-    staff_text = _staff_text(history)
+    staff_text = staff_message.strip() or _staff_text(history)
     declarations = _model_declarations(offered, contracts, staff_text)
     declarations.append(_cancel_declaration())
     contents = _contents(history)
@@ -855,6 +857,7 @@ def _handle_call(
             permission_codes=_codes(request),
             stored_date=(workflow or {}).get("start_date", ""),
             require_join="member" in (workflow or {}).get("goals", ""),
+            staff_text=staff_text,
         )
         if failure is not None:
             return None, failure

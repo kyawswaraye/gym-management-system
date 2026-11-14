@@ -291,7 +291,7 @@ def test_scripted_pt_payment_and_confirmation(
                 "member_id": "ဝင့် ဝါ",
                 "trainer_staff_profile_id": "Soe Soe",
                 "service_package_id": "PT3",
-                "service_date": "2026-01-01",
+                "service_date": "2026-11-12",
                 "description": "Private sessions",
                 "gross_fee": "100.00",
                 "currency": gym.currency,
@@ -329,7 +329,7 @@ def test_scripted_pt_payment_and_confirmation(
                     "member_id": "ဝင့် ဝါ",
                     "trainer_staff_profile_id": "Soe Soe",
                     "service_package_id": "PT3",
-                    "service_date": "2026-01-01",
+                    "service_date": "2026-11-12",
                     "description": "Private sessions",
                     "gross_fee": "100.00",
                     "currency": gym.currency,
@@ -379,6 +379,7 @@ def test_scripted_pt_payment_and_confirmation(
         },
         text="အတည်ပြုပါ။",
     )
+    script.push_text("ရှိပြီးသား ဖြစ်ပါတယ်။")
     duplicate = _post(client, headers, "ဝင့်ဝါကို Soe Soe PT ထည့်မယ်။ ဒီနေ့။")
     duplicate_body = str(duplicate["message"]["body"])
     if duplicate.get("pending_confirmation") is not None or "ရှိပြီးသား" not in duplicate_body:

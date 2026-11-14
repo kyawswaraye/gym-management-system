@@ -164,6 +164,7 @@ def resolve_references(
     permission_codes: frozenset[str] | None = None,
     stored_date: str = "",
     require_join: bool = False,
+    staff_text: str = "",
 ) -> tuple[dict[str, object], dict[str, str], dict[str, object] | None]:
     """Return the id payload, card labels, and a tool error when staff must choose."""
 
@@ -183,12 +184,12 @@ def resolve_references(
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         staff_bodies = _staff_bodies(gym, conversation)
-        staff_text = staff_bodies[0] if staff_bodies else ""
+        current_text = staff_text.strip() or (staff_bodies[0] if staff_bodies else "")
         _normalize_numbers(resolved)
         _normalize_line_numbers(resolved)
         unstated = _keep_stated_dates(
             resolved,
-            staff_text,
+            current_text,
             today=_local_today(gym),
             gym=gym,
             history=staff_bodies[1:],
@@ -207,7 +208,7 @@ def resolve_references(
         loaded = {field: loader(gym) for field, loader in _LOADERS.items() if field in needed}
     labels: dict[str, str] = {}
     for field, supplied in present.items():
-        choice = choose_reference(supplied, loaded[field], staff_text)
+        choice = choose_reference(supplied, loaded[field], current_text)
         failure = _choice_failure(field, choice)
         if failure is not None:
             return dict(payload), {}, failure
@@ -217,7 +218,7 @@ def resolve_references(
         copied, line_labels, failure = _resolve_line_products(
             payload,
             loaded["product_id"],
-            staff_text,
+            current_text,
         )
         if failure is not None:
             return dict(payload), {}, failure

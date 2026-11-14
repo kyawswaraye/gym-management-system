@@ -737,7 +737,7 @@ _SUCCESS = re.compile(
     r"(\bis saved\b|\bhas been saved\b|\bwas saved\b|\bsuccessfully\b|"
     r"\bi saved\b|\bi've saved\b|\bi have saved\b|"
     r"\bregistered\b|\bcreated\b|\bcompleted\b|"
-    r"သိမ်းပြီး|ပြီးပါပြီ|အောင်မြင်ပါပြီ|အောင်မြင်စွာ|မှတ်ပြီးပါပြီ|ပါပြီ)",
+    r"သိမ်းပြီး|ပြီးပါပြီ|အောင်မြင်ပါပြီ|အောင်မြင်စွာ|မှတ်ပြီးပါပြီ)",
     re.IGNORECASE,
 )
 _LEAK_TEXT = (
