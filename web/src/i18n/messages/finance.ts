@@ -335,6 +335,8 @@ export const financeEn = {
     "This is not a cash payment, so no cash session is sent.",
   "This records the payment now. You can print the receipt again if the paper does not come out.":
     "This records the payment now. You can print the receipt again if the paper does not come out.",
+  "This register already has an open session. Close it before opening another.":
+    "This register already has an open session. Close it before opening another.",
   "This posted cash payment has no linked movement, so the void does not name a destination session.":
     "This posted cash payment has no linked movement, so the void does not name a destination session.",
   "This slip is a printer test. It is not a receipt.":
@@ -709,6 +711,8 @@ export const financeMm = {
     "ဤသည် ငွေသားဖြင့် ငွေပေးချေမှု မဟုတ်သောကြောင့် ငွေသားကာလ မပို့ပါ။",
   "This records the payment now. You can print the receipt again if the paper does not come out.":
     "ဤခလုတ်က ငွေကို ချက်ချင်းမှတ်ပါတယ်။ စက္ကူမထွက်ရင် ပြေစာကို ပြန်ပုံနှိပ်နိုင်ပါတယ်။",
+  "This register already has an open session. Close it before opening another.":
+    "ဤငွေသားစာရင်းတွင် ဖွင့်ထားသော ကာလ ရှိပြီးဖြစ်သည်။ အသစ်မဖွင့်မီ ထိုကာလကို ပိတ်ပါ။",
   "This posted cash payment has no linked movement, so the void does not name a destination session.":
     "စာရင်းသွင်းပြီး ဤငွေသား ငွေပေးချေမှုတွင် ချိတ်ဆက်ထားသော အဝင်အထွက် မရှိသောကြောင့် ပယ်ဖျက်ရာတွင် လက်ခံမည့် ကာလကို မဖော်ပြပါ။",
   "This slip is a printer test. It is not a receipt.":

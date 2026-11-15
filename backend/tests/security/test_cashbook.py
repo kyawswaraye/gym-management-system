@@ -276,6 +276,10 @@ def test_cash_commands_replay_scope_and_roles() -> None:
     )
     assert conflict.status_code == 409
     assert conflict.json()["error"]["code"] == "FINANCE_STATE_CONFLICT"
+    assert (
+        conflict.json()["error"]["message"]
+        == "This register already has an open session. Close it before opening another."
+    )
     assert conflict.json()["request_id"] == "req_cash_conflict_01"
     conflict_replay = _open(
         api,

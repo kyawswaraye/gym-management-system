@@ -13,6 +13,7 @@ import {
 } from "@/features/finance/client";
 import { FormDialog } from "@/components/form-dialog";
 import { fieldMap, financeError } from "@/features/finance/errors";
+import { OperationError } from "@/features/operations/client";
 import { canonicalMoney, subtractMoney } from "@/features/finance/money";
 import { formatAppDate } from "@/lib/date";
 import { useCursorPages } from "@/features/finance/paging";
@@ -1052,6 +1053,16 @@ export function CashBookManager({
                 setFormError(
                   financeError(caught, tx("The session could not be opened.")),
                 );
+                if (
+                  caught instanceof OperationError &&
+                  caught.code === "FINANCE_STATE_CONFLICT"
+                ) {
+                  const openMain = sessions.rows.find(
+                    (row) =>
+                      row.status === "OPEN" && row.register_code === "MAIN",
+                  );
+                  if (openMain) setSelectedId(openMain.id);
+                }
               })
               .finally(() => setPending(false));
           }}

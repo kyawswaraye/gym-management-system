@@ -315,6 +315,7 @@ MESSAGES: dict[str, str] = {
     "This plan cannot be retired while a gym has a trial or active subscription.": "Gym တစ်ခုတွင် စမ်းသပ်မှု သို့မဟုတ် အသုံးပြုနေသော စာရင်းသွင်းမှု ရှိနေစဉ် ဤအစီအစဉ်ကို ရပ်တန့်၍မရပါ။",
     "This product is not active.": "ဤကုန်ပစ္စည်းကို အသုံးမပြုပါ။",
     "This provider-backed operation is not configured.": "ဤဝန်ဆောင်မှုပေးသူအပေါ် အခြေခံသော လုပ်ဆောင်ချက်ကို မသတ်မှတ်ရသေးပါ။",
+    "This register already has an open session. Close it before opening another.": "ဤငွေသားစာရင်းတွင် ဖွင့်ထားသော ကာလ ရှိပြီးဖြစ်သည်။ အသစ်မဖွင့်မီ ထိုကာလကို ပိတ်ပါ။",
     "This request must change at least one field.": "ဤတောင်းဆိုမှုသည် အကွက်အနည်းဆုံးတစ်ခု ပြောင်းရမည်။",
     "This role key is reserved.": "ဤအခန်းကဏ္ဍ keyကို သီးသန့်ထားပြီးဖြစ်သည်။",
     "This user is already linked to a member in this gym.": "ဤအသုံးပြုသူကို ဤ Gym ၏ အဖွဲ့ဝင်တစ်ဦးနှင့် ချိတ်ဆက်ပြီးဖြစ်သည်။",

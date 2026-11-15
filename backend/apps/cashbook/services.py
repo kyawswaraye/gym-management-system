@@ -23,7 +23,11 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.audit.services import write_tenant_audit
-from apps.cashbook.exceptions import CashMovementRejected, CashSessionUnavailable
+from apps.cashbook.exceptions import (
+    CashMovementRejected,
+    CashSessionUnavailable,
+    RegisterAlreadyOpen,
+)
 from apps.cashbook.models import CashSession, CashTransaction
 from apps.cashbook.selectors import (
     holds_protected_role,
@@ -154,7 +158,7 @@ def open_cash_session(
             )
     except IntegrityError as exc:
         if getattr(exc.__cause__, "sqlstate", None) == "23505":
-            raise CashSessionUnavailable() from exc
+            raise RegisterAlreadyOpen() from exc
         raise
     write_tenant_audit(
         gym=gym,

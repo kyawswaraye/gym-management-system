@@ -171,6 +171,38 @@ describe("cash book", () => {
     });
   });
 
+  it("selects the open main register when opening is rejected", async () => {
+    vi.mocked(listCashSessions).mockResolvedValue({
+      data: [session({ register_code: "MAIN" })],
+      meta: { has_more: false, next_after: null },
+    });
+    vi.mocked(openCashSession).mockRejectedValue(
+      new OperationError(
+        "This register already has an open session. Close it before opening another.",
+        {},
+        "FINANCE_STATE_CONFLICT",
+      ),
+    );
+    renderBook();
+    expect(await screen.findByRole("button", { name: "MAIN" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Open session" }));
+    const openDialog = screen.getByRole("dialog", { name: "Open session" });
+    fireEvent.change(
+      within(openDialog).getByRole("textbox", { name: "Opening cash (THB)" }),
+      { target: { value: "10.00" } },
+    );
+    fireEvent.click(
+      within(openDialog).getByRole("button", { name: "Open session" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This register already has an open session. Close it before opening another.",
+    );
+    expect(screen.getByRole("button", { name: "MAIN" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+  });
+
   it("shows the server error", async () => {
     vi.mocked(listCashSessions).mockRejectedValue(
       new OperationError("The cash book is unavailable."),
