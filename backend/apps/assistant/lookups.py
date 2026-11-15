@@ -980,9 +980,7 @@ def _class_types(gym: Gym) -> tuple[NamedRecord, ...]:
 
 def _categories(gym: Gym) -> tuple[NamedRecord, ...]:
     rows = ProductCategory.objects.filter(gym=gym).order_by("name", "id")
-    return tuple(
-        NamedRecord(str(row.id), row.name, label=row.name, code=row.code) for row in rows
-    )
+    return tuple(NamedRecord(str(row.id), row.name, label=row.name, code=row.code) for row in rows)
 
 
 def _products(gym: Gym) -> tuple[NamedRecord, ...]:

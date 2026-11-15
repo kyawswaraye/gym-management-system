@@ -194,9 +194,7 @@ def _sale_line_fields(
         elif "staff_profile_id" in line:
             staff = labels.get(f"{prefix}.staff_profile_id")
             shown = (
-                staff
-                if isinstance(staff, str) and staff.strip()
-                else line.get("staff_profile_id")
+                staff if isinstance(staff, str) and staff.strip() else line.get("staff_profile_id")
             )
             text = _stored_scalar(shown)
             if text:
