@@ -152,7 +152,7 @@ describe("member package catalog", () => {
     const catalog = await screen.findByRole("region", {
       name: "Granted packages",
     });
-    const table = within(catalog).getByRole("table", {
+    const table = await within(catalog).findByRole("table", {
       name: "Granted packages",
     });
     const rows = within(table).getAllByRole("row");
