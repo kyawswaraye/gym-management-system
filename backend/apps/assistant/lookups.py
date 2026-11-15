@@ -27,7 +27,7 @@ from apps.common.db.tenant_context import set_gym_context
 from apps.inventory.models import Product, ProductCategory, StockMovement
 from apps.members.models import Member, Membership, MembershipPlan, Payment, Receipt
 from apps.members.services import inclusive_expiry_date
-from apps.tenants.models import Gym, GymMembership, StaffProfile
+from apps.tenants.models import ExpenseCategory, Gym, GymMembership, StaffProfile
 from apps.trainers.models import (
     MemberServicePackage,
     PTBooking,
@@ -166,16 +166,23 @@ def resolve_references(
     stored_date: str = "",
     require_join: bool = False,
     staff_text: str = "",
+    tool_name: str = "",
 ) -> tuple[dict[str, object], dict[str, str], dict[str, object] | None]:
     """Return the id payload, card labels, and a tool error when staff must choose."""
 
+    loaders = dict(_LOADERS)
+    if tool_name in _EXPENSE_CATEGORY_TOOLS:
+        loaders["category_id"] = _expense_categories
     present = {
         field: value
-        for field, value in ((field, payload.get(field)) for field in _LOADERS)
+        for field, value in ((field, payload.get(field)) for field in loaders)
         if isinstance(value, str) and value.strip()
     }
     line_products = _line_product_values(payload)
-    denied = _denied_catalog(present, line_products, permission_codes or frozenset())
+    catalog_present = present
+    if tool_name in _EXPENSE_CATEGORY_TOOLS:
+        catalog_present = {key: value for key, value in present.items() if key != "category_id"}
+    denied = _denied_catalog(catalog_present, line_products, permission_codes or frozenset())
     if denied is not None:
         return dict(payload), {}, {"error": "permission_denied", "field": denied}
     resolved = dict(payload)
@@ -206,7 +213,7 @@ def resolve_references(
             return dict(payload), {}, {"error": "date_unconfirmed", "field": unstated}
         if not needed:
             return resolved, {}, None
-        loaded = {field: loader(gym) for field, loader in _LOADERS.items() if field in needed}
+        loaded = {field: loader(gym) for field, loader in loaders.items() if field in needed}
     labels: dict[str, str] = {}
     for field, supplied in present.items():
         choice = choose_reference(supplied, loaded[field], current_text)
@@ -978,6 +985,11 @@ def _class_types(gym: Gym) -> tuple[NamedRecord, ...]:
     return tuple(NamedRecord(str(row.id), row.name, label=row.name) for row in rows)
 
 
+def _expense_categories(gym: Gym) -> tuple[NamedRecord, ...]:
+    rows = ExpenseCategory.objects.filter(gym=gym, is_active=True).order_by("name", "id")
+    return tuple(NamedRecord(str(row.id), row.name, label=row.name, code=row.code) for row in rows)
+
+
 def _categories(gym: Gym) -> tuple[NamedRecord, ...]:
     rows = ProductCategory.objects.filter(gym=gym).order_by("name", "id")
     return tuple(NamedRecord(str(row.id), row.name, label=row.name, code=row.code) for row in rows)
@@ -1274,6 +1286,7 @@ def _occurrences(gym: Gym) -> tuple[NamedRecord, ...]:
     )
 
 
+_EXPENSE_CATEGORY_TOOLS = frozenset({"create_expense", "update_expense", "update_expense_category"})
 _LOADERS: dict[str, Callable[[Gym], tuple[NamedRecord, ...]]] = {
     "member_id": _members,
     "trainer_staff_profile_id": _trainers,

@@ -147,7 +147,7 @@ def test_a_lookup_still_offers_write_tools(
     assert "create_payment" in seen[0]
     assert "create_member" in seen[0]
     assert result["pending_confirmation"] is None
-    assert result["message"]["body"] == "I still need the member and the amount."
+    assert result["message"]["body"] == "What amount? I still need the member and the amount."
 
 
 def test_a_write_request_keeps_write_declarations_and_the_confirmation(
@@ -188,8 +188,13 @@ def test_a_write_request_keeps_write_declarations_and_the_confirmation(
     assert "create_member" in seen[0]
     assert "search_members" in seen[0]
     assert result["pending_confirmation"] is not None
-    assert result["message"]["body"] == "Review the change before confirming."
-    assert "saved" not in str(result["message"]["body"]).casefold()
+    assert result["message"]["body"] == (
+        "Review the change before confirming. That change is not saved until you confirm."
+    )
+    folded = str(result["message"]["body"]).casefold()
+    assert "not saved" in folded
+    assert "is saved" not in folded
+    assert "was saved" not in folded
 
 
 def test_a_saved_change_follow_up_still_receives_write_declarations(

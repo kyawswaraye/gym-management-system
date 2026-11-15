@@ -884,6 +884,7 @@ def _handle_call(
             stored_date=(workflow or {}).get("start_date", ""),
             require_join="member" in (workflow or {}).get("goals", ""),
             staff_text=staff_text,
+            tool_name=name,
         )
         if failure is not None:
             return None, failure
