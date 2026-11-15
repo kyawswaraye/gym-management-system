@@ -51,7 +51,7 @@ class AssignmentMemberSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     member_number = serializers.CharField()
     first_name = serializers.CharField()
-    last_name = serializers.CharField()
+    last_name = serializers.CharField(allow_blank=True)
 
 
 class TrainerAssignmentSerializer(serializers.Serializer):
@@ -73,7 +73,7 @@ class AssignedMemberSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     member_number = serializers.CharField()
     first_name = serializers.CharField()
-    last_name = serializers.CharField()
+    last_name = serializers.CharField(allow_blank=True)
     assignment_id = serializers.UUIDField()
     effective_from = serializers.DateField()
     effective_until = serializers.DateField(allow_null=True)

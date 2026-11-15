@@ -13,9 +13,12 @@ from apps.assistant.executor import ExecutionMode
 from apps.assistant.member_tools import (
     MEMBER_TOOL_NAMES,
     execute_registered_tool,
+    member_tool_contracts,
     member_tool_definitions,
 )
 from apps.assistant.models import Goal
+from apps.assistant.payment_tools import payment_tool_contracts
+from apps.assistant.proposals import declaration
 from apps.assistant.registry import closed_production_names, production_registry
 from apps.tenants.models import Gym, GymMembership
 from apps.users.models import User
@@ -123,3 +126,42 @@ def test_saved_plan_is_not_proposed_again() -> None:
         {"name": "Yoga", "price": "1500", "duration_unit": "MONTH", "duration_value": "1"},
         saved,
     )
+
+
+def test_a_purchase_without_a_cost_is_not_proposed() -> None:
+    from apps.assistant.turns import _stock_cost
+
+    missing = _stock_cost("adjust_stock", {"movement_type": "PURCHASE", "quantity": "6.000"})
+    assert missing == {"error": "missing_fields", "fields": ["unit_cost"]}
+    opening = {"movement_type": "OPENING", "quantity": "6.000", "unit_cost": "2000"}
+    assert _stock_cost("adjust_stock", opening) is None
+    assert "unit_cost" not in opening
+
+
+def test_create_member_last_name_is_optional() -> None:
+    declared = declaration(member_tool_contracts()["create_member"])
+    parameters = declared["parameters"]
+    assert isinstance(parameters, dict)
+    properties = parameters["properties"]
+    required = parameters["required"]
+    assert isinstance(properties, dict)
+    assert isinstance(required, list)
+    last_name = properties["last_name"]
+    assert isinstance(last_name, dict)
+    assert last_name["description"] == ("Last name. Leave empty when the name has no family name.")
+    assert "last_name" not in required
+    assert "first_name" in required
+    assert "join_date" in required
+
+
+def test_write_schemas_include_the_fields_a_change_needs() -> None:
+    member = declaration(member_tool_contracts()["update_member"])
+    payment = declaration(payment_tool_contracts()["create_payment"])
+    member_fields = member["parameters"]["properties"]
+    payment_fields = payment["parameters"]["properties"]
+    assert "phone" in member_fields
+    assert "member_id" in member["parameters"]["required"]
+    assert "phone" not in member["parameters"]["required"]
+    assert "member_id" in payment_fields
+    assert "membership_id" in payment_fields
+    assert "member_id" not in payment["parameters"]["required"]

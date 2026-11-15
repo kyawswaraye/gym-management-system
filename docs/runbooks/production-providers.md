@@ -97,6 +97,20 @@ tool arguments the model requests. It does not send authentication tokens,
 passwords, or another gym's records. Financial and salary tools still require
 the staff member's existing permissions before any result is returned.
 
+The production Compose file defaults `GEMINI_THINKING` to `off` and
+`GEMINI_MAX_OUTPUT_TOKENS` to `2048` on the `api` and `scheduler` services.
+The host env file may override either value. `GEMINI_THINKING` is `off` or
+`low`. `GEMINI_MAX_OUTPUT_TOKENS` is capped at 8192. Gemini 3 counts thinking
+tokens inside that output budget, so a Burmese answer needs the 2048 default.
+Step and tool-call limits use the backend defaults in production: 5 steps and
+8 tool calls. The log line `assistant provider usage` includes
+`cached_tokens`, `thought_tokens`, and `finish_reason` for cost checks.
+
+`GEMINI_THINKING` and `GEMINI_MAX_OUTPUT_TOKENS` are runtime environment values
+on the `api` and `scheduler` services. Changing a host env override needs a
+restart of those services. Nothing here is compiled into the web client, so a
+web image build is not required.
+
 This note is an implementation description. It is not legal approval of
 jurisdiction, retention, or data residency, and it is not Google's privacy
 approval. Leave the production assistant disabled until the API key exists and

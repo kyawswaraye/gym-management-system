@@ -772,8 +772,13 @@ describe("Members manager", () => {
     ).toBeInTheDocument();
     expect(getGymSettings).not.toHaveBeenCalled();
 
+    expect(screen.getByLabelText("First name")).toBeRequired();
+    expect(screen.getByLabelText("Join date")).toBeRequired();
+    expect(screen.getByLabelText("Last name")).not.toBeRequired();
+    expect(screen.getByLabelText("Phone")).not.toBeRequired();
+
     fireEvent.change(screen.getByLabelText("First name"), {
-      target: { value: "  Grace   Hopper " },
+      target: { value: "   " },
     });
     fireEvent.change(screen.getByLabelText("Last name"), {
       target: { value: "  " },
@@ -788,7 +793,7 @@ describe("Members manager", () => {
 
     expect(operationMutation).not.toHaveBeenCalled();
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Enter a first name, last name, and join date.",
+      "Enter a first name and join date.",
     );
 
     fireEvent.change(screen.getByLabelText("First name"), {
@@ -863,6 +868,43 @@ describe("Members manager", () => {
         emergency_contact_phone: "999",
         notes: "Evening visits",
       }),
+    );
+  });
+
+  it("creates a member whose name has no family name", async () => {
+    vi.mocked(listMembers).mockResolvedValue(
+      page([
+        member({
+          first_name: "Hla Hla",
+          last_name: "",
+          normalized_full_name: "hla hla",
+          member_number: "MEM-000009",
+        }),
+      ]),
+    );
+    render(<MembersManager canCreate defaultDate="2026-10-17" />);
+
+    const row = await screen.findByRole("row", { name: /Hla Hla/ });
+    expect(
+      within(row).getByRole("link", { name: "Hla Hla" }).textContent?.trim(),
+    ).toBe("Hla Hla");
+    expect(within(row).getByText("HH")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
+    fireEvent.change(screen.getByLabelText("First name"), {
+      target: { value: "  Nwe   Nwe  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save member" }));
+
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith(
+        "members/",
+        expect.objectContaining({
+          first_name: "Nwe Nwe",
+          last_name: "",
+          join_date: "2026-10-17",
+        }),
+      ),
     );
   });
 

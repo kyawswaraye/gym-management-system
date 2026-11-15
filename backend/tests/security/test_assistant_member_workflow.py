@@ -104,12 +104,13 @@ class _Script:
     ) -> ModelTurn:
         del declarations, system_instruction, transport
         self.calls += 1
-        latest = " ".join(
+        texts = [
             part["text"]
-            for part in _latest_parts(contents)
+            for item in contents
+            for part in (item.get("parts") if isinstance(item.get("parts"), list) else [])
             if isinstance(part, dict) and isinstance(part.get("text"), str)
-        )
-        if latest.startswith("The change is saved"):
+        ]
+        if any(text.startswith("The change is saved") for text in texts):
             raise ProviderCallError(ProviderFailure.QUOTA)
         if self.mode == "explain":
             text = f"Member number {self.member_number}."

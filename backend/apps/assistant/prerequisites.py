@@ -10,6 +10,14 @@ class FieldRequirement:
     description: str
     required: bool = True
     kind: str = "string"
+    item_kind: str = "string"
+    item_fields: tuple[FieldRequirement, ...] = ()
+
+
+def optional(name: str, description: str, kind: str = "string") -> FieldRequirement:
+    """A field the model may send. The server still validates it."""
+
+    return FieldRequirement(name, description, required=False, kind=kind)
 
 
 @dataclass(frozen=True)

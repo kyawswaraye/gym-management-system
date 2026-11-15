@@ -105,14 +105,25 @@ def gemini_max_retries() -> int:
     return min(configured, 1)
 
 
+def gemini_thinking() -> str:
+    level = str(getattr(settings, "GEMINI_THINKING", "off")).strip().lower()
+    if level == "low":
+        return "low"
+    return "off"
+
+
+def gemini_max_output_tokens() -> int:
+    return _positive_int(str(getattr(settings, "GEMINI_MAX_OUTPUT_TOKENS", "2048")), 2048, 8192)
+
+
 def max_steps() -> int:
     """Model rounds in one turn. A higher setting is capped so a loop can still stop."""
 
-    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_STEPS", "8")), 8, 20)
+    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_STEPS", "5")), 5, 20)
 
 
 def max_tool_calls() -> int:
-    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_TOOL_CALLS", "16")), 16, 32)
+    return _positive_int(str(getattr(settings, "ASSISTANT_MAX_TOOL_CALLS", "8")), 8, 32)
 
 
 def max_execution_seconds() -> int:

@@ -512,7 +512,7 @@ def test_live_gemini_confirms_member_sale_booking_and_payment(
                 previous_step,
                 (),
             )
-            summary = str(pending.get("summary") or "")
+            summary = str(pending.get("tool_name") or pending.get("summary") or "")
             folded = summary.casefold()
             another_draft = (
                 _rows(gym, PTSale) > 0
@@ -531,7 +531,9 @@ def test_live_gemini_confirms_member_sale_booking_and_payment(
             for _chain in range(3):
                 if not isinstance(follow, dict):
                     break
-                follow_summary = str(follow.get("summary") or "").casefold()
+                follow_summary = str(
+                    follow.get("tool_name") or follow.get("summary") or ""
+                ).casefold()
                 if "submit" not in follow_summary and "approve" not in follow_summary:
                     break
                 previous_step = str(follow["step_id"])
@@ -592,7 +594,7 @@ def test_live_gemini_confirms_member_sale_booking_and_payment(
         for _chain in range(3):
             if not isinstance(follow, dict):
                 break
-            follow_summary = str(follow.get("summary") or "").casefold()
+            follow_summary = str(follow.get("tool_name") or follow.get("summary") or "").casefold()
             if "submit" not in follow_summary and "approve" not in follow_summary:
                 transcript.append(f"SKIP follow-up: {follow.get('summary')}")
                 break

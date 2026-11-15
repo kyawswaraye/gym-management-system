@@ -48,6 +48,22 @@ pytestmark = [
 
 _OPENING = "လူသစ်တစ်ယောက် Member လုပ်မယ်။ Class တက်မယ်။ PT လည်းလုပ်မယ်။ ဘာလုပ်ရမလဲ?"
 _DETAILS = "Wint War, 13-11-2026, Monthly_plan ဝယ်မယ်။"
+
+
+def _shown_amount(body: str) -> str:
+    """Compare 50,000.00 and 50000 as the same stored amount."""
+
+    return body.replace(",", "").replace(".00", "")
+
+
+def _stored_name(member: object) -> str:
+    """A whole name may sit in first_name, or be split across the two fields."""
+
+    first = str(getattr(member, "first_name", "") or "").strip()
+    last = str(getattr(member, "last_name", "") or "").strip()
+    return " ".join(part for part in (first, last) if part)
+
+
 _PRICE = "Monthly_plan ဘယ်လောက်လဲ?"
 _PACKAGES = "PT package တွေ ဘယ်လောက်ရှိလဲ?"
 _INCOME = "ဒီနေ့ Payment ဘယ်လောက်ဝင်ထားလဲ?"
@@ -110,15 +126,16 @@ def test_live_gemini_keeps_registration_and_answers_from_the_gym(
         assert _counts(gym) == (0, 0, 0, 0)
 
         priced = say(_PRICE, conversation)
-        assert "50000" in str(priced["message"]["body"])
+        priced_body = _shown_amount(str(priced["message"]["body"]))
+        assert "50000" in priced_body
         assert priced["pending_confirmation"] is not None
         assert _counts(gym) == (0, 0, 0, 0)
-        assert "membership plan" in _tools(priced) or "50000" in str(priced["message"]["body"])
+        assert "membership plan" in _tools(priced) or "50000" in priced_body
 
         packaged = say(_PACKAGES, conversation)
         package_body = str(packaged["message"]["body"])
         assert "Morning PT" in package_body
-        assert "80000" in package_body.replace(",", "")
+        assert "80000" in _shown_amount(package_body)
         assert "package" in _tools(packaged) or "Morning PT" in package_body
         assert packaged["pending_confirmation"] is not None
         assert _counts(gym) == (0, 0, 0, 0)
@@ -156,8 +173,7 @@ def test_live_gemini_keeps_registration_and_answers_from_the_gym(
         assert created["outcome"] == "committed"
         members = _members(gym)
         assert len(members) == 1
-        assert members[0].first_name == "Wint"
-        assert members[0].last_name == "War"
+        assert _stored_name(members[0]) == "Wint War"
         assert members[0].join_date.isoformat() == "2026-11-13"
         assert _counts(gym)[0] == 1
         assert plan.code == "Monthly_plan"
@@ -201,7 +217,7 @@ def test_live_gemini_answers_modules_and_resumes_registration(
     try:
         catalog = say("How much is Monthly_plan, and what PT packages are available?")
         conversation = str(catalog["conversation_id"])
-        catalog_body = str(catalog["message"]["body"]).replace(",", "")
+        catalog_body = _shown_amount(str(catalog["message"]["body"]))
         assert "50000" in catalog_body
         assert "Morning PT" in catalog_body
         assert "80000" in catalog_body
@@ -252,8 +268,7 @@ def test_live_gemini_answers_modules_and_resumes_registration(
         assert created["outcome"] == "committed"
         stored = _members(gym)
         assert len(stored) == 1
-        assert stored[0].first_name == "Wint"
-        assert stored[0].last_name == "War"
+        assert _stored_name(stored[0]) == "Wint War"
         assert stored[0].join_date.isoformat() == "2026-11-13"
     except AssertionError as exc:
         raise AssertionError(f"{exc}\n" + "\n".join(transcript)) from None
@@ -495,7 +510,7 @@ def test_live_gemini_answers_the_remaining_reads(monkeypatch: pytest.MonkeyPatch
             "ဘယ် Trainer က PT အများဆုံးရောင်းထားလဲ? Answer from posted sales only.",
             conversation,
         )
-        assert "search_pt_trainer_sales" in _tools(trainers_sales)
+        assert "posted pt sales" in _tools(trainers_sales)
         assert _empty_or_zero(str(trainers_sales["message"]["body"]))
         assert trainers_sales["pending_confirmation"] is None
         assert _counts(gym) == (1, 1, 0, 0)

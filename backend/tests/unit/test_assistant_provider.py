@@ -497,6 +497,9 @@ def test_usage_metadata_is_logged_without_the_prompt(
     assert "prompt_tokens=unavailable" in caplog.text
     assert "candidate_tokens=unavailable" in caplog.text
     assert "total_tokens=unavailable" in caplog.text
+    assert "cached_tokens=unavailable" in caplog.text
+    assert "thought_tokens=unavailable" in caplog.text
+    assert "finish_reason=unavailable" in caplog.text
     assert "outcome=ok" in caplog.text
     assert "requests=1" in caplog.text
     assert secret not in caplog.text
@@ -514,20 +517,26 @@ def test_present_usage_counts_are_logged_and_booleans_are_not_counts(
                 "promptTokenCount": True,
                 "candidatesTokenCount": -3,
                 "totalTokenCount": "12",
+                "cachedContentTokenCount": False,
+                "thoughtsTokenCount": -1,
             },
         }
     )
     assert parsed.usage.prompt_tokens is None
     assert parsed.usage.candidate_tokens is None
     assert parsed.usage.total_tokens is None
+    assert parsed.usage.cached_tokens is None
+    assert parsed.usage.thought_tokens is None
 
     def transport(_body: dict[str, object], _timeout: int) -> dict[str, object]:
         return {
-            "candidates": [{"content": {"parts": [{"text": "Hi"}]}}],
+            "candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": "Hi"}]}}],
             "usageMetadata": {
                 "promptTokenCount": 15,
                 "candidatesTokenCount": 2,
                 "totalTokenCount": 17,
+                "cachedContentTokenCount": 9,
+                "thoughtsTokenCount": 4,
             },
         }
 
@@ -541,7 +550,57 @@ def test_present_usage_counts_are_logged_and_booleans_are_not_counts(
     assert turn.usage.prompt_tokens == 15
     assert turn.usage.candidate_tokens == 2
     assert turn.usage.total_tokens == 17
+    assert turn.usage.cached_tokens == 9
+    assert turn.usage.thought_tokens == 4
     assert "prompt_tokens=15" in caplog.text
     assert "candidate_tokens=2" in caplog.text
     assert "total_tokens=17" in caplog.text
+    assert "cached_tokens=9" in caplog.text
+    assert "thought_tokens=4" in caplog.text
+    assert "finish_reason=STOP" in caplog.text
     assert "hidden prompt" not in caplog.text
+
+
+def test_generation_config_caps_output_and_sets_thinking_by_model() -> None:
+    seen: list[dict[str, object]] = []
+
+    def transport(body: dict[str, object], _timeout: int) -> dict[str, object]:
+        seen.append(body)
+        return {"candidates": [{"content": {"parts": [{"text": "Hi"}]}}]}
+
+    cases = (
+        ("gemini-3-flash", "off", "2048", {"thinkingLevel": "low"}, 2048),
+        ("Gemini-3-Pro", "low", "2048", {"thinkingLevel": "low"}, 2048),
+        ("gemini-2.5-pro", "off", "2048", {"thinkingBudget": 128}, 2048),
+        ("gemini-2.5-pro", "low", "2048", {"thinkingBudget": 512}, 2048),
+        ("gemini-2.5-flash", "off", "2048", {"thinkingBudget": 0}, 2048),
+        ("gemini-2.5-flash-lite", "LOW", "2048", {"thinkingBudget": 512}, 2048),
+        ("gemini-2.5-flash", "high", "2048", {"thinkingBudget": 0}, 2048),
+        ("gemini-2.0-flash", "off", "2048", None, 2048),
+        ("gemini-test", "low", "8193", None, 2048),
+    )
+    for model, level, output_tokens, thinking, expected_tokens in cases:
+        seen.clear()
+        with override_settings(
+            **{
+                **_SETTINGS,
+                "GEMINI_MODEL": model,
+                "GEMINI_THINKING": level,
+                "GEMINI_MAX_OUTPUT_TOKENS": output_tokens,
+            }
+        ):
+            generate_content(
+                contents=[],
+                declarations=[],
+                system_instruction="test",
+                transport=transport,
+            )
+        assert len(seen) == 1
+        config = seen[0]["generationConfig"]
+        assert isinstance(config, dict)
+        assert config["temperature"] == 0.2
+        assert config["maxOutputTokens"] == expected_tokens
+        if thinking is None:
+            assert "thinkingConfig" not in config
+        else:
+            assert config["thinkingConfig"] == thinking

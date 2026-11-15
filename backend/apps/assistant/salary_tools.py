@@ -36,7 +36,7 @@ from apps.assistant.executor import (
     execute_confirmed_tool,
 )
 from apps.assistant.models import Goal
-from apps.assistant.prerequisites import FieldRequirement, Prerequisite
+from apps.assistant.prerequisites import FieldRequirement, Prerequisite, optional
 from apps.assistant.registry import ToolDefinition
 from apps.cashbook.serializers import transaction_payload
 from apps.common.finance.idempotency import IdempotentResponse
@@ -343,7 +343,9 @@ def approve_salary_period_body(data: Mapping[str, object], *, period_id: str) ->
 def reject_salary_period_body(data: Mapping[str, object], *, period_id: str) -> dict[str, object]:
     """Return the reject body whose finance hash matches the HTTP view."""
 
-    fields = _validated_with(RejectSalarySerializer, data)
+    from apps.assistant.approval import rejection_reason_input
+
+    fields = _validated_with(RejectSalarySerializer, rejection_reason_input(data))
     return {"salary_period_id": period_id, "reason": str(fields["rejection_reason"])}
 
 
@@ -629,7 +631,13 @@ _CREATE = RegisteredTool(
 _UPDATE = RegisteredTool(
     contract=_contract(
         _definition("update_salary_period", "Update a salary period draft", "salaries.update"),
-        (FieldRequirement("salary_period_id", "Salary period"),),
+        (
+            FieldRequirement("salary_period_id", "Salary period"),
+            optional("description", "Description"),
+            optional("period_start", "Period start as YYYY-MM-DD"),
+            optional("period_end", "Period end as YYYY-MM-DD"),
+            optional("business_date", "Business date as YYYY-MM-DD"),
+        ),
         http_method="PATCH",
         route=UPDATE_ROUTE,
         route_fields=("period_route_id",),
@@ -644,8 +652,19 @@ _LINES = RegisteredTool(
             FieldRequirement("salary_period_id", "Salary period"),
             FieldRequirement(
                 "lines",
-                "A list of staff wage lines. Each line has staff_profile_id, "
-                "amount as text, currency, payment_method, and description.",
+                "Staff wage lines for this period.",
+                kind="array",
+                item_kind="object",
+                item_fields=(
+                    FieldRequirement("staff_profile_id", "Staff member"),
+                    FieldRequirement("amount", "Wage amount as text, such as 100000"),
+                    FieldRequirement("currency", "Gym currency code"),
+                    FieldRequirement(
+                        "payment_method",
+                        "CASH, BANK_TRANSFER, CARD, MOBILE_PAYMENT, or OTHER",
+                    ),
+                    FieldRequirement("description", "What the wage is for"),
+                ),
             ),
         ),
         http_method="PUT",

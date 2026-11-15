@@ -78,22 +78,24 @@ EXPECTED_VALUES = {
     "BACKUP_S3_URI_STYLE": "host",
     "BACKUP_REPO_PATH": "/gym-platform",
     "BACKUP_STANZA": "gym",
-    "BACKUP_REPO_CIPHER_PASS_FILE": (
-        "../environments/production/backup-repo-cipher-pass.example"
-    ),
+    "BACKUP_REPO_CIPHER_PASS_FILE": ("../environments/production/backup-repo-cipher-pass.example"),
     "BACKUP_S3_ACCESS_KEY_FILE": "../environments/production/backup-s3-access-key.example",
     "BACKUP_S3_SECRET_KEY_FILE": "../environments/production/backup-s3-secret-key.example",
     "MONITOR_DB_PASSWORD_FILE": "../environments/production/monitor-db-password.example",
-    "GRAFANA_ADMIN_PASSWORD_FILE": (
-        "../environments/production/grafana-admin-password.example"
-    ),
+    "GRAFANA_ADMIN_PASSWORD_FILE": ("../environments/production/grafana-admin-password.example"),
     "ALERT_DELIVERY_MODE": "resend-email",
     "ALERT_EMAIL_FROM": "alerts@example.com",
     "ALERT_EMAIL_TO": "ops@example.com",
-    "ALERT_SMTP_PASSWORD_FILE": (
-        "../environments/production/alert-smtp-password.example"
-    ),
+    "ALERT_SMTP_PASSWORD_FILE": ("../environments/production/alert-smtp-password.example"),
     "ASSISTANT_ENABLED": "false",
+    "GEMINI_THINKING": "off",
+    "GEMINI_MAX_OUTPUT_TOKENS": "2048",
+}
+# Host env may override these. Every other Compose default stays rejected so a
+# default cannot hide a mutable image tag.
+ALLOWED_COMPOSE_DEFAULTS = {
+    "GEMINI_THINKING": "off",
+    "GEMINI_MAX_OUTPUT_TOKENS": "2048",
 }
 PLACEHOLDER = "replace-from-secret-store"
 PRIVATE_SERVICES = (
@@ -194,10 +196,9 @@ STEADY_CPU_CEILING = 3.25
 HOST_MEMORY_MB = 8192
 MEMORY_RESERVE_MB = 2048
 SECRET_MARKERS = ("AKIA", "-----BEGIN", "re_", "xox", "ghp_", "github_pat_", "eyJ")
-VARIABLE_RE = re.compile(r"\$\{([A-Z0-9_]+)(?::\?[^}]*)?\}")
-SECRET_ARG_RE = re.compile(
-    r"ARG\s+([A-Z0-9_]*(?:SECRET|PASSWORD|TOKEN|PEPPER|KEY)[A-Z0-9_]*)"
-)
+VARIABLE_RE = re.compile(r"\$\{([A-Z0-9_]+)(?::\?[^}]*|:-[^{}]*)?\}")
+COMPOSE_DEFAULT_RE = re.compile(r"\$\{([A-Z0-9_]+):-([^{}]*)\}")
+SECRET_ARG_RE = re.compile(r"ARG\s+([A-Z0-9_]*(?:SECRET|PASSWORD|TOKEN|PEPPER|KEY)[A-Z0-9_]*)")
 
 
 def parse_simple_yaml(text: str) -> dict[str, Any]:
@@ -240,10 +241,14 @@ def lint_image_reference(value: str) -> list[str]:
 
 def lint_compose_source(text: str) -> list[str]:
     errors: list[str] = []
-    if ":-" in text:
-        errors.append(
-            "Compose defaults are not allowed; a default can hide a mutable tag"
-        )
+    defaults = COMPOSE_DEFAULT_RE.findall(text)
+    remainder = text
+    for name, value in defaults:
+        remainder = remainder.replace(f"${{{name}:-{value}}}", "", 1)
+    if ":-" in remainder or any(
+        ALLOWED_COMPOSE_DEFAULTS.get(name) != value for name, value in defaults
+    ):
+        errors.append("Compose defaults are not allowed; a default can hide a mutable tag")
     if re.search(r"\blatest\b", text):
         errors.append("Compose source contains a mutable latest reference")
     for banned in ("pgsty", "silo", "redis", "celery", "kubernetes"):
@@ -280,9 +285,7 @@ def lint_compose_document(document: dict[str, Any]) -> list[str]:
         "probe",
         "observe",
     }:
-        errors.append(
-            "networks must be edge, app, data, scan, backup, probe, and observe"
-        )
+        errors.append("networks must be edge, app, data, scan, backup, probe, and observe")
     else:
         for name, internal in (
             ("data", "true"),
@@ -329,9 +332,7 @@ def lint_compose_document(document: dict[str, Any]) -> list[str]:
             memory_total += _memory_mb(service.get("mem_limit"), name, errors)
             cpu_total += _cpu(service.get("cpus"), name, errors)
     if memory_total > STEADY_MEMORY_CEILING_MB:
-        errors.append(
-            f"steady memory {memory_total}m exceeds {STEADY_MEMORY_CEILING_MB}m"
-        )
+        errors.append(f"steady memory {memory_total}m exceeds {STEADY_MEMORY_CEILING_MB}m")
     if round(cpu_total, 2) > STEADY_CPU_CEILING:
         errors.append(f"steady CPU {cpu_total} exceeds {STEADY_CPU_CEILING}")
     if memory_total + MEMORY_RESERVE_MB > HOST_MEMORY_MB:
@@ -361,9 +362,7 @@ def caddy_upstream(path: str) -> str:
 def lint_caddy(text: str) -> list[str]:
     errors: list[str] = []
     if _matcher_paths(text, "member") != list(MEMBER_API_PATTERNS):
-        errors.append(
-            "Caddy member proxy must allow only /api/v1/member-auth and /api/v1/member"
-        )
+        errors.append("Caddy member proxy must allow only /api/v1/member-auth and /api/v1/member")
     if _matcher_paths(text, "blocked") != ["/api/v1", "/api/v1/*"]:
         errors.append("Caddy must reject every other /api/v1 route")
     if text.count("reverse_proxy api:8000") != 1:
@@ -420,9 +419,7 @@ def lint_caddy(text: str) -> list[str]:
     if capture not in text:
         errors.append("Caddy request ID matcher must capture 1-128 characters into $1")
     if "{http.request.header.X-Request-Id}" not in text:
-        errors.append(
-            "Caddy request ID source must use the canonical header placeholder"
-        )
+        errors.append("Caddy request ID source must use the canonical header placeholder")
     return errors
 
 
@@ -473,13 +470,9 @@ def lint_env_example(text: str, compose_text: str) -> list[str]:
     errors: list[str] = []
     values = _load_env(text)
     required = set(VARIABLE_RE.findall(compose_text))
-    classified = (
-        set(DIGEST_NAMES) | SECRET_PLACEHOLDERS | EMPTY_OK | set(EXPECTED_VALUES)
-    )
+    classified = set(DIGEST_NAMES) | SECRET_PLACEHOLDERS | EMPTY_OK | set(EXPECTED_VALUES)
     if required - classified:
-        errors.append(
-            f"unclassified Compose variables: {sorted(required - classified)}"
-        )
+        errors.append(f"unclassified Compose variables: {sorted(required - classified)}")
     for name in required:
         if name not in values:
             errors.append(f"compose env example is missing {name}")
@@ -496,12 +489,7 @@ def lint_env_example(text: str, compose_text: str) -> list[str]:
             errors.append(f"{name} drifted from the documented non-secret example")
         elif name in EMPTY_OK and value != "":
             errors.append(f"{name} must be empty in the committed example")
-        if (
-            ":?" in compose_text
-            and name in required
-            and value == ""
-            and name not in EMPTY_OK
-        ):
+        if ":?" in compose_text and name in required and value == "" and name not in EMPTY_OK:
             errors.append(f"{name} is required and empty")
     for name in required:
         if ":?" in _variable_usage(compose_text, name) and values.get(name, "") == "":
@@ -520,24 +508,16 @@ def lint_repository(repo: Path) -> list[str]:
     except ValueError as exc:
         return [*errors, f"Compose parser: {exc}"]
     errors.extend(lint_compose_document(document))
+    errors.extend(lint_caddy((repo / "infra/caddy/Caddyfile").read_text(encoding="utf-8")))
     errors.extend(
-        lint_caddy((repo / "infra/caddy/Caddyfile").read_text(encoding="utf-8"))
+        lint_backend_dockerfile((repo / "backend/Dockerfile").read_text(encoding="utf-8"))
     )
-    errors.extend(
-        lint_backend_dockerfile(
-            (repo / "backend/Dockerfile").read_text(encoding="utf-8")
-        )
-    )
-    errors.extend(
-        lint_web_dockerfile((repo / "web/Dockerfile").read_text(encoding="utf-8"))
-    )
+    errors.extend(lint_web_dockerfile((repo / "web/Dockerfile").read_text(encoding="utf-8")))
     errors.extend(lint_env_example(env_path.read_text(encoding="utf-8"), compose_text))
     errors.extend(_lint_supporting_files(repo))
     errors.extend(_lint_release(repo))
     errors.extend(_lint_backup(repo, document if isinstance(document, dict) else {}))
-    errors.extend(
-        _lint_observability(repo, document if isinstance(document, dict) else {})
-    )
+    errors.extend(_lint_observability(repo, document if isinstance(document, dict) else {}))
     errors.extend(_lint_deployment(repo))
     errors.extend(_lint_staging(repo))
     return errors
@@ -694,9 +674,7 @@ def run_compose_config(repo: Path) -> list[str]:
         "config",
         "--quiet",
     ]
-    result = subprocess.run(
-        command, cwd=repo, capture_output=True, text=True, check=False
-    )
+    result = subprocess.run(command, cwd=repo, capture_output=True, text=True, check=False)
     if result.returncode == 0:
         return []
     detail = (result.stderr or result.stdout or "docker compose config failed").strip()
@@ -761,11 +739,7 @@ def _lint_service(name: str, service: dict[str, Any]) -> list[str]:
         errors.append("caddy needs NET_BIND_SERVICE after dropping capabilities")
     if name in {"api", "web", "migrate", "scheduler"} and service.get("user") != "10001:10001":
         errors.append(f"{name} must run as uid 10001")
-    if (
-        name != "migrate"
-        and not name.startswith("backup-")
-        and "healthcheck" not in service
-    ):
+    if name != "migrate" and not name.startswith("backup-") and "healthcheck" not in service:
         errors.append(f"{name} is missing a healthcheck")
     logging = service.get("logging")
     options = logging.get("options") if isinstance(logging, dict) else None
@@ -811,6 +785,17 @@ def _lint_roles(services: dict[str, Any]) -> list[str]:
             errors.append("scheduler must not receive migration or admin database secrets")
         if "ports" in services["scheduler"]:
             errors.append("scheduler must not publish a host port")
+    for service_name in ("api", "scheduler"):
+        environment = services[service_name].get("environment")
+        if not isinstance(environment, dict):
+            continue
+        for key, value in ALLOWED_COMPOSE_DEFAULTS.items():
+            expected = f"${{{key}:-{value}}}"
+            if environment.get(key) != expected:
+                errors.append(
+                    f"{service_name} must set {key} to {expected} "
+                    "so a missing host env uses the production default"
+                )
     if "RUNTIME_DB_PASSWORD" in migrate or "POSTGRES_ADMIN_PASSWORD" in migrate:
         errors.append("migrate must not receive runtime or admin database secrets")
     if migrate != MIGRATE_ENVIRONMENT:
@@ -818,17 +803,12 @@ def _lint_roles(services: dict[str, Any]) -> list[str]:
             "migrate environment must contain only the migration identity and Django secret"
         )
     if api.get("ALLOWED_HOSTS") != "${PUBLIC_HOST:?Set PUBLIC_HOST},api,127.0.0.1":
-        errors.append(
-            "api must accept the public host plus private health and BFF hosts"
-        )
+        errors.append("api must accept the public host plus private health and BFF hosts")
     if "DJANGO_LISTEN_HOST" in api or "DJANGO_LISTEN_HOST" in migrate:
         errors.append("DJANGO_LISTEN_HOST is not a production bind control")
     if api.get("RUNTIME_DB_USER") != "${RUNTIME_DB_USER:?Set RUNTIME_DB_USER}":
         errors.append("api runtime user must come from RUNTIME_DB_USER")
-    if (
-        migrate.get("MIGRATION_DB_USER")
-        != "${MIGRATION_DB_USER:?Set MIGRATION_DB_USER}"
-    ):
+    if migrate.get("MIGRATION_DB_USER") != "${MIGRATION_DB_USER:?Set MIGRATION_DB_USER}":
         errors.append("migrate user must come from MIGRATION_DB_USER")
     if services["scheduler"].get("command") != [
         "python",
@@ -876,9 +856,7 @@ def _lint_roles(services: dict[str, Any]) -> list[str]:
     if postgres.get("POSTGRES_MIGRATION_PASSWORD") != (
         "${MIGRATION_DB_PASSWORD:?Set MIGRATION_DB_PASSWORD}"
     ):
-        errors.append(
-            "postgres must initialize gym_migration from MIGRATION_DB_PASSWORD"
-        )
+        errors.append("postgres must initialize gym_migration from MIGRATION_DB_PASSWORD")
     if postgres.get("POSTGRES_RUNTIME_PASSWORD") != (
         "${RUNTIME_DB_PASSWORD:?Set RUNTIME_DB_PASSWORD}"
     ):
@@ -897,13 +875,8 @@ def _lint_connections(services: dict[str, Any]) -> list[str]:
     maximum = int(match.group(1))
     if "max_wal_senders=3" not in joined:
         return ["postgres max_wal_senders must stay at 3 for backup"]
-    if (
-        2 + SCHEDULER_CONNECTIONS + MONITOR_CONNECTIONS + CONNECTION_RESERVE + 3
-        >= maximum
-    ):
-        return [
-            "worker connections, WAL senders, and the reserve must fit max_connections"
-        ]
+    if 2 + SCHEDULER_CONNECTIONS + MONITOR_CONNECTIONS + CONNECTION_RESERVE + 3 >= maximum:
+        return ["worker connections, WAL senders, and the reserve must fit max_connections"]
     return []
 
 
@@ -916,38 +889,28 @@ def _lint_supporting_files(repo: Path) -> list[str]:
         errors.append("Gunicorn must reject WEB_CONCURRENCY above 4")
     if "accesslog = None" not in gunicorn:
         errors.append("Gunicorn must not log the raw request target")
-    production = (repo / "backend/requirements/production.txt").read_text(
-        encoding="utf-8"
-    )
+    production = (repo / "backend/requirements/production.txt").read_text(encoding="utf-8")
     for pin in ("gunicorn==26.2.0", "drf-spectacular==0.30.0"):
         if pin not in production:
             errors.append(f"production requirements missing {pin}")
-    settings = (repo / "backend/config/settings/production.py").read_text(
-        encoding="utf-8"
-    )
+    settings = (repo / "backend/config/settings/production.py").read_text(encoding="utf-8")
     if "SECURE_SSL_REDIRECT = True" not in settings:
         errors.append("production TLS redirect must stay enabled")
     if "SECURE_PROXY_SSL_HEADER" not in settings:
-        errors.append(
-            "production settings must declare the private forwarded-proto header"
-        )
+        errors.append("production settings must declare the private forwarded-proto header")
     if "django.middleware.csrf.CsrfViewMiddleware" not in settings:
         errors.append("production settings must keep Django CSRF middleware")
     if "XFrameOptionsMiddleware" not in settings:
         errors.append("production settings must keep the clickjacking middleware")
     if "DJANGO_LISTEN_HOST" in settings:
-        errors.append(
-            "production settings must not treat DJANGO_LISTEN_HOST as a bind control"
-        )
+        errors.append("production settings must not treat DJANGO_LISTEN_HOST as a bind control")
     if "STRUCTURED_REQUEST_LOG = True" not in settings:
         errors.append("production request logs must be enabled")
     if "JsonLogFormatter" not in settings or '"gym.http"' not in settings:
         errors.append("production logs must use the JSON request formatter")
     if '"django.request"' not in settings or '"CRITICAL"' not in settings:
         errors.append("Django's raw request logger must stay quiet")
-    migration = (repo / "backend/config/settings/migration.py").read_text(
-        encoding="utf-8"
-    )
+    migration = (repo / "backend/config/settings/migration.py").read_text(encoding="utf-8")
     for required in (
         "DATABASE_ROLE_MODE",
         "MIGRATION",
@@ -962,9 +925,7 @@ def _lint_supporting_files(repo: Path) -> list[str]:
     next_config = (repo / "web/next.config.ts").read_text(encoding="utf-8")
     if 'output: "standalone"' not in next_config:
         errors.append("Next.js must build a standalone server")
-    api_template = (repo / "backend/.env.production.example").read_text(
-        encoding="utf-8"
-    )
+    api_template = (repo / "backend/.env.production.example").read_text(encoding="utf-8")
     for name in (
         "MINIO_ENDPOINT_URL",
         "RESEND_API_KEY",
@@ -1019,13 +980,11 @@ def _load_env(text: str) -> dict[str, str]:
 
 
 def _variable_usage(text: str, name: str) -> str:
-    match = re.search(rf"\$\{{{name}(?::\?[^}}]*)?\}}", text)
+    match = re.search(rf"\$\{{{name}(?::\?[^}}]*|:-[^{{}}]*)?\}}", text)
     return match.group(0) if match else ""
 
 
-def _parse_node(
-    lines: list[tuple[int, str]], index: int, indent: int
-) -> tuple[Any, int]:
+def _parse_node(lines: list[tuple[int, str]], index: int, indent: int) -> tuple[Any, int]:
     if index >= len(lines) or _indent(lines[index][1]) < indent:
         return {}, index
     if lines[index][1].strip().startswith("- "):
@@ -1033,9 +992,7 @@ def _parse_node(
     return _parse_map(lines, index, _indent(lines[index][1]))
 
 
-def _parse_map(
-    lines: list[tuple[int, str]], index: int, indent: int
-) -> tuple[dict[str, Any], int]:
+def _parse_map(lines: list[tuple[int, str]], index: int, indent: int) -> tuple[dict[str, Any], int]:
     result: dict[str, Any] = {}
     while index < len(lines):
         line_no, raw = lines[index]
@@ -1061,9 +1018,7 @@ def _parse_map(
     return result, index
 
 
-def _parse_list(
-    lines: list[tuple[int, str]], index: int, indent: int
-) -> tuple[list[Any], int]:
+def _parse_list(lines: list[tuple[int, str]], index: int, indent: int) -> tuple[list[Any], int]:
     result: list[Any] = []
     while index < len(lines):
         line_no, raw = lines[index]
@@ -1085,9 +1040,7 @@ def _parse_list(
                 index += 1
                 while index < len(lines):
                     next_no, next_raw = lines[index]
-                    if _indent(next_raw) != child_indent or next_raw.strip().startswith(
-                        "- "
-                    ):
+                    if _indent(next_raw) != child_indent or next_raw.strip().startswith("- "):
                         break
                     child_key, child_value = _split_key(next_raw.strip(), next_no)
                     if child_value is None:

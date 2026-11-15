@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
+from decimal import Decimal
+from types import SimpleNamespace
 from typing import cast
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from apps.assistant.lookups import (
@@ -10,8 +14,10 @@ from apps.assistant.lookups import (
     _local_today,
     _normalize_line_numbers,
     _normalize_numbers,
+    _payment_update_gate,
     _service_day,
     assignment_gap,
+    bind_latest_ledger_entry,
     booking_package_gap,
     choose_reference,
     existing_assignment,
@@ -273,7 +279,7 @@ def test_a_json_line_string_becomes_a_line_list() -> None:
     lines = payload["lines"]
     assert isinstance(lines, list)
     assert lines[0]["product_id"] == "BAR"
-    assert lines[0]["quantity"] == "2"
+    assert lines[0]["quantity"] == "2.000"
 
 
 def test_a_period_with_both_stated_days_is_not_a_date_conflict() -> None:
@@ -314,10 +320,10 @@ def test_a_json_number_is_stored_as_decimal_text() -> None:
     _normalize_line_numbers(payload)
 
     assert payload["sale_price"] == "4000"
-    assert payload["low_stock_threshold"] == "2"
+    assert payload["low_stock_threshold"] == "2.000"
     lines = payload["lines"]
     assert isinstance(lines, list)
-    assert lines[0]["quantity"] == "2"
+    assert lines[0]["quantity"] == "2.000"
     assert lines[0]["discount"] == "0"
     assert lines[0]["amount"] == "10000"
 
@@ -595,8 +601,260 @@ def test_myanmar_digits_in_a_line_quantity_become_arabic() -> None:
 
     lines = payload["lines"]
     assert isinstance(lines, list)
-    assert lines[0]["quantity"] == "2"
+    assert lines[0]["quantity"] == "2.000"
     assert lines[0]["discount"] == "0"
+
+
+def test_same_day_classes_resolve_by_location_and_clock() -> None:
+    morning = NamedRecord(
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa11",
+        "Yoga",
+        when="2026-11-15",
+        label="Yoga Studio C 07:00",
+        code="studio c",
+    )
+    later = NamedRecord(
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa12",
+        "Yoga",
+        when="2026-11-15",
+        label="Yoga Studio C 12:00",
+        code="studio c",
+    )
+    other = NamedRecord(
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa13",
+        "Yoga",
+        when="2026-11-15",
+        label="Yoga Studio B 08:00",
+        code="studio b",
+    )
+
+    by_place = choose_reference(
+        other.id,
+        (morning, later, other),
+        "Book Nyein Nyein into the Studio B Yoga class",
+    )
+    by_clock = choose_reference(
+        other.id,
+        (morning, later),
+        "Mark the 07:00 Studio C Yoga booking as a no-show",
+    )
+
+    assert by_place.id == other.id
+    assert by_place.error == ""
+    assert by_clock.id == morning.id
+    assert by_clock.error == ""
+
+
+def test_a_salary_month_replaces_a_stale_period_id() -> None:
+    november = NamedRecord(
+        "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01",
+        "November coaching payroll",
+        when="2026-11-01",
+        code="november",
+    )
+    september = NamedRecord(
+        "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02",
+        "September wages",
+        when="2026-09-01",
+        code="september",
+    )
+
+    choice = choose_reference(
+        november.id,
+        (november, september),
+        "Put one wage line on the September period",
+    )
+
+    assert choice.id == september.id
+    assert choice.error == ""
+
+
+def test_a_grant_is_not_used_as_the_ledger_correction(monkeypatch) -> None:
+    from contextlib import nullcontext
+
+    package_id = uuid4()
+    grant_id = uuid4()
+    attended_id = uuid4()
+    gym = SimpleNamespace(id=uuid4())
+    grant = SimpleNamespace(
+        id=str(grant_id),
+        reason="GRANT",
+        gym=gym,
+        member_service_package_id=str(package_id),
+        corrections=SimpleNamespace(exists=lambda: False),
+    )
+    attended = SimpleNamespace(
+        id=str(attended_id),
+        reason="ATTENDED",
+        gym=gym,
+        member_service_package_id=str(package_id),
+        corrections=SimpleNamespace(exists=lambda: False),
+    )
+
+    class _Rows:
+        def __init__(self, rows: list[SimpleNamespace]) -> None:
+            self.rows = rows
+
+        def filter(self, **kwargs: object) -> _Rows:
+            plain = {key: value for key, value in kwargs.items() if "__" not in key}
+            kept: list[SimpleNamespace] = []
+            for row in self.rows:
+                if all(str(getattr(row, key)) == str(value) for key, value in plain.items()):
+                    kept.append(row)
+            return _Rows(kept)
+
+        def exclude(self, **kwargs: object) -> _Rows:
+            return _Rows(
+                [
+                    row
+                    for row in self.rows
+                    if all(getattr(row, key) != value for key, value in kwargs.items())
+                ]
+            )
+
+        def order_by(self, *_fields: str) -> _Rows:
+            return self
+
+        def first(self) -> SimpleNamespace | None:
+            return self.rows[0] if self.rows else None
+
+    class _Ledger:
+        def filter(self, **kwargs: object) -> _Rows:
+            return _Rows([grant, attended]).filter(**kwargs)
+
+    monkeypatch.setattr("apps.assistant.lookups.transaction.atomic", lambda: nullcontext())
+    monkeypatch.setattr("apps.assistant.lookups.set_gym_context", lambda **_kwargs: None)
+    monkeypatch.setattr("apps.trainers.models.ServiceSessionLedger.objects", _Ledger())
+    monkeypatch.setattr(
+        "apps.trainers.models.ServiceSessionLedger.Reason",
+        SimpleNamespace(GRANT="GRANT"),
+    )
+    payload: dict[str, object] = {
+        "member_service_package_id": str(package_id),
+        "reverses_entry_id": str(grant_id),
+    }
+
+    failure = bind_latest_ledger_entry(
+        cast(Gym, gym),
+        "adjust_package_ledger",
+        payload,
+    )
+
+    assert failure is None
+    assert payload["reverses_entry_id"] == str(attended_id)
+
+    only_grant = _Ledger()
+
+    def grant_only(**_kwargs: object) -> _Rows:
+        return _Rows([grant])
+
+    only_grant.filter = grant_only  # type: ignore[method-assign]
+    monkeypatch.setattr("apps.trainers.models.ServiceSessionLedger.objects", only_grant)
+    grant_only_payload: dict[str, object] = {
+        "member_service_package_id": str(package_id),
+        "reverses_entry_id": str(grant_id),
+    }
+
+    missing = bind_latest_ledger_entry(
+        cast(Gym, gym),
+        "adjust_package_ledger",
+        grant_only_payload,
+    )
+
+    assert missing == {"error": "not_found", "field": "reverses_entry_id"}
+    assert grant_only_payload["reverses_entry_id"] == str(grant_id)
+
+
+def test_description_only_payment_update_keeps_the_stored_amount(monkeypatch) -> None:
+    payment_id = uuid4()
+    member_id = uuid4()
+    payment = SimpleNamespace(
+        id=payment_id,
+        amount=Decimal("20000.00"),
+        purpose="MEMBERSHIP",
+        status="DRAFT",
+        pt_sale_id=None,
+        member_id=member_id,
+    )
+    monkeypatch.setattr(
+        "apps.assistant.lookups._resolve_payment",
+        lambda *_args, **_kwargs: (payment, None),
+    )
+    monkeypatch.setattr(
+        "apps.assistant.lookups._bind_membership_payment",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr("apps.assistant.lookups._service_day", lambda *_args, **_kwargs: None)
+    gym = cast(Gym, SimpleNamespace(currency="MMK"))
+    payload: dict[str, object] = {
+        "payment_id": str(payment_id),
+        "description": "November partial",
+        "amount": "99999",
+        "purpose": "MEMBERSHIP",
+    }
+
+    failure = _payment_update_gate(
+        gym,
+        payload,
+        "Change that payment description to November partial.",
+    )
+
+    assert failure is None
+    assert payload["amount"] == "20000.00"
+    assert payload["description"] == "November partial"
+
+
+def test_a_contradicted_payment_amount_is_not_replaced(monkeypatch) -> None:
+    payment_id = uuid4()
+    payment = SimpleNamespace(
+        id=payment_id,
+        amount=Decimal("40.00"),
+        purpose="OTHER",
+        status="DRAFT",
+        pt_sale_id=None,
+        member_id=None,
+    )
+    monkeypatch.setattr(
+        "apps.assistant.lookups._resolve_payment",
+        lambda *_args, **_kwargs: (payment, None),
+    )
+    monkeypatch.setattr("apps.assistant.lookups._service_day", lambda *_args, **_kwargs: None)
+    gym = cast(Gym, SimpleNamespace(currency="MMK"))
+    payload: dict[str, object] = {
+        "payment_id": str(payment_id),
+        "amount": "25.00",
+        "business_date": "2026-11-15",
+        "purpose": "OTHER",
+    }
+
+    failure = _payment_update_gate(
+        gym,
+        payload,
+        "Change 40.00 on 2026-11-15.",
+    )
+
+    assert failure == {"error": "amount_mismatch"}
+    assert payload["amount"] == "25.00"
+
+
+def test_a_stopped_run_does_not_replace_a_richer_coverage_report(tmp_path) -> None:
+    from tests.security.test_assistant_tool_coverage import _write_report
+
+    path = tmp_path / "coverage.json"
+    path.write_text(json.dumps({"covered": ["create_member", "update_payment"]}), encoding="utf-8")
+
+    _write_report(
+        {"covered": [], "stopped": "provider unavailable"},
+        str(path),
+    )
+
+    assert json.loads(path.read_text(encoding="utf-8"))["covered"] == [
+        "create_member",
+        "update_payment",
+    ]
+    aborted = json.loads((tmp_path / "coverage.json.aborted").read_text(encoding="utf-8"))
+    assert aborted["stopped"] == "provider unavailable"
+    assert aborted["covered"] == []
 
 
 def test_a_sale_without_a_trainer_id_is_not_an_assignment_gap() -> None:

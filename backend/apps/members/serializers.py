@@ -139,7 +139,7 @@ class MemberCreateSerializer(StrictSerializer):
         required=False, allow_blank=True, default="", max_length=32
     )
     first_name = serializers.CharField(max_length=100)
-    last_name = serializers.CharField(max_length=100)
+    last_name = serializers.CharField(required=False, allow_blank=True, default="", max_length=100)
     phone = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=32)
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     gender = MemberGenderField()
@@ -172,7 +172,7 @@ class MemberCreateSerializer(StrictSerializer):
         return _member_name(value)
 
     def validate_last_name(self, value: str) -> str:
-        return _member_name(value)
+        return normalize_member_name(value)
 
     def validate_phone(self, value: str | None) -> str | None:
         return _optional_phone(value)
@@ -197,7 +197,7 @@ class MemberCreateSerializer(StrictSerializer):
 
 class MemberUpdateSerializer(StrictSerializer):
     first_name = serializers.CharField(required=False, max_length=100)
-    last_name = serializers.CharField(required=False, max_length=100)
+    last_name = serializers.CharField(required=False, allow_blank=True, max_length=100)
     phone = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=32)
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     gender = MemberGenderField()
@@ -225,7 +225,7 @@ class MemberUpdateSerializer(StrictSerializer):
         return _member_name(value)
 
     def validate_last_name(self, value: str) -> str:
-        return _member_name(value)
+        return normalize_member_name(value)
 
     def validate_phone(self, value: str | None) -> str | None:
         return _optional_phone(value)
@@ -672,7 +672,7 @@ class CheckInMemberSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     member_number = serializers.CharField()
     first_name = serializers.CharField()
-    last_name = serializers.CharField()
+    last_name = serializers.CharField(allow_blank=True)
 
 
 class CheckInEligibilitySerializer(serializers.Serializer):

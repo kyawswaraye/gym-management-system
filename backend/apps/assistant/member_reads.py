@@ -115,8 +115,19 @@ def get_member(call: ReadCall) -> dict[str, object]:
 
     if call.gym.id is None:
         raise ExecutionRejected("The assistant session is incomplete.", code="session")
-    member_id = _member_id(call.payload.get("member_id"))
-    row = _visible_members(call).filter(id=member_id).first()
+    raw = call.payload.get("member_id")
+    visible = _visible_members(call)
+    if isinstance(raw, str):
+        token = raw.strip()
+        try:
+            UUID(token)
+        except ValueError:
+            row = visible.filter(member_number=token).first()
+            if row is None:
+                raise Http404 from None
+            return _row(row)
+    member_id = _member_id(raw)
+    row = visible.filter(id=member_id).first()
     if row is None:
         raise Http404
     return _row(row)
@@ -249,11 +260,16 @@ _READS = {
         ),
     ),
     GET_MEMBER: _contract(
-        _definition(GET_MEMBER, "Read one member in this gym"),
+        _definition(
+            GET_MEMBER,
+            "Open one member's stored record by member number or by the id from "
+            "search_members. Returns that one member, including the join date and "
+            "status. search_members returns every match instead of one record.",
+        ),
         (
             FieldRequirement(
                 "member_id",
-                "Member id returned by search_members",
+                "Member number, such as MEM-000004, or the id returned by search_members.",
             ),
         ),
     ),

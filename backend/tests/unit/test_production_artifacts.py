@@ -46,6 +46,27 @@ def test_compose_source_rejects_mutable_defaults() -> None:
     module = load()
     errors = module.lint_compose_source("image: ${API_IMAGE:-postgres:18.6}\n")
     assert any("default" in error or "digest" in error for error in errors)
+    allowed = (
+        "GEMINI_THINKING: ${GEMINI_THINKING:-off}\n"
+        "GEMINI_MAX_OUTPUT_TOKENS: ${GEMINI_MAX_OUTPUT_TOKENS:-2048}\n"
+    )
+    assert module.lint_compose_source(allowed) == []
+    drifted = module.lint_compose_source("GEMINI_THINKING: ${GEMINI_THINKING:-low}\n")
+    assert any("default" in error for error in drifted)
+
+
+def test_api_and_scheduler_default_gemini_cost_controls() -> None:
+    module = load()
+    document = module.parse_simple_yaml(
+        (ROOT / "infra/compose/docker-compose.prod.yml").read_text(encoding="utf-8")
+    )
+    for name in ("api", "scheduler"):
+        environment = document["services"][name]["environment"]
+        assert environment["GEMINI_THINKING"] == "${GEMINI_THINKING:-off}"
+        assert environment["GEMINI_MAX_OUTPUT_TOKENS"] == ("${GEMINI_MAX_OUTPUT_TOKENS:-2048}")
+    document["services"]["api"]["environment"]["GEMINI_THINKING"] = "${GEMINI_THINKING}"
+    errors = module.lint_compose_document(document)
+    assert any("api" in error and "GEMINI_THINKING" in error for error in errors)
 
 
 def test_private_host_port_fails_closed() -> None:

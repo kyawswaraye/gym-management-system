@@ -22,7 +22,9 @@ from apps.assistant.configuration import (
     assistant_configuration,
     classify_provider_failure,
     e2e_script_enabled,
+    gemini_max_output_tokens,
     gemini_max_retries,
+    gemini_thinking,
     gemini_timeout_seconds,
 )
 
@@ -57,6 +59,8 @@ class ProviderUsage:
     prompt_tokens: int | None
     candidate_tokens: int | None
     total_tokens: int | None
+    cached_tokens: int | None = None
+    thought_tokens: int | None = None
 
 
 _UNAVAILABLE_USAGE = ProviderUsage(None, None, None)
@@ -69,6 +73,7 @@ class ModelTurn:
     parts: tuple[dict[str, object], ...]
     blocked: bool = False
     usage: ProviderUsage = _UNAVAILABLE_USAGE
+    finish_reason: str = "unavailable"
 
 
 def parse_model_turn(payload: Mapping[str, object]) -> ModelTurn:
@@ -85,6 +90,7 @@ def parse_model_turn(payload: Mapping[str, object]) -> ModelTurn:
     candidate = candidates[0]
     if not isinstance(candidate, Mapping):
         raise ProviderCallError(ProviderFailure.PROVIDER)
+    finish_reason = _finish_reason(candidate)
     content = candidate.get("content")
     if not isinstance(content, Mapping):
         raise ProviderCallError(ProviderFailure.PROVIDER)
@@ -118,7 +124,14 @@ def parse_model_turn(payload: Mapping[str, object]) -> ModelTurn:
     text = "".join(texts).strip()
     if text == "" and not calls and not blocked:
         raise ProviderCallError(ProviderFailure.PROVIDER)
-    return ModelTurn(text, tuple(calls), tuple(echoed), blocked=blocked, usage=usage)
+    return ModelTurn(
+        text,
+        tuple(calls),
+        tuple(echoed),
+        blocked=blocked,
+        usage=usage,
+        finish_reason=finish_reason,
+    )
 
 
 def generate_content(
@@ -136,10 +149,20 @@ def generate_content(
 
     if not assistant_configuration().available:
         raise ProviderCallError(ProviderFailure.CREDENTIAL)
+    generation: dict[str, object] = {
+        "temperature": 0.2,
+        "maxOutputTokens": gemini_max_output_tokens(),
+    }
+    thinking = _thinking_config(
+        str(getattr(settings, "GEMINI_MODEL", "")),
+        gemini_thinking(),
+    )
+    if thinking:
+        generation["thinkingConfig"] = thinking
     body: dict[str, object] = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},
         "contents": contents,
-        "generationConfig": {"temperature": 0.2},
+        "generationConfig": generation,
     }
     if declarations:
         body["tools"] = [{"functionDeclarations": declarations}]
@@ -165,9 +188,26 @@ def generate_content(
             _log_usage(outcome=ProviderFailure.PROVIDER.value, requests=attempt + 1, usage=None)
             raise ProviderCallError(ProviderFailure.PROVIDER) from exc
         outcome = "blocked" if turn.blocked else "ok"
-        _log_usage(outcome=outcome, requests=attempt + 1, usage=turn.usage)
+        _log_usage(
+            outcome=outcome,
+            requests=attempt + 1,
+            usage=turn.usage,
+            finish_reason=turn.finish_reason,
+        )
         return turn
     raise ProviderCallError(last)
+
+
+def _thinking_config(model: str, level: str) -> dict[str, object]:
+    name = model.lower()
+    config: dict[str, object] = {}
+    if name.startswith("gemini-3"):
+        config = {"thinkingLevel": "low"}
+    elif "2.5-pro" in name:
+        config = {"thinkingBudget": 128 if level == "off" else 512}
+    elif "2.5" in name:
+        config = {"thinkingBudget": 0 if level == "off" else 512}
+    return config
 
 
 def _scripted_transport(body: dict[str, object], timeout: int) -> dict[str, object]:
@@ -253,6 +293,8 @@ def _usage(payload: Mapping[str, object]) -> ProviderUsage:
         _token_count(raw.get("promptTokenCount")),
         _token_count(raw.get("candidatesTokenCount")),
         _token_count(raw.get("totalTokenCount")),
+        _token_count(raw.get("cachedContentTokenCount")),
+        _token_count(raw.get("thoughtsTokenCount")),
     )
 
 
@@ -262,18 +304,38 @@ def _token_count(value: object) -> int | None:
     return value
 
 
-def _log_usage(*, outcome: str, requests: int, usage: ProviderUsage | None) -> None:
+def _finish_reason(candidate: Mapping[str, object]) -> str:
+    reason = candidate.get("finishReason")
+    if not isinstance(reason, str):
+        return "unavailable"
+    token = reason.strip()
+    if token.isascii() and token.replace("_", "").isalnum() and len(token) <= 40:
+        return token
+    return "unavailable"
+
+
+def _log_usage(
+    *,
+    outcome: str,
+    requests: int,
+    usage: ProviderUsage | None,
+    finish_reason: str = "unavailable",
+) -> None:
     """Record counts only. The prompt, tool results, and key stay out of the log."""
 
     counted = usage or _UNAVAILABLE_USAGE
     logger.info(
         "assistant provider usage outcome=%s requests=%s prompt_tokens=%s "
-        "candidate_tokens=%s total_tokens=%s",
+        "candidate_tokens=%s total_tokens=%s cached_tokens=%s thought_tokens=%s "
+        "finish_reason=%s",
         outcome,
         requests,
         _token_text(counted.prompt_tokens),
         _token_text(counted.candidate_tokens),
         _token_text(counted.total_tokens),
+        _token_text(counted.cached_tokens),
+        _token_text(counted.thought_tokens),
+        finish_reason,
     )
 
 

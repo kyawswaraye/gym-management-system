@@ -36,7 +36,7 @@ from apps.assistant.executor import (
     execute_confirmed_tool,
 )
 from apps.assistant.models import Goal
-from apps.assistant.prerequisites import FieldRequirement, Prerequisite
+from apps.assistant.prerequisites import FieldRequirement, Prerequisite, optional
 from apps.assistant.registry import ToolDefinition
 from apps.cashbook.serializers import session_payload, transaction_payload
 from apps.common.finance.idempotency import IdempotentResponse
@@ -331,7 +331,9 @@ def approve_payment_body(data: Mapping[str, object], *, payment_id: str) -> dict
 def reject_payment_body(data: Mapping[str, object], *, payment_id: str) -> dict[str, object]:
     """Return the reject body whose finance hash matches the HTTP view."""
 
-    fields = _validated_with(RejectPaymentSerializer, data)
+    from apps.assistant.approval import rejection_reason_input
+
+    fields = _validated_with(RejectPaymentSerializer, rejection_reason_input(data))
     return {"payment_id": payment_id, "reason": str(fields["rejection_reason"])}
 
 
@@ -704,12 +706,23 @@ _CREATE = RegisteredTool(
             "payments.create",
         ),
         (
-            FieldRequirement("purpose", "Purpose"),
+            FieldRequirement(
+                "purpose",
+                "MEMBERSHIP or OTHER. MEMBERSHIP also needs member_id and membership_id.",
+            ),
             FieldRequirement("description", "Description"),
-            FieldRequirement("amount", "Amount"),
-            FieldRequirement("currency", "Currency"),
-            FieldRequirement("method", "Method"),
-            FieldRequirement("business_date", "Business date"),
+            FieldRequirement("amount", "Amount as text, such as 25000.00"),
+            FieldRequirement("currency", "Gym currency code, such as THB"),
+            FieldRequirement(
+                "method",
+                "CASH, BANK_TRANSFER, CARD, MOBILE_PAYMENT, or OTHER",
+            ),
+            FieldRequirement("business_date", "Business date as YYYY-MM-DD"),
+            optional("member_id", "Member number or stored id. Required for MEMBERSHIP."),
+            optional(
+                "membership_id",
+                "Membership for this charge. Required for MEMBERSHIP.",
+            ),
         ),
         http_method="POST",
         route=CREATE_ROUTE,
@@ -720,7 +733,17 @@ _CREATE = RegisteredTool(
 _UPDATE = RegisteredTool(
     contract=_contract(
         _definition("update_payment", "Update a payment draft", "payments.update"),
-        (FieldRequirement("payment_id", "Payment"),),
+        (
+            FieldRequirement("payment_id", "Payment"),
+            optional("amount", "Amount as text"),
+            optional("description", "Description"),
+            optional("method", "CASH, BANK_TRANSFER, CARD, MOBILE_PAYMENT, or OTHER"),
+            optional("purpose", "MEMBERSHIP or OTHER"),
+            optional("member_id", "Member"),
+            optional("membership_id", "Membership"),
+            optional("currency", "Gym currency code"),
+            optional("business_date", "Business date as YYYY-MM-DD"),
+        ),
         http_method="PATCH",
         route=UPDATE_ROUTE,
         route_fields=("payment_route_id",),

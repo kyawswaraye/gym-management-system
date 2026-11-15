@@ -13,7 +13,6 @@ from rest_framework.views import APIView
 
 from apps.assistant.configuration import ProviderFailure
 from apps.assistant.dispatch import tool_contracts
-from apps.assistant.knowledge import complete_stored_reply
 from apps.assistant.provider import FunctionCall, ModelTurn, ProviderCallError
 from apps.assistant.turns import _model_declarations, _reply
 
@@ -143,9 +142,9 @@ def test_a_lookup_still_offers_write_tools(
     result = _run()
 
     assert seen
-    assert "search_payments" in seen[0]
-    assert "create_payment" in seen[0]
-    assert "create_member" in seen[0]
+    assert seen[0] == {"select_workflow", "cancel_pending_confirmation"}
+    assert "create_payment" in seen[-1]
+    assert "search_payments" in seen[-1]
     assert result["pending_confirmation"] is None
     assert result["message"]["body"] == "What amount? I still need the member and the amount."
 
@@ -185,8 +184,8 @@ def test_a_write_request_keeps_write_declarations_and_the_confirmation(
     result = _run()
 
     assert len(seen) == 2
-    assert "create_member" in seen[0]
-    assert "search_members" in seen[0]
+    assert "create_member" in seen[1]
+    assert "search_members" in seen[1]
     assert result["pending_confirmation"] is not None
     assert result["message"]["body"] == (
         "Review the change before confirming. That change is not saved until you confirm."
@@ -210,6 +209,10 @@ def test_a_saved_change_follow_up_still_receives_write_declarations(
         return _text("The member is saved.")
 
     _install(monkeypatch, staff_text="Add Ada Lovelace", generate=generate)
+    monkeypatch.setattr(
+        "apps.assistant.turns.load_state",
+        lambda *_args, **_kwargs: {"active_workflows": "member_registration"},
+    )
     result = _reply(
         request=cast(Request, SimpleNamespace(permission_codes=frozenset())),
         view=APIView(),
@@ -319,8 +322,9 @@ def test_a_single_record_read_still_asks_the_model_to_answer(
 
 def test_declarations_keep_authorized_reads_and_writes() -> None:
     contracts = tool_contracts()
-    lookup = _names(_model_declarations(_OFFERED, contracts, "List payments"))
-    change = _names(_model_declarations(_OFFERED, contracts, "Add Ada Lovelace"))
+    modules = frozenset({"payments", "members", "retail", "classes", "finance"})
+    lookup = _names(_model_declarations(_OFFERED, contracts, modules))
+    change = _names(_model_declarations(_OFFERED, contracts, modules))
     assert lookup == change
     assert "search_payments" in lookup
     assert "create_payment" in lookup
@@ -348,10 +352,38 @@ def test_a_skipped_read_is_not_run_and_an_invention_is_not_shown(
 
     assert called == []
     body = str(result["message"]["body"])
+    assert body == "No stored record matches that."
     assert "99999" not in body
     assert "Hla" not in body
     assert "1999-01-01" not in body
     assert result["pending_confirmation"] is None
+
+
+def test_invented_person_with_no_matching_rows_is_not_shown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    invented = "Invented Person paid 99999 on 1999-01-01."
+
+    def generate(**kwargs: object) -> ModelTurn:
+        if _responses(kwargs["contents"]):
+            return _text(invented)
+        return _call("search_members", {})
+
+    def handle(**_kwargs: object) -> tuple[None, dict[str, object]]:
+        return None, {"result": {"results": []}}
+
+    _install(monkeypatch, staff_text="Search members.", generate=generate, handle=handle)
+    english = str(_run()["message"]["body"])
+    assert english == "No stored record matches that."
+    for hidden in ("Invented Person", "99999", "1999-01-01"):
+        assert hidden not in english
+
+    _install(monkeypatch, staff_text="အဖွဲ့ဝင် စာရင်း ရှာ", generate=generate, handle=handle)
+    burmese = str(_run()["message"]["body"])
+    assert burmese == "သိမ်းထားတဲ့ မှတ်တမ်း မတွေ့ပါ။"
+    assert "Invented Person" not in burmese
+    assert "99999" not in burmese
+    assert "1999-01-01" not in burmese
 
 
 def test_a_provider_failure_does_not_run_a_keyword_read(
@@ -375,32 +407,6 @@ def test_a_provider_failure_does_not_run_a_keyword_read(
     body = str(result["message"]["body"])
     assert "10.00" not in body
     assert "unavailable" in body.casefold()
-
-
-def test_a_partial_list_is_not_treated_as_finished() -> None:
-    classes = {"results": [{"name": "Yoga", "status": "SCHEDULED"}]}
-    bookings = {"results": [{"member_number": "MEM-000101", "status": "BOOKED"}]}
-    staff = "List classes and bookings"
-    assert complete_stored_reply(staff, {"search_class_occurrences": classes}) is None
-    finished = complete_stored_reply(
-        staff,
-        {"search_class_occurrences": classes, "search_bookings": bookings},
-    )
-    assert finished is not None
-    assert "Yoga" in finished
-    assert "MEM-000101" in finished
-    ambiguous = complete_stored_reply(
-        "What did the member pay",
-        {
-            "search_members": {
-                "ambiguous": True,
-                "results": [{"member_number": "MEM-000101"}, {"member_number": "MEM-000102"}],
-            }
-        },
-    )
-    assert ambiguous is not None
-    assert "MEM-000101" in ambiguous
-    assert "MEM-000102" in ambiguous
 
 
 def test_the_step_limit_stops_without_claiming_success(

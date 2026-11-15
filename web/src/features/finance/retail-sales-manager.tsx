@@ -172,7 +172,8 @@ function memberChoiceLabel(member: {
   first_name: string;
   last_name: string;
 }): string {
-  return `${member.member_number} — ${member.first_name} ${member.last_name}`;
+  const name = `${member.first_name} ${member.last_name}`.trim();
+  return name ? `${member.member_number} — ${name}` : member.member_number;
 }
 
 function saleMemberLabel(

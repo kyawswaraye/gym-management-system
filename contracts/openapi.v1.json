@@ -31478,7 +31478,7 @@
                     },
                     "last_name": {
                         "type": "string",
-                        "minLength": 1,
+                        "default": "",
                         "maxLength": 100
                     },
                     "phone": {
@@ -31545,8 +31545,7 @@
                 },
                 "required": [
                     "first_name",
-                    "join_date",
-                    "last_name"
+                    "join_date"
                 ]
             },
             "MemberDevice": {
@@ -35949,7 +35948,6 @@
                     },
                     "last_name": {
                         "type": "string",
-                        "minLength": 1,
                         "maxLength": 100
                     },
                     "phone": {

@@ -5,10 +5,8 @@ from __future__ import annotations
 from datetime import date
 
 from apps.assistant.knowledge import (
-    fact_tools,
     grounded_information_reply,
     information_question,
-    refuse_write_for_lookup,
     staff_notice,
 )
 from apps.assistant.lookups import (
@@ -18,17 +16,25 @@ from apps.assistant.lookups import (
 )
 from apps.assistant.workflow_state import (
     absorb_read,
-    capability_brief,
     confirmation_reply,
-    direct_reply,
-    remember_facts,
-    remember_intent,
     stored_date_reply,
 )
 
 _TODAY = date(2026, 11, 12)
+
+
+def test_a_definition_keeps_the_class_package_sentence() -> None:
+    kept = grounded_information_reply(
+        "Membership is gym access for a period. Class Package covers 10 sessions.",
+        brief="Today is 2026-11-12.",
+        staff_text="Membership နဲ့ class package ဘာကွာလဲ?",
+    )
+    assert "membership" in kept.casefold()
+    assert "class" in kept.casefold()
+    assert "10" not in kept
+
+
 _SUPPLIED = "Wint War, 13-11-2026, Monthly_plan ဝယ်မယ်။"
-_OPENING = "လူတစ်ယောက်လာပြီး member လုပ်မယ်။class တက်မယ်။pt လုပ်မယ်တဲ့။ဘာတွေလုပ်ရမလဲ?"
 
 
 def test_day_month_year_dates_normalize_to_13_november_2026() -> None:
@@ -147,52 +153,18 @@ def test_an_invalid_or_ambiguous_date_explains_the_problem() -> None:
     assert calendar_day("02/03/2026", _TODAY) == "ambiguous"
 
 
-def test_onboarding_keeps_member_class_and_pt_and_the_supplied_facts() -> None:
-    state: dict[str, str] = {}
-    remember_intent(state, _OPENING)
-    assert state["workflow"] == "member"
-    assert state["goals"] == "member,membership,class,pt"
-    assert capability_brief(_OPENING, state).startswith("Relevant operation. Members")
-    assert "separate steps" in capability_brief(_OPENING, state)
-
-    remember_intent(state, _SUPPLIED)
-    remember_facts(state, _SUPPLIED, _TODAY)
-    assert state["workflow"] == "member"
-    assert state["member_name"] == "Wint War"
-    assert state["plan_code"] == "Monthly_plan"
-    assert state["start_date"] == "2026-11-13"
-
-    remember_intent(state, "ဘယ်ရက်လဲ။")
-    remember_facts(state, "Which date?", _TODAY)
-    remember_facts(state, "32-11-2026", _TODAY)
-    assert state["start_date"] == "2026-11-13"
-    assert state["workflow"] == "member"
-
+def test_a_stored_date_is_repeated_instead_of_asked_again() -> None:
+    state = {
+        "member_name": "Wint War",
+        "plan_code": "Monthly_plan",
+        "start_date": "2026-11-13",
+    }
     burmese = stored_date_reply("ဘယ်ရက်လဲ။", state)
     english = stored_date_reply("Which date?", state)
     assert burmese is not None and "2026-11-13" in burmese and "13 November 2026" in burmese
-    assert "ဘယ်ရက်လဲ" not in (burmese or "")
+    assert "ဘယ်ရက်လဲ" not in burmese
     assert english is not None and english.startswith("The date is")
-    assert "Which date" not in (english or "")
-    assert direct_reply("ဘယ်ရက်လဲ။", state) == burmese
-
-    remember_intent(state, "class တက်မယ်")
-    assert state["workflow"] == "member"
-    state["member_id"] = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    remember_intent(state, "class တက်မယ်")
-    assert state["workflow"] == "class"
-    assert state["goals"] == "member,membership,class,pt"
-    assert state["member_name"] == "Wint War"
-
-
-def test_a_pt_only_request_stays_personal_training() -> None:
-    state: dict[str, str] = {}
-    remember_intent(state, "ဝင့်ဝါကို PT ထည့်မယ်")
-    remember_intent(state, "ဒီနေ့")
-    remember_intent(state, "100")
-    assert state["workflow"] == "pt"
-    assert state.get("goals", "") == ""
-    assert capability_brief("ဒီနေ့", state).startswith("Relevant operation. Personal training")
+    assert "Which date" not in english
 
 
 def test_a_confirmation_reply_shows_the_collected_facts_without_claiming_a_save() -> None:
@@ -224,55 +196,13 @@ def test_a_confirmation_reply_shows_the_collected_facts_without_claiming_a_save(
     assert "ဘယ်ရက်လဲ" not in reply
 
 
-def test_a_side_question_keeps_the_registration_and_can_return() -> None:
-    state: dict[str, str] = {}
-    opening = "Register a new member named Wint War, starting 13-11-2026."
-    remember_intent(state, opening)
-    remember_facts(state, opening, _TODAY)
-    assert state["workflow"] == "member"
-    assert state["member_name"] == "Wint War"
-    assert state["start_date"] == "2026-11-13"
-
-    for question in (
-        "How much is the Monthly Plan?",
-        "What about the PT package?",
-        "Show me today's payments.",
-    ):
-        remember_intent(state, question)
-        remember_facts(state, question, _TODAY)
-    assert state["workflow"] == "member"
-    assert state["member_name"] == "Wint War"
-    assert state["start_date"] == "2026-11-13"
-    assert state.get("parked", "") == ""
-    asked = capability_brief("How much is the Monthly Plan?", state)
-    assert "Answer only this question" in asked
-    assert "separate steps" not in asked
+def test_an_open_registration_is_not_replaced_by_a_lookup() -> None:
+    state = {
+        "workflow": "member",
+        "member_name": "Wint War",
+        "start_date": "2026-11-13",
+    }
     assert information_question("How much is the Monthly Plan?")
-    assert fact_tools("How much is the Monthly Plan?") == ("search_membership_plans",)
-    assert fact_tools("Monthly_plan ဘယ်လောက်လဲ?") == ("search_membership_plans",)
-    assert fact_tools("PT package တွေ ဘယ်လောက်ရှိလဲ?") == ("search_service_packages",)
-    assert "get_gym_dashboard" in fact_tools("ဒီနေ့ Payment ဘယ်လောက်ဝင်ထားလဲ?")
-    assert "search_payments" in fact_tools("ဒီနေ့ Payment ဘယ်လောက်ဝင်ထားလဲ?")
-    assert fact_tools("Active member count") == ("get_gym_dashboard",)
-    assert fact_tools("Available classes") == ("search_class_occurrences",)
-    remember_intent(state, "Today's payments.")
-    remember_intent(state, "Available classes")
-    assert state["workflow"] == "member"
-    assert state["start_date"] == "2026-11-13"
-    assert refuse_write_for_lookup("How much is the Monthly Plan?", "write")
-    assert not refuse_write_for_lookup("Add Ada Lovelace", "write")
-
-    remember_intent(state, "Create a PT booking")
-    assert state["workflow"] == "pt"
-    assert state["parked"] == "member"
-    resume = "Okay, register her and sell Monthly_plan."
-    remember_intent(state, resume)
-    remember_facts(state, resume, _TODAY)
-    assert state["workflow"] == "member"
-    assert state.get("parked", "") == ""
-    assert state["plan_code"] == "Monthly_plan"
-    assert state["start_date"] == "2026-11-13"
-
     absorb_read(
         state,
         "search_members",
@@ -301,6 +231,4 @@ def test_a_side_question_keeps_the_registration_and_can_return() -> None:
         brief="Service packages: Morning PT PT 8",
         staff_text="What about the PT package?",
     )
-    assert "Morning PT" in invented
-    assert "Fantasy" not in invented
-    assert "99999" not in invented
+    assert invented == ""

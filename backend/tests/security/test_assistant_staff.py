@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 from django.db import transaction
+from django.http import Http404
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -442,7 +443,7 @@ def test_role_changes_keep_delegation_and_gym_boundaries() -> None:
             {"membership_id": str(receptionist.id), "role_ids": [str(owner_role.id)]},
             assigned.version,
         )
-    with pytest.raises(GymMembership.DoesNotExist):
+    with pytest.raises(Http404):
         _run(
             gym,
             owner,

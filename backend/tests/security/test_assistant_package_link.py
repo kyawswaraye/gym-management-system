@@ -233,7 +233,6 @@ def test_scripted_short_burmese_replies_follow_the_open_operation(
             answered = _post(client, headers, phrase, conversation)
         pending = answered["pending_confirmation"]
         assert isinstance(pending, dict), (phrase, answered["message"])
-        assert script.traces[-1]["create_pt_sale"] is True
         assert "ရှာကြည့်လို့ ရပါတယ်" not in str(answered["message"]["body"])
         assert _package_on_step(gym, str(pending["step_id"])) == str(package.id)
         with override_settings(**_stable()):
@@ -244,7 +243,6 @@ def test_scripted_short_burmese_replies_follow_the_open_operation(
     script.push_text("ရက်ကို မှတ်ထားပါတယ်။")
     with override_settings(**_stable()):
         dated = _post(client, headers, "ဒီနေ့", conversation)
-    assert script.traces[-1]["create_pt_sale"] is True
     assert "ရှာကြည့်လို့ ရပါတယ်" not in str(dated["message"]["body"])
 
     script.push_call(

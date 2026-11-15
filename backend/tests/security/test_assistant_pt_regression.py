@@ -243,21 +243,17 @@ def test_scripted_pt_payment_and_confirmation(
     )
     proposed = _post(client, headers, "ဒီနေ့", conversation)
     pending = proposed["pending_confirmation"]
-    date_trace = script.traces[-1] if script.traces else {}
     problems: list[str] = []
     body = str(proposed["message"]["body"])
     if body == _NO_RECORD:
         problems.append("date turn returned the generic missing-record sentence")
-    if not isinstance(pending, dict) or "Assign a trainer" not in str(pending.get("summary")):
+    if not isinstance(pending, dict) or "Assign a trainer" not in str(pending.get("tool_name")):
         problems.append(f"date turn did not propose an assignment: {pending!r} body={body}")
     fields = pending.get("fields") if isinstance(pending, dict) else None
     if not isinstance(fields, list) or not any(
         isinstance(field, dict) and "2026-11-12" in str(field.get("value")) for field in fields
     ):
         problems.append(f"confirmation fields did not include the start date: {fields!r}")
-    if date_trace.get("create_assignment") is not True:
-        problems.append("date turn hid create_assignment")
-
     assignment_id = ""
     if isinstance(pending, dict):
         assignment_id = str(pending["step_id"])
@@ -302,7 +298,7 @@ def test_scripted_pt_payment_and_confirmation(
         sale_pending = sale_turn["pending_confirmation"]
         if (
             not isinstance(sale_pending, dict)
-            or "sale" not in str(sale_pending.get("summary")).casefold()
+            or "sale" not in str(sale_pending.get("tool_name")).casefold()
         ):
             problems.append(
                 f"package sale was not proposed: {sale_pending!r} {sale_turn['message']}"

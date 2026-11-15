@@ -5486,6 +5486,7 @@ export interface components {
       /** @default  */
       member_number: string;
       first_name: string;
+      /** @default  */
       last_name: string;
       phone?: string | null;
       email?: string | null;

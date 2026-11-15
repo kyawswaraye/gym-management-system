@@ -189,7 +189,9 @@ function MemberAvatar({
 }) {
   const tx = useTx();
   const [failed, setFailed] = useState(false);
-  const initials = `${Array.from(firstName.trim())[0] ?? ""}${Array.from(lastName.trim())[0] ?? ""}`;
+  const firstInitial = Array.from(firstName.trim())[0] ?? "";
+  const lastInitial = Array.from(lastName.trim())[0] ?? firstInitial;
+  const initials = `${firstInitial}${lastInitial}`;
   if (photoUrl && !failed) {
     return (
       <Image

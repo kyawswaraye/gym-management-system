@@ -99,6 +99,10 @@ test("owner assigns trainers and prepares the catalogs", async ({ page }) => {
   await expect(grant).toBeVisible();
   await pickMember(grant, "E2Escan", /E2Escan Visitor/);
   await selectByText(combo(grant, "Which pack?"), "CLASS · E2E_CLASS_PACK");
+  // Finished classes move to yesterday before 01:11. valid_from must cover that day.
+  await grant
+    .getByLabel("Business date", { exact: true })
+    .fill(earliestBookableDate());
   await grant.locator('textarea[name="reason"]').fill("E2E class grant");
   await runCommand(page, /\/member-service-packages\/?$/, () =>
     grant.getByRole("button", { name: "Save grant", exact: true }).click(),
@@ -143,6 +147,8 @@ test("reception submits packaged cash sales and cannot approve", async ({
     gross: "100.00",
     packageLabel: "E2E_PT_PACK",
     payment: "100.00",
+    // pastPt uses yesterday for a few minutes after 00:15. The pack must start then.
+    serviceDate: earliestBookableDate(),
   });
   await submitOpenSale(page);
   await expect(saleDetail(page)).toContainText("PENDING_APPROVAL");
@@ -683,6 +689,10 @@ function addDays(iso: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+function earliestBookableDate(instant = new Date()): string {
+  return addDays(gymWall(instant).date, -1);
+}
+
 function weekdayOf(iso: string): number {
   const [year, month, day] = iso.split("-").map(Number);
   const date = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1));
@@ -943,7 +953,7 @@ async function assign(
   // Cover yesterday so near-midnight past PT / finished class helpers stay valid.
   await form
     .getByLabel("Effective from", { exact: true })
-    .fill(addDays(gymWall().date, -1));
+    .fill(earliestBookableDate());
   await runCommand(page, /\/trainer-assignments\/?$/, () =>
     form.getByRole("button", { name: "Save assignment", exact: true }).click(),
   );
@@ -990,6 +1000,7 @@ async function createSale(
     gross: string;
     packageLabel?: string;
     payment?: string;
+    serviceDate?: string;
   },
 ): Promise<void> {
   await page.getByRole("button", { name: "Create draft", exact: true }).click();
@@ -997,6 +1008,11 @@ async function createSale(
   await expect(form).toBeVisible();
   await pickMember(form, "E2Escan", /E2Escan Visitor/);
   await selectByText(combo(form, "Trainer"), input.trainer);
+  if (input.serviceDate) {
+    await form
+      .getByLabel("Service date", { exact: true })
+      .fill(input.serviceDate);
+  }
   await form.getByLabel("Description", { exact: true }).fill(input.description);
   if (input.packageLabel) {
     await selectByText(combo(form, "PT package"), input.packageLabel);

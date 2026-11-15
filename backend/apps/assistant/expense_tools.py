@@ -36,7 +36,7 @@ from apps.assistant.executor import (
     execute_confirmed_tool,
 )
 from apps.assistant.models import Goal
-from apps.assistant.prerequisites import FieldRequirement, Prerequisite
+from apps.assistant.prerequisites import FieldRequirement, Prerequisite, optional
 from apps.assistant.registry import ToolDefinition
 from apps.cashbook.serializers import session_payload, transaction_payload
 from apps.common.finance.idempotency import IdempotentResponse
@@ -353,7 +353,9 @@ def approve_expense_body(data: Mapping[str, object], *, expense_id: str) -> dict
 def reject_expense_body(data: Mapping[str, object], *, expense_id: str) -> dict[str, object]:
     """Return the reject body whose finance hash matches the HTTP view."""
 
-    fields = _validated_with(RejectExpenseSerializer, data)
+    from apps.assistant.approval import rejection_reason_input
+
+    fields = _validated_with(RejectExpenseSerializer, rejection_reason_input(data))
     return {"expense_id": expense_id, "reason": str(fields["rejection_reason"])}
 
 
@@ -653,7 +655,10 @@ _CATEGORY_UPDATE = RegisteredTool(
             "Update an expense category",
             "expense_categories.manage",
         ),
-        (FieldRequirement("category_id", "Expense category"),),
+        (
+            FieldRequirement("category_id", "Expense category"),
+            optional("name", "Name"),
+        ),
         http_method="PATCH",
         route=CATEGORY_UPDATE_ROUTE,
         route_fields=("category_route_id",),
@@ -681,7 +686,15 @@ _CREATE = RegisteredTool(
 _UPDATE = RegisteredTool(
     contract=_contract(
         _definition("update_expense", "Update an expense draft", "expenses.update"),
-        (FieldRequirement("expense_id", "Expense"),),
+        (
+            FieldRequirement("expense_id", "Expense"),
+            optional("amount", "Amount as text"),
+            optional("description", "Description"),
+            optional("payment_method", "CASH, BANK_TRANSFER, CARD, MOBILE_PAYMENT, or OTHER"),
+            optional("business_date", "Business date as YYYY-MM-DD"),
+            optional("category_id", "Expense category"),
+            optional("currency", "Gym currency code"),
+        ),
         http_method="PATCH",
         route=EXPENSE_UPDATE_ROUTE,
         route_fields=("expense_route_id",),

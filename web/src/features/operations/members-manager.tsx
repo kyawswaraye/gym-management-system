@@ -29,6 +29,12 @@ import {
 import { actionButtonClass } from "@/lib/ui/action-button";
 import type { Member, MemberListPage, MemberListQuery } from "@/types/api";
 
+function memberMonogram(firstName: string, lastName: string): string {
+  const first = firstName.trim();
+  const last = lastName.trim();
+  return `${first.slice(0, 1)}${(last || first).slice(0, 1)}`;
+}
+
 const PAGE_LIMIT = 25;
 const MEMBER_STATUSES = [
   "ACTIVE",
@@ -438,8 +444,8 @@ export function MembersManager({
     event.preventDefault();
     if (submitLock.current) return;
     const payload = memberCreatePayload({ ...draft, member_number: "" });
-    if (!payload.first_name || !payload.last_name || !payload.join_date) {
-      setError(tx("Enter a first name, last name, and join date."));
+    if (!payload.first_name || !payload.join_date) {
+      setError(tx("Enter a first name and join date."));
       setErrorScope(null);
       return;
     }
@@ -791,8 +797,7 @@ export function MembersManager({
                           className={`grid size-10 shrink-0 place-items-center rounded-full text-xs font-black ${archived ? "bg-slate-200 text-slate-500" : "bg-slate-100 text-slate-600"}`}
                           aria-hidden="true"
                         >
-                          {member.first_name.slice(0, 1)}
-                          {member.last_name.slice(0, 1)}
+                          {memberMonogram(member.first_name, member.last_name)}
                         </span>
                         <span>
                           <Link

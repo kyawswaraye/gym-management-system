@@ -10,10 +10,12 @@ from rest_framework.views import APIView
 
 from apps.assistant.execution import ExecutionRejected
 from apps.assistant.models import Goal
+from apps.assistant.proposals import declaration, display_fields
 from apps.assistant.registry import closed_production_names, production_registry
 from apps.assistant.training_tools import (
     TRAINING_TOOL_NAMES,
     execute_registered_tool,
+    training_tool_contracts,
     training_tool_definitions,
 )
 from apps.tenants.models import Gym, GymMembership
@@ -34,6 +36,16 @@ def test_registered_training_tools_are_confirmed_database_writes() -> None:
     assert tools["create_service_package"].permissions == ("pt.schedule.manage",)
     assert tools["create_class_type"].permissions == ("classes.manage",)
     assert tools["update_class_type"].permissions == ("classes.manage",)
+    declared = declaration(training_tool_contracts()["update_class_type"])
+    properties = declared["parameters"]["properties"]
+    assert isinstance(properties, dict)
+    assert "default_capacity" in properties
+    assert "default_capacity" not in declared["parameters"]["required"]
+    shown = display_fields(
+        {"class_type_id": str(uuid4()), "default_capacity": 10},
+        approval=False,
+    )
+    assert {"name": "default_capacity", "value": "10"} in shown
     names = production_registry().names()
     assert "create_payment" in names
     assert "approve_payment" in names

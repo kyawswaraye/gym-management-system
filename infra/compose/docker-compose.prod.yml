@@ -153,6 +153,8 @@ services:
       ASSISTANT_ENABLED: ${ASSISTANT_ENABLED}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL}
+      GEMINI_THINKING: ${GEMINI_THINKING:-off}
+      GEMINI_MAX_OUTPUT_TOKENS: ${GEMINI_MAX_OUTPUT_TOKENS:-2048}
     networks:
       - app
       - data
@@ -241,6 +243,8 @@ services:
       ASSISTANT_ENABLED: ${ASSISTANT_ENABLED}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL}
+      GEMINI_THINKING: ${GEMINI_THINKING:-off}
+      GEMINI_MAX_OUTPUT_TOKENS: ${GEMINI_MAX_OUTPUT_TOKENS:-2048}
       SCHEDULER_METRICS_PATH: /var/lib/gym-backup-metrics/scheduler.prom
     command:
       - python

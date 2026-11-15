@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from datetime import date
-from decimal import Decimal
 from types import SimpleNamespace
 from typing import cast
 
@@ -15,24 +14,21 @@ from apps.assistant.knowledge import (
     DOMAIN_MAP,
     assistant_context,
     exact_code,
-    fact_tools,
     gate_sentence,
     grounded_read_reply,
     included_sections,
-    knowledge_capability,
+    localized_summary,
     public_activity,
-    refuse_write_for_lookup,
+    reply_needs_fresh_read,
     staff_notice,
-    stated_amount,
-    stored_listing_reply,
-    unnamed_member_payment_reply,
-    unsupported_lookup_reply,
+    states_stored_facts,
+    unconfirmed_notice,
     visible_reply,
-    widen_list_filters,
 )
 from apps.assistant.lookups import _keep_stated_dates
 from apps.assistant.registry import production_registry
 from apps.assistant.turns import _SYSTEM, _handle_call, _read
+from apps.assistant.workflows import guide_text
 
 
 def test_domain_map_covers_the_gym_records() -> None:
@@ -40,20 +36,9 @@ def test_domain_map_covers_the_gym_records() -> None:
     for phrase in (
         "member",
         "membership",
-        "check-in",
         "ACTIVE, EXPIRED, SUSPENDED, CANCELLED, or ARCHIVED",
-        "trainer assignment",
-        "service package",
-        "PT booking",
-        "class type",
-        "class booking",
         "DRAFT, then PENDING_APPROVAL",
         "cash session",
-        "receipt",
-        "salary period",
-        "retail",
-        "stock movements",
-        "announcements",
         "one-off email",
         "do not invent",
         "no daily shift roster",
@@ -62,12 +47,35 @@ def test_domain_map_covers_the_gym_records() -> None:
         "not supported",
         "not saved until the server confirms",
         "not a member membership",
-        "get_gym_report",
         "pending_payment_amount",
-        "do not invent a cause",
+        "myanmar digits",
     ):
         assert phrase.casefold() in text
     assert "do not say a tool is missing" not in text
+    guides = guide_text(
+        (
+            "check_in",
+            "personal_training",
+            "class_lifecycle",
+            "retail_inventory",
+            "salaries",
+            "announcements",
+            "reports",
+        )
+    ).casefold()
+    for phrase in (
+        "check-in",
+        "create_pt_booking",
+        "create_class_type",
+        "create_class_booking",
+        "create_salary_period",
+        "retail",
+        "stock",
+        "announcement",
+        "get_gym_report",
+        "do not invent a cause",
+    ):
+        assert phrase.casefold() in guides
 
 
 def test_turn_answers_lists_from_the_brief() -> None:
@@ -80,8 +88,9 @@ def test_turn_answers_lists_from_the_brief() -> None:
     assert "do not invent" in text
     assert "do not choose" in text
     assert "reply in the staff member's language" in text
-    assert "get_gym_report" in DOMAIN_MAP.casefold()
-    assert "get_trainer_dashboard" in DOMAIN_MAP.casefold()
+    reports = guide_text(("reports",)).casefold()
+    assert "get_gym_report" in reports
+    assert "get_trainer_dashboard" in reports
     assert "myanmar digits have the" in text
     assert "never say a tool is missing" not in text
 
@@ -115,100 +124,14 @@ def test_capabilities_follow_registered_tools() -> None:
     reads = {name for name in names if registry.get(name).operation == "read"}
     writes = [name for name in names if registry.get(name).operation == "write"]
 
-    assert knowledge_capability("payments") == "read"
-    assert knowledge_capability("members") == "read"
     assert {"search_payments", "get_payment", "search_members"} <= reads
-    assert knowledge_capability("checkins") == "read"
-    assert knowledge_capability("pt_sales") == "read"
-    assert knowledge_capability("inventory") == "read"
     assert "search_check_ins" in reads
     assert "search_membership_expiries" in reads
     assert "search_low_stock" in reads
     assert "search_staff_access" in reads
-    assert knowledge_capability("audit") == "unsupported"
-    assert knowledge_capability("roster") == "unsupported"
-    assert knowledge_capability("mail") == "unsupported"
     assert "search_service_packages" in reads
     assert len(writes) == 98
     assert len(reads) == 36
-
-
-def test_business_questions_route_to_the_stored_read() -> None:
-    today = date(2026, 11, 14)
-    expected = {
-        "ဒီနေ့ Gym ကို Member ဘယ်နှယောက်လာပြီးပြီလဲ။": ("search_check_ins",),
-        "ဒီလ Membership သက်တမ်းကုန်မယ့်သူတွေ ဘယ်သူတွေလဲ။": ("search_membership_expiries",),
-        "မနေ့က Check-in ဝင်ထားတဲ့သူတွေ ပြပေးပါ။": ("search_check_ins",),
-        "ဘယ် Trainer က Member ဘယ်နှယောက်ကို တာဝန်ယူထားလဲ။": ("search_trainer_assignments",),
-        "ဘယ်သူတွေ PT Package ဝယ်ထားလဲ။": ("search_pt_packages",),
-        "Member တစ်ယောက်ရဲ့ PT Session ဘယ်နှကြိမ်ကျန်လဲ။": ("search_pt_packages",),
-        "ဒီနေ့ Class ဘယ်နှခုရှိလဲ။": ("search_class_occurrences",),
-        "နောက်လာမယ့် Class တွေ ပြပေးပါ။": ("search_class_occurrences",),
-        "Stock နည်းနေတဲ့ Product တွေ ဘာတွေရှိလဲ။": ("search_low_stock",),
-        "ဒီလ ဘယ် Product တွေ အရောင်းအများဆုံးလဲ။": ("search_product_sales",),
-        "Staff တစ်ယောက်ချင်းစီ ဘာ Permission တွေရထားလဲ။": ("search_staff_access",),
-    }
-    for question, tools in expected.items():
-        assert fact_tools(question) == tools
-    money = fact_tools("ဒီလ ဝင်ငွေ၊ အသုံးစရိတ်၊ အမြတ် ဘယ်လောက်ရှိလဲ။")
-    assert "get_gym_dashboard" in money
-    expiry = widen_list_filters(
-        "search_membership_expiries",
-        {},
-        "ဒီလ Membership သက်တမ်းကုန်မယ့်သူတွေ ဘယ်သူတွေလဲ။",
-        today,
-    )
-    assert expiry["expiry_from"] == "2026-11-01"
-    assert expiry["expiry_to"] == "2026-11-30"
-    yesterday = widen_list_filters(
-        "search_check_ins",
-        {},
-        "မနေ့က Check-in ဝင်ထားတဲ့သူတွေ ပြပေးပါ။",
-        today,
-    )
-    assert yesterday["date_from"] == "2026-11-13"
-    assert yesterday["date_to"] == "2026-11-13"
-    workload = widen_list_filters(
-        "search_trainer_assignments",
-        {},
-        "ဘယ် Trainer က Member ဘယ်နှယောက်ကို တာဝန်ယူထားလဲ။",
-        today,
-    )
-    assert workload["summary"] is True
-
-
-def test_an_unsupported_read_does_not_invent_a_record() -> None:
-    reply = unsupported_lookup_reply("Show the audit log")
-
-    assert reply is not None
-    assert "Audit records are not available." in reply
-    assert "ACTIVE" not in reply
-    assert "2026-" not in reply
-    assert "saved" not in reply.casefold()
-    assert unsupported_lookup_reply("List payments") is None
-    assert unsupported_lookup_reply("Add Ada Lovelace") is None
-    assert unsupported_lookup_reply("Approve the payment") is None
-    assert unsupported_lookup_reply("How many check-ins today") is None
-    assert unsupported_lookup_reply("Show the check-in history") is None
-    named = unsupported_lookup_reply("Show Aung Aung's audit trail")
-    assert named is not None
-    assert "Audit records are not available." in named
-    assert "Aung Aung" in named
-    assert "ACTIVE" not in named
-    assert unsupported_lookup_reply("Who attended the class") is None
-
-
-def test_a_burmese_unsupported_domain_keeps_exact_tokens() -> None:
-    reply = unsupported_lookup_reply("Aung Aung ရဲ့ စစ်ဆေးမှတ်တမ်း ပြပါ။ MEM-000101 2026-11-11")
-
-    assert reply is not None
-    assert "မဖတ်နိုင်" in reply
-    assert "Aung Aung" in reply
-    assert "MEM-000101" in reply
-    assert "2026-11-11" in reply
-    assert "MEM-000102" not in reply
-    assert "create_manual_check_in" not in reply
-    assert "ACTIVE" not in reply
 
 
 def test_a_question_does_not_hide_a_write_tool(monkeypatch) -> None:
@@ -246,8 +169,6 @@ def test_a_question_does_not_hide_a_write_tool(monkeypatch) -> None:
 
     assert proposal is not None
     assert body["status"] == "confirmation_required"
-    assert refuse_write_for_lookup("List payments", "write")
-    assert not refuse_write_for_lookup("Add Ada Lovelace", "write")
 
 
 def test_permission_denial_and_raw_exceptions_stay_off_the_reply(monkeypatch) -> None:
@@ -291,14 +212,18 @@ def test_permission_denial_and_raw_exceptions_stay_off_the_reply(monkeypatch) ->
     assert "OperationalError" not in staff
     assert "Traceback" not in staff.casefold()
 
+    priced = visible_reply(
+        "Call search_membership_plans for Monthly_plan. Monthly_plan is 50,000.00 THB.",
+        confirmed=False,
+        proposed=False,
+        staff_text="How much is Monthly_plan",
+    )
+    assert "Monthly_plan" in priced
+    assert "search_membership_plans" not in priced
+    assert "50,000.00" in priced
 
-def test_burmese_amounts_keep_the_same_value() -> None:
-    assert stated_amount("၅၀၀၀၀") == "50000"
-    assert Decimal(stated_amount("၅၀၀၀၀") or "0") == Decimal("50000")
-    assert stated_amount("၈၀,၀၀၀") == "80000"  # noqa: RUF001
-    assert Decimal(stated_amount("၈၀,၀၀၀") or "0") == Decimal("80000")  # noqa: RUF001
-    assert stated_amount("၁,၅၀၀.၅၀") == "1500.50"
-    assert Decimal(stated_amount("၁,၅၀၀.၅၀") or "0") == Decimal("1500.50")
+
+def test_burmese_digits_in_a_code_keep_the_same_value() -> None:
     assert exact_code("MEM-၀၀၀၁၀၁") == "MEM-000101"
     assert exact_code("WATER-B") == "WATER-B"
 
@@ -433,6 +358,12 @@ def test_a_change_is_not_called_saved_before_the_server_confirms() -> None:
         proposed=True,
         staff_text="yes",
     )
+    finished = visible_reply(
+        "အပြီးသတ်ပေးလိုက်ပါပြီ။",
+        confirmed=False,
+        proposed=True,
+        staff_text="yes",
+    )
 
     assert waiting == "That change is not saved until you confirm."
     assert "is saved" not in waiting
@@ -441,6 +372,8 @@ def test_a_change_is_not_called_saved_before_the_server_confirms() -> None:
     assert "မသိမ်းရသေး" in burmese
     assert "မသိမ်းရသေး" in registered
     assert "အောင်မြင်" not in registered
+    assert "မသိမ်းရသေး" in finished
+    assert "ပါပြီ" not in finished
     leaked = visible_reply(
         "SELECT * FROM payments",
         confirmed=False,
@@ -551,212 +484,26 @@ def test_a_read_answer_keeps_only_stored_or_brief_facts() -> None:
     assert "၅၀၀၀၀" not in burmese
 
 
-def test_a_list_without_a_read_does_not_invent_rows() -> None:
-    sales = "Search retail sales and expenses. List each amount and description."
-    missed = stored_listing_reply(sales, {})
-    assert missed is not None
-    assert "will not guess" in missed
-    assert "Cleaning" not in missed
-    assert "500" not in missed
-    assert "1000" not in missed
-    assert "2000" not in missed
-
-    stored = stored_listing_reply(
-        sales,
-        {
-            "search_sales": {
-                "results": [
-                    {
-                        "status": "POSTED",
-                        "total_amount": "15.00",
-                        "business_date": "2026-11-11",
-                        "name": "Desk Water",
-                    }
-                ]
-            },
-            "search_expenses": {
-                "results": [
-                    {
-                        "status": "POSTED",
-                        "amount": "25.00",
-                        "business_date": "2026-11-11",
-                        "description": "Desk towels",
-                    }
-                ]
-            },
-        },
+def test_invented_person_with_no_rows_is_not_shown() -> None:
+    invented = "Invented Person paid 99999 on 1999-01-01."
+    english = grounded_read_reply(
+        invented,
+        results=[{"results": []}],
+        brief="Live gym brief. Today is 2026-11-16.",
+        staff_text="Search members.",
     )
-    assert stored is not None
-    assert "15.00" in stored
-    assert "Desk Water" in stored
-    assert "25.00" in stored
-    assert "Desk towels" in stored
-    assert "Cleaning" not in stored
-    assert "Marketing" not in stored
-
-
-def test_salary_and_cash_lists_keep_every_stored_row() -> None:
-    question = "Search salary periods and cash sessions. List status and business dates only."
-    missed = stored_listing_reply(question, {})
-    assert missed is not None
-    assert "2026-10-31" not in missed
-    assert "will not guess" in missed
-
-    stored = stored_listing_reply(
-        question,
-        {
-            "search_salary_periods": {
-                "results": [
-                    {
-                        "status": "POSTED",
-                        "period_start": "2026-11-11",
-                        "period_end": "2026-11-11",
-                    }
-                ]
-            },
-            "search_cash_sessions": {
-                "results": [
-                    {"status": "CLOSED", "business_date": "2026-11-11"},
-                    {"status": "OPEN", "business_date": "2026-11-11"},
-                ]
-            },
-        },
-    )
-    assert stored is not None
-    assert "2026-11-11" in stored
-    assert "2026-10-31" not in stored
-    assert "CLOSED" in stored
-    assert "OPEN" in stored
-
-
-def test_a_general_class_list_does_not_keep_today_filter() -> None:
-    question = "Search class occurrences and class bookings."
-    opened = widen_list_filters(
-        "search_class_occurrences",
-        {"date_from": "2026-11-12", "date_to": "2026-11-12", "limit": 25},
-        question,
-        date(2026, 11, 12),
-    )
-    bookings = widen_list_filters(
-        "search_bookings",
-        {"date_from": "2026-11-12", "status": "BOOKED"},
-        question,
-        date(2026, 11, 12),
-    )
-    today = widen_list_filters(
-        "search_class_occurrences",
-        {"date_from": "2026-11-11", "limit": 25},
-        "Which classes are scheduled today?",
-        date(2026, 11, 12),
-    )
-    stated = widen_list_filters(
-        "search_class_occurrences",
-        {"date_from": "2026-11-12", "date_to": "2026-11-12"},
-        "Search class occurrences on 2026-11-18.",
-        date(2026, 11, 12),
-    )
-    cash = widen_list_filters(
-        "search_cash_sessions",
-        {"status": "OPEN", "business_date": "2026-10-31"},
-        "Search salary periods and cash sessions.",
-        date(2026, 11, 12),
+    burmese = grounded_read_reply(
+        invented,
+        results=[{"results": []}],
+        brief="Today is 2026-11-16.",
+        staff_text="အဖွဲ့ဝင် စာရင်း ရှာ",
     )
 
-    assert "date_from" not in opened
-    assert "date_to" not in opened
-    assert opened["limit"] == 25
-    assert "date_from" not in bookings
-    assert today["date_from"] == "2026-11-12"
-    assert today["date_to"] == "2026-11-12"
-    assert stated["date_from"] == "2026-11-18"
-    assert stated["date_to"] == "2026-11-18"
-    assert "status" not in cash
-    assert "business_date" not in cash
-    today_reply = stored_listing_reply(
-        "Which classes are scheduled today?",
-        {"search_class_occurrences": {"results": []}},
-    )
-    assert today_reply is not None
-    assert "limited to today" in today_reply
-
-
-def test_duplicate_plan_names_ask_for_a_code() -> None:
-    question = "Which membership plan is named Yoga?"
-    reply = stored_listing_reply(
-        question,
-        {
-            "search_membership_plans": {
-                "ambiguous": True,
-                "results": [
-                    {"code": "YOGA", "name": "Yoga", "status": "ACTIVE", "price": "50000.00"},
-                    {"code": "YOGA_2", "name": "Yoga", "status": "INACTIVE", "price": "50000.00"},
-                ],
-            }
-        },
-    )
-    catalog = stored_listing_reply(
-        "Search memberships and membership plans.",
-        {
-            "search_memberships": {
-                "results": [
-                    {
-                        "plan_name": "Desk Month",
-                        "status": "ACTIVE",
-                        "member_number": "MEM-000001",
-                    }
-                ]
-            },
-            "search_membership_plans": {
-                "results": [
-                    {"code": "DESK_MONTH", "name": "Desk Month", "status": "ACTIVE"},
-                    {"code": "PROBE", "name": "Probe", "status": "INACTIVE"},
-                    {"code": "YOGA", "name": "Yoga", "status": "ACTIVE"},
-                    {"code": "YOGA_2", "name": "Yoga", "status": "INACTIVE"},
-                ]
-            },
-        },
-    )
-
-    assert reply is not None
-    assert "Which plan code?" in reply
-    assert "YOGA" in reply
-    assert "YOGA_2" in reply
-    assert "INACTIVE" in reply
-    assert "only one" not in reply.casefold()
-    assert catalog is not None
-    assert "PROBE" in catalog
-    assert "YOGA_2" in catalog
-    assert "MEM-000001" in catalog
-
-
-def test_an_unnamed_member_payment_asks_instead_of_listing_rows() -> None:
-    reply = unnamed_member_payment_reply("What did the member pay?")
-    named = unnamed_member_payment_reply("What did Hla Win pay?")
-    numbered = unnamed_member_payment_reply("What did member MEM-000001 pay?")
-    ambiguous = stored_listing_reply(
-        "What did Aung Aung pay?",
-        {
-            "search_members": {
-                "ambiguous": True,
-                "results": [
-                    {"member_number": "MEM-000002", "first_name": "aung"},
-                    {"member_number": "MEM-000003", "first_name": "Aung"},
-                    {"member_number": "MEM-000004", "first_name": "Aung"},
-                ],
-            },
-            "search_payments": {"results": [{"amount": "15.00", "purpose": "PRODUCT"}]},
-        },
-    )
-
-    assert reply == "Which member? Tell me the member number."
-    assert named is None
-    assert numbered is None
-    assert ambiguous is not None
-    assert "MEM-000002" in ambiguous
-    assert "MEM-000003" in ambiguous
-    assert "MEM-000004" in ambiguous
-    assert "15.00" not in ambiguous
-    assert "PRODUCT" not in ambiguous
+    assert english == "No stored record matches that."
+    assert burmese == "သိမ်းထားတဲ့ မှတ်တမ်း မတွေ့ပါ။"
+    for hidden in ("Invented Person", "99999", "1999-01-01"):
+        assert hidden not in english
+        assert hidden not in burmese
 
 
 _NOVEMBER = {
@@ -896,3 +643,166 @@ def test_a_derived_percent_stays_and_a_wrong_percent_does_not_leave_a_sign() -> 
     assert "%" not in pending
     assert "is saved" not in pending.casefold()
     assert "not saved" in pending.casefold()
+
+
+def test_grounding_drops_a_removed_list_item_in_burmese_and_english() -> None:
+    brief = "Live gym brief. Today is 2026-11-12."
+    burmese = grounded_read_reply(
+        "အဆင့်တွေက ၁။ Member အသစ် စာရင်းသွင်းခြင်း။ "
+        "၂။ Hla Hla ကို 1999-01-01 မှာ စာရင်းသွင်းမယ်။ "
+        "၃။ Class တက်ဖို့ အတန်းရွေးမယ်။",
+        results=(),
+        brief=brief,
+        staff_text="ဘာလုပ်ရမလဲ?",
+        fallback=False,
+    )
+    english = grounded_read_reply(
+        "1. Register the member. 2. Hla Hla is not stored. 3. Choose a class.",
+        results=(),
+        brief=brief,
+        staff_text="What are the steps?",
+        fallback=False,
+    )
+    bullets = grounded_read_reply(
+        "- Register the member.\n- Hla Hla is not stored.\n- Choose a class.",
+        results=(),
+        brief=brief,
+        staff_text="What are the steps?",
+        fallback=False,
+    )
+    example = grounded_read_reply(
+        "ပြီးမှ Class နဲ့ PT ကို ဆက်လုပ်လို့ရပါတယ်။ (ဥပမာ - 2026-11-12)",
+        results=(),
+        brief=brief,
+        staff_text="ဘာလုပ်ရမလဲ?",
+        fallback=False,
+    )
+
+    assert "၁။" in burmese
+    assert "Member အသစ် စာရင်းသွင်းခြင်း" in burmese
+    assert "၃။" in burmese
+    assert "Class တက်ဖို့" in burmese
+    assert "၂။" not in burmese
+    assert "Hla" not in burmese
+    assert "1999" not in burmese
+    assert "။ ။" not in burmese
+    assert burmese.strip("။ ") != ""
+    assert "1." in english
+    assert "Register the member" in english
+    assert "3." in english
+    assert "Choose a class" in english
+    assert "2." not in english
+    assert "Hla" not in english
+    assert "- Register the member." in bullets
+    assert "- Choose a class." in bullets
+    assert "Hla" not in bullets
+    assert "ဥပမာ" not in example
+    assert "2026-11-12" not in example
+    assert "ဆက်လုပ်လို့ရပါတယ်" in example
+
+
+def test_product_field_labels_stay_with_their_values_in_english_and_burmese() -> None:
+    product = {
+        "results": [
+            {
+                "sku": "LOCAL1",
+                "name": "Local Bottle",
+                "unit": "BTL",
+                "sale_price": "10.00",
+                "current_unit_cost": "4.00",
+                "quantity_on_hand": "0.000",
+                "low_stock_threshold": "5.000",
+                "status": "ACTIVE",
+            }
+        ]
+    }
+    labeled = (
+        "**Name:** Local Bottle **SKU:** LOCAL1 **Status:** ACTIVE "
+        "**Quantity on Hand:** 0.000 BTL **Sale Price:** 10.00 THB "
+        "**Current Unit Cost:** 4.00 THB **Low Stock Threshold:** 5.000 BTL"
+    )
+    english = visible_reply(
+        grounded_read_reply(
+            f"There is one product in the system: {labeled} Call search_products. "
+            "Hla Hla paid 999.00.",
+            results=[product],
+            brief="Products.",
+            staff_text="Search products.",
+        ),
+        confirmed=False,
+        proposed=False,
+        staff_text="Search products.",
+    )
+    burmese = visible_reply(
+        grounded_read_reply(
+            f"ပစ္စည်းတစ်ခု ရှိပါတယ်။ {labeled} "
+            "**sale_price:** 10.00 THB **unit_cost:** 4.00 THB **reorder_level:** 5.000 BTL",
+            results=[product],
+            brief="Products.",
+            staff_text="ပစ္စည်း ရှာပါ။",
+        ),
+        confirmed=False,
+        proposed=False,
+        staff_text="ပစ္စည်း ရှာပါ။",
+    )
+
+    for shown in (english, burmese):
+        assert "Local Bottle" in shown
+        assert "LOCAL1" in shown
+        assert "ACTIVE" in shown
+        assert "0.000" in shown
+        assert "10.00" in shown
+        assert "4.00" in shown
+        assert "5.000" in shown
+        assert "**:**" not in shown
+        assert "Sale Price" in shown or "Sale price" in shown
+        assert "Current Unit Cost" in shown or "Unit cost" in shown
+        assert "Low Stock Threshold" in shown or "Reorder level" in shown
+    assert "search_products" not in english
+    assert "Hla" not in english
+    assert "999" not in english
+    assert "Sale price" in burmese
+    assert "Unit cost" in burmese
+    assert "Reorder level" in burmese
+    assert "ရှိပါတယ်" in burmese
+
+
+def test_burmese_proposal_summary_and_notice_follow_the_conversation() -> None:
+    summary = localized_summary("Create a member.", burmese=True)
+    priced = localized_summary("Create a retail sale draft. Amount 30.00.", burmese=True)
+    english = localized_summary("Create a member.", burmese=False)
+    side_question = unconfirmed_notice("Any expenses today?")
+    burmese_turn = unconfirmed_notice("မြန်မာ")
+
+    assert "Create a member" not in summary
+    assert summary.endswith("။")
+    assert "အဖွဲ့ဝင်" in summary
+    assert english == "Create a member."
+    assert "Create a retail sale" not in priced
+    assert "30.00" in priced
+    assert "ပမာဏ" in priced
+    assert side_question == "That change is not saved until you confirm."
+    assert burmese_turn == "ဒီပြောင်းလဲမှုကို မသိမ်းရသေးပါ။ အတည်ပြုပြီးမှ သိမ်းပါမယ်။"
+    assert states_stored_facts("There are currently no trainer assignments in the system.")
+    assert not states_stored_facts("A membership is a purchased term for one member.")
+    brief = "Active trainer assignments: 0.\nProducts: Spring Water sku 5.000"
+    assert reply_needs_fresh_read(
+        "Which trainer is assigned how many members?",
+        "There are currently no trainer assignments in the system.",
+        brief,
+    )
+    assert not reply_needs_fresh_read(
+        "Spring Water လက်ကျန် ဘယ်လောက်လဲ",
+        "Spring Water လက်ကျန် 5။",
+        brief,
+    )
+    assert not reply_needs_fresh_read(
+        "Which date?",
+        "Wint War, 13 November 2026 (2026-11-13).",
+        "Wint War, 13-11-2026, Monthly_plan",
+    )
+    assert not reply_needs_fresh_read(
+        "What is a membership?",
+        "A membership is a purchased term for one member.",
+        brief,
+    )

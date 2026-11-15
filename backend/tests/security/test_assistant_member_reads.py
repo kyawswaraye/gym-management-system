@@ -282,3 +282,18 @@ def test_member_reads_stay_in_scope_and_write_nothing() -> None:
     assert _counts(gym, goal)[1:] == before[1:]
     assert _counts(gym, goal)[0] == before[0]
     assert isinstance(first.id, UUID)
+
+
+@override_settings(**jwt_settings())
+def test_member_search_matches_a_name_without_its_space() -> None:
+    gym, owner = _owner("MS01", "ms01-owner@example.test")
+    other_gym, other_owner = _owner("MS02", "ms02-owner@example.test")
+    member = _person(gym, owner, "ဝင့်", "ဝါ")
+    foreign = _person(other_gym, other_owner, "ဝင့်", "ဝါ")
+
+    page = _read(gym, owner, "search_members", {"search": "ဝင့်ဝါ", "limit": 25})
+
+    assert _ids(page) == {str(member.id)}
+    assert str(foreign.id) not in _ids(page)
+    spaced = _read(gym, owner, "search_members", {"search": "ဝင့် ဝါ", "limit": 25})
+    assert _ids(spaced) == {str(member.id)}

@@ -279,8 +279,9 @@ _READS = {
     SEARCH_STAFF_ACCESS: _contract(
         _definition(
             SEARCH_STAFF_ACCESS,
-            "Search effective permissions for a staff profile in this gym. "
-            "The codes come from that profile's assigned roles.",
+            "Return one staff member's effective permission codes. "
+            "search_staff returns the profile and role names, not those codes. "
+            "Owners are not staff profiles.",
             ("staff.view", "roles.view"),
         ),
         (

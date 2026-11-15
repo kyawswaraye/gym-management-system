@@ -218,7 +218,7 @@ export function ProfileScreen() {
                 </Text>
               )}
               <Text style={{ fontSize: 20, fontWeight: "700" }}>
-                {profile.data.first_name} {profile.data.last_name}
+                {`${profile.data.first_name} ${profile.data.last_name}`.trim()}
               </Text>
               <Text style={{ color: colors.muted }}>
                 {profile.data.member_number}

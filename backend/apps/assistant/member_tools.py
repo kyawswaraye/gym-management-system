@@ -22,7 +22,7 @@ from rest_framework.views import APIView
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
 from apps.assistant.executor import ExecutionMode, ToolCall, ToolContract, execute_confirmed_tool
 from apps.assistant.models import Goal
-from apps.assistant.prerequisites import FieldRequirement, Prerequisite
+from apps.assistant.prerequisites import FieldRequirement, Prerequisite, optional
 from apps.assistant.registry import ToolDefinition
 from apps.members.models import Member, MembershipPlan
 from apps.members.serializers import (
@@ -57,8 +57,24 @@ from apps.trainers.selectors import require_assigned_member, require_visible_mem
 
 _MEMBER_FIELDS = (
     FieldRequirement("first_name", "First name"),
-    FieldRequirement("last_name", "Last name"),
-    FieldRequirement("join_date", "Join date"),
+    optional("last_name", "Last name. Leave empty when the name has no family name."),
+    FieldRequirement("join_date", "Join date as YYYY-MM-DD"),
+    optional("phone", "Phone"),
+    optional("email", "Email"),
+    optional("gender", "FEMALE, MALE, OTHER, or UNSPECIFIED"),
+    optional("date_of_birth", "Date of birth as YYYY-MM-DD"),
+    optional("notes", "Notes"),
+)
+_MEMBER_CHANGES = (
+    FieldRequirement("member_id", "Member. Send the member number or the stored id."),
+    optional("first_name", "First name"),
+    optional("last_name", "Last name"),
+    optional("phone", "Phone"),
+    optional("email", "Email"),
+    optional("gender", "FEMALE, MALE, OTHER, or UNSPECIFIED"),
+    optional("date_of_birth", "Date of birth as YYYY-MM-DD"),
+    optional("join_date", "Join date as YYYY-MM-DD"),
+    optional("notes", "Notes"),
 )
 _PLAN_FIELDS = (
     FieldRequirement("name", "Plan name"),
@@ -149,7 +165,7 @@ def _create_member(call: ToolCall) -> str:
         actor=call.actor,
         member_number=str(payload.get("member_number", "")),
         first_name=str(payload["first_name"]),
-        last_name=str(payload["last_name"]),
+        last_name=str(payload.get("last_name", "")),
         phone=payload.get("phone"),
         email=payload.get("email"),
         gender=payload.get("gender"),
@@ -322,8 +338,13 @@ def _tools() -> tuple[RegisteredTool, ...]:
             _create_member,
         ),
         (
-            _definition("update_member", "Update a member", ("members.update",), members),
-            (FieldRequirement("member_id", "Member"),),
+            _definition(
+                "update_member",
+                "Update a member's name, phone, email, or notes",
+                ("members.update",),
+                members,
+            ),
+            _MEMBER_CHANGES,
             _update_member,
         ),
         (
@@ -342,8 +363,20 @@ def _tools() -> tuple[RegisteredTool, ...]:
             _create_plan,
         ),
         (
-            _definition("update_plan", "Update a membership plan", ("memberships.update",), plans),
-            (FieldRequirement("plan_id", "Plan"),),
+            _definition(
+                "update_plan",
+                "Update a membership plan's name, duration, or price",
+                ("memberships.update",),
+                plans,
+            ),
+            (
+                FieldRequirement("plan_id", "Plan"),
+                optional("name", "Plan name"),
+                optional("description", "Description"),
+                optional("duration_value", "Duration as a whole number"),
+                optional("duration_unit", "DAY, WEEK, MONTH, or YEAR"),
+                optional("price", "Price in the gym currency"),
+            ),
             _update_plan,
         ),
         (
@@ -366,7 +399,9 @@ def _tools() -> tuple[RegisteredTool, ...]:
             (
                 FieldRequirement("member_id", "Member"),
                 FieldRequirement("plan_id", "Plan"),
-                FieldRequirement("start_date", "Start date"),
+                FieldRequirement("start_date", "Start date as YYYY-MM-DD"),
+                optional("note", "Note"),
+                optional("discount_amount", "Discount in the gym currency. Zero when omitted."),
             ),
             _create_membership,
         ),
@@ -377,7 +412,10 @@ def _tools() -> tuple[RegisteredTool, ...]:
                 ("memberships.update",),
                 plans,
             ),
-            (FieldRequirement("membership_id", "Membership"),),
+            (
+                FieldRequirement("membership_id", "Membership"),
+                FieldRequirement("note", "The note to store"),
+            ),
             _update_membership_note,
         ),
         (

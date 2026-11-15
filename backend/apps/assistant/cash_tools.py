@@ -24,7 +24,7 @@ from rest_framework.views import APIView
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
 from apps.assistant.executor import ExecutionMode, ToolCall, ToolContract, execute_confirmed_tool
 from apps.assistant.models import Goal
-from apps.assistant.prerequisites import FieldRequirement, Prerequisite
+from apps.assistant.prerequisites import FieldRequirement, Prerequisite, optional
 from apps.assistant.registry import ToolDefinition
 from apps.cashbook.selectors import get_visible_session
 from apps.cashbook.serializers import (
@@ -196,10 +196,10 @@ def _with_session(body: dict[str, object], payload: Mapping[str, object]) -> dic
 
 
 def adjust_cash_command(payload: Mapping[str, object]) -> dict[str, object]:
-    body = adjust_finance_body(
-        _without(payload, "gym_id", "session_id", "cash_session_id"),
-        session_id="",
-    )
+    data = _without(payload, "gym_id", "session_id", "cash_session_id")
+    if data.get("description") in {None, ""}:
+        data["description"] = ""
+    body = adjust_finance_body(data, session_id="")
     return _with_session(body, payload)
 
 
@@ -373,8 +373,9 @@ _OPEN = RegisteredTool(
     contract=_contract(
         _definition("open_cash_session", "Open a cash session", "cashbook.open"),
         (
-            FieldRequirement("business_date", "Business date"),
-            FieldRequirement("opening_cash", "Opening cash"),
+            FieldRequirement("business_date", "Business date as YYYY-MM-DD"),
+            FieldRequirement("opening_cash", "Opening cash as text, such as 100000.00"),
+            optional("register_code", "Register code. Omit to use the default register."),
         ),
         route=OPEN_ROUTE,
     ),
@@ -392,6 +393,10 @@ _ADJUST = RegisteredTool(
             FieldRequirement("currency", "Currency"),
             FieldRequirement("business_date", "Business date"),
             FieldRequirement("reason", "Reason"),
+            optional(
+                "description",
+                "Short label for the till movement. Omit it when the reason is enough.",
+            ),
         ),
         route=ADJUST_ROUTE,
         route_fields=("session_id",),
@@ -405,7 +410,14 @@ _RECONCILE = RegisteredTool(
         _definition("reconcile_cash_session", "Reconcile a cash session", "cashbook.reconcile"),
         (
             FieldRequirement("session_id", "Cash session"),
-            FieldRequirement("actual_closing", "Actual closing"),
+            FieldRequirement(
+                "actual_closing",
+                "Cash counted in the drawer. Use the expected closing when the count matches.",
+            ),
+            optional(
+                "difference_reason",
+                "Required only when the counted cash is not the expected closing.",
+            ),
         ),
         route=RECONCILE_ROUTE,
         route_fields=("session_id",),

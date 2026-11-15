@@ -22,7 +22,7 @@ from rest_framework.views import APIView
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
 from apps.assistant.executor import ExecutionMode, ToolCall, ToolContract, execute_confirmed_tool
 from apps.assistant.models import Goal
-from apps.assistant.prerequisites import FieldRequirement, Prerequisite
+from apps.assistant.prerequisites import FieldRequirement, Prerequisite, optional
 from apps.assistant.registry import ToolDefinition
 from apps.classes.serializers import (
     ClassOccurrenceCancelSerializer,
@@ -58,7 +58,12 @@ class RegisteredTool:
 def _definition() -> ToolDefinition:
     return ToolDefinition(
         name="create_class_schedule",
-        description="Create a class schedule",
+        description=(
+            "Create a class schedule. Weekdays are integers, 0 Monday through "
+            "6 Sunday. A schedule that starts and ends on one date meets on "
+            "that date's weekday. location_is_exclusive is true unless the "
+            "location can be shared."
+        ),
         module="classes",
         operation="write",
         permissions=("classes.manage",),
@@ -78,14 +83,23 @@ def _contract() -> ToolContract:
             fields=(
                 FieldRequirement("class_type_id", "Class type"),
                 FieldRequirement("trainer_staff_profile_id", "Trainer"),
-                FieldRequirement("weekdays", "Weekdays"),
-                FieldRequirement("local_start_time", "Start time"),
-                FieldRequirement("local_end_time", "End time"),
-                FieldRequirement("effective_from", "Start date"),
-                FieldRequirement("effective_until", "End date"),
+                FieldRequirement(
+                    "weekdays",
+                    "Weekdays as integers, 0 Monday through 6 Sunday",
+                    kind="array",
+                    item_kind="integer",
+                ),
+                FieldRequirement("local_start_time", "Start time HH:MM"),
+                FieldRequirement("local_end_time", "End time HH:MM"),
+                FieldRequirement("effective_from", "Start date YYYY-MM-DD"),
+                FieldRequirement("effective_until", "End date YYYY-MM-DD, at most 365 days later"),
                 FieldRequirement("location", "Location"),
-                FieldRequirement("location_is_exclusive", "Exclusive location"),
-                FieldRequirement("capacity", "Capacity"),
+                FieldRequirement(
+                    "location_is_exclusive",
+                    "True when this location cannot overlap",
+                    kind="boolean",
+                ),
+                FieldRequirement("capacity", "Capacity as a whole number"),
             ),
         ),
         http_method=SCHEDULE_METHOD,
@@ -388,7 +402,11 @@ def _cancel_definition() -> ToolDefinition:
 _UPDATE = RegisteredTool(
     contract=_route_contract(
         _update_definition(),
-        (FieldRequirement("schedule_id", "Schedule"),),
+        (
+            FieldRequirement("schedule_id", "Schedule"),
+            optional("location", "Location"),
+            optional("capacity", "Capacity as a whole number"),
+        ),
         http_method=UPDATE_SCHEDULE_METHOD,
         route=UPDATE_SCHEDULE_ROUTE,
         route_fields=("schedule_id",),

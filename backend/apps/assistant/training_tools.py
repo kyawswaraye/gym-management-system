@@ -280,11 +280,28 @@ def _tools() -> tuple[RegisteredTool, ...]:
         (
             _definition(
                 "update_class_type",
-                "Update a class type",
+                "Update one class type. default_capacity is the type capacity. "
+                "This does not change a schedule or an occurrence.",
                 ("classes.manage",),
                 "classes",
             ),
-            (FieldRequirement("class_type_id", "Class type"),),
+            (
+                FieldRequirement("class_type_id", "Class type"),
+                FieldRequirement("name", "Name", required=False),
+                FieldRequirement("description", "Description", required=False),
+                FieldRequirement(
+                    "default_duration_minutes",
+                    "Duration in minutes",
+                    required=False,
+                    kind="integer",
+                ),
+                FieldRequirement(
+                    "default_capacity",
+                    "Default capacity",
+                    required=False,
+                    kind="integer",
+                ),
+            ),
             _update_class_type,
         ),
     )

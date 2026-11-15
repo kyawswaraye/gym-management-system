@@ -15,6 +15,7 @@ from typing import Any, NoReturn
 from django.core import signing
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Count, F, Prefetch, Q, QuerySet
+from django.http import Http404
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
@@ -787,7 +788,7 @@ def _visible_staff_membership(*, gym_id: uuid.UUID, membership_id: uuid.UUID) ->
             is_owner=False,
         )
     except GymMembership.DoesNotExist as exc:
-        raise GymMembership.DoesNotExist from exc
+        raise Http404 from exc
 
 
 def _lock_staff_membership(*, gym_id: uuid.UUID, membership_id: uuid.UUID) -> GymMembership:
@@ -798,7 +799,7 @@ def _lock_staff_membership(*, gym_id: uuid.UUID, membership_id: uuid.UUID) -> Gy
             is_owner=False,
         )
     except GymMembership.DoesNotExist as exc:
-        raise GymMembership.DoesNotExist from exc
+        raise Http404 from exc
 
 
 def _protected_identity_changes(role: Role, changes: dict[str, Any]) -> bool:

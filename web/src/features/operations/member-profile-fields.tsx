@@ -99,7 +99,6 @@ export function MemberProfileFields({
           disabled={disabled}
           maxLength={100}
           onChange={(event) => update("last_name", event.target.value)}
-          required
           value={value.last_name}
         />
       </label>

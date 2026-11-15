@@ -93,21 +93,29 @@ class _Mock:
         transport: object = None,
     ) -> ModelTurn:
         del declarations, transport
-        latest = " ".join(
+        texts = [
             part["text"]
-            for part in _latest_parts(contents)
+            for item in contents
+            for part in (item.get("parts") if isinstance(item.get("parts"), list) else [])
             if isinstance(part, dict) and isinstance(part.get("text"), str)
-        )
-        if latest.startswith("The change is saved"):
+        ]
+        if any(text.startswith("The change is saved") for text in texts):
             raise ProviderCallError(ProviderFailure.QUOTA)
+        latest = ""
+        for text in reversed(texts):
+            if text.startswith("Verified references") or "Live gym brief" in text:
+                continue
+            latest = text
+            break
         responded = any(
             isinstance(part, dict) and "functionResponse" in part
             for part in _latest_parts(contents)
         )
         if responded or not self.queue:
-            quantity = _brief_quantity(system_instruction, "Spring Water")
+            blob = "\n".join([system_instruction, *texts])
+            quantity = _brief_quantity(blob, "Spring Water")
             echoed = _echo_result(contents)
-            catalog = _brief_line(system_instruction, "Service packages:")
+            catalog = _brief_line(blob, "Service packages:")
             if quantity and "လက်ကျန်" in latest:
                 text = f"Spring Water လက်ကျန် {quantity}။"
             elif catalog and "ပက်ကေ့" in latest:
@@ -188,7 +196,7 @@ def _brief_line(brief: str, prefix: str) -> str:
 
 def _brief_quantity(brief: str, name: str) -> str:
     for line in brief.splitlines():
-        if name in line:
+        if name in line and "ဘယ်လောက်" not in line:
             parts = line.split()
             if parts:
                 return parts[-1]
@@ -758,6 +766,7 @@ def test_burmese_pt_package_and_class_booking(monkeypatch: pytest.MonkeyPatch) -
             ip_address=None,
             user_agent="",
         )
+    mock.push("search_service_packages", {})
     found = _post(client, headers, "PT ပက်ကေ့ စာရင်း ရှာ", conversation)
     found_body = str(found["message"]["body"])
     assert "Three sessions" in found_body or "PT3" in found_body

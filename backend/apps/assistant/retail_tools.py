@@ -36,7 +36,7 @@ from apps.assistant.executor import (
     execute_confirmed_tool,
 )
 from apps.assistant.models import Goal
-from apps.assistant.prerequisites import FieldRequirement, Prerequisite
+from apps.assistant.prerequisites import FieldRequirement, Prerequisite, optional
 from apps.assistant.registry import ToolDefinition
 from apps.cashbook.serializers import transaction_payload
 from apps.common.finance.idempotency import IdempotentResponse
@@ -338,7 +338,9 @@ def approve_retail_sale_body(data: Mapping[str, object], *, sale_id: str) -> dic
 def reject_retail_sale_body(data: Mapping[str, object], *, sale_id: str) -> dict[str, object]:
     """Return the reject body whose finance hash matches the HTTP view."""
 
-    fields = _validated_with(RejectRetailSaleSerializer, data)
+    from apps.assistant.approval import rejection_reason_input
+
+    fields = _validated_with(RejectRetailSaleSerializer, rejection_reason_input(data))
     return {"retail_sale_id": sale_id, "reason": str(fields["rejection_reason"])}
 
 
@@ -680,7 +682,14 @@ _CREATE = RegisteredTool(
 _UPDATE = RegisteredTool(
     contract=_contract(
         _definition("update_retail_sale", "Update a retail sale draft", "retail.update"),
-        (FieldRequirement("retail_sale_id", "Retail sale"),),
+        (
+            FieldRequirement("retail_sale_id", "Retail sale"),
+            optional("payment_method", "CASH, BANK_TRANSFER, CARD, MOBILE_PAYMENT, or OTHER"),
+            optional(
+                "lines",
+                "Replacement sale lines. Each line has product_id and quantity as text.",
+            ),
+        ),
         http_method="PATCH",
         route=UPDATE_ROUTE,
         route_fields=("sale_route_id",),

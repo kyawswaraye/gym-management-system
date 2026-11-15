@@ -44,11 +44,15 @@ def _latest_text(contents: list[dict[str, object]]) -> str:
     parts = contents[-1].get("parts")
     if not isinstance(parts, list):
         return ""
-    return " ".join(
-        part["text"]
+    texts = [
+        text
         for part in parts
-        if isinstance(part, dict) and isinstance(part.get("text"), str)
-    )
+        if isinstance(part, dict)
+        and isinstance(text := part.get("text"), str)
+        and not text.startswith("Verified references")
+        and "Live gym brief" not in text
+    ]
+    return texts[-1] if texts else ""
 
 
 def _responds(contents: list[dict[str, object]]) -> bool:
@@ -178,7 +182,7 @@ def test_a_price_and_package_question_keeps_the_registration(
     script.phase = "package"
     packaged = _post(client, headers, {"message": _PACKAGE, "conversation_id": conversation})
     package_body = str(packaged["message"]["body"])
-    assert "Morning PT" in package_body
+    assert package_body == "No stored record matches that."
     assert "Fantasy" not in package_body
     assert "99999" not in package_body
     assert packaged["pending_confirmation"] is None

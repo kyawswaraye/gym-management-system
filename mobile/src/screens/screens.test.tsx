@@ -147,6 +147,22 @@ describe("member screens", () => {
     expect(view.getByLabelText("GymPilot MM")).toBeTruthy();
   });
 
+  it("shows a member name that has no family name", async () => {
+    const view = await renderSignedIn(<DashboardScreen />, {
+      dashboard: async () => ({
+        ...dashboardData,
+        member: {
+          ...dashboardData.member,
+          first_name: "Hla Hla",
+          last_name: "",
+        },
+      }),
+    });
+    expect(await view.findByText("Hla Hla")).toBeTruthy();
+    expect(view.getByText("HH")).toBeTruthy();
+    expect(view.getByLabelText("Signed in as Hla Hla")).toBeTruthy();
+  });
+
   it("shows the signed-in gym logo instead of the default wordmark", async () => {
     const gymLogo = jest.fn(async () => ({
       contentType: "image/png",

@@ -155,8 +155,7 @@ export const operationsEn = {
     "Enter a commission from 0 to 100 with up to 2 decimal places.",
   "Enter a description up to 4000 characters.":
     "Enter a description up to 4000 characters.",
-  "Enter a first name, last name, and join date.":
-    "Enter a first name, last name, and join date.",
+  "Enter a first name and join date.": "Enter a first name and join date.",
   "Enter a joined date.": "Enter a joined date.",
   "Enter a note up to 4000 characters.": "Enter a note up to 4000 characters.",
   "Enter a plan code without spaces.": "Enter a plan code without spaces.",
@@ -768,8 +767,8 @@ export const operationsMm = {
     "ကော်မရှင်ကို 0 မှ 100 အတွင်း၊ ဒသမနေရာ 2 လုံးအထိ ထည့်ပါ။",
   "Enter a description up to 4000 characters.":
     "စာလုံး 4000 အထိ ဖော်ပြချက်ကို ထည့်ပါ။",
-  "Enter a first name, last name, and join date.":
-    "ပထမအမည်၊ မျိုးရိုးအမည်နှင့် အဖွဲ့ဝင်ဖြစ်သည့်ရက်ကို ထည့်ပါ။",
+  "Enter a first name and join date.":
+    "ပထမအမည်နှင့် အဖွဲ့ဝင်ဖြစ်သည့်ရက်ကို ထည့်ပါ။",
   "Enter a joined date.": "အဖွဲ့ဝင်ဖြစ်သည့်ရက်ကို ထည့်ပါ။",
   "Enter a note up to 4000 characters.": "စာလုံး 4000 အထိ မှတ်ချက်ကို ထည့်ပါ။",
   "Enter a plan code without spaces.": "နေရာလွတ်မပါသည့် အစီအစဉ်ကုဒ်ကို ထည့်ပါ။",

@@ -11,7 +11,7 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -22,11 +22,15 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
 from apps.assistant.models import Conversation, Message
+from apps.cashbook.models import CashSession
 from apps.classes.models import ClassBooking, ClassOccurrence, ClassType
 from apps.common.db.tenant_context import set_gym_context
+from apps.expenses.models import Expense
 from apps.inventory.models import Product, ProductCategory, StockMovement
 from apps.members.models import Member, Membership, MembershipPlan, Payment, Receipt
 from apps.members.services import inclusive_expiry_date
+from apps.salaries.models import SalaryPeriod
+from apps.sales.models import RetailSale, RetailSaleLine
 from apps.tenants.models import ExpenseCategory, Gym, GymMembership, StaffProfile
 from apps.trainers.models import (
     MemberServicePackage,
@@ -110,6 +114,10 @@ def choose_reference(supplied: str, records: Sequence[NamedRecord], staff_text: 
     """Pick the record the staff named, or say the name is missing or ambiguous."""
 
     coded = _by_code(records, staff_text)
+    if len(coded) > 1:
+        timed = _matching_clock(coded, staff_text)
+        if len(timed) == 1:
+            coded = timed
     if len(coded) == 1:
         return Choice(id=coded[0].id, label=coded[0].shown())
     if len(coded) > 1:
@@ -171,8 +179,39 @@ def resolve_references(
     """Return the id payload, card labels, and a tool error when staff must choose."""
 
     loaders = dict(_LOADERS)
-    if tool_name in _EXPENSE_CATEGORY_TOOLS:
+    if tool_name in {"create_expense", "update_expense", "update_expense_category"}:
         loaders["category_id"] = _expense_categories
+    if tool_name == "restore_member":
+        loaders["member_id"] = _archived_members
+    if tool_name in {
+        "suspend_membership",
+        "resume_membership",
+        "cancel_membership",
+        "update_membership_note",
+    }:
+        loaders["membership_id"] = _member_memberships
+    if tool_name in {"replace_membership_roles", "revoke_owner", "cancel_owner_invitation"}:
+        loaders["membership_id"] = _staff_memberships
+    if tool_name in {"suspend_staff", "activate_staff", "update_staff_profile"}:
+        loaders["staff_id"] = _staff_profiles
+    if tool_name in {"archive_role", "update_role", "replace_role_permissions"}:
+        loaders["role_id"] = _roles
+    if tool_name in {"publish_announcement", "update_announcement", "cancel_announcement"}:
+        loaders["announcement_id"] = _announcements
+    if tool_name == "check_out_check_in":
+        loaders["check_in_id"] = _open_check_ins
+    if tool_name in {
+        "attend_class_booking",
+        "mark_class_booking_no_show",
+        "cancel_class_booking",
+    }:
+        loaders["booking_id"] = _class_bookings
+    if tool_name in {"attend_pt_booking", "mark_pt_booking_no_show", "cancel_pt_booking"}:
+        loaders["booking_id"] = _pt_bookings
+    if tool_name in {"cancel_assignment", "end_assignment"}:
+        loaders["assignment_id"] = _assignments
+    if tool_name == "update_class_type":
+        loaders["class_type_id"] = _class_types
     present = {
         field: value
         for field, value in ((field, payload.get(field)) for field in loaders)
@@ -180,7 +219,7 @@ def resolve_references(
     }
     line_products = _line_product_values(payload)
     catalog_present = present
-    if tool_name in _EXPENSE_CATEGORY_TOOLS:
+    if tool_name in {"create_expense", "update_expense", "update_expense_category"}:
         catalog_present = {key: value for key, value in present.items() if key != "category_id"}
     denied = _denied_catalog(catalog_present, line_products, permission_codes or frozenset())
     if denied is not None:
@@ -211,7 +250,17 @@ def resolve_references(
             if problem is not None:
                 return dict(payload), {}, problem
             return dict(payload), {}, {"error": "date_unconfirmed", "field": unstated}
-        if not needed:
+        trainers = _trainers(gym) if _line_staff_values(resolved) else ()
+        if tool_name == "replace_membership_roles":
+            mapped = _membership_for_staff_token(gym, resolved.get("membership_id"))
+            if mapped is not None:
+                resolved["membership_id"] = mapped
+                present["membership_id"] = mapped
+                needed.add("membership_id")
+            role_failure = _resolve_role_list(gym, resolved)
+            if role_failure is not None:
+                return dict(payload), {}, role_failure
+        if not needed and not trainers and tool_name != "return_retail_sale":
             return resolved, {}, None
         loaded = {field: loader(gym) for field, loader in loaders.items() if field in needed}
     labels: dict[str, str] = {}
@@ -232,6 +281,24 @@ def resolve_references(
             return dict(payload), {}, failure
         resolved["lines"] = copied
         labels.update(line_labels)
+    staff_lines = _line_staff_values(resolved)
+    if staff_lines:
+        copied_lines, staff_labels, staff_failure = _resolve_line_staff(
+            resolved,
+            trainers,
+            current_text,
+        )
+        if staff_failure is not None:
+            return dict(payload), {}, staff_failure
+        resolved["lines"] = copied_lines
+        labels.update(staff_labels)
+    if tool_name == "return_retail_sale":
+        bound, return_labels, return_failure = _bind_return_lines(gym, resolved)
+        if return_failure is not None:
+            return dict(payload), {}, return_failure
+        if bound is not None:
+            resolved["lines"] = bound
+            labels.update(return_labels)
     return resolved, labels, None
 
 
@@ -699,11 +766,15 @@ def _shift_local_day(raw: str, stated: date, gym: Gym) -> str | None:
     return moved.isoformat()
 
 
+_QUANTITY_FIELDS = frozenset({"quantity", "low_stock_threshold"})
+
+
 def _normalize_numbers(payload: dict[str, object]) -> None:
     for key, value in payload.items():
         if key not in _NUMERIC_FIELDS:
             continue
-        converted = _decimal_text(value)
+        places = 3 if key in _QUANTITY_FIELDS else None
+        converted = _scaled_text(value, places) if places is not None else _decimal_text(value)
         if converted is not None:
             payload[key] = converted
 
@@ -744,11 +815,33 @@ def _normalize_line_numbers(payload: dict[str, object]) -> None:
             continue
         item = dict(line)
         for key in ("quantity", "discount", "amount"):
-            converted = _decimal_text(item.get(key))
+            raw = item.get(key)
+            converted = _scaled_text(raw, 3) if key == "quantity" else _decimal_text(raw)
             if converted is not None:
                 item[key] = converted
         copied.append(item)
     payload["lines"] = copied
+
+
+def _scaled_text(value: object, places: int) -> str | None:
+    """Return decimal text at the scale the finance field stores.
+
+    A whole number such as 2 becomes 2.000 for a stock quantity. A value with
+    too many decimal places is left unchanged so the serializer can reject it.
+    """
+
+    text = _decimal_text(value)
+    if text is None:
+        return None
+    try:
+        parsed = Decimal(text)
+    except InvalidOperation:
+        return text
+    exponent = parsed.as_tuple().exponent
+    if not isinstance(exponent, int) or exponent < -places:
+        return text
+    quantum = Decimal(1).scaleb(-places)
+    return format(parsed.quantize(quantum), "f")
 
 
 def _decimal_text(value: object) -> str | None:
@@ -952,8 +1045,17 @@ def relative_window(text: str, today: date) -> tuple[date, date] | None:
     return None
 
 
+def _archived_members(gym: Gym) -> tuple[NamedRecord, ...]:
+    rows = Member.objects.filter(gym=gym, status=Member.Status.ARCHIVED)
+    return _member_records(rows)
+
+
 def _members(gym: Gym) -> tuple[NamedRecord, ...]:
     rows = Member.objects.filter(gym=gym).exclude(status=Member.Status.ARCHIVED)
+    return _member_records(rows)
+
+
+def _member_records(rows: QuerySet[Member]) -> tuple[NamedRecord, ...]:
     return tuple(
         NamedRecord(
             str(row.id),
@@ -963,6 +1065,175 @@ def _members(gym: Gym) -> tuple[NamedRecord, ...]:
         )
         for row in rows
     )
+
+
+def _member_memberships(gym: Gym) -> tuple[NamedRecord, ...]:
+    rows = Membership.objects.filter(gym=gym).select_related("member")
+    return tuple(
+        NamedRecord(
+            str(row.id),
+            " ".join(part for part in (row.member.first_name, row.member.last_name) if part),
+            label=" ".join(part for part in (row.member.first_name, row.member.last_name) if part),
+            code=row.member.member_number,
+            when=str(row.status),
+        )
+        for row in rows
+    )
+
+
+def _staff_profiles(gym: Gym) -> tuple[NamedRecord, ...]:
+    rows = StaffProfile.objects.filter(gym=gym).exclude(status=StaffProfile.Status.ARCHIVED)
+    return tuple(
+        NamedRecord(str(row.id), row.display_name, label=row.display_name, code=row.staff_code)
+        for row in rows
+    )
+
+
+def _staff_memberships(gym: Gym) -> tuple[NamedRecord, ...]:
+    rows = StaffProfile.objects.filter(gym=gym).exclude(status=StaffProfile.Status.ARCHIVED)
+    records = [
+        NamedRecord(
+            str(row.gym_membership_id),
+            row.display_name,
+            label=row.display_name,
+            code=row.staff_code,
+        )
+        for row in rows
+    ]
+    owners = GymMembership.objects.filter(gym=gym, is_owner=True).select_related("user")
+    for owner in owners:
+        user = owner.user
+        name = " ".join(part for part in (user.first_name, user.last_name) if part) or user.email
+        records.append(
+            NamedRecord(str(owner.id), name, label=name, code=user.email, when=str(owner.status))
+        )
+    return tuple(records)
+
+
+def _roles(gym: Gym) -> tuple[NamedRecord, ...]:
+    from apps.tenants.models import Role
+
+    rows = Role.objects.filter(gym=gym, is_active=True)
+    return tuple(NamedRecord(str(row.id), row.name, label=row.name, code=row.key) for row in rows)
+
+
+def _announcements(gym: Gym) -> tuple[NamedRecord, ...]:
+    from apps.announcements.models import Announcement
+
+    rows = Announcement.objects.filter(gym=gym)
+    return tuple(NamedRecord(str(row.id), row.title, label=row.title) for row in rows)
+
+
+def _open_check_ins(gym: Gym) -> tuple[NamedRecord, ...]:
+    from apps.members.models import CheckIn
+
+    rows = CheckIn.objects.filter(gym=gym, check_out_at__isnull=True).select_related("member")
+    return tuple(
+        NamedRecord(
+            str(row.id),
+            " ".join(part for part in (row.member.first_name, row.member.last_name) if part),
+            label=" ".join(part for part in (row.member.first_name, row.member.last_name) if part),
+            code=row.member.member_number,
+        )
+        for row in rows
+    )
+
+
+def _class_bookings(gym: Gym) -> tuple[NamedRecord, ...]:
+    rows = ClassBooking.objects.filter(gym=gym).select_related("member", "class_occurrence")
+    zone = _gym_zone(gym)
+    return tuple(
+        NamedRecord(
+            str(row.id),
+            " ".join(part for part in (row.member.first_name, row.member.last_name) if part),
+            label=(
+                f"{row.member.first_name} {row.class_occurrence.location} "
+                f"{row.class_occurrence.starts_at.astimezone(zone).strftime('%H:%M')}"
+            ).strip(),
+            code=row.class_occurrence.location.casefold(),
+        )
+        for row in rows
+    )
+
+
+def _pt_bookings(gym: Gym) -> tuple[NamedRecord, ...]:
+    rows = PTBooking.objects.filter(gym=gym).select_related("member")
+    return tuple(
+        NamedRecord(
+            str(row.id),
+            " ".join(part for part in (row.member.first_name, row.member.last_name) if part),
+            label=" ".join(part for part in (row.member.first_name, row.member.last_name) if part),
+            when=row.starts_at.isoformat() if row.starts_at is not None else "",
+        )
+        for row in rows
+    )
+
+
+def _assignments(gym: Gym) -> tuple[NamedRecord, ...]:
+    rows = TrainerAssignment.objects.filter(gym=gym).select_related(
+        "member", "trainer_staff_profile"
+    )
+    return tuple(
+        NamedRecord(
+            str(row.id),
+            " ".join(part for part in (row.member.first_name, row.member.last_name) if part),
+            label=" ".join(
+                part
+                for part in (
+                    row.trainer_staff_profile.display_name,
+                    row.member.first_name,
+                    row.member.last_name,
+                )
+                if part
+            ),
+        )
+        for row in rows
+    )
+
+
+def _membership_for_staff_token(gym: Gym, raw: object) -> str | None:
+    """Map a staff profile id onto that profile's gym membership id."""
+
+    parsed = _uuid_text(raw)
+    if parsed is None:
+        return None
+    if GymMembership.objects.filter(gym=gym, id=parsed).exists():
+        return parsed
+    profile = StaffProfile.objects.filter(gym=gym, id=parsed).only("gym_membership_id").first()
+    if profile is None:
+        return None
+    return str(profile.gym_membership_id)
+
+
+def _resolve_role_list(gym: Gym, payload: dict[str, object]) -> dict[str, object] | None:
+    raw = payload.get("role_ids")
+    if not isinstance(raw, list):
+        return None
+    from apps.tenants.models import Role
+
+    roles = list(Role.objects.filter(gym=gym, is_active=True))
+    resolved: list[str] = []
+    for item in raw:
+        if not isinstance(item, str) or not item.strip():
+            return {"error": "not_found", "field": "role_ids"}
+        parsed = _uuid_text(item)
+        if parsed is not None and any(str(role.id) == parsed for role in roles):
+            resolved.append(parsed)
+            continue
+        folded = item.casefold()
+        hits = [
+            role
+            for role in roles
+            if folded == role.name.casefold() or folded == role.key.casefold()
+        ]
+        if len(hits) != 1:
+            return {
+                "error": "ambiguous" if len(hits) > 1 else "not_found",
+                "field": "role_ids",
+            }
+        resolved.append(str(hits[0].id))
+    payload["role_ids"] = resolved
+    return None
 
 
 def _trainers(gym: Gym) -> tuple[NamedRecord, ...]:
@@ -1275,20 +1546,56 @@ def _occurrences(gym: Gym) -> tuple[NamedRecord, ...]:
         .select_related("class_type")
         .order_by("local_date", "starts_at")
     )
+    zone = _gym_zone(gym)
     return tuple(
         NamedRecord(
             str(row.id),
             row.class_type.name,
             when=row.local_date.isoformat(),
-            label=f"{row.class_type.name} {row.local_date.isoformat()}",
+            label=(
+                f"{row.class_type.name} {row.location} "
+                f"{row.starts_at.astimezone(zone).strftime('%H:%M')}"
+            ),
+            code=row.location.casefold(),
         )
         for row in rows
     )
 
 
-_EXPENSE_CATEGORY_TOOLS = frozenset({"create_expense", "update_expense", "update_expense_category"})
+def _salary_periods(gym: Gym) -> tuple[NamedRecord, ...]:
+    rows = SalaryPeriod.objects.filter(gym=gym).order_by("period_start", "id")
+    records: list[NamedRecord] = []
+    for row in rows:
+        description = row.description.strip()
+        records.append(
+            NamedRecord(
+                str(row.id),
+                description or row.period_start.isoformat(),
+                when=row.period_start.isoformat(),
+                label=f"{description} {row.period_start.isoformat()}".strip(),
+                code=row.period_start.strftime("%B").casefold(),
+            )
+        )
+    return tuple(records)
+
+
+def _granted_packages(gym: Gym) -> tuple[NamedRecord, ...]:
+    rows = MemberServicePackage.objects.filter(gym=gym).select_related("service_package", "member")
+    return tuple(
+        NamedRecord(
+            str(row.id),
+            row.service_package.name,
+            label=f"{row.member.first_name} {row.service_package.name}".strip(),
+            code=row.service_package.code.casefold(),
+        )
+        for row in rows
+    )
+
+
 _LOADERS: dict[str, Callable[[Gym], tuple[NamedRecord, ...]]] = {
     "member_id": _members,
+    "salary_period_id": _salary_periods,
+    "member_service_package_id": _granted_packages,
     "trainer_staff_profile_id": _trainers,
     "class_type_id": _class_types,
     "class_occurrence_id": _occurrences,
@@ -1324,6 +1631,45 @@ def _denied_catalog(
         if _CATALOG_PERMISSIONS[field].isdisjoint(permission_codes):
             return field
     return None
+
+
+def _line_staff_values(payload: Mapping[str, object]) -> list[tuple[int, str]]:
+    lines = _line_items(payload.get("lines"))
+    if not lines:
+        return []
+    values: list[tuple[int, str]] = []
+    for index, line in enumerate(lines):
+        if not isinstance(line, Mapping):
+            continue
+        staff_id = line.get("staff_profile_id")
+        if isinstance(staff_id, str) and staff_id.strip():
+            values.append((index, staff_id))
+    return values
+
+
+def _resolve_line_staff(
+    payload: dict[str, object],
+    records: Sequence[NamedRecord],
+    staff_text: str,
+) -> tuple[list[object], dict[str, str], dict[str, object] | None]:
+    lines = _line_items(payload.get("lines")) or []
+    labels: dict[str, str] = {}
+    copied: list[object] = []
+    for index, line in enumerate(lines):
+        if not isinstance(line, dict):
+            copied.append(line)
+            continue
+        item = dict(line)
+        raw = item.get("staff_profile_id")
+        if isinstance(raw, str) and raw.strip():
+            choice = choose_reference(raw, records, staff_text)
+            failure = _choice_failure("staff_profile_id", choice)
+            if failure is not None:
+                return [], {}, failure
+            item["staff_profile_id"] = choice.id
+            labels[f"lines.{index}.staff_profile_id"] = choice.label
+        copied.append(item)
+    return copied, labels, None
 
 
 def _line_product_values(payload: Mapping[str, object]) -> list[tuple[int, str]]:
@@ -1391,6 +1737,17 @@ def _ambiguous_named(records: Sequence[NamedRecord]) -> bool:
         key = _fold(record.name)
         counts[key] = counts.get(key, 0) + 1
     return any(count > 1 for count in counts.values())
+
+
+def _matching_clock(records: Sequence[NamedRecord], text: str) -> list[NamedRecord]:
+    """Keep records whose label clock is written in the staff text."""
+
+    folded = _fold(text)
+    return [
+        record
+        for record in records
+        if any(clock in folded for clock in re.findall(r"\b\d{2}:\d{2}\b", record.label))
+    ]
 
 
 def _by_code(records: Sequence[NamedRecord], text: str) -> list[NamedRecord]:
@@ -1495,6 +1852,8 @@ _GATED_TOOLS = frozenset(
         "create_class_booking",
         "create_pt_booking",
         "create_retail_sale",
+        "update_retail_sale",
+        "return_retail_sale",
     }
 )
 _OVERLAP_STATUSES = (
@@ -1564,12 +1923,19 @@ def proposal_block(
             return _pt_booking_gate(gym, payload)
         if tool_name == "create_retail_sale":
             return _retail_gate(gym, payload, staff_text)
+        if tool_name == "update_retail_sale":
+            lines = _line_items(payload.get("lines"))
+            if not lines:
+                return None
+            return _retail_gate(gym, payload, staff_text)
         if tool_name == "create_payment":
             return _payment_create_gate(gym, payload, staff_text)
         if tool_name == "update_payment":
             return _payment_update_gate(gym, payload, staff_text)
         if tool_name == "refund_payment":
             return _refund_gate(gym, payload, staff_text)
+        if tool_name == "return_retail_sale":
+            return _return_sale_gate(gym, payload)
         if tool_name == "void_payment":
             return _void_gate(gym, payload, staff_text)
     return None
@@ -1800,6 +2166,460 @@ def _retail_gate(
     return None
 
 
+_OPEN_CHARGE = (
+    Payment.Status.DRAFT,
+    Payment.Status.PENDING_APPROVAL,
+    Payment.Status.POSTED,
+)
+_SUBMIT_FIELD = {
+    "submit_payment": "payment_id",
+    "submit_expense": "expense_id",
+    "submit_salary_period": "salary_period_id",
+    "submit_retail_sale": "retail_sale_id",
+    "submit_pt_sale": "pt_sale_id",
+}
+
+
+def attach_cash_session(
+    gym: Gym,
+    tool_name: str,
+    payload: dict[str, object],
+) -> tuple[dict[str, str], dict[str, object] | None]:
+    """Use the one open till when a cash movement is posted.
+
+    The model does not choose a session id. One open till is the register.
+    None means the till must be opened. Several means the staff must name one.
+    """
+
+    if not _cash_movement(gym, tool_name, payload):
+        return {}, None
+    if _uuid_text(payload.get("cash_session_id")) is not None:
+        return {}, None
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        sessions = list(
+            CashSession.objects.filter(gym=gym, status=CashSession.Status.OPEN).order_by(
+                "register_code", "id"
+            )
+        )
+    if len(sessions) == 1:
+        session = sessions[0]
+        payload["cash_session_id"] = str(session.id)
+        return {"cash_session_id": session.register_code}, None
+    if not sessions:
+        return {}, {
+            "error": "cash_session_required",
+            "message": "This cash movement needs an open till. Open it, then continue.",
+        }
+    return {}, {
+        "error": "cash_session_required",
+        "registers": [session.register_code for session in sessions],
+        "message": "More than one till is open. Say which register to use.",
+    }
+
+
+def _cash_movement(gym: Gym, tool_name: str, payload: Mapping[str, object]) -> bool:
+    """Return whether this command posts cash and still needs a till."""
+
+    stated = str(payload.get("method") or payload.get("payment_method") or "").strip().upper()
+    if tool_name == "record_pt_commission_payment":
+        return stated == "CASH"
+    if tool_name == "refund_payment" and stated != "":
+        return stated == "CASH"
+    record = _cash_record(gym, tool_name, payload)
+    if record is None:
+        return False
+    return record == "CASH"
+
+
+def _cash_record(gym: Gym, tool_name: str, payload: Mapping[str, object]) -> str | None:
+    if tool_name not in {
+        "approve_payment",
+        "void_payment",
+        "refund_payment",
+        "approve_expense",
+        "void_expense",
+        "approve_retail_sale",
+        "void_retail_sale",
+        "return_retail_sale",
+        "void_pt_sale",
+    }:
+        return None
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        if tool_name in {"approve_payment", "void_payment", "refund_payment"}:
+            payment_id = _uuid_value(payload.get("payment_id"))
+            payment = (
+                None
+                if payment_id is None
+                else Payment.objects.filter(gym=gym, id=payment_id).only("method").first()
+            )
+            return None if payment is None else str(payment.method)
+        if tool_name in {"approve_expense", "void_expense"}:
+            expense_id = _uuid_value(payload.get("expense_id"))
+            expense = (
+                None
+                if expense_id is None
+                else Expense.objects.filter(gym=gym, id=expense_id).only("payment_method").first()
+            )
+            return None if expense is None else str(expense.payment_method)
+        if tool_name in {"approve_retail_sale", "void_retail_sale", "return_retail_sale"}:
+            retail_id = _uuid_value(payload.get("retail_sale_id"))
+            retail_sale = (
+                None
+                if retail_id is None
+                else RetailSale.objects.filter(gym=gym, id=retail_id).only("payment_method").first()
+            )
+            return None if retail_sale is None else str(retail_sale.payment_method)
+        if tool_name == "void_pt_sale":
+            from apps.trainers.models import PTSale
+
+            pt_sale_id = _uuid_value(payload.get("pt_sale_id"))
+            pt_sale = (
+                None
+                if pt_sale_id is None
+                else PTSale.objects.filter(gym=gym, id=pt_sale_id).select_related("payment").first()
+            )
+            paid = None if pt_sale is None else pt_sale.payment
+            return None if paid is None else str(paid.method)
+    return None
+
+
+def align_class_schedule(tool_name: str, payload: dict[str, object]) -> None:
+    """A one-day schedule can only meet on that date's weekday.
+
+    An omitted exclusive flag is stored as exclusive, which is the value the
+    schedule command will keep.
+    """
+
+    if tool_name != "create_class_schedule":
+        return
+    if payload.get("location_is_exclusive") in {None, ""}:
+        payload["location_is_exclusive"] = True
+    start = payload.get("effective_from")
+    end = payload.get("effective_until")
+    if not isinstance(start, str) or start != end:
+        return
+    try:
+        day = date.fromisoformat(start)
+    except ValueError:
+        return
+    payload["weekdays"] = [day.weekday()]
+
+
+def attach_payout_reversals(
+    gym: Gym,
+    tool_name: str,
+    payload: dict[str, object],
+) -> dict[str, object] | None:
+    """Fill the posted commission payouts a PT sale void must name.
+
+    The model does not invent payout ids. Each posted payout is reversed once.
+    A cash payout uses the one open till.
+    """
+
+    if tool_name != "void_pt_sale":
+        return None
+    sale_id = _uuid_value(payload.get("pt_sale_id"))
+    if sale_id is None:
+        return None
+    from apps.trainers.models import PTCommission, PTCommissionPayment
+
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        commission = PTCommission.objects.filter(gym=gym, pt_sale_id=sale_id).only("id").first()
+        posted = []
+        if commission is not None:
+            posted = list(
+                PTCommissionPayment.objects.filter(
+                    gym=gym,
+                    pt_commission_id=commission.id,
+                    status=PTCommissionPayment.Status.POSTED,
+                ).order_by("created_at", "id")
+            )
+        sessions = list(
+            CashSession.objects.filter(gym=gym, status=CashSession.Status.OPEN).order_by(
+                "register_code", "id"
+            )
+        )
+    reversals: list[dict[str, object]] = []
+    for row in posted:
+        cash = str(row.payment_method) == "CASH"
+        session_id: str | None = None
+        if cash:
+            if len(sessions) != 1:
+                if not sessions:
+                    return {
+                        "error": "cash_session_required",
+                        "message": "A cash commission reversal needs an open till.",
+                    }
+                return {
+                    "error": "cash_session_required",
+                    "registers": [session.register_code for session in sessions],
+                    "message": "More than one till is open. Say which register to use.",
+                }
+            session_id = str(sessions[0].id)
+        reversals.append({"commission_payment_id": str(row.id), "cash_session_id": session_id})
+    payload["payout_reversals"] = reversals
+    return None
+
+
+def bind_latest_ledger_entry(
+    gym: Gym,
+    tool_name: str,
+    payload: dict[str, object],
+) -> dict[str, object] | None:
+    """Use the package's latest ledger row when the supplied entry is not stored."""
+
+    if tool_name != "adjust_package_ledger":
+        return None
+    from apps.trainers.models import ServiceSessionLedger
+
+    package_id = _uuid_value(payload.get("member_service_package_id"))
+    entry_id = _uuid_value(payload.get("reverses_entry_id"))
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        supplied = (
+            ServiceSessionLedger.objects.filter(gym=gym, id=entry_id).first()
+            if entry_id is not None
+            else None
+        )
+        if (
+            supplied is not None
+            and supplied.reason != ServiceSessionLedger.Reason.GRANT
+            and not supplied.corrections.exists()
+        ):
+            return None
+        if package_id is None:
+            return {"error": "not_found", "field": "reverses_entry_id"}
+        latest = (
+            ServiceSessionLedger.objects.filter(gym=gym, member_service_package_id=package_id)
+            .exclude(reason=ServiceSessionLedger.Reason.GRANT)
+            .filter(corrections__isnull=True)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+    if latest is None:
+        return {"error": "not_found", "field": "reverses_entry_id"}
+    payload["reverses_entry_id"] = str(latest.id)
+    return None
+
+
+def prepare_cash_reconcile(
+    gym: Gym,
+    tool_name: str,
+    payload: dict[str, object],
+) -> dict[str, object] | None:
+    """Tell the model the expected closing when the count does not match it."""
+
+    if tool_name != "reconcile_cash_session":
+        return None
+    session_id = _uuid_text(payload.get("session_id") or payload.get("cash_session_id"))
+    if session_id is None:
+        return None
+    from apps.cashbook.services import recompute_cash_totals
+
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        session = CashSession.objects.filter(gym=gym, id=session_id).first()
+        if session is None or session.status != CashSession.Status.OPEN:
+            return {"error": "not_found", "field": "session_id"}
+        sales, expenses, manual = recompute_cash_totals(session)
+        expected = session.opening_cash + sales - expenses + manual
+    counted = _decimal_amount(payload.get("actual_closing"))
+    reason = payload.get("difference_reason")
+    stated = reason.strip() if isinstance(reason, str) else ""
+    expected_text = format(expected, "f")
+    if counted is None:
+        return {
+            "error": "missing_fields",
+            "fields": ["actual_closing"],
+            "expected_closing": expected_text,
+            "message": f"The expected closing is {expected_text}.",
+        }
+    if counted != expected and stated == "":
+        return {
+            "error": "cash_difference",
+            "expected_closing": expected_text,
+            "message": (
+                f"The counted cash differs from the expected closing {expected_text}. "
+                "Send that expected amount when the drawer matches, or send "
+                "difference_reason when it does not."
+            ),
+        }
+    return None
+
+
+def reject_uncancellable(
+    gym: Gym,
+    tool_name: str,
+    payload: Mapping[str, object],
+) -> dict[str, object] | None:
+    """A cancel card is only for a draft. Reject or void the later states."""
+
+    field = {
+        "cancel_payment": "payment_id",
+        "cancel_expense": "expense_id",
+        "cancel_retail_sale": "retail_sale_id",
+        "cancel_pt_sale": "pt_sale_id",
+    }.get(tool_name)
+    if field is None:
+        return None
+    record_id = _uuid_value(payload.get(field))
+    if record_id is None:
+        return None
+    from apps.trainers.models import PTSale
+
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        status: str | None
+        if tool_name == "cancel_payment":
+            payment_row = Payment.objects.filter(gym=gym, id=record_id).only("status").first()
+            status = None if payment_row is None else str(payment_row.status)
+        elif tool_name == "cancel_expense":
+            expense_row = Expense.objects.filter(gym=gym, id=record_id).only("status").first()
+            status = None if expense_row is None else str(expense_row.status)
+        elif tool_name == "cancel_retail_sale":
+            retail_row = RetailSale.objects.filter(gym=gym, id=record_id).only("status").first()
+            status = None if retail_row is None else str(retail_row.status)
+        else:
+            pt_row = PTSale.objects.filter(gym=gym, id=record_id).only("status").first()
+            status = None if pt_row is None else str(pt_row.status)
+    if status is None:
+        return {"error": "not_found", "field": field}
+    if status == "DRAFT":
+        return None
+    return {
+        "error": "finance_state",
+        "status": status,
+        "message": (
+            "Only a draft can be cancelled. Reject a record that is waiting for "
+            "approval, or void a posted record."
+        ),
+    }
+
+
+def reject_repeat_submit(
+    gym: Gym,
+    tool_name: str,
+    payload: Mapping[str, object],
+) -> dict[str, object] | None:
+    """Refuse a submit card for a record that is no longer a draft."""
+
+    field = _SUBMIT_FIELD.get(tool_name)
+    if field is None:
+        return None
+    record_id = _uuid_text(payload.get(field))
+    if record_id is None:
+        return None
+    status = _submit_status(gym, tool_name, record_id)
+    if status is None:
+        return {"error": "not_found", "field": field}
+    if status == "DRAFT":
+        return None
+    message = "That record cannot take this step in its current state."
+    if status == "PENDING_APPROVAL":
+        message = (
+            "This record is already submitted and waiting for approval. "
+            "Approve it. Do not submit it again."
+        )
+    return {"error": "finance_state", "status": status, "message": message}
+
+
+def reject_repeat_publish(
+    gym: Gym,
+    tool_name: str,
+    payload: Mapping[str, object],
+) -> dict[str, object] | None:
+    """Refuse another publish card after the announcement is already published."""
+
+    if tool_name != "publish_announcement":
+        return None
+    from apps.announcements.models import Announcement
+
+    record_id = _uuid_text(payload.get("announcement_id"))
+    if record_id is None:
+        return None
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        notice = Announcement.objects.filter(gym=gym, id=record_id).only("status").first()
+    if notice is None:
+        return {"error": "not_found", "field": "announcement_id"}
+    if notice.status == Announcement.Status.DRAFT:
+        return None
+    if notice.status == Announcement.Status.PUBLISHED:
+        return {
+            "status": "already_saved",
+            "message": "That announcement is already published. Do not publish it again.",
+        }
+    return {
+        "error": "finance_state",
+        "status": str(notice.status),
+        "message": "That announcement cannot be published from its current state.",
+    }
+
+
+def _submit_status(gym: Gym, tool_name: str, record_id: str) -> str | None:
+    from apps.trainers.models import PTSale
+
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        status: str | None
+        if tool_name == "submit_payment":
+            payment = Payment.objects.filter(gym=gym, id=record_id).only("status").first()
+            status = None if payment is None else str(payment.status)
+        elif tool_name == "submit_expense":
+            expense = Expense.objects.filter(gym=gym, id=record_id).only("status").first()
+            status = None if expense is None else str(expense.status)
+        elif tool_name == "submit_salary_period":
+            period = SalaryPeriod.objects.filter(gym=gym, id=record_id).only("status").first()
+            status = None if period is None else str(period.status)
+        elif tool_name == "submit_retail_sale":
+            sale = RetailSale.objects.filter(gym=gym, id=record_id).only("status").first()
+            status = None if sale is None else str(sale.status)
+        elif tool_name == "submit_pt_sale":
+            pt_sale = PTSale.objects.filter(gym=gym, id=record_id).only("status").first()
+            status = None if pt_sale is None else str(pt_sale.status)
+        else:
+            return None
+    return status
+
+
+def _open_charge(gym: Gym, payload: Mapping[str, object]) -> dict[str, object] | None:
+    """Return the charge that already records this payment. Do not create another."""
+
+    member_id = _uuid_text(payload.get("member_id"))
+    amount = _decimal_amount(payload.get("amount"))
+    method = str(payload.get("method", "")).strip().upper()
+    day = _service_day(payload.get("business_date"), gym)
+    if member_id is None or amount is None or method == "" or day is None:
+        return None
+    query = Payment.objects.filter(
+        gym=gym,
+        member_id=member_id,
+        entry_type=Payment.EntryType.CHARGE,
+        amount=amount,
+        method=method,
+        business_date=day,
+        status__in=_OPEN_CHARGE,
+    )
+    membership_id = _uuid_text(payload.get("membership_id"))
+    if membership_id is not None:
+        query = query.filter(membership_id=membership_id)
+    existing = query.order_by("created_at", "id").first()
+    if existing is None:
+        return None
+    return {
+        "status": "already_saved",
+        "payment_id": str(existing.id),
+        "payment_status": str(existing.status),
+        "message": (
+            "This charge is already stored. Submit the draft or approve the "
+            "waiting payment. Do not create another one."
+        ),
+    }
+
+
 def _payment_create_gate(
     gym: Gym,
     payload: dict[str, object],
@@ -1817,8 +2637,11 @@ def _payment_create_gate(
         return {"error": "date_invalid"}
     if purpose != Payment.Purpose.MEMBERSHIP:
         payload.pop("membership_id", None)
-        return None
-    return _bind_membership_payment(gym, payload, staff_text)
+        return _open_charge(gym, payload)
+    bound = _bind_membership_payment(gym, payload, staff_text)
+    if bound is not None:
+        return bound
+    return _open_charge(gym, payload)
 
 
 def _payment_update_gate(
@@ -1845,7 +2668,30 @@ def _payment_update_gate(
     if "amount" in payload:
         amount_error = _require_stated_amount(payload, staff_text, required=True)
         if amount_error is not None:
-            return amount_error
+            if amount_error.get("error") == "amount_mismatch":
+                return amount_error
+            payload.pop("amount", None)
+            changing = {
+                key
+                for key in payload
+                if key
+                not in {
+                    "payment_id",
+                    "currency",
+                    "purpose",
+                    "member_id",
+                    "membership_id",
+                    "gym_id",
+                }
+            }
+            if not changing:
+                return amount_error
+    if "amount" not in payload:
+        stored = Decimal(payment.amount).quantize(_MONEY)
+        stated = _payment_amounts(_stated_decimals(staff_text))
+        if stated and stored not in stated:
+            return {"error": "amount_mismatch"}
+        payload["amount"] = format(stored, "f")
     purpose = str(payload.get("purpose", payment.purpose)).strip().upper()
     if purpose == Payment.Purpose.MEMBERSHIP or (
         "membership_id" in payload and purpose != Payment.Purpose.OTHER
@@ -1894,7 +2740,95 @@ def _refund_gate(
     day = _service_day(payload.get("business_date"), gym)
     if day is not None and (day > _local_today(gym) or day < payment.business_date):
         return {"error": "date_invalid"}
+    posted = Payment.objects.filter(
+        gym=gym,
+        original_payment=payment,
+        entry_type=Payment.EntryType.REFUND,
+        amount=amount,
+        status=Payment.Status.POSTED,
+    )
+    if posted.exists():
+        return {"status": "already_saved"}
     return None
+
+
+def _bind_return_lines(
+    gym: Gym,
+    payload: dict[str, object],
+) -> tuple[list[object] | None, dict[str, str], dict[str, object] | None]:
+    """Use the sale's stored line when the model sends the sale id or product name."""
+
+    lines = _line_items(payload.get("lines"))
+    sale_id = _uuid_text(payload.get("retail_sale_id") or payload.get("sale_route_id"))
+    if lines is None or sale_id is None:
+        return None, {}, None
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        stored = list(
+            RetailSaleLine.objects.filter(gym=gym, sale_id=UUID(sale_id)).select_related("product")
+        )
+    if not stored:
+        return None, {}, {"error": "not_found", "field": "line_id"}
+    labels: dict[str, str] = {}
+    copied: list[object] = []
+    for index, line in enumerate(lines):
+        if not isinstance(line, dict):
+            return None, {}, {"error": "missing_fields", "fields": ["lines"]}
+        item = dict(line)
+        match = _return_line(stored, item.get("line_id"), sale_id)
+        if match is None:
+            return None, {}, {"error": "not_found", "field": "line_id"}
+        item["line_id"] = str(match.id)
+        labels[f"lines.{index}.line_id"] = f"{match.product.name} ({match.sku_snapshot})"
+        copied.append(item)
+    return copied, labels, None
+
+
+def _return_line(
+    stored: Sequence[RetailSaleLine],
+    raw: object,
+    sale_id: str,
+) -> RetailSaleLine | None:
+    rows = list(stored)
+    if isinstance(raw, str) and raw.strip():
+        parsed = _uuid_text(raw)
+        if parsed is not None:
+            found = next((row for row in rows if str(row.id) == parsed), None)
+            if found is not None:
+                return found
+            if parsed == sale_id and len(rows) == 1:
+                return rows[0]
+            return None
+        folded = raw.casefold()
+        named = [
+            row
+            for row in rows
+            if folded in row.product.name.casefold() or folded == row.sku_snapshot.casefold()
+        ]
+        if len(named) == 1:
+            return named[0]
+        return None
+    if len(rows) == 1:
+        return rows[0]
+    return None
+
+
+def _return_sale_gate(gym: Gym, payload: Mapping[str, object]) -> dict[str, object] | None:
+    from apps.sales.models import RetailSale
+
+    sale_id = _uuid_text(payload.get("retail_sale_id") or payload.get("sale_route_id"))
+    if sale_id is None:
+        return {"error": "not_found", "field": "retail_sale_id"}
+    sale = RetailSale.objects.filter(gym=gym, id=sale_id).first()
+    if sale is None:
+        return {"error": "not_found", "field": "retail_sale_id"}
+    if sale.status == RetailSale.Status.POSTED:
+        return None
+    return {
+        "error": "sale_state",
+        "status": str(sale.status),
+        "message": "The sale is not posted. Approve it before returning goods.",
+    }
 
 
 def _void_gate(

@@ -552,8 +552,12 @@ def test_a_manager_posts_one_salary(
         "100000 in the gym currency, by bank transfer, described as November "
         "desk wages, and the business date is today. This gym requires a "
         "separate approval, so the salary is not finished until the period is "
-        "posted. Confirm cards for Su Su and 100000. Reject a card for someone "
-        "else or a different amount."
+        "posted. The period itself is only the date range. Confirm that card "
+        "when the dates are 1 November 2026 through 12 November 2026, even "
+        "when the wage amount is not on it. Confirm the wage line when it "
+        "names Su Su and 100000 by bank transfer. Then confirm submit and "
+        "approve until the period is posted. Reject a card for someone else "
+        "or a different amount."
     )
     transcript = _run_goal(client=client, headers=headers, live=live, goal=goal, limit=16)
     _quota(transcript)
@@ -577,11 +581,15 @@ def test_a_desk_publishes_a_notice_and_opens_the_till(
     gym, _owner, client, headers = _gym(monkeypatch, "NC07")
     _finance(gym)
     goal = (
-        "Two separate jobs. First, publish a general announcement for every "
+        "Two separate jobs. First, publish one general announcement for every "
         "active member. The title is Saturday class and the message is that "
-        "the morning class starts at seven. Publishing is what sends it; a "
-        "draft is not enough. Second, open today's cash till with 25000 "
-        "opening cash. Confirm cards that match. Do not close the till."
+        "the morning class starts at seven. The stored type is general. "
+        "The draft is saved only so it can be published; it is not sent yet. "
+        "Confirm a draft card when the audience, title, message, and general "
+        "type match, then confirm the card that publishes it. Reject a card "
+        "whose type is not general. Second, open today's cash till once with "
+        "25000 opening cash. Confirm that card. Do not open another till and "
+        "do not close it."
     )
     transcript = _run_goal(client=client, headers=headers, live=live, goal=goal, limit=12)
     _quota(transcript)

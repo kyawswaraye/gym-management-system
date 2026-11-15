@@ -256,9 +256,26 @@ def _staff_text(contents: list[object]) -> str:
             if isinstance(part, Mapping) and isinstance(part.get("text"), str):
                 texts.append(part["text"])
     for text in reversed(texts):
-        if not text.startswith("Call the stored read"):
-            return text
+        if _skip_instruction(text):
+            continue
+        return text
     return texts[-1] if texts else ""
+
+
+def _skip_instruction(text: str) -> bool:
+    """Ignore the live brief. A saved-change cue is still the instruction."""
+
+    if text.startswith(("Call the stored read", "That answer stated stored records")):
+        return True
+    if text.startswith(
+        (
+            "The change is saved.",
+            "The booking was not saved.",
+            "The sale or booking was not saved.",
+        )
+    ):
+        return False
+    return text.startswith("Verified references") or "Live gym brief" in text
 
 
 def _responses(contents: list[object]) -> dict[str, Mapping[str, object]]:

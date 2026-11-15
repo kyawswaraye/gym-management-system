@@ -32,7 +32,7 @@ from apps.announcements.services import (
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
 from apps.assistant.executor import ExecutionMode, ToolCall, ToolContract, execute_confirmed_tool
 from apps.assistant.models import Goal
-from apps.assistant.prerequisites import FieldRequirement, Prerequisite
+from apps.assistant.prerequisites import FieldRequirement, Prerequisite, optional
 from apps.assistant.registry import ToolDefinition
 from apps.members.checkin_services import check_out_check_in, create_manual_check_in
 from apps.members.serializers import CheckInCheckoutSerializer, CheckInCreateSerializer
@@ -253,7 +253,17 @@ def _tools() -> tuple[RegisteredTool, ...]:
                 announcements,
                 "announcements",
             ),
-            (FieldRequirement("announcement_id", "Announcement"),),
+            (
+                FieldRequirement("announcement_id", "Announcement"),
+                optional("title", "Title"),
+                optional("body", "Body"),
+                optional("type", "EVENT, PROMOTION, or GENERAL"),
+                optional(
+                    "audience",
+                    "ALL_ACTIVE_MEMBERS, PT_CLIENTS, EXPIRING_WITHIN_7_DAYS, "
+                    "or EXPIRING_WITHIN_30_DAYS",
+                ),
+            ),
             _update_announcement,
         ),
         (
@@ -286,7 +296,10 @@ def _tools() -> tuple[RegisteredTool, ...]:
                 checkins,
                 "checkins",
             ),
-            (FieldRequirement("member_id", "Member"),),
+            (
+                FieldRequirement("member_id", "Member"),
+                optional("note", "Note"),
+            ),
             _create_manual_check_in,
         ),
         (

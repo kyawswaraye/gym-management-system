@@ -20,7 +20,7 @@ from rest_framework.views import APIView
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
 from apps.assistant.executor import ExecutionMode, ToolCall, ToolContract, execute_confirmed_tool
 from apps.assistant.models import Goal
-from apps.assistant.prerequisites import FieldRequirement, Prerequisite
+from apps.assistant.prerequisites import FieldRequirement, Prerequisite, optional
 from apps.assistant.registry import ToolDefinition
 from apps.common.api.exceptions import AuthenticationFailed
 from apps.tenants.role_serializers import (
@@ -344,7 +344,12 @@ def _tools() -> tuple[RegisteredTool, ...]:
                 ("staff.manage",),
                 staff,
             ),
-            (FieldRequirement("staff_id", "Staff profile"),),
+            (
+                FieldRequirement("staff_id", "Staff profile"),
+                optional("display_name", "Display name"),
+                optional("employment_title", "Job title"),
+                optional("phone", "Phone"),
+            ),
             _update_staff_profile,
         ),
         (
@@ -380,7 +385,11 @@ def _tools() -> tuple[RegisteredTool, ...]:
         ),
         (
             _definition("update_role", "Update a custom role", ("roles.manage",), roles),
-            (FieldRequirement("role_id", "Role"),),
+            (
+                FieldRequirement("role_id", "Role"),
+                optional("name", "Role name"),
+                optional("description", "Description"),
+            ),
             _update_role,
         ),
         (
@@ -395,7 +404,14 @@ def _tools() -> tuple[RegisteredTool, ...]:
                 ("roles.manage",),
                 roles,
             ),
-            (FieldRequirement("role_id", "Role"),),
+            (
+                FieldRequirement("role_id", "Role"),
+                FieldRequirement(
+                    "permission_codes",
+                    "Permission codes that should remain on this role",
+                    kind="array",
+                ),
+            ),
             _replace_role_permissions,
         ),
         (
@@ -405,12 +421,20 @@ def _tools() -> tuple[RegisteredTool, ...]:
                 ("staff.manage",),
                 roles,
             ),
-            (FieldRequirement("membership_id", "Staff membership"),),
+            (
+                FieldRequirement("membership_id", "Staff membership"),
+                FieldRequirement("role_ids", "Role ids to assign", kind="array"),
+            ),
             _replace_membership_roles,
         ),
         (
             _definition("update_gym_profile", "Update the gym profile", ("gym.update",), gym),
-            None,
+            (
+                optional("name", "Gym name"),
+                optional("phone", "Phone"),
+                optional("email", "Email"),
+                optional("city", "City"),
+            ),
             _update_gym_profile,
         ),
         (
@@ -421,7 +445,14 @@ def _tools() -> tuple[RegisteredTool, ...]:
                 gym,
                 owner=True,
             ),
-            None,
+            (
+                optional("member_number_prefix", "Member number prefix"),
+                optional(
+                    "class_cancellation_cutoff_minutes",
+                    "Minutes before a class when cancellation closes",
+                ),
+                optional("receipt_number_prefix", "Receipt number prefix"),
+            ),
             _update_gym_settings,
         ),
         (

@@ -3,6 +3,7 @@ infra/compose/blackbox.rendered.yml
 
 # Secrets and local environment
 .env
+backend/.gemini-coverage/
 .env.*
 !.env.example
 !**/.env.example

@@ -17,7 +17,7 @@ _DEPTH = 6
 _WIDTH = 40
 _TEXT = 2000
 _SKU = re.compile(r"^[A-Z0-9][A-Z0-9_-]{0,31}$")
-_LINE_MONEY = ("discount",)
+_LINE_MONEY = ("discount", "amount")
 _UNAVAILABLE = "Product unavailable"
 
 
@@ -88,7 +88,25 @@ def declaration(contract: ToolContract) -> dict[str, object]:
         for field in contract.prerequisite.fields:
             if field.name in hidden:
                 continue
-            properties[field.name] = {"type": field.kind, "description": field.description}
+            schema: dict[str, object] = {"type": field.kind, "description": field.description}
+            if field.kind == "array" and field.item_fields:
+                item_properties: dict[str, object] = {}
+                item_required: list[str] = []
+                for item in field.item_fields:
+                    item_properties[item.name] = {
+                        "type": item.kind,
+                        "description": item.description,
+                    }
+                    if item.required:
+                        item_required.append(item.name)
+                schema["items"] = {
+                    "type": "object",
+                    "properties": item_properties,
+                    "required": item_required,
+                }
+            elif field.kind == "array":
+                schema["items"] = {"type": field.item_kind}
+            properties[field.name] = schema
             if field.required:
                 required.append(field.name)
     return {
@@ -199,8 +217,14 @@ def _sale_line_fields(
             text = _stored_scalar(shown)
             if text:
                 fields.append({"name": f"{prefix}.staff", "value": text})
+            for key in ("currency", "payment_method", "description"):
+                extra = _stored_scalar(line.get(key))
+                if extra:
+                    fields.append({"name": f"{prefix}.{key}", "value": extra})
         elif "line_id" in line:
-            text = _stored_scalar(line.get("line_id"))
+            stored = labels.get(f"{prefix}.line_id")
+            shown = stored if isinstance(stored, str) and stored.strip() else line.get("line_id")
+            text = _stored_scalar(shown)
             if text:
                 fields.append({"name": f"{prefix}.line", "value": text})
         if "quantity" in line:
@@ -246,6 +270,8 @@ def _display(value: object) -> str:
         text = ""
     elif isinstance(value, int | float):
         text = str(value)
+    elif isinstance(value, list):
+        text = ", ".join(part for part in (_display(item) for item in value) if part)
     else:
         text = ""
     return text[:200]

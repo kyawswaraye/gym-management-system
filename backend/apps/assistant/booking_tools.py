@@ -334,7 +334,12 @@ def _cancel_prepare(
 
 _CREATE = RegisteredTool(
     contract=_contract(
-        _definition("create_class_booking", "Create a class booking", _BOOK_OR_MANAGE),
+        _definition(
+            "create_class_booking",
+            "Book a member into one scheduled class occurrence. This is not a "
+            "membership and not a personal-training booking.",
+            _BOOK_OR_MANAGE,
+        ),
         (
             FieldRequirement("class_occurrence_id", "Class occurrence"),
             FieldRequirement("member_id", "Member"),
@@ -348,7 +353,12 @@ _CREATE = RegisteredTool(
 )
 _ATTEND = RegisteredTool(
     contract=_contract(
-        _definition("attend_class_booking", "Attend a class booking", ("classes.attendance",)),
+        _definition(
+            "attend_class_booking",
+            "Mark an existing class booking attended. The class must already "
+            "have started, and the booking must still be booked.",
+            ("classes.attendance",),
+        ),
         (FieldRequirement("booking_id", "Booking"),),
         http_method=BOOKING_ACTION_METHOD,
         route=ATTEND_BOOKING_ROUTE,
@@ -361,7 +371,8 @@ _NO_SHOW = RegisteredTool(
     contract=_contract(
         _definition(
             "mark_class_booking_no_show",
-            "Mark a class booking no-show",
+            "Mark an existing class booking as a no-show after that class has "
+            "ended. The booking must still be booked.",
             ("classes.attendance",),
         ),
         (FieldRequirement("booking_id", "Booking"),),
@@ -374,7 +385,11 @@ _NO_SHOW = RegisteredTool(
 )
 _CANCEL = RegisteredTool(
     contract=_contract(
-        _definition("cancel_class_booking", "Cancel a class booking", _BOOK_OR_MANAGE),
+        _definition(
+            "cancel_class_booking",
+            "Cancel an existing class booking that is still booked.",
+            _BOOK_OR_MANAGE,
+        ),
         (FieldRequirement("booking_id", "Booking"),),
         http_method=BOOKING_ACTION_METHOD,
         route=CANCEL_BOOKING_ROUTE,

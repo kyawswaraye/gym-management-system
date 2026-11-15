@@ -29,6 +29,20 @@ from apps.trainers.models import PTSale
 CONFIRMATION_FIELDS = ("record_id", "amount")
 
 
+def rejection_reason_input(data: Mapping[str, object]) -> dict[str, object]:
+    """Accept the tool field ``reason`` on a serializer that stores ``rejection_reason``.
+
+    The finance view hash still uses the word the HTTP body already uses.
+    """
+
+    payload = dict(data)
+    reason = payload.pop("reason", None)
+    current = payload.get("rejection_reason")
+    if current in {None, ""} and isinstance(reason, str):
+        payload["rejection_reason"] = reason
+    return payload
+
+
 def approval_loader(
     request: Request,
     payload: Mapping[str, object],

@@ -84,11 +84,18 @@ def search_trainers(call: ReadCall) -> dict[str, object]:
         limit=int(query["limit"]),
         after=str(query.get("after") or ""),
     )
-    return {
+    body: dict[str, object] = {
         "results": [_trainer_row(row) for row in rows],
         "has_more": bool(meta["has_more"]),
         "next_after": meta["next_after"],
     }
+    if not rows:
+        body["note"] = (
+            "No trainer profiles. This does not answer assignment counts. "
+            "Call search_trainer_assignments with summary true before saying "
+            "there are no assignments."
+        )
+    return body
 
 
 def search_trainer_assignments(call: ReadCall) -> dict[str, object]:
@@ -210,15 +217,19 @@ _READS = {
     SEARCH_TRAINERS: _contract(
         _definition(
             SEARCH_TRAINERS,
-            "Search trainers in this gym. Returns the staff profiles this caller can see.",
+            "Search trainer profiles in this gym. An empty list does not answer "
+            "who is assigned. Call search_trainer_assignments with summary true "
+            "for each trainer's active member count.",
         ),
         _LIMIT,
     ),
     SEARCH_TRAINER_ASSIGNMENTS: _contract(
         _definition(
             SEARCH_TRAINER_ASSIGNMENTS,
-            "Search trainer assignments in this gym. Status is ACTIVE, ENDED, or CANCELLED. "
-            "Set summary true for each trainer's current active member count.",
+            "Search trainer assignments in this gym. Call this for who is assigned "
+            "or how many members each trainer has, even when search_trainers was "
+            "empty. Status is ACTIVE, ENDED, or CANCELLED. Set summary true for "
+            "each trainer's current active member count.",
         ),
         (
             FieldRequirement(

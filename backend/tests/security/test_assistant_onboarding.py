@@ -75,16 +75,20 @@ def _responds(contents: list[dict[str, object]]) -> bool:
 
 
 def _latest(contents: list[dict[str, object]]) -> str:
-    if not contents:
-        return ""
-    parts = contents[-1].get("parts")
-    if not isinstance(parts, list):
-        return ""
-    return " ".join(
+    texts = [
         part["text"]
-        for part in parts
+        for item in contents
+        for part in (item.get("parts") if isinstance(item.get("parts"), list) else [])
         if isinstance(part, dict) and isinstance(part.get("text"), str)
-    )
+    ]
+    for text in reversed(texts):
+        if text.startswith(("The change is saved", "The booking was not saved")):
+            return text
+    for text in reversed(texts):
+        if text.startswith("Verified references") or "Live gym brief" in text:
+            continue
+        return text
+    return ""
 
 
 class _Script:
@@ -111,7 +115,9 @@ class _Script:
             return _text("32-11-2026 သည် မှန်ကန်တဲ့ ရက်မဟုတ်ပါ။")
         if latest.startswith("The change is saved"):
             if self.mode == "await_membership":
-                member_id = self.member_id or _brief_value(system_instruction, "member_id")
+                member_id = self.member_id or _brief_value(
+                    latest + "\n" + system_instruction, "member_id"
+                )
                 return _call(
                     "create_membership",
                     {

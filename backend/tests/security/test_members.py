@@ -698,3 +698,86 @@ def test_member_save_normalizes_profile_fields() -> None:
     assert member.gender == "MALE"
     assert member.authz_version == 1
     assert member.address["country_code"] == ""
+
+
+@override_settings(**jwt_settings())
+def test_member_last_name_is_optional_and_can_be_cleared() -> None:
+    client, platform_access = platform_token("member-blank-last-platform@example.test")
+    gym_payload = provision(
+        client, platform_access, code="BLANK", owner_email="blank-last-owner@example.test"
+    )
+    gym = Gym.objects.get(id=gym_payload["gym"]["id"])
+    owner = GymMembership.objects.select_related("user").get(
+        id=gym_payload["owner"]["gym_membership"]["id"]
+    )
+    headers = auth_headers(staff_token(owner))
+    api = _client()
+
+    missing = api.post(
+        "/api/v1/members/",
+        {"first_name": "Hla Hla", "join_date": "2026-11-16"},
+        format="json",
+        **headers,
+    )
+    assert missing.status_code == 201, missing.json()
+    created = missing.json()["data"]
+    assert created["first_name"] == "Hla Hla"
+    assert created["last_name"] == ""
+    assert created["normalized_full_name"] == "hla hla"
+    stored = _stored(gym.id, created["id"])
+    assert stored.last_name == ""
+    assert stored.display_name == "Hla Hla"
+    assert stored.normalized_full_name == "hla hla"
+
+    blank = api.post(
+        "/api/v1/members/",
+        {"first_name": "Nwe   Nwe", "last_name": "   ", "join_date": "2026-11-16"},
+        format="json",
+        **headers,
+    )
+    assert blank.status_code == 201, blank.json()
+    assert blank.json()["data"]["last_name"] == ""
+    assert blank.json()["data"]["first_name"] == "Nwe Nwe"
+    assert blank.json()["data"]["normalized_full_name"] == "nwe nwe"
+
+    found = api.get("/api/v1/members/?search=Hla%20Hla", **headers)
+    assert found.status_code == 200, found.json()
+    assert [row["id"] for row in found.json()["data"]] == [created["id"]]
+
+    named = api.post(
+        "/api/v1/members/",
+        {"first_name": "Ada", "last_name": "Lovelace", "join_date": "2026-11-16"},
+        format="json",
+        **headers,
+    )
+    assert named.status_code == 201, named.json()
+    member_id = named.json()["data"]["id"]
+    cleared = api.patch(
+        f"/api/v1/members/{member_id}/",
+        {"last_name": ""},
+        format="json",
+        **headers,
+    )
+    assert cleared.status_code == 200, cleared.json()
+    assert cleared.json()["data"]["first_name"] == "Ada"
+    assert cleared.json()["data"]["last_name"] == ""
+    assert cleared.json()["data"]["normalized_full_name"] == "ada"
+    assert _stored(gym.id, member_id).display_name == "Ada"
+
+    whitespace = api.patch(
+        f"/api/v1/members/{member_id}/",
+        {"last_name": "   "},
+        format="json",
+        **headers,
+    )
+    assert whitespace.status_code == 200, whitespace.json()
+    assert whitespace.json()["data"]["last_name"] == ""
+
+    still_required = api.post(
+        "/api/v1/members/",
+        {"last_name": "", "join_date": "2026-11-16"},
+        format="json",
+        **headers,
+    )
+    assert still_required.status_code == 400
+    assert "first_name" in still_required.json()["error"]["fields"]

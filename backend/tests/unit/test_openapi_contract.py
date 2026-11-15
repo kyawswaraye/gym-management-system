@@ -989,6 +989,11 @@ def test_openapi_documents_members() -> None:
     }
 
     assert set(create) == writable
+    assert "last_name" not in schemas["MemberCreateRequest"]["required"]
+    assert {"first_name", "join_date"} <= set(schemas["MemberCreateRequest"]["required"])
+    assert create["last_name"].get("default") == ""
+    assert "minLength" not in create["last_name"]
+    assert "minLength" not in update["last_name"]
     assert set(update) == writable - {"member_number"}
     assert set(member) == writable | {
         "id",

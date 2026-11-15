@@ -407,4 +407,115 @@ describe("assistant chat", () => {
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
     expect(reject).not.toHaveBeenCalled();
   });
+
+  it("shows a class-type capacity and rejects the card", async () => {
+    turn.mockResolvedValue({
+      conversation_id: "conversation-1",
+      message: {
+        id: "message-1",
+        role: "assistant",
+        body: "Please confirm the class type.",
+        created_at: "2026-11-15T00:00:00Z",
+      },
+      pending_confirmation: {
+        step_id: "step-class",
+        goal_id: "goal-1",
+        tool_name: "update_class_type",
+        summary: "Update one class type.",
+        fields: [
+          { name: "class_type_id", value: "Yoga" },
+          { name: "default_capacity", value: "10" },
+        ],
+        approval: null,
+      },
+      tool_activity: [{ name: "update_class_type", status: "proposed" }],
+    });
+    reject.mockResolvedValue({
+      conversation_id: "conversation-1",
+      message: {
+        id: "message-2",
+        role: "assistant",
+        body: "The change was not saved.",
+        created_at: "2026-11-15T00:01:00Z",
+      },
+      pending_confirmation: null,
+      tool_activity: [{ name: "update_class_type", status: "cancelled" }],
+      outcome: "cancelled",
+    });
+    render(<AssistantChat membershipId="membership-1" />);
+    fireEvent.change(screen.getByLabelText("Assistant"), {
+      target: { value: "Change the Yoga class type capacity to 10." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("10")).toBeVisible();
+    expect(screen.getByText("Yoga")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Reject change" }));
+    expect(await screen.findByText("The change was not saved.")).toBeVisible();
+    expect(reject).toHaveBeenCalledWith("step-class");
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("shows a posted result and a confirmation error", async () => {
+    turn.mockResolvedValue({
+      conversation_id: "conversation-1",
+      message: {
+        id: "message-1",
+        role: "assistant",
+        body: "Please confirm the draft.",
+        created_at: "2026-11-15T00:00:00Z",
+      },
+      pending_confirmation: {
+        step_id: "step-pay",
+        goal_id: "goal-1",
+        tool_name: "approve_payment",
+        summary: "Approve the submitted payment.",
+        fields: [{ name: "description", value: "November partial" }],
+        approval: { record_id: "pay-1", amount: "20000.00" },
+      },
+      tool_activity: [{ name: "approve_payment", status: "proposed" }],
+    });
+    confirm.mockRejectedValue(new Error("The stored change was not accepted."));
+    render(<AssistantChat membershipId="membership-1" />);
+    fireEvent.change(screen.getByLabelText("Assistant"), {
+      target: { value: "Approve the submitted payment." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("November partial")).toBeVisible();
+    expect(screen.getByText("Amount 20000.00")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm change" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The assistant is unavailable.",
+    );
+    expect(screen.getByText("Please confirm the draft.")).toBeVisible();
+  });
+
+  it("shows draft, submitted, pending, and posted replies", async () => {
+    const bodies = [
+      "The draft is saved.",
+      "The record is submitted.",
+      "The record is waiting for approval.",
+      "The record is posted.",
+    ];
+    for (const body of bodies) {
+      turn.mockResolvedValueOnce({
+        conversation_id: "conversation-1",
+        message: {
+          id: body,
+          role: "assistant",
+          body,
+          created_at: "2026-11-15T00:00:00Z",
+        },
+        pending_confirmation: null,
+        tool_activity: [],
+      });
+    }
+    render(<AssistantChat membershipId="membership-1" />);
+    for (const body of bodies) {
+      fireEvent.change(screen.getByLabelText("Assistant"), {
+        target: { value: body },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+      expect(await screen.findByText(body)).toBeVisible();
+    }
+  });
 });

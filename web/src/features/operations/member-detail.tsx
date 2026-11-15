@@ -344,8 +344,8 @@ export function MemberDetail({
     event.preventDefault();
     if (!canUpdate || !draft || saveLocked.current) return;
     const payload = memberUpdatePayload(draft);
-    if (!payload.first_name || !payload.last_name || !payload.join_date) {
-      setError(tx("Enter a first name, last name, and join date."));
+    if (!payload.first_name || !payload.join_date) {
+      setError(tx("Enter a first name and join date."));
       return;
     }
     saveLocked.current = true;

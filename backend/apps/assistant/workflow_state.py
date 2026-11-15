@@ -8,28 +8,23 @@ erase a member, plan, or date the database already returned.
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Mapping
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 from uuid import UUID
 
 from django.db import transaction
 
-from apps.assistant.knowledge import (
-    information_question,
-    short_reply_kind,
-    shown_day,
-    speaks_burmese,
-)
+from apps.assistant.knowledge import shown_day, speaks_burmese
 from apps.assistant.models import Conversation, Message
 from apps.common.db.tenant_context import set_gym_context
 from apps.members.models import Member, Membership
-from apps.tenants.models import Gym
+from apps.tenants.models import Gym, GymSettings
 
 _MARKER = "workflow-state v1\n"
 _KEYS = (
     "workflow",
+    "active_workflows",
     "goals",
     "stage",
     "member_id",
@@ -57,94 +52,14 @@ _KEYS = (
     "pt_booking_id",
     "occurrence_id",
     "class_booking_id",
+    "salary_period_id",
+    "retail_sale_id",
+    "expense_id",
+    "announcement_id",
+    "record_status",
+    "return_key",
+    "saved_changes",
     "verified",
-)
-_NEXT_WORDS = (
-    "ဘာဆက်",
-    "ဘာလုပ်ဖို့",
-    "ကျန်သေး",
-    "what next",
-    "what remains",
-    "what should",
-)
-_CAPABILITIES: tuple[tuple[tuple[str, ...], str], ...] = (
-    (
-        ("member", "အဖွဲ့ဝင်", "membership", "အသင်းဝင်", "plan", "အစီအစဉ်"),
-        "Members and memberships. Reads: search_members, get_member, "
-        "search_memberships, search_membership_plans. Writes that wait for "
-        "confirmation: create_member, update_member, archive_member, "
-        "restore_member, create_membership, suspend_membership, "
-        "resume_membership, cancel_membership. A new member needs a name and "
-        "join date. The server assigns the member number. A new membership "
-        "needs that member, an active plan, and a start date. Pending, active, "
-        "and suspended ranges cannot overlap. Assigning a membership does not "
-        "record a payment. Next, offer an active plan, then a payment if the "
-        "membership is unpaid.",
-    ),
-    (
-        ("payment", "receipt", "refund", "ငွေပေး", "ပြန်အမ်း", "ဘောင်ချာ"),
-        "Payments. Reads: search_payments, get_payment. A refund is a payment "
-        "whose entry_type is REFUND. Writes wait for confirmation: "
-        "create_payment, update_payment, submit_payment, cancel_payment, "
-        "approve_payment, reject_payment, void_payment, refund_payment, "
-        "void_receipt. Cash needs an open cash session. Separate finance "
-        "approval stays pending until an authorized role approves it. Do not "
-        "call an unpaid membership paid.",
-    ),
-    (
-        ("pt", "trainer", "package", "commission", "ကော်မရှင်", "နည်းပြ"),
-        "Personal training. Reads: search_service_packages for catalog prices, "
-        "search_pt_packages for a member's remaining sessions, search_pt_commissions. "
-        "Writes wait for confirmation: create_assignment, create_pt_sale, "
-        "submit_pt_sale, approve_pt_sale, reject_pt_sale, create_pt_booking, "
-        "attend_pt_booking, cancel_pt_booking. A sale or booking needs an "
-        "active trainer assignment covering the date. A metered booking needs "
-        "an active package with sessions left. Next, say the date, trainer, "
-        "and remaining sessions after a saved booking.",
-    ),
-    (
-        ("class", "booking", "အတန်း", "ဘိုကင်"),
-        "Classes. Reads: search_class_occurrences, search_bookings. Writes "
-        "wait for confirmation: create_class_schedule, create_class_booking, "
-        "attend_class_booking, cancel_class_booking. A booking needs a "
-        "scheduled occurrence with room and an eligible member. A duplicate "
-        "booking is refused. Next, say the class date and time after a saved "
-        "booking.",
-    ),
-    (
-        ("cash", "expense", "salary", "လစာ", "အသုံး", "ငွေသား", "income", "revenue", "ဝင်ငွေ"),
-        "Money operations. Reads: search_expenses, search_salary_periods, "
-        "search_cash_sessions, get_gym_dashboard. Dashboard totals use the gym "
-        "timezone and include financial amounts only when this staff member "
-        "has reports.financial. Writes wait for confirmation and keep the "
-        "existing approval rules: expenses, salary periods, and cash sessions. "
-        "A submitted salary or expense is not paid or posted until the "
-        "required role approves it.",
-    ),
-    (
-        ("stock", "inventory", "retail", "sku", "လက်ကျန်", "အရောင်း"),
-        "Inventory and retail. Reads: search_sales. Writes wait for "
-        "confirmation: create_product, adjust_stock, create_retail_sale, "
-        "submit_retail_sale, return_retail_sale, void_retail_sale. On-hand "
-        "quantity is the sum of stock movements. A return follows the posted "
-        "sale. Next, say the resulting stock after a saved sale or adjustment.",
-    ),
-    (
-        ("announcement", "ကြေညာ", "check-in", "check in", "ဝင်ရောက်"),
-        "Announcements and check-in. Read: search_announcements. Status is "
-        "DRAFT, SCHEDULED, PUBLISHED, CANCELLED, or EXPIRED. Writes wait for "
-        "confirmation: create_announcement, update_announcement, "
-        "publish_announcement, cancel_announcement, create_manual_check_in, "
-        "check_out_check_in. Publishing does not mean the member inbox has "
-        "already been delivered. A check-in still follows membership eligibility.",
-    ),
-    (
-        ("staff", "role", "permission", "ဝန်ထမ်း", "အခန်းကဏ္ဍ"),
-        "Staff and gym settings. Writes wait for confirmation: "
-        "update_staff_profile, create_role, update_role, archive_role, "
-        "update_gym_profile. Permissions on the signed-in membership decide "
-        "which tool is offered. The server checks them again before a write.",
-    ),
 )
 
 
@@ -280,7 +195,39 @@ def absorb_proposal(
     state["last_tool"] = tool
     state["last_outcome"] = "waiting_confirmation"
     _copy_payload(state, payload)
-    state["next"] = _next_for(tool, state)
+    state["next"] = ""
+
+
+def _stored_status(gym: Gym, tool: str) -> str:
+    """Return the status a saved finance or announcement step actually leaves."""
+
+    if tool.startswith("approve_"):
+        return "POSTED"
+    if tool == "publish_announcement":
+        return "PUBLISHED"
+    if tool in _DRAFTS:
+        return "DRAFT"
+    if tool not in _SUBMITTED:
+        return ""
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        settings = GymSettings.objects.filter(gym=gym).first()
+    separate = settings is None or settings.require_separate_finance_approval
+    return "PENDING_APPROVAL" if separate else "POSTED"
+
+
+def return_fingerprint(payload: Mapping[str, object]) -> str:
+    """Identify one return so the same goods are not returned again."""
+
+    sale = payload.get("retail_sale_id") or payload.get("sale_route_id") or ""
+    lines = payload.get("lines")
+    parts: list[str] = []
+    if isinstance(lines, list):
+        for line in lines:
+            if not isinstance(line, dict):
+                continue
+            parts.append(f"{line.get('line_id')}:{line.get('quantity')}")
+    return f"{sale}|{','.join(sorted(parts))}"
 
 
 def remember_commit(
@@ -296,8 +243,13 @@ def remember_commit(
     state["last_outcome"] = "saved"
     state["last_reference"] = reference or ""
     _copy_payload(state, payload)
+    status = _stored_status(gym, tool)
+    if status:
+        state["record_status"] = status
+    if tool == "return_retail_sale":
+        state["return_key"] = return_fingerprint(payload)
     if not reference:
-        state["next"] = _next_for(tool, state)
+        state["next"] = ""
         return
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
@@ -325,32 +277,7 @@ def remember_commit(
                 state["start_date"] = membership.start_date.isoformat()
                 state["payment_status"] = membership.payment_status
                 state["workflow"] = "membership"
-    state["next"] = _next_for(tool, state)
-
-
-def same_created_member(state: Mapping[str, str], payload: Mapping[str, object]) -> bool:
-    """A matching name is not the same operation.
-
-    A second member may share a name. Replay protection belongs to the
-    confirmed step and its execution identity, not to the person name.
-    """
-
-    del state, payload
-    return False
-
-
-def direct_reply(text: str, state: Mapping[str, str]) -> str | None:
-    """Answer a stored fact without another model call."""
-
-    dated = stored_date_reply(text, state)
-    if dated is not None:
-        return dated
-    number = _number_reply(text, state)
-    if number is not None:
-        return number
-    if not any(word in text or word in text.casefold() for word in _NEXT_WORDS):
-        return None
-    return _next_sentence(state, speaks_burmese(text))
+    state["next"] = ""
 
 
 def completion_sentence(state: Mapping[str, str], staff_text: str) -> str:
@@ -377,89 +304,6 @@ def provider_notice(staff_text: str, state: Mapping[str, str]) -> str:
     return "The assistant is unavailable. Nothing new was saved."
 
 
-_PT_INTENT = re.compile(r"(?<![a-z0-9])pt(?![a-z0-9])")
-
-
-def remember_intent(state: dict[str, str], text: str) -> None:
-    """Keep the operation the staff named. A later date must not drop it.
-
-    A member lookup stores the person on the same state. That fact is not a
-    switch from personal training to a membership sale. A request that names
-    membership, class, and PT together stays on member registration first.
-    """
-
-    if short_reply_kind(text) or _date_followup(text):
-        return
-    if _resumes(text) and state.get("parked"):
-        state["workflow"] = state["parked"]
-        state["parked"] = ""
-        return
-    if information_question(text):
-        return
-    folded = text.casefold()
-    wants_pt = bool(_PT_INTENT.search(folded) or "နည်းပြ" in text)
-    wants_class = bool(re.search(r"\bclass\b", folded) or "အတန်း" in text)
-    wants_member = "member" in folded or "အဖွဲ့ဝင်" in text
-    wants_membership = "membership" in folded or "အသင်းဝင်" in text
-    if wants_member and (wants_class or wants_pt):
-        parts = ["member", "membership"]
-        if wants_class:
-            parts.append("class")
-        if wants_pt:
-            parts.append("pt")
-        state["goals"] = ",".join(parts)
-        if not state.get("member_id"):
-            _switch_workflow(state, "member")
-        return
-    if state.get("goals") and not (wants_pt or wants_class or wants_member or wants_membership):
-        return
-    if _registers_member(text) and not state.get("member_id"):
-        _switch_workflow(state, "member")
-        return
-    if wants_pt:
-        _switch_workflow(state, "pt")
-        return
-    if "ငွေပေး" in text or "payment" in folded or "ပြန်အမ်း" in text:
-        _switch_workflow(state, "payment")
-        return
-    if wants_membership:
-        _switch_workflow(state, "membership")
-        return
-    if wants_class and state.get("member_id"):
-        _switch_workflow(state, "class")
-
-
-_RESUMES = (
-    "အရင်ဟာ ဆက်လုပ်",
-    "ဆက်လုပ်",
-    "continue that",
-    "go back",
-    "register her",
-    "register him",
-)
-
-
-def _resumes(text: str) -> bool:
-    folded = text.casefold()
-    return any(phrase in text or phrase in folded for phrase in _RESUMES)
-
-
-def _registers_member(text: str) -> bool:
-    folded = text.casefold()
-    if "register" in folded or "စာရင်းသွင်း" in text:
-        return True
-    return "new member" in folded or "အဖွဲ့ဝင်အသစ်" in text or "အဖွဲ့ဝင် အသစ်" in text
-
-
-def _switch_workflow(state: dict[str, str], workflow: str) -> None:
-    """Move to another operation and keep the previous one for a later return."""
-
-    current = state.get("workflow") or ""
-    if current and current != workflow and not state.get("parked"):
-        state["parked"] = current
-    state["workflow"] = workflow
-
-
 def _open_registration(state: Mapping[str, str]) -> bool:
     return bool(state.get("member_name")) and not state.get("member_id")
 
@@ -474,8 +318,6 @@ def _kept_start(state: Mapping[str, str]) -> bool:
     return bool(state.get("start_date")) and state.get("workflow") not in {"", "membership"}
 
 
-_PERSON_NAME = re.compile(r"\b([A-Z][a-z]+(?:[ '-][A-Z][a-z]+)+)\b")
-_PLAN_CODE = re.compile(r"\b([A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+)\b")
 _DATE_QUESTIONS = (
     "which date",
     "which start date",
@@ -485,26 +327,6 @@ _DATE_QUESTIONS = (
     "ဘယ်ရက်က စမလဲ",
     "ဘယ်နေ့လဲ",
 )
-
-
-def remember_facts(state: dict[str, str], text: str, today: date) -> None:
-    """Keep a name, plan code, and calendar day the staff already gave."""
-
-    from apps.assistant.lookups import calendar_day
-
-    if short_reply_kind(text) or asks_stored_date(text):
-        return
-    found = calendar_day(text, today)
-    if isinstance(found, date) and not information_question(text):
-        state["start_date"] = found.isoformat()
-    if not state.get("member_id") and not state.get("member_name"):
-        named = _PERSON_NAME.search(text)
-        if named is not None:
-            state["member_name"] = named.group(1)
-    if not state.get("plan_id"):
-        code = _PLAN_CODE.search(text)
-        if code is not None:
-            state["plan_code"] = code.group(1)
 
 
 def asks_stored_date(text: str) -> bool:
@@ -605,82 +427,20 @@ def _proposal_fields(proposal: Mapping[str, object]) -> dict[str, str]:
     return found
 
 
-def _date_followup(text: str) -> bool:
-    """A date or a date question, without a new operation in the same message."""
-
-    from apps.assistant.lookups import calendar_day
-
-    if asks_stored_date(text):
-        return True
-    if _operation_mention(text):
-        return False
-    folded = text.casefold()
-    if any(
-        token in text
-        for token in (
-            "ဒီနေ့",
-            "ယနေ့",
-            "မနက်ဖြန်",
-            "နက်ဖြန်",
-            "မနေ့",
-            "မနေ့က",
-            "နောက်တစ်ပတ်",
-            "နောက်အပတ်",
-        )
-    ):
-        return True
-    if re.search(r"\b(today|tomorrow|yesterday|next week)\b", folded):
-        return True
-    return isinstance(calendar_day(text, date.today()), date)
+_BRIEF_SKIP = frozenset({"verified", "next", "goals", "workflow", "parked", "saved_changes"})
 
 
-def _operation_mention(text: str) -> bool:
-    folded = text.casefold()
-    if _PT_INTENT.search(folded) or "နည်းပြ" in text:
-        return True
-    if re.search(r"\bclass\b", folded) or "အတန်း" in text:
-        return True
-    if "member" in folded or "အဖွဲ့ဝင်" in text:
-        return True
-    if "membership" in folded or "အသင်းဝင်" in text:
-        return True
-    if "payment" in folded or "ငွေပေး" in text or "ပြန်အမ်း" in text:
-        return True
-    if "plan" in folded or "အစီအစဉ်" in text:
-        return True
-    return _PLAN_CODE.search(text) is not None
+def note_saved_change(state: dict[str, str], tool: str, plain: Mapping[str, str]) -> None:
+    """Remember one saved write so a later turn does not propose it again."""
 
-
-def capability_brief(text: str, state: Mapping[str, str]) -> str:
-    asked = information_question(text)
-    blob = text if asked else f"{text} {state.get('workflow', '')} {state.get('next', '')}"
-    folded = blob.casefold()
-    card = (
-        "Relevant operation. Use a registered read before answering a stored "
-        "record. A write is only proposed until the server confirms it."
-    )
-    for words, description in _CAPABILITIES:
-        if any(word in folded or word in blob for word in words):
-            card = "Relevant operation. " + description
-            break
-    if asked:
-        return (
-            card + " Answer only this question from a read tool or the live gym brief. "
-            "Leave the stored name, date, plan, and workflow in place."
-        )
-    goals = state.get("goals") or ""
-    if "class" in goals or "pt" in goals:
-        card += (
-            " This onboarding is separate steps: register the member, then sell "
-            "the named membership, then class enrollment, then PT. Do not ask "
-            "again for a name, date, or plan already stored. Do not invent a "
-            "class, trainer, package, or schedule. Missing class or PT details "
-            "do not block member registration or the membership sale."
-        )
-    return card
-
-
-_BRIEF_SKIP = frozenset({"verified", "next", "goals", "workflow", "parked"})
+    try:
+        existing = json.loads(state.get("saved_changes") or "[]")
+    except json.JSONDecodeError:
+        existing = []
+    if not isinstance(existing, list):
+        existing = []
+    existing.append({"tool": tool, "payload": dict(plain)})
+    state["saved_changes"] = json.dumps(existing[-6:], ensure_ascii=False)[:4000]
 
 
 def note_verified(state: dict[str, str], tool: str, body: Mapping[str, object]) -> None:
@@ -737,67 +497,6 @@ def state_brief(state: Mapping[str, str]) -> str:
     return "\n".join(lines)
 
 
-def dashboard_arguments(
-    payload: Mapping[str, object],
-    text: str,
-    today: date,
-) -> dict[str, object]:
-    updated = dict(payload)
-    replacement = _named_dashboard_period(text, today)
-    if replacement is None:
-        return updated
-    if "range" in replacement:
-        updated.pop("date_from", None)
-        updated.pop("date_to", None)
-    else:
-        updated.pop("range", None)
-    updated.update(replacement)
-    return updated
-
-
-def _named_dashboard_period(text: str, today: date) -> dict[str, str] | None:
-    """Use the month or day the staff named, including over a model range."""
-
-    folded = text.casefold()
-    if "နောက်လ" in text or "next month" in folded:
-        return {"range": "next_month"}
-    if "ဒီလ" in text or "this month" in folded or "နောက်တစ်လ" in text:
-        return {"range": "this_month"}
-    if "မနေ့က" in text or re.search(r"\byesterday\b", folded):
-        day = (today - timedelta(days=1)).isoformat()
-        return {"date_from": day, "date_to": day}
-    if "မနက်ဖြန်" in text or "နက်ဖြန်" in text or re.search(r"\btomorrow\b", folded):
-        day = (today + timedelta(days=1)).isoformat()
-        return {"date_from": day, "date_to": day}
-    if any(word in text for word in ("ဒီနေ့", "ယနေ့")) or re.search(r"\btoday\b", folded):
-        return {"range": "today"}
-    return None
-
-
-def selling_membership(text: str, state: Mapping[str, str] | None = None) -> bool:
-    folded = text.casefold()
-    if any(
-        word in folded or word in text
-        for word in ("inactive", "all plans", "plan catalog", "which plan", "ပိတ်ထား")
-    ):
-        return False
-    if state and state.get("next") == "create_membership":
-        return True
-    phrases = (
-        "assign",
-        "new membership",
-        "create membership",
-        "sell a membership",
-        "membership sale",
-        "အသင်းဝင်ဖွင့်",
-        "အသင်းဝင် တပ်",
-        "အစီအစဉ်တပ်",
-        "membership ထည့်",
-        "plan ထည့်",
-    )
-    return any(phrase in folded or phrase in text for phrase in phrases)
-
-
 def _public_state(state: Mapping[str, str]) -> dict[str, str]:
     return {key: str(state.get(key) or "") for key in _KEYS}
 
@@ -833,72 +532,35 @@ def _copy_payload(state: dict[str, str], payload: Mapping[str, object]) -> None:
     name = _person(_text(payload.get("first_name")), _text(payload.get("last_name")))
     if name:
         state["member_name"] = name
-
-
-def _next_for(tool: str, state: Mapping[str, str]) -> str:
-    """A saved write does not choose the staff member's next operation."""
-
-    del tool, state
-    return ""
-
-
-def _number_reply(text: str, state: Mapping[str, str]) -> str | None:
-    number = str(state.get("member_number") or "")
-    name = str(state.get("member_name") or "")
-    if not number:
-        return None
-    folded = text.casefold()
-    asks = (
-        "member number" in folded
-        or "အဖွဲ့ဝင်နံပါတ်" in text
-        or ("နံပါတ်" in text and ("အဖွဲ့ဝင်" in text or "member" in folded))
-    )
-    if not asks:
-        return None
-    if (
-        name
-        and name.casefold() not in folded
-        and not ("အဖွဲ့ဝင်နံပါတ်" in text or "member number" in folded)
+    for key in (
+        "salary_period_id",
+        "retail_sale_id",
+        "expense_id",
+        "announcement_id",
+        "payment_id",
     ):
-        return None
-    if speaks_burmese(text):
-        who = f"{name} ရဲ့ " if name else ""
-        return f"{who}အဖွဲ့ဝင်နံပါတ်က {number} ပါ။"
-    who = f"{name}'s " if name else "The "
-    return f"{who}member number is {number}."
+        value = _uuid(payload.get(key))
+        if value:
+            state[key] = value
 
 
-def _next_sentence(state: Mapping[str, str], burmese: bool) -> str:
-    nxt = state.get("next") or ""
-    name = state.get("member_name") or ""
-    number = state.get("member_number") or ""
-    if nxt == "create_membership" and (name or number):
-        if burmese:
-            return f"{name} ({number}) ကို အသင်းဝင် အစီအစဉ် တပ်ဆင်နိုင်ပါတယ်။ ဘယ်အစီအစဉ်လဲ။".strip()
-        return f"A membership can be assigned to {name} ({number}). Which active plan?".strip()
-    if nxt == "create_payment":
-        if burmese:
-            return "အသင်းဝင်ကို သိမ်းပြီးပါပြီ။ ငွေပေးချေမှု မတင်ရသေးပါ။"
-        return "The membership is stored. Payment has not been recorded."
-    if nxt == "class":
-        if burmese:
-            return "အသင်းဝင်ကို သိမ်းပြီးပါပြီ။ အတန်းက သီးခြားပါ။ ဘယ်အတန်းနဲ့ ဘယ်အချိန်လဲ။"
-        return "The membership is stored. Class enrollment is separate. Which class and schedule?"
-    if nxt == "pt":
-        if burmese:
-            return "PT က သီးခြားပါ။ ဘယ်ပက်ကေ့နဲ့ ဘယ်သင်တန်းဆရာလဲ။"
-        return "PT is separate. Which package and trainer?"
-    if nxt == "approval":
-        if burmese:
-            return "တင်ပြီးပါပြီ။ ခွင့်ရှိတဲ့ ဝန်ထမ်းက အတည်ပြုဖို့ ကျန်ပါသေးတယ်။"
-        return "It is submitted. An authorized staff member still has to approve it."
-    if state.get("last_outcome") == "saved":
-        return _done_sentence(state, burmese)
-    if burmese:
-        return "နောက်တစ်ဆင့်အတွက် လိုအပ်တဲ့ အချက်ကို ပြောပါ။"
-    return "Tell me the one fact still needed for the next step."
-
-
+_DRAFTS = frozenset(
+    {
+        "create_salary_period",
+        "update_salary_period",
+        "replace_salary_lines",
+        "create_payment",
+        "update_payment",
+        "create_expense",
+        "update_expense",
+        "create_retail_sale",
+        "update_retail_sale",
+        "create_pt_sale",
+        "update_pt_sale",
+        "create_announcement",
+        "update_announcement",
+    }
+)
 _SUBMITTED = frozenset(
     {
         "submit_expense",
@@ -911,7 +573,8 @@ _SUBMITTED = frozenset(
 
 
 def _done_sentence(state: Mapping[str, str], burmese: bool) -> str:
-    if state.get("next") == "approval" or state.get("last_tool") in _SUBMITTED:
+    saved_submit = state.get("last_outcome") == "saved" and state.get("last_tool") in _SUBMITTED
+    if state.get("next") == "approval" or saved_submit:
         if burmese:
             return "တင်ပြီးပါပြီ။ ခွင့်ရှိတဲ့ ဝန်ထမ်းက အတည်ပြုဖို့ ကျန်ပါသေးတယ်။"
         return "It is submitted. An authorized staff member still has to approve it."
@@ -928,6 +591,10 @@ def _done_sentence(state: Mapping[str, str], burmese: bool) -> str:
         if burmese:
             return f"{name} အတွက် {plan} ကို {start} မှ သိမ်းပြီးပါပြီ။"
         return f"The {plan} membership for {name} starts {start}."
+    if state.get("record_status") == "DRAFT" and state.get("last_outcome") != "saved":
+        if burmese:
+            return "စာရင်းမူကြမ်း သိမ်းပြီးပါပြီ။ မတင်ရသေးပါ။"
+        return "The draft is saved. It is not submitted."
     if burmese:
         return "သိမ်းပြီးပါပြီ။"
     return "That change is saved."

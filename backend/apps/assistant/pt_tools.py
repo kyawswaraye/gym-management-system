@@ -37,7 +37,7 @@ from apps.assistant.executor import (
     execute_confirmed_tool,
 )
 from apps.assistant.models import Goal
-from apps.assistant.prerequisites import FieldRequirement, Prerequisite
+from apps.assistant.prerequisites import FieldRequirement, Prerequisite, optional
 from apps.assistant.registry import ToolDefinition
 from apps.cashbook.serializers import session_payload, transaction_payload
 from apps.classes.booking_views import EmptyCommandSerializer
@@ -811,8 +811,12 @@ _SALE_FIELDS = (
     FieldRequirement("trainer_staff_profile_id", "Trainer"),
     FieldRequirement("service_date", "Service date"),
     FieldRequirement("description", "Description"),
-    FieldRequirement("gross_fee", "Gross fee"),
-    FieldRequirement("currency", "Currency"),
+    FieldRequirement("gross_fee", "Gross fee as text"),
+    FieldRequirement("currency", "Gym currency code"),
+    optional(
+        "service_package_id",
+        "Sellable service package to grant with this sale. Send the package name or id.",
+    ),
 )
 _CREATE_SALE = RegisteredTool(
     contract=_contract(
@@ -827,7 +831,13 @@ _CREATE_SALE = RegisteredTool(
 _UPDATE_SALE = RegisteredTool(
     contract=_contract(
         _definition("update_pt_sale", "Update a PT sale draft", "pt.sales.update"),
-        (FieldRequirement("pt_sale_id", "PT sale"),),
+        (
+            FieldRequirement("pt_sale_id", "PT sale"),
+            optional("gross_fee", "Gross fee as text"),
+            optional("description", "Description"),
+            optional("service_date", "Service date as YYYY-MM-DD"),
+            optional("service_package_id", "Service package"),
+        ),
         http_method="PATCH",
         route=UPDATE_SALE_ROUTE,
         route_fields=("pt_sale_id",),
@@ -867,7 +877,11 @@ _VOID_SALE = RegisteredTool(
             FieldRequirement("pt_sale_id", "PT sale"),
             FieldRequirement("reason", "Reason"),
             FieldRequirement("business_date", "Business date"),
-            FieldRequirement("payout_reversals", "Payout reversals"),
+            optional(
+                "payout_reversals",
+                "Posted commission payouts to reverse. Omit this. The server "
+                "names each posted payout on the sale.",
+            ),
         ),
         http_method="POST",
         route=VOID_SALE_ROUTE,
@@ -937,8 +951,12 @@ _CREATE_BOOKING = RegisteredTool(
         (
             FieldRequirement("trainer_staff_profile_id", "Trainer"),
             FieldRequirement("member_id", "Member"),
-            FieldRequirement("starts_at", "Start"),
-            FieldRequirement("ends_at", "End"),
+            FieldRequirement("starts_at", "Start as an ISO datetime in the gym timezone"),
+            FieldRequirement("ends_at", "End as an ISO datetime in the gym timezone"),
+            optional(
+                "member_service_package_id",
+                "Granted package when the booking consumes a session",
+            ),
         ),
         http_method="POST",
         route=CREATE_BOOKING_ROUTE,

@@ -1093,6 +1093,43 @@ describe("Member profile editor", () => {
     expect(payload).not.toHaveProperty("id");
   });
 
+  it("clears a last name and shows a single given name", async () => {
+    vi.mocked(operationGet).mockResolvedValue(
+      summary({
+        member: member({
+          first_name: "Hla Hla",
+          last_name: "",
+          normalized_full_name: "hla hla",
+        }),
+      }),
+    );
+    renderDetail({ canUpdate: true });
+
+    const shownName = await screen.findByText("Hla Hla");
+    expect(shownName.textContent?.replace(/\s+/g, " ").trim()).toBe("Hla Hla");
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit profile" }),
+    );
+    expect(screen.getByLabelText("Last name")).not.toBeRequired();
+    expect(screen.getByLabelText("Last name")).toHaveValue("");
+    fireEvent.change(screen.getByLabelText("Last name"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() =>
+      expect(operationMutation).toHaveBeenCalledWith(
+        `members/${MEMBER_ID}/`,
+        expect.objectContaining({
+          first_name: "Hla Hla",
+          last_name: "",
+        }),
+        "PATCH",
+      ),
+    );
+  });
+
   it("keeps the summary and edited values when saving fails", async () => {
     vi.mocked(operationMutation).mockRejectedValue(
       new Error("Unable to update member."),

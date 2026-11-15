@@ -181,7 +181,8 @@ def test_member_validation_normalizes_contacts_and_dates() -> None:
     blank_phone = MemberCreateSerializer(data=_create_body(phone="", email=""))
 
     assert not blank.is_valid()
-    assert set(blank.errors) >= {"first_name", "last_name"}
+    assert "first_name" in blank.errors
+    assert "last_name" not in blank.errors
     assert not born_after.is_valid()
     assert "date_of_birth" in born_after.errors
     assert same_day.is_valid(), same_day.errors
@@ -194,6 +195,27 @@ def test_member_validation_normalizes_contacts_and_dates() -> None:
     assert blank_phone.validated_data["email"] is None
     assert normalize_member_phone("+1 202 555 0100") == "+12025550100"
     assert canonical_address({})["country_code"] == ""
+
+
+def test_member_last_name_may_be_omitted_or_cleared() -> None:
+    omitted = MemberCreateSerializer(data={"first_name": "Hla Hla", "join_date": "2026-11-16"})
+    blank = MemberCreateSerializer(data=_create_body(first_name="Nwe   Nwe", last_name="  "))
+    spaced = MemberCreateSerializer(data=_create_body(last_name="  Lovelace  "))
+    cleared = MemberUpdateSerializer(data={"last_name": "   "})
+    missing_first = MemberCreateSerializer(data={"last_name": "", "join_date": "2026-11-16"})
+
+    assert omitted.is_valid(), omitted.errors
+    assert omitted.validated_data["first_name"] == "Hla Hla"
+    assert omitted.validated_data["last_name"] == ""
+    assert blank.is_valid(), blank.errors
+    assert blank.validated_data["first_name"] == "Nwe Nwe"
+    assert blank.validated_data["last_name"] == ""
+    assert spaced.is_valid(), spaced.errors
+    assert spaced.validated_data["last_name"] == "Lovelace"
+    assert cleared.is_valid(), cleared.errors
+    assert cleared.validated_data == {"last_name": ""}
+    assert not missing_first.is_valid()
+    assert "first_name" in missing_first.errors
 
 
 def test_member_archive_and_list_query_are_strict() -> None:

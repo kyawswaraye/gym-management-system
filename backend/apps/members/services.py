@@ -22,7 +22,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce, Greatest
+from django.db.models.functions import Coalesce, Greatest, Replace
 from django.http import Http404
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
@@ -552,14 +552,28 @@ def page_members(
     if joined_to is not None:
         queryset = queryset.filter(join_date__lte=joined_to)
     if search.strip():
-        queryset = queryset.filter(_member_search_filter(search))
-    if after:
+        matched = queryset.filter(_member_search_filter(search))
+    else:
+        matched = queryset
+    compact = "".join(search.casefold().split()) if search.strip() else ""
+
+    def after_cursor(rows_qs: QuerySet[Member]) -> QuerySet[Member]:
+        if not after:
+            return rows_qs
         normalized_full_name, member_id = decode_member_cursor(after, scope=scope)
-        queryset = queryset.filter(
+        return rows_qs.filter(
             Q(normalized_full_name__gt=normalized_full_name)
             | Q(normalized_full_name=normalized_full_name, id__gt=member_id)
         )
-    rows = list(queryset[: limit + 1])
+
+    rows = list(after_cursor(matched)[: limit + 1])
+    # A spaced name such as "Hla Hla" still matches a search with the spaces removed.
+    # The extra read runs only when the spaced search itself matched nothing.
+    if not rows and compact and (not after or not matched.exists()):
+        compact_rows = queryset.annotate(
+            compact_full_name=Replace("normalized_full_name", Value(" "), Value(""))
+        ).filter(compact_full_name__icontains=compact)
+        rows = list(after_cursor(compact_rows)[: limit + 1])
     has_more = len(rows) > limit
     rows = rows[:limit]
     next_after = None

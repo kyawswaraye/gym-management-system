@@ -262,12 +262,14 @@ def test_get_member_returns_one_operational_row(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_get_member_hides_an_invalid_or_invisible_id(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fail(_call: ReadCall) -> _Query:
-        raise AssertionError("selector ran")
-
-    monkeypatch.setattr("apps.assistant.member_reads._visible_members", fail)
+    by_number = _Query(None)
+    monkeypatch.setattr(
+        "apps.assistant.member_reads._visible_members",
+        lambda _call: by_number,
+    )
     with pytest.raises(Http404):
         get_member(_call(_gym(), {"member_id": "not-a-member"}))
+    assert by_number.filters == [{"member_number": "not-a-member"}]
 
     monkeypatch.setattr(
         "apps.assistant.member_reads._visible_members",

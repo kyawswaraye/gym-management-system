@@ -8,6 +8,7 @@ place it on the view route. Adjustment keeps the product id in the body.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -15,6 +16,7 @@ from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
 
+from django.db import transaction
 from rest_framework.renderers import JSONRenderer
 from rest_framework.request import Request
 from rest_framework.serializers import Serializer
@@ -23,9 +25,11 @@ from rest_framework.views import APIView
 from apps.assistant.execution import ExecutionRejected, ExecutionResult
 from apps.assistant.executor import ExecutionMode, ToolCall, ToolContract, execute_confirmed_tool
 from apps.assistant.models import Goal
-from apps.assistant.prerequisites import FieldRequirement, Prerequisite
+from apps.assistant.prerequisites import FieldRequirement, Prerequisite, optional
 from apps.assistant.registry import ToolDefinition
+from apps.common.db.tenant_context import set_gym_context
 from apps.common.finance.idempotency import IdempotentResponse
+from apps.inventory.models import Product, ProductCategory
 from apps.inventory.serializers import (
     ProductCategoryWriteSerializer,
     ProductUpdateSerializer,
@@ -374,7 +378,8 @@ _PRODUCT = RegisteredTool(
         _definition("create_product", "Create a product", _MANAGE),
         (
             FieldRequirement("name", "Name"),
-            FieldRequirement("category_id", "Category"),
+            optional("sku", "SKU such as BAR. Omit it and the server assigns one."),
+            FieldRequirement("category_id", "Category name or id"),
             FieldRequirement("unit", "Unit"),
             FieldRequirement("sale_price", "Sale price"),
             FieldRequirement("current_unit_cost", "Current unit cost"),
@@ -389,8 +394,13 @@ _PRODUCT = RegisteredTool(
 )
 _UPDATE = RegisteredTool(
     contract=_contract(
-        _definition("update_product", "Update a product", _MANAGE),
-        (FieldRequirement("product_id", "Product"),),
+        _definition("update_product", "Update a product's name or price", _MANAGE),
+        (
+            FieldRequirement("product_id", "Product"),
+            optional("name", "Name"),
+            optional("sale_price", "Sale price as text"),
+            optional("low_stock_threshold", "Low stock threshold as text"),
+        ),
         http_method=UPDATE_PRODUCT_METHOD,
         route=UPDATE_PRODUCT_ROUTE,
         route_fields=("product_id",),
@@ -409,11 +419,12 @@ _ADJUST = RegisteredTool(
             ),
             FieldRequirement(
                 "movement_type",
-                "OPENING, PURCHASE, DAMAGE, LOSS, ADJUSTMENT, or CORRECTION. "
-                "A purchase also needs unit_cost as text.",
+                "OPENING for a first count, PURCHASE for a buy, or DAMAGE, "
+                "LOSS, ADJUSTMENT, CORRECTION. A purchase also needs unit_cost.",
             ),
-            FieldRequirement("business_date", "Business date"),
+            FieldRequirement("business_date", "Business date as YYYY-MM-DD"),
             FieldRequirement("reason", "Reason"),
+            optional("unit_cost", "Unit cost as text. Required only for PURCHASE."),
         ),
         http_method=ADJUST_METHOD,
         route=adjust_route(),
@@ -465,3 +476,47 @@ def execute_registered_tool(
         confirmed=confirmed,
         finance_mutate=tool.finance_mutate,
     )
+
+
+def catalog_already_stored(
+    gym: Gym,
+    tool_name: str,
+    payload: Mapping[str, object],
+) -> dict[str, object] | None:
+    """Return already_saved when this gym already has that category or SKU."""
+
+    if tool_name == "create_product_category":
+        name = payload.get("name")
+        if not isinstance(name, str) or not name.strip():
+            return None
+        key = re.sub(r"\s+", " ", name.strip()).upper()
+        with transaction.atomic():
+            set_gym_context(gym_id=gym.id)
+            row = ProductCategory.objects.filter(gym=gym, normalized_name=key).first()
+        if row is None:
+            return None
+        return {
+            "status": "already_saved",
+            "message": (
+                "That category is already stored. Do not create it again. "
+                "Continue with the product or the opening count."
+            ),
+        }
+    if tool_name != "create_product":
+        return None
+    sku = payload.get("sku")
+    if not isinstance(sku, str) or not sku.strip():
+        return None
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        product = Product.objects.filter(gym=gym, sku__iexact=sku.strip()).first()
+    if product is None:
+        return None
+    return {
+        "status": "already_saved",
+        "product_id": str(product.id),
+        "message": (
+            "That product is already stored. Record the opening count with "
+            "adjust_stock and movement_type OPENING. Do not create it again."
+        ),
+    }

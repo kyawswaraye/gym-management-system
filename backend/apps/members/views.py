@@ -178,7 +178,7 @@ class MemberListCreateView(MemberFeatureAPIView):
             actor=request.gym_membership,
             member_number=str(payload.get("member_number", "")),
             first_name=str(payload["first_name"]),
-            last_name=str(payload["last_name"]),
+            last_name=str(payload.get("last_name", "")),
             phone=payload.get("phone"),
             email=payload.get("email"),
             gender=payload.get("gender"),

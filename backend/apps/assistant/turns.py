@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections.abc import Mapping
 from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
 from time import monotonic
 from typing import cast
 from uuid import UUID
@@ -35,26 +37,38 @@ from apps.assistant.dispatch import (
 from apps.assistant.entitlement import require_gym_ai
 from apps.assistant.execution import ExecutionRejected
 from apps.assistant.executor import ToolContract
+from apps.assistant.inventory_tools import catalog_already_stored
 from apps.assistant.knowledge import (
+    DOMAIN_MAP,
     assistant_context,
     gate_sentence,
     grounded_information_reply,
     grounded_read_reply,
+    localized_summary,
     public_activity,
+    reply_needs_fresh_read,
     speaks_burmese,
     staff_notice,
     unconfirmed_notice,
     visible_reply,
 )
 from apps.assistant.lookups import (
+    align_class_schedule,
     assignment_gap,
+    attach_cash_session,
+    attach_payout_reversals,
     attach_sale_package,
+    bind_latest_ledger_entry,
     booking_package_gap,
     existing_assignment,
     member_has_class_booking,
     membership_conflict,
+    prepare_cash_reconcile,
     proposal_block,
     refundable_balance,
+    reject_repeat_publish,
+    reject_repeat_submit,
+    reject_uncancellable,
     remember_sale_package,
     resolve_references,
     sale_package_failure,
@@ -83,15 +97,27 @@ from apps.assistant.serializers import message_data
 from apps.assistant.workflow_state import (
     absorb_proposal,
     absorb_read,
+    asks_stored_date,
     completion_sentence,
     confirmation_reply,
     is_state_message,
     load_state,
+    note_saved_change,
     note_verified,
     provider_notice,
     remember_commit,
+    return_fingerprint,
     save_state,
     state_brief,
+)
+from apps.assistant.workflows import (
+    catalog_text,
+    get_workflow,
+    guide_text,
+    modules_for,
+    sections_for,
+    workflow_ids,
+    workflows_for_module,
 )
 from apps.classes.exceptions import ClassFull, ScheduleConflict
 from apps.common.api.exceptions import CodedAPIException, RequestRejected
@@ -124,8 +150,9 @@ _SYSTEM = (
     "work. Follow the meaning. "
     "You choose which tools to call and in what order. The server runs only the "
     "tools you call, in this gym, and does not add a read you skipped. The live "
-    "gym brief is a partial snapshot. Call a read when the question needs a "
-    "complete, filtered, or current record. If a result does not contain the "
+    "gym brief is a partial snapshot. Call a read in this turn when the question "
+    "asks for stored records, even if an earlier turn already read them. Do not "
+    "answer a stored-data question from memory. If a result does not contain the "
     "fact, say that you cannot retrieve it. Do not invent the record. Do not "
     "call a write tool to answer a question. Do not invent an amount, person, "
     "payment, sale, expense, "
@@ -152,12 +179,26 @@ _SYSTEM = (
     "person may still correct a fact or mean a different record. "
     "There is no daily shift roster. Passwords, sessions, and audit storage are "
     "not available. Keep stored names, numbers, codes, dates, amounts, and "
-    "statuses exactly as stored. Myanmar digits have the same values as Arabic "
+    "statuses exactly as stored. A stored code may contain an underscore. "
+    "Quote that code exactly. An underscore does not make it a tool name. "
+    "Myanmar digits have the same values as Arabic "
     "digits. Use the gym timezone for relative days. Reply in the staff "
-    "member's language."
+    "member's language. "
+    "A short decline only cancels the waiting confirmation. Call "
+    "cancel_pending_confirmation and do not propose that change again. "
+    "The loaded tools cover only the active workflows. When the staff asks "
+    "about an area those tools do not cover, call select_workflow with the "
+    "current workflow and the workflow for that area (use reports for a "
+    "lookup or question) before answering. Never say you cannot access "
+    "something before doing that."
 )
 _ANSWER_NOW = (
     "Answer now from the tool results already in this conversation. Do not call more tools."
+)
+_REQUIRE_READ = (
+    "That answer stated stored records without a read tool in this turn. "
+    "Call the read tool for this question now, then answer from its result. "
+    "Do not reuse an earlier turn and do not answer before the read returns."
 )
 _CONTINUE = (
     "The previous change is saved. Do not propose that same change again. "
@@ -167,6 +208,11 @@ _UNAVAILABLE = "The assistant is unavailable."
 _LIMIT = "I could not finish that within the assistant limit."
 _BLOCKED = "I can't help with that request."
 _CANCEL = "cancel_pending_confirmation"
+_SELECT = "select_workflow"
+_OPENING = (
+    "Verified references come from tool results and confirmed writes. "
+    "Conversation history is what was said. A waiting confirmation is not saved."
+)
 
 
 class AssistantUnavailable(CodedAPIException):
@@ -175,8 +221,8 @@ class AssistantUnavailable(CodedAPIException):
     default_detail = "The assistant is unavailable."
 
 
-_HISTORY = 24
-_READ_LIMIT = 12000
+_HISTORY = 12
+_READ_LIMIT = 6000
 _GOAL_TTL = timedelta(hours=24)
 
 
@@ -229,6 +275,29 @@ def _continue_task(
 ) -> dict[str, object] | None:
     """Ask the next fact or propose the next change after a saved step."""
 
+    workflow = load_state(gym, conversation)
+    status = workflow.get("record_status") or ""
+    cue = "The change is saved."
+    if status and status != "POSTED":
+        cue += f" Stored status is {status}. It is not posted."
+    if saved[0] == "return_retail_sale":
+        cue += " That return is already stored. Do not return those goods again."
+    if saved[0] == "create_product_category":
+        cue += (
+            " The category is saved. Do not create that category again. "
+            "Create the product next with the SKU, unit, sale price, and cost "
+            "the staff stated."
+        )
+    if saved[0] == "create_product":
+        cue += (
+            " The product is saved. Do not create it again. If the staff asked "
+            "for an opening count, propose adjust_stock with movement_type "
+            "OPENING, that quantity, and a short reason."
+        )
+    if status == "DRAFT":
+        cue += " Submit this draft. It is not posted until that submit is approved."
+    if status == "PENDING_APPROVAL":
+        cue += " Use the approve tool for this same record. Do not submit it again."
     return _reply(
         request=request,
         view=view,
@@ -236,7 +305,7 @@ def _continue_task(
         actor=actor,
         conversation=conversation,
         instruction=_SYSTEM + " " + _CONTINUE,
-        cue="The change is saved.",
+        cue=cue,
         provider_fallback=None,
         saved=saved,
     )
@@ -260,12 +329,6 @@ def _reply(
     offered = _offered(request)
     contracts = tool_contracts()
     staff_text = staff_message.strip() or _staff_text(history)
-    declarations = _model_declarations(offered, contracts, staff_text)
-    declarations.append(_cancel_declaration())
-    contents = _contents(history)
-    if cue:
-        instruction += "\n" + cue
-        contents.append({"role": "user", "parts": [{"text": cue}]})
     activity: list[dict[str, str]] = []
     proposal = pending
     deadline = monotonic() + max_execution_seconds()
@@ -273,53 +336,116 @@ def _reply(
     model_calls = 0
     reply = ""
     read_completed = False
+    read_nudge = False
     read_results: list[Mapping[str, object]] = []
     opened_now = False
     limit_reached = False
     provider_down = False
-    if pending is not None:
-        instruction += " A confirmation is already waiting. Do not propose another write."
     workflow = load_state(gym, conversation)
     remember_sale_package(gym, conversation, workflow)
-    context = assistant_context(gym, _codes(request), assistant_full_access(request))
-    opening_card = (
-        "Verified references come from tool results and confirmed writes. "
-        "Conversation history is what was said. A waiting confirmation is not saved."
+    active = _active_workflows(workflow)
+    context = assistant_context(
+        gym,
+        _codes(request),
+        assistant_full_access(request),
+        sections=sections_for(active),
     )
-    instruction += "\n\n" + opening_card
-    instruction += "\n" + state_brief(workflow)
-    instruction += "\n\n" + context
     marker = "Live gym brief"
     live_brief = context[context.find(marker) :] if marker in context else ""
+    contents = _contents(history)
+    dynamic = "\n".join(part for part in (cue, state_brief(workflow), live_brief) if part)
+    _attach_context(contents, dynamic)
+    declarations = _workflow_declarations(offered, contracts, active)
+    system_instruction = _system_instruction(
+        instruction,
+        pending=proposal is not None,
+        active=active,
+    )
     seen_errors: set[tuple[str, str]] = set()
     last_error: Mapping[str, object] | None = None
     try:
-        for _step in range(max_steps()):
+        steps_used = 0
+        free_selects = 0
+        while steps_used < max_steps():
             opened_now = False
             if monotonic() >= deadline:
                 reply = reply or _LIMIT
                 break
+            active = _active_workflows(workflow)
+            declarations = _workflow_declarations(offered, contracts, active)
+            system_instruction = _system_instruction(
+                instruction,
+                pending=proposal is not None,
+                active=active,
+            )
             model_calls += 1
             turn = generate_content(
                 contents=contents,
                 declarations=declarations,
-                system_instruction=instruction,
+                system_instruction=system_instruction,
             )
             if turn.blocked:
                 reply = _BLOCKED
                 break
             if not turn.calls:
                 reply = turn.text or _LIMIT
+                if _needs_fresh_read(
+                    reply=reply,
+                    staff_text=staff_text,
+                    read_completed=read_completed,
+                    nudged=read_nudge,
+                    declarations=declarations,
+                    contracts=contracts,
+                    allowed=_grounding_text(history, workflow, live_brief),
+                ):
+                    # One extra provider call. The next loop either reads or stops.
+                    read_nudge = True
+                    contents.append({"role": "model", "parts": [dict(part) for part in turn.parts]})
+                    contents.append({"role": "user", "parts": [{"text": _REQUIRE_READ}]})
+                    continue
                 break
             contents.append({"role": "model", "parts": [dict(part) for part in turn.parts]})
             responses: list[dict[str, object]] = []
             repeated_error = False
+            only_select = True
+            cancelled_now = False
+            declared = _declaration_names(declarations)
             for call in turn.calls:
+                if call.name != _SELECT:
+                    only_select = False
                 if calls_used >= max_tool_calls():
                     responses.append(_function_response(call.name, {"error": "step_limit"}))
                     activity.append({"name": call.name, "status": "limit"})
                     continue
                 calls_used += 1
+                if call.name == _SELECT:
+                    body = _select_workflows(workflow, call.arguments)
+                    responses.append(_function_response(call.name, body))
+                    activity.append({"name": call.name, "status": _activity_status(body)})
+                    continue
+                if cancelled_now and call.name != _CANCEL:
+                    contract = contracts.get(call.name)
+                    operation = "" if contract is None else contract.definition.operation
+                    if operation == "write":
+                        body = {
+                            "status": "cancelled",
+                            "saved": False,
+                            "message": ("The waiting change was dropped. Do not propose it again."),
+                        }
+                        responses.append(_function_response(call.name, body))
+                        activity.append({"name": call.name, "status": "cancelled"})
+                        continue
+                if call.name not in declared and call.name in offered:
+                    contract = contracts.get(call.name)
+                    module = "" if contract is None else contract.definition.module
+                    if contract is not None and _auto_activate(workflow, module):
+                        declared = _declaration_names(
+                            _workflow_declarations(
+                                offered,
+                                contracts,
+                                _active_workflows(workflow),
+                            )
+                        )
                 outcome, body = _handle_call(
                     request=request,
                     view=view,
@@ -334,7 +460,10 @@ def _reply(
                     staff_text=staff_text,
                     workflow=workflow,
                 )
-                if body.get("status") in {"cancelled", "expired"}:
+                if body.get("status") == "cancelled":
+                    cancelled_now = True
+                    proposal = None
+                elif body.get("status") == "expired":
                     proposal = None
                 elif outcome is not None:
                     proposal = outcome
@@ -376,11 +505,15 @@ def _reply(
             if repeated_error:
                 reply = turn.text or reply or _LIMIT
                 break
+            if only_select and free_selects < 2:
+                free_selects += 1
+                continue
+            steps_used += 1
         else:
             limit_reached = True
             reply, extra_calls = _answer_from_results(
                 contents=contents,
-                instruction=instruction,
+                instruction=system_instruction,
                 results=read_results,
                 brief=live_brief,
                 staff_text=staff_text,
@@ -399,7 +532,7 @@ def _reply(
                 contracts=contracts,
                 limit_reached=limit_reached,
                 workflow=workflow,
-                opening_card=opening_card,
+                opening_card=_OPENING,
             )
             save_state(gym, conversation, workflow)
             return None
@@ -417,7 +550,7 @@ def _reply(
         contracts=contracts,
         limit_reached=limit_reached,
         workflow=workflow,
-        opening_card=opening_card,
+        opening_card=_OPENING,
     )
     save_state(gym, conversation, workflow)
     if reply in {"", _LIMIT}:
@@ -436,7 +569,6 @@ def _reply(
                 results=read_results,
                 brief=ground,
                 staff_text=staff_text,
-                fallback=True,
             )
         else:
             corrected = grounded_information_reply(
@@ -444,31 +576,43 @@ def _reply(
                 brief=ground,
                 staff_text=staff_text,
             )
-        if corrected:
-            reply = corrected
+        # Every factual sentence was unsupported. Show the stored rows, or the
+        # not-found notice. The model's invented text stays off the reply.
+        reply = (
+            corrected
+            or staff_notice({"error": "not_found"}, staff_text)
+            or ("No stored record matches that.")
+        )
+    burmese = _conversation_burmese(history, staff_text, reply)
+    language = "မြန်မာ" if burmese else staff_text
     if not provider_down:
         reply = visible_reply(
             reply,
             confirmed=saved is not None,
             proposed=proposal is not None,
-            staff_text=staff_text,
+            staff_text=language,
         )
     if not provider_down and opened_now and saved is not None:
         # The previous write is stored. The card that is open now is a different step.
-        done = completion_sentence(workflow, staff_text)
-        if speaks_burmese(staff_text):
+        done = completion_sentence(workflow, language)
+        if burmese:
             reply = f"{done} နောက်တစ်ချက်ကို အတည်ပြုပြီးမှ သိမ်းပါမယ်။".strip()
         else:
             reply = f"{done} The next change is not saved until you confirm.".strip()
     elif not provider_down and proposal is None and saved is None and last_error is not None:
-        notice = staff_notice(last_error, staff_text)
+        notice = staff_notice(last_error, language)
         if notice and notice not in reply:
             reply = f"{notice} {reply}".strip()
     elif not provider_down and proposal is not None and saved is None:
-        notice = unconfirmed_notice(staff_text)
+        notice = unconfirmed_notice(language)
+        english_notice = "That change is not saved until you confirm."
+        if burmese and english_notice in reply:
+            reply = reply.replace(english_notice, notice)
         if notice not in reply:
             reply = f"{reply} {notice}".strip()
-    reply = confirmation_reply(reply, proposal, staff_text, workflow)
+    if not provider_down and burmese and proposal is not None:
+        proposal, reply = _localize_pending(proposal, reply)
+    reply = confirmation_reply(reply, proposal, language, workflow)
     recorded = append_message(
         gym=gym,
         conversation=conversation,
@@ -550,12 +694,22 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
         ) from None
     except ValidationError as exc:
         kind = _validation_kind(exc)
-        logger.info("assistant confirmation invalid")
+        logger.info("assistant confirmation invalid kind=%s", kind)
         if kind == "already_saved":
             return _closed_confirmation(gym, goal, step, kind)
-        raise RequestRejected(
-            {"confirmation": [_confirmation_text(gym, goal.conversation, kind)]}
-        ) from exc
+        close_goal(
+            gym=gym,
+            goal=goal,
+            step=step,
+            status=Goal.Status.CANCELLED,
+            step_status=WorkflowStep.Status.CANCELLED,
+            summary=kind,
+        )
+        hint = _validation_hint(exc)
+        sentence = _confirmation_text(gym, goal.conversation, kind)
+        if hint:
+            sentence = f"{sentence} {hint}"
+        raise RequestRejected({"confirmation": [sentence]}) from exc
     except MembershipOverlap:
         logger.info("assistant confirmation membership overlap")
         raise RequestRejected(
@@ -724,6 +878,7 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
     if result.outcome in {"committed", "existing"}:
         workflow = load_state(gym, goal.conversation)
         remember_commit(gym, workflow, step.tool_name, payload, result.effect_reference)
+        note_saved_change(workflow, step.tool_name, _plain_change(payload))
         save_state(gym, goal.conversation, workflow)
         close_goal(
             gym=gym,
@@ -792,10 +947,94 @@ def _same_saved_change(
 
     if saved is None or name != saved[0]:
         return False
-    return _plain_change(payload) == _plain_change(saved[1])
+    return _plain_change(payload, name) == _plain_change(saved[1], name)
 
 
-def _plain_change(payload: Mapping[str, object]) -> dict[str, str]:
+_REMEMBERED_TOOLS = frozenset({"create_product_category", "create_product"})
+
+
+def _remembered_saved_change(
+    name: str,
+    payload: Mapping[str, object],
+    workflow: Mapping[str, str] | None,
+) -> bool:
+    """A saved category or product is not proposed again later in the conversation."""
+
+    if name not in _REMEMBERED_TOOLS or not workflow:
+        return False
+    raw = workflow.get("saved_changes") or ""
+    if not raw:
+        return False
+    try:
+        existing = json.loads(raw)
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(existing, list):
+        return False
+    current = _plain_change(payload)
+    for item in existing:
+        if not isinstance(item, Mapping) or item.get("tool") != name:
+            continue
+        stored = item.get("payload")
+        if isinstance(stored, Mapping) and _plain_change(stored) == current:
+            return True
+    return False
+
+
+_NAME_ONLY = re.compile(r"^[^\W\d_]+(?:[ '.-]+[^\W\d_]+){0,3}$")
+_NAME_BLOCK = frozenset(
+    {"add", "register", "create", "join", "member", "plan", "today", "package", "date"}
+)
+
+
+def _name_only_member(text: str) -> bool:
+    """A bare name is not a registration. A verb or a plan still is a request."""
+
+    token = " ".join(text.strip().strip("။.!?၊").split())
+    if token == "" or len(token) > 48:
+        return False
+    if any(word in _NAME_BLOCK for word in token.casefold().split()):
+        return False
+    if any(mark in token for mark in ("လုပ်", "ဝယ်", "စာရင်း", "အဖွဲ့", "ဒီနေ့", "မနက်ဖြန်")):
+        return False
+    return _NAME_ONLY.fullmatch(token) is not None
+
+
+_PIECE_ALIASES = frozenset({"PCS", "PC", "PIECES"})
+
+
+def _align_product_unit(
+    gym: Gym,
+    conversation: Conversation,
+    payload: dict[str, object],
+    staff_text: str,
+) -> None:
+    """Store the unit in capitals. pcs is PIECE when the staff said PIECE."""
+
+    unit = payload.get("unit")
+    if not isinstance(unit, str):
+        return
+    token = re.sub(r"[^A-Za-z0-9_]", "", unit).upper()
+    if not re.fullmatch(r"[A-Z][A-Z0-9_]{0,15}", token):
+        return
+    if token in _PIECE_ALIASES and _staff_said_piece(gym, conversation, staff_text):
+        payload["unit"] = "PIECE"
+        return
+    payload["unit"] = token
+
+
+def _staff_said_piece(gym: Gym, conversation: Conversation, staff_text: str) -> bool:
+    if re.search(r"\bpiece\b", staff_text, re.IGNORECASE):
+        return True
+    said = "\n".join(
+        message.body
+        for message in _history(gym, conversation)
+        if message.role == Message.Role.STAFF
+    )
+    return re.search(r"\bpiece\b", said, re.IGNORECASE) is not None
+
+
+def _plain_change(payload: Mapping[str, object], tool: str = "") -> dict[str, str]:
     words = {
         "day": "day",
         "days": "day",
@@ -813,8 +1052,33 @@ def _plain_change(payload: Mapping[str, object]) -> dict[str, str]:
         text = str(value).strip().casefold()
         if key.casefold() == "duration_unit":
             text = words.get(text, text)
+        number = _plain_number(text)
+        if number is not None:
+            text = number
         plain[key.casefold()] = text
+    if tool == "create_member":
+        first = plain.pop("first_name", "")
+        last = plain.pop("last_name", "")
+        plain["full_name"] = " ".join(f"{first} {last}".split())
     return plain
+
+
+def _plain_number(text: str) -> str | None:
+    """Collapse equivalent amounts such as 50000, 50000.00, and 50,000."""
+
+    cleaned = text.replace(",", "").replace("၊", "").strip()
+    if cleaned == "":
+        return None
+    try:
+        number = Decimal(cleaned)
+    except InvalidOperation:
+        return None
+    if not number.is_finite():
+        return None
+    rendered = format(number, "f")
+    if "." in rendered:
+        rendered = rendered.rstrip("0").rstrip(".")
+    return rendered or "0"
 
 
 def waiting_confirmation(
@@ -908,7 +1172,58 @@ def _handle_call(
         blocked = proposal_block(gym, actor, name, payload, staff_text)
         if blocked is not None:
             return None, blocked
-        if _same_saved_change(name, payload, saved):
+        stock = _stock_cost(name, payload)
+        if stock is not None:
+            return None, stock
+        wages = _wage_lines(name, payload)
+        if wages is not None:
+            return None, wages
+        if name == "adjust_cash_session" and payload.get("description") in {None, ""}:
+            payload["description"] = ""
+        align_class_schedule(name, payload)
+        session_labels, session_error = attach_cash_session(gym, name, payload)
+        if session_error is not None:
+            return None, session_error
+        labels.update(session_labels)
+        reversal_error = attach_payout_reversals(gym, name, payload)
+        if reversal_error is not None:
+            return None, reversal_error
+        ledger_error = bind_latest_ledger_entry(gym, name, payload)
+        if ledger_error is not None:
+            return None, ledger_error
+        reconcile_error = prepare_cash_reconcile(gym, name, payload)
+        if reconcile_error is not None:
+            return None, reconcile_error
+        cancel_state = reject_uncancellable(gym, name, payload)
+        if cancel_state is not None:
+            return None, cancel_state
+        repeat = reject_repeat_submit(gym, name, payload)
+        if repeat is not None:
+            return None, repeat
+        published = reject_repeat_publish(gym, name, payload)
+        if published is not None:
+            return None, published
+        if (
+            name == "return_retail_sale"
+            and workflow is not None
+            and workflow.get("return_key")
+            and workflow.get("return_key") == return_fingerprint(payload)
+        ):
+            return None, {
+                "status": "already_saved",
+                "message": "That return is already stored. Do not return those goods again.",
+            }
+        if name == "create_member" and _name_only_member(staff_text):
+            return None, {"error": "missing_fields", "fields": ["join_date"]}
+        if name in {"create_product", "update_product"}:
+            _align_product_unit(gym, conversation, payload, staff_text)
+        if name in {"create_product", "create_product_category"}:
+            stored_catalog = catalog_already_stored(gym, name, payload)
+            if stored_catalog is not None:
+                return None, stored_catalog
+        if _same_saved_change(name, payload, saved) or _remembered_saved_change(
+            name, payload, workflow
+        ):
             return None, {"status": "already_saved"}
         if contract.prerequisite is not None:
             missing = missing_fields(contract.prerequisite, payload)
@@ -1116,6 +1431,7 @@ def _owned_step(gym: Gym, actor: GymMembership, step_id: UUID) -> tuple[Goal, Wo
             .first()
         )
         if step is None:
+            logger.info("assistant confirmation missing step")
             raise Http404
         goal = step.goal
         raw = step.required_input if isinstance(step.required_input, dict) else {}
@@ -1125,6 +1441,7 @@ def _owned_step(gym: Gym, actor: GymMembership, step_id: UUID) -> tuple[Goal, Wo
             or goal.conversation.created_by_membership_id != actor.id
             or owner != str(actor.id)
         ):
+            logger.info("assistant confirmation owner mismatch")
             raise Http404
         return goal, step
 
@@ -1209,9 +1526,10 @@ def _cancel_declaration() -> dict[str, object]:
         "name": _CANCEL,
         "description": (
             "Drop the confirmation waiting in this conversation. Call this when "
-            "the staff member does not want that prepared change. This does not "
-            "confirm a change and does not delete a saved record. If nothing is "
-            "waiting, the result says so."
+            "the staff member does not want that prepared change, including a "
+            "short decline. Do not propose that change again in the same reply. "
+            "This does not confirm a change and does not delete a saved record. "
+            "If nothing is waiting, the result says so."
         ),
         "parameters": {"type": "object", "properties": {}, "required": []},
     }
@@ -1408,7 +1726,7 @@ def _log_turn(
     capability = workflow.get("workflow") or "none"
     logger.info(
         "assistant turn model_calls=%s tool_calls=%s tools=%s write_declarations=%s "
-        "read_declarations=%s limit_reached=%s capability=%s workflow=%s",
+        "read_declarations=%s limit_reached=%s capability=%s workflow=%s workflows=%s",
         model_calls,
         tool_calls,
         tools or "none",
@@ -1417,25 +1735,161 @@ def _log_turn(
         limit_reached,
         capability,
         workflow.get("workflow") or "none",
+        workflow.get("active_workflows") or "none",
     )
+
+
+def _system_instruction(base: str, *, pending: bool, active: list[str]) -> str:
+    """Static prompt only. The gym brief, verified refs, and cue stay in contents."""
+
+    parts = [base.strip()]
+    if pending:
+        parts.append("A confirmation is already waiting. Do not propose another write.")
+    parts.append(_OPENING)
+    parts.append(DOMAIN_MAP)
+    parts.append("Workflows (call select_workflow to switch):\n" + catalog_text())
+    if active:
+        parts.append("Active workflow steps:\n" + guide_text(active))
+    return "\n\n".join(part for part in parts if part)
+
+
+def _workflow_declarations(
+    offered: frozenset[str],
+    contracts: Mapping[str, ToolContract],
+    active: list[str],
+) -> list[dict[str, object]]:
+    selected = _model_declarations(
+        offered,
+        contracts,
+        modules_for(active),
+        all_reads=_workflows_all_reads(active),
+    )
+    selected.append(_select_declaration())
+    selected.append(_cancel_declaration())
+    return selected
+
+
+def _select_declaration() -> dict[str, object]:
+    return {
+        "name": _SELECT,
+        "description": (
+            "Call this first to load the tools and steps for the staff member's "
+            "task, and call it again whenever the task switches. The loaded tools "
+            "cover only the active workflows. When the staff asks about an area "
+            "those tools do not cover, call this with the current workflow and "
+            "the workflow for that area (use reports for a lookup or question) "
+            "before answering. Never say you cannot access something before "
+            "doing that. Pass one or two workflow ids from the catalog."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "workflows": {
+                    "type": "array",
+                    "description": "One or two workflow ids.",
+                    "maxItems": 2,
+                    "items": {"type": "string", "enum": list(workflow_ids())},
+                }
+            },
+            "required": ["workflows"],
+        },
+    }
+
+
+def _select_workflows(
+    workflow: dict[str, str],
+    arguments: Mapping[str, object],
+) -> dict[str, object]:
+    choices = list(workflow_ids())
+    raw = arguments.get("workflows")
+    if not isinstance(raw, list) or not 1 <= len(raw) <= 2:
+        return {"error": "unknown_workflow", "choices": choices}
+    chosen: list[str] = []
+    for item in raw:
+        if not isinstance(item, str) or get_workflow(item) is None:
+            return {"error": "unknown_workflow", "choices": choices}
+        if item not in chosen:
+            chosen.append(item)
+    workflow["active_workflows"] = ",".join(chosen)
+    return {"status": "selected", "workflows": chosen}
+
+
+def _active_workflows(workflow: Mapping[str, str]) -> list[str]:
+    found: list[str] = []
+    for item in (workflow.get("active_workflows") or "").split(","):
+        name = item.strip()
+        if name and get_workflow(name) is not None and name not in found:
+            found.append(name)
+    return found[:2]
+
+
+def _auto_activate(workflow: dict[str, str], module: str) -> bool:
+    """Load the first workflow that owns this module. Keep at most two, newest last."""
+
+    matches = workflows_for_module(module)
+    if not matches:
+        return False
+    chosen = matches[0].id
+    current = _active_workflows(workflow)
+    if chosen in current:
+        return False
+    current.append(chosen)
+    workflow["active_workflows"] = ",".join(current[-2:])
+    return True
+
+
+def _declaration_names(declarations: list[dict[str, object]]) -> set[str]:
+    names: set[str] = set()
+    for item in declarations:
+        name = item.get("name")
+        if isinstance(name, str):
+            names.add(name)
+    return names
+
+
+def _attach_context(contents: list[dict[str, object]], text: str) -> None:
+    """Append the dynamic turn context to the last user message."""
+
+    if text.strip() == "":
+        return
+    part = {"text": text}
+    for item in reversed(contents):
+        if item.get("role") != "user":
+            continue
+        parts = item.get("parts")
+        if isinstance(parts, list):
+            parts.append(part)
+            return
+    contents.append({"role": "user", "parts": [part]})
+
+
+def _workflows_all_reads(active: list[str]) -> bool:
+    for workflow_id in active:
+        item = get_workflow(workflow_id)
+        if item is not None and item.all_reads:
+            return True
+    return False
 
 
 def _model_declarations(
     offered: frozenset[str],
     contracts: Mapping[str, ToolContract],
-    staff_text: str,
+    modules: frozenset[str],
+    all_reads: bool = False,
 ) -> list[dict[str, object]]:
-    """Offer every tool this staff member may use.
+    """Offer the tools in these modules that this staff member may use.
 
-    The message text does not hide a tool. Execution still checks permission,
-    entitlement, and the gym on the request.
+    A workflow marked all_reads also offers every registered read. Execution
+    still checks permission, entitlement, and the gym on the request.
     """
 
-    del staff_text
     selected: list[dict[str, object]] = []
     for name in sorted(offered):
         contract = contracts.get(name)
         if contract is None:
+            continue
+        definition = contract.definition
+        if definition.module not in modules and not (all_reads and definition.operation == "read"):
             continue
         selected.append(declaration(contract))
     return selected
@@ -1500,6 +1954,94 @@ def _staff_text(history: list[Message]) -> str:
     return ""
 
 
+def _conversation_burmese(history: list[Message], staff_text: str, reply: str) -> bool:
+    """The conversation language, not only the latest English side question.
+
+    One Burmese question inside an English registration does not switch the
+    proposal notice. A Burmese reply does, including when the latest question
+    was asked in English.
+    """
+
+    if speaks_burmese(staff_text) or speaks_burmese(reply):
+        return True
+    prior = [
+        message.body
+        for message in history
+        if message.role == Message.Role.STAFF
+        and not is_state_message(message)
+        and message.body.strip()
+        and message.body.strip() != staff_text.strip()
+    ]
+    if not prior:
+        return False
+    burmese_count = sum(speaks_burmese(body) for body in prior)
+    return burmese_count > len(prior) - burmese_count
+
+
+def _needs_fresh_read(
+    *,
+    reply: str,
+    staff_text: str,
+    read_completed: bool,
+    nudged: bool,
+    declarations: list[dict[str, object]],
+    contracts: Mapping[str, ToolContract],
+    allowed: str,
+) -> bool:
+    """One retry when this turn answered stored facts without reading them.
+
+    A date the staff already gave, or a quantity already in this turn's brief,
+    is not a new lookup. An absence claim still is: the brief's total is not
+    the per-record list the question asked for.
+    """
+
+    if nudged or read_completed or reply in {"", _LIMIT, _BLOCKED}:
+        return False
+    if asks_stored_date(staff_text):
+        return False
+    if not _declarations_have_read(declarations, contracts):
+        return False
+    return reply_needs_fresh_read(staff_text, reply, allowed)
+
+
+def _declarations_have_read(
+    declarations: list[dict[str, object]],
+    contracts: Mapping[str, ToolContract],
+) -> bool:
+    for item in declarations:
+        name = item.get("name")
+        contract = contracts.get(name) if isinstance(name, str) else None
+        if contract is not None and contract.definition.operation == "read":
+            return True
+    return False
+
+
+def _localize_pending(
+    proposal: dict[str, object],
+    reply: str,
+) -> tuple[dict[str, object], str]:
+    """Show the proposal summary in the conversation language. The tool name stays."""
+
+    summary = proposal.get("summary")
+    if not isinstance(summary, str) or not summary.strip():
+        return proposal, reply
+    localized = localized_summary(summary, burmese=True)
+    if localized == summary:
+        return proposal, reply
+    updated = dict(proposal)
+    updated["summary"] = localized
+    return updated, _replace_summary(reply, summary, localized)
+
+
+def _replace_summary(reply: str, summary: str, localized: str) -> str:
+    if summary in reply:
+        return reply.replace(summary, localized, 1)
+    lead = summary.removesuffix(".")
+    if lead and lead in reply:
+        return reply.replace(lead, localized.removesuffix("။"), 1)
+    return reply
+
+
 def _grounding_text(history: list[Message], workflow: Mapping[str, str], brief: str) -> str:
     """Facts the reply may repeat: this gym's brief, verified refs, and what staff said."""
 
@@ -1525,6 +2067,59 @@ def _confirmation_text(
 ) -> str:
     staff_text = _staff_text(_history(gym, conversation))
     return gate_sentence(kind, staff_text, detail)
+
+
+def _stock_cost(name: str, payload: dict[str, object]) -> dict[str, object] | None:
+    """A purchase needs a unit cost. Other movements do not store one."""
+
+    if name != "adjust_stock":
+        return None
+    movement = payload.get("movement_type")
+    kind = movement.strip().upper() if isinstance(movement, str) else ""
+    cost = payload.get("unit_cost")
+    has_cost = cost not in {None, ""}
+    if kind == "PURCHASE" and not has_cost:
+        return {"error": "missing_fields", "fields": ["unit_cost"]}
+    if kind != "PURCHASE" and has_cost:
+        payload.pop("unit_cost", None)
+    return None
+
+
+def _wage_lines(name: str, payload: Mapping[str, object]) -> dict[str, object] | None:
+    """A salary line needs the person, amount, currency, method, and description."""
+
+    if name != "replace_salary_lines":
+        return None
+    lines = payload.get("lines")
+    if not isinstance(lines, list) or not lines:
+        return {"error": "missing_fields", "fields": ["lines"]}
+    required = ("staff_profile_id", "amount", "currency", "payment_method", "description")
+    missing: list[str] = []
+    for line in lines:
+        if not isinstance(line, dict):
+            return {"error": "missing_fields", "fields": ["lines"]}
+        for key in required:
+            if line.get(key) in {None, ""}:
+                missing.append(key)
+    if missing:
+        return {"error": "missing_fields", "fields": list(dict.fromkeys(missing))}
+    return None
+
+
+def _validation_hint(exc: ValidationError) -> str:
+    """Name the fields the serializer rejected. Values stay out of the reply."""
+
+    detail = exc.detail
+    if not isinstance(detail, dict):
+        return ""
+    names = [
+        key
+        for key in detail
+        if isinstance(key, str) and key.replace("_", "").isalnum() and len(key) <= 40
+    ]
+    if not names:
+        return ""
+    return "Check " + ", ".join(names[:4]) + "."
 
 
 def _validation_kind(exc: ValidationError) -> str:
