@@ -702,6 +702,22 @@ _GATE_SENTENCES = {
         "This member does not have an eligible active membership.",
         "ဒီအဖွဲ့ဝင်မှာ ဝင်ရောက်နိုင်တဲ့ အသင်းဝင်ကြေး မရှိပါ။",
     ),
+    "check_in_open": (
+        "This member is already checked in. Check out before checking in again.",
+        "ဒီအဖွဲ့ဝင် ဝင်ထားပြီးသားပါ။ ပြန်ထွက်ပြီးမှ ပြန်ဝင်ပါ။",
+    ),
+    "check_in_duplicate": (
+        "This member was already checked in.",
+        "ဒီအဖွဲ့ဝင်ကို ဒီကာလမှာ ဝင်ထားပြီးသားပါ။",
+    ),
+    "already_saved": (
+        "That change is already stored.",
+        "ဒီပြောင်းလဲမှု ရှိပြီးသားပါ။",
+    ),
+    "finance_state": (
+        "That record cannot take this step in its current state. Nothing new was saved.",
+        "ဒီအခြေအနေမှာ ဒီအဆင့်ကို လုပ်လို့ မရပါ။ အသစ် မသိမ်းရပါ။",
+    ),
 }
 _WRITE_WORDS = re.compile(
     r"\b(add|create|book|register|update|cancel|void|approve|reject|sell|"
@@ -736,8 +752,9 @@ _AMOUNT = re.compile(r"\d+(?:\.\d+)?")
 _SUCCESS = re.compile(
     r"(\bis saved\b|\bhas been saved\b|\bwas saved\b|\bsuccessfully\b|"
     r"\bi saved\b|\bi've saved\b|\bi have saved\b|"
+    r"\balready with finance\b|"
     r"\bregistered\b|\bcreated\b|\bcompleted\b|"
-    r"သိမ်းပြီး|ပြီးပါပြီ|အောင်မြင်ပါပြီ|အောင်မြင်စွာ|မှတ်ပြီးပါပြီ)",
+    r"သိမ်းပြီး|ပြီးပါပြီ|အောင်မြင်ပါပြီ|အောင်မြင်စွာ|မှတ်ပြီးပါပြီ|တင်ပြထားပြီး)",
     re.IGNORECASE,
 )
 _LEAK_TEXT = (
@@ -1854,6 +1871,12 @@ def _unconfirmed_sentence(burmese: bool) -> str:
     if burmese:
         return "ဒီပြောင်းလဲမှုကို မသိမ်းရသေးပါ။ အတည်ပြုပြီးမှ သိမ်းပါမယ်။"
     return "That change is not saved until you confirm."
+
+
+def unconfirmed_notice(staff_text: str) -> str:
+    """State that a prepared change is still waiting. This is not a success."""
+
+    return _unconfirmed_sentence(speaks_burmese(staff_text))
 
 
 def _reply_sentences(text: str) -> list[str]:

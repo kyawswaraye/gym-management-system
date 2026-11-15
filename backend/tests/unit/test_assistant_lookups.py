@@ -263,6 +263,65 @@ def test_myanmar_digits_in_an_amount_become_arabic() -> None:
     assert payload["gross_fee"] == "8000"
 
 
+def test_a_json_line_string_becomes_a_line_list() -> None:
+    payload: dict[str, object] = {
+        "lines": '[{"product_id": "BAR", "quantity": 2}]',
+    }
+
+    _normalize_line_numbers(payload)
+
+    lines = payload["lines"]
+    assert isinstance(lines, list)
+    assert lines[0]["product_id"] == "BAR"
+    assert lines[0]["quantity"] == "2"
+
+
+def test_a_period_with_both_stated_days_is_not_a_date_conflict() -> None:
+    payload: dict[str, object] = {
+        "period_start": "2026-11-01",
+        "period_end": "2026-11-12",
+        "business_date": "2026-11-12",
+    }
+
+    assert (
+        _keep_stated_dates(
+            payload,
+            "from 2026-11-01 to 2026-11-12",
+            today=date(2026, 11, 12),
+        )
+        is None
+    )
+
+
+def test_two_days_for_one_date_field_stay_a_conflict() -> None:
+    payload: dict[str, object] = {"business_date": "2026-11-12"}
+
+    assert _keep_stated_dates(
+        payload,
+        "2026-11-01 or 2026-11-12",
+        today=date(2026, 11, 12),
+    )
+
+
+def test_a_json_number_is_stored_as_decimal_text() -> None:
+    payload: dict[str, object] = {
+        "sale_price": 4000,
+        "low_stock_threshold": 2,
+        "lines": [{"quantity": 2, "discount": 0, "amount": 10000}],
+    }
+
+    _normalize_numbers(payload)
+    _normalize_line_numbers(payload)
+
+    assert payload["sale_price"] == "4000"
+    assert payload["low_stock_threshold"] == "2"
+    lines = payload["lines"]
+    assert isinstance(lines, list)
+    assert lines[0]["quantity"] == "2"
+    assert lines[0]["discount"] == "0"
+    assert lines[0]["amount"] == "10000"
+
+
 def test_a_sale_does_not_need_a_booking_package() -> None:
     assert booking_package_gap(cast(Gym, None), "create_pt_sale", {}) is None
 

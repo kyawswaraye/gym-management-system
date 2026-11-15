@@ -697,7 +697,12 @@ def _command_prepare(command: Callable[[Mapping[str, object]], dict[str, object]
 
 _CREATE = RegisteredTool(
     contract=_contract(
-        _definition("create_payment", "Create a payment draft", "payments.create"),
+        _definition(
+            "create_payment",
+            "Create a member payment draft. Staff wages belong on a salary period, "
+            "and a refund of a posted charge uses refund_payment.",
+            "payments.create",
+        ),
         (
             FieldRequirement("purpose", "Purpose"),
             FieldRequirement("description", "Description"),
@@ -764,7 +769,12 @@ _VOID = RegisteredTool(
 )
 _REFUND = RegisteredTool(
     contract=_contract(
-        _definition("refund_payment", "Refund a posted payment", "payments.refund"),
+        _definition(
+            "refund_payment",
+            "Refund part of a posted charge. This records a refund against that "
+            "payment. It does not create a new charge.",
+            "payments.refund",
+        ),
         (
             FieldRequirement("payment_id", "Payment"),
             FieldRequirement("amount", "Amount"),

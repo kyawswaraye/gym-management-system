@@ -493,3 +493,49 @@ def test_staff_response_hides_tool_names_and_ungrounded_read_claims(monkeypatch)
         '"limit"',
     ):
         assert hidden not in rendered
+
+
+@override_settings(**_settings())
+def test_text_beside_a_tool_call_cannot_claim_the_write_is_saved(monkeypatch) -> None:
+    gym, owner = _owner("TN19", "tn19-owner@example.test")
+    _enable(gym, "members")
+
+    def claim(
+        *,
+        contents: list[dict[str, object]],
+        declarations: list[dict[str, object]],
+        system_instruction: str,
+        transport: object = None,
+    ) -> ModelTurn:
+        del contents, declarations, system_instruction, transport
+        text = "တင်ပြထားပြီး ဖြစ်ပါသည်။ The sale is already with finance."
+        arguments = {
+            "first_name": "Nwe",
+            "last_name": "Nwe",
+            "join_date": "2026-11-15",
+        }
+        return ModelTurn(
+            text,
+            (FunctionCall("create_member", arguments),),
+            (
+                {"text": text},
+                {"functionCall": {"name": "create_member", "args": arguments}},
+            ),
+        )
+
+    monkeypatch.setattr("apps.assistant.turns.generate_content", claim)
+    client = APIClient()
+    response = client.post(
+        "/api/v1/assistant/turns/",
+        {"message": "Nwe Nwe ကို ဒီနေ့ အဖွဲ့ဝင်ဖွင့်ပေးပါ။"},
+        format="json",
+        HTTP_AUTHORIZATION=f"Bearer {staff_token(owner)}",
+    )
+    assert response.status_code == 200, response.json()
+    data = response.json()["data"]
+    body = str(data["message"]["body"])
+    assert data["pending_confirmation"]["tool_name"] == "Create a member"
+    assert "မသိမ်းရသေး" in body
+    assert "တင်ပြထားပြီး" not in body
+    assert "already with finance" not in body
+    assert _rows(gym) == (0, 0)

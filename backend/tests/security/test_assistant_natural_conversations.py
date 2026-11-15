@@ -15,15 +15,22 @@ from decimal import Decimal
 import pytest
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Sum
 from django.test import override_settings
 
+from apps.announcements.models import Announcement
 from apps.assistant.provider import ProviderCallError, generate_content
+from apps.cashbook.models import CashSession
 from apps.cashbook.services import open_cash_session
 from apps.common.db.tenant_context import set_gym_context
 from apps.expenses.models import Expense
-from apps.members.models import Member, Membership, Payment
+from apps.inventory.models import Product, StockMovement
+from apps.inventory.services import adjust_stock, create_category, create_product
+from apps.members.models import CheckIn, Member, Membership, Payment
 from apps.members.services import gym_today
-from apps.tenants.models import ExpenseCategory, Gym
+from apps.salaries.models import SalaryPeriod, StaffSalaryLine
+from apps.sales.models import RetailReturnLine, RetailSale, RetailSaleLine
+from apps.tenants.models import ExpenseCategory, Gym, StaffProfile
 from tests.security.test_assistant_onboarding import (
     _confirm,
     _gym,
@@ -32,6 +39,9 @@ from tests.security.test_assistant_onboarding import (
     _reject,
     _settings,
 )
+from tests.security.test_assistant_schedule import _enable
+from tests.security.test_dashboard import _membership, _post_payment
+from tests.security.test_tenant_gym_settings import add_staff
 
 pytestmark = [
     pytest.mark.postgresql,
@@ -386,3 +396,318 @@ def _category(gym: Gym, actor_id: object) -> None:
             created_by_membership_id=actor_id,
             updated_by_membership_id=actor_id,
         )
+
+
+def _finance(gym: Gym) -> None:
+    _enable(gym, "finance")
+
+
+def _quota(transcript: list[str]) -> None:
+    if any(line.startswith("QUOTA") for line in transcript):
+        _fail(transcript, "NOT VERIFIED: provider quota or availability stopped the conversation")
+
+
+def _on_hand(gym: Gym, product: Product) -> Decimal:
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        total = StockMovement.objects.filter(gym=gym, product=product).aggregate(
+            total=Sum("quantity")
+        )["total"]
+    return Decimal(total or 0)
+
+
+@override_settings(**_conversation_settings())
+def test_a_desk_receives_stock_and_can_say_what_is_on_hand(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live = _live_settings()
+    gym, _owner, client, headers = _gym(monkeypatch, "NC04")
+    _finance(gym)
+    goal = (
+        "The shop has no protein bars yet. Add a product category called Snacks. "
+        "Add one product named Protein Bar, SKU BAR, unit PIECE, sale price 4000, "
+        "current cost 2000, default cost 2000, and a low-stock threshold of 2. "
+        "Then record an opening count of 6 today, with a short reason that this "
+        "is the first count. Confirm each card that matches those facts. "
+        "After the stock is saved, ask how many Protein Bars are on hand and "
+        "stop when the answer says 6."
+    )
+    transcript = _run_goal(client=client, headers=headers, live=live, goal=goal, limit=14)
+    _quota(transcript)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        products = list(Product.objects.filter(gym=gym))
+    if len(products) != 1:
+        _fail(transcript, f"{len(products)} products were saved")
+    product = products[0]
+    if product.sale_price != Decimal("4000.00"):
+        _fail(transcript, f"sale price was {product.sale_price}")
+    held = _on_hand(gym, product)
+    if held != Decimal("6.000"):
+        _fail(transcript, f"on hand was {held}")
+    if not any("6" in line or "၆" in line for line in transcript if line.startswith("ASSISTANT:")):
+        _fail(transcript, "the assistant did not report the quantity it had saved")
+
+
+@override_settings(**_conversation_settings())
+def test_a_desk_sells_two_bars_and_takes_one_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live = _live_settings()
+    gym, owner, client, headers = _gym(monkeypatch, "NC05")
+    _finance(gym)
+    today = gym_today(gym)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        category = create_category(
+            gym=gym,
+            actor=owner,
+            fields={"code": "SNACKS", "name": "Snacks"},
+            request_id="req_nc_category",
+            ip_address=None,
+            user_agent="",
+        )
+        product = create_product(
+            gym=gym,
+            actor=owner,
+            fields={
+                "sku": "BAR",
+                "name": "Protein Bar",
+                "category_id": category.id,
+                "unit": "PIECE",
+                "sale_price": "4000.00",
+                "current_unit_cost": "2000.00",
+                "default_unit_cost": "2000.00",
+                "low_stock_threshold": "2.000",
+            },
+            request_id="req_nc_product",
+            ip_address=None,
+            user_agent="",
+        )
+        adjust_stock(
+            gym=gym,
+            actor=owner,
+            fields={
+                "product_id": product.id,
+                "quantity": "10.000",
+                "movement_type": "OPENING",
+                "business_date": today,
+                "reason": "Opening count",
+            },
+            request_id="req_nc_opening",
+            ip_address=None,
+            user_agent="",
+        )
+    goal = (
+        "Protein Bar, SKU BAR, is already in stock at 4000 each. Sell two of "
+        "them today to a walk-in customer by bank transfer. This gym requires "
+        "a separate approval, so the sale is not finished until it is posted. "
+        "Then the customer brings one bar back today. Record that return. "
+        "Confirm cards that sell two and return one. Reject a card for a "
+        "different quantity or a different product."
+    )
+    transcript = _run_goal(client=client, headers=headers, live=live, goal=goal, limit=16)
+    _quota(transcript)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        sales = list(RetailSale.objects.filter(gym=gym))
+        posted = [sale for sale in sales if sale.status == RetailSale.Status.POSTED]
+        sold = list(RetailSaleLine.objects.filter(gym=gym, product=product))
+        returned = list(RetailReturnLine.objects.filter(gym=gym, sale_line__product=product))
+    if len(posted) != 1:
+        _fail(transcript, f"{len(posted)} posted retail sales, {len(sales)} sales in total")
+    quantities = [line.quantity for line in sold]
+    if Decimal("2.000") not in quantities:
+        _fail(transcript, f"sold quantities were {quantities}")
+    if sum((line.quantity for line in returned), Decimal("0")) != Decimal("1.000"):
+        _fail(transcript, f"returned quantities were {[line.quantity for line in returned]}")
+    held = _on_hand(gym, product)
+    if held != Decimal("9.000"):
+        _fail(transcript, f"on hand was {held}")
+
+
+@override_settings(**_conversation_settings())
+def test_a_manager_posts_one_salary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live = _live_settings()
+    gym, owner, client, headers = _gym(monkeypatch, "NC06")
+    _finance(gym)
+    today = gym_today(gym)
+    trainer = add_staff(gym, email="nc06-su@example.test", role_key="TRAINER")
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        profile = StaffProfile.objects.create(
+            gym=gym,
+            gym_membership=trainer,
+            staff_code="SU-SU",
+            display_name="Su Su",
+            joined_date=today,
+            status=StaffProfile.Status.ACTIVE,
+            created_by_membership_id=owner.id,
+            updated_by_membership_id=owner.id,
+        )
+    goal = (
+        "Pay Su Su for 1 November 2026 through 12 November 2026. The wages are "
+        "100000 in the gym currency, by bank transfer, described as November "
+        "desk wages, and the business date is today. This gym requires a "
+        "separate approval, so the salary is not finished until the period is "
+        "posted. Confirm cards for Su Su and 100000. Reject a card for someone "
+        "else or a different amount."
+    )
+    transcript = _run_goal(client=client, headers=headers, live=live, goal=goal, limit=16)
+    _quota(transcript)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        periods = list(SalaryPeriod.objects.filter(gym=gym))
+        posted = [period for period in periods if period.status == SalaryPeriod.Status.POSTED]
+        lines = list(StaffSalaryLine.objects.filter(gym=gym, staff_profile=profile))
+    if len(posted) != 1:
+        _fail(transcript, f"{len(posted)} posted salary periods, {len(periods)} in total")
+    if len(lines) != 1 or lines[0].amount != Decimal("100000.00"):
+        shown = [(line.amount, str(line.staff_profile_id)) for line in lines]
+        _fail(transcript, f"salary lines were {shown}")
+
+
+@override_settings(**_conversation_settings())
+def test_a_desk_publishes_a_notice_and_opens_the_till(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live = _live_settings()
+    gym, _owner, client, headers = _gym(monkeypatch, "NC07")
+    _finance(gym)
+    goal = (
+        "Two separate jobs. First, publish a general announcement for every "
+        "active member. The title is Saturday class and the message is that "
+        "the morning class starts at seven. Publishing is what sends it; a "
+        "draft is not enough. Second, open today's cash till with 25000 "
+        "opening cash. Confirm cards that match. Do not close the till."
+    )
+    transcript = _run_goal(client=client, headers=headers, live=live, goal=goal, limit=12)
+    _quota(transcript)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        notices = list(Announcement.objects.filter(gym=gym))
+        published = [notice for notice in notices if notice.status == Announcement.Status.PUBLISHED]
+        tills = list(CashSession.objects.filter(gym=gym, status=CashSession.Status.OPEN))
+    if len(published) != 1:
+        _fail(transcript, f"{len(published)} published announcements, {len(notices)} in total")
+    notice = published[0]
+    if notice.audience != Announcement.Audience.ALL_ACTIVE_MEMBERS:
+        _fail(transcript, f"audience was {notice.audience}")
+    if notice.type != Announcement.Type.GENERAL:
+        _fail(transcript, f"announcement type was {notice.type}")
+    if len(tills) != 1 or tills[0].opening_cash != Decimal("25000.00"):
+        shown = [(till.status, till.opening_cash) for till in tills]
+        _fail(transcript, f"open tills were {shown}")
+
+
+@override_settings(**_conversation_settings())
+def test_a_desk_refunds_part_of_a_posted_payment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live = _live_settings()
+    gym, owner, client, headers = _gym(monkeypatch, "NC08")
+    _finance(gym)
+    today = gym_today(gym)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        member = Member.objects.create(
+            gym=gym,
+            member_number="NC08-1",
+            first_name="Aye",
+            last_name="Aye",
+            join_date=today,
+            created_by_membership_id=owner.id,
+            updated_by_membership_id=owner.id,
+        )
+    original_id = _post_payment(
+        client,
+        headers,
+        headers,
+        {
+            "purpose": "OTHER",
+            "description": "Visitor pass",
+            "amount": "40000.00",
+            "currency": gym.currency,
+            "method": "BANK_TRANSFER",
+            "business_date": today.isoformat(),
+            "member_id": str(member.id),
+        },
+    )
+    goal = (
+        "Aye Aye, member number NC08-1, already has a posted 40000 bank "
+        "transfer for a visitor pass. She overpaid. Refund 10000 of that "
+        "payment, by bank transfer, today, and say the reason is an overpayment. "
+        "This gym requires a separate approval, so the refund is not finished "
+        "until it is posted. Do not create another charge and do not refund "
+        "the whole 40000. Confirm only a 10000 refund card."
+    )
+    transcript = _run_goal(client=client, headers=headers, live=live, goal=goal, limit=12)
+    _quota(transcript)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        refunds = list(
+            Payment.objects.filter(
+                gym=gym,
+                member=member,
+                entry_type=Payment.EntryType.REFUND,
+            )
+        )
+    posted = [
+        refund
+        for refund in refunds
+        if refund.amount == Decimal("10000.00")
+        and refund.status == Payment.Status.POSTED
+        and str(refund.original_payment_id) == original_id
+    ]
+    if len(posted) != 1:
+        shown = [(refund.amount, refund.status, refund.original_payment_id) for refund in refunds]
+        _fail(transcript, f"posted 10000 refunds were {len(posted)}; rows {shown}")
+
+
+@override_settings(**_conversation_settings())
+def test_a_desk_checks_someone_in_and_then_pauses_the_membership(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live = _live_settings()
+    gym, owner, client, headers = _gym(monkeypatch, "NC09")
+    plan = _plan(gym, owner.id)
+    today = gym_today(gym)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        member = Member.objects.create(
+            gym=gym,
+            member_number="NC09-1",
+            first_name="Min",
+            last_name="Min",
+            join_date=today,
+            created_by_membership_id=owner.id,
+            updated_by_membership_id=owner.id,
+        )
+    membership = _membership(
+        gym,
+        owner,
+        member=member,
+        plan=plan,
+        start=today,
+        expiry=today.replace(year=today.year + 1),
+        amount="50000.00",
+        source=Membership.RevenueSource.NEW_MEMBER,
+    )
+    goal = (
+        "Min Min, member number NC09-1, is here. Check her in today. After "
+        "that visit is recorded, she asks to pause her membership. Suspend "
+        "that membership. Do not cancel it and do not check her out unless "
+        "she asks. Confirm the check-in and the suspension."
+    )
+    transcript = _run_goal(client=client, headers=headers, live=live, goal=goal, limit=10)
+    _quota(transcript)
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        visits = CheckIn.objects.filter(gym=gym, member=member).count()
+        stored = Membership.objects.get(gym=gym, id=membership.id)
+    if visits != 1:
+        _fail(transcript, f"{visits} check-ins were saved")
+    if stored.status != Membership.Status.SUSPENDED:
+        _fail(transcript, f"membership status was {stored.status}")

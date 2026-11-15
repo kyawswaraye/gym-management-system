@@ -188,8 +188,23 @@ def _sale_line_fields(
         if not isinstance(line, Mapping):
             continue
         prefix = f"lines.{index}"
-        stored = labels.get(f"{prefix}.product_id")
-        fields.append({"name": f"{prefix}.product", "value": _stored_product(stored)})
+        if "product_id" in line:
+            stored = labels.get(f"{prefix}.product_id")
+            fields.append({"name": f"{prefix}.product", "value": _stored_product(stored)})
+        elif "staff_profile_id" in line:
+            staff = labels.get(f"{prefix}.staff_profile_id")
+            shown = (
+                staff
+                if isinstance(staff, str) and staff.strip()
+                else line.get("staff_profile_id")
+            )
+            text = _stored_scalar(shown)
+            if text:
+                fields.append({"name": f"{prefix}.staff", "value": text})
+        elif "line_id" in line:
+            text = _stored_scalar(line.get("line_id"))
+            if text:
+                fields.append({"name": f"{prefix}.line", "value": text})
         if "quantity" in line:
             quantity = _stored_scalar(line.get("quantity"))
             if quantity != "":

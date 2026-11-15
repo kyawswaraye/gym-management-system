@@ -6,6 +6,7 @@ The stored payload stays an id. The confirmation card shows the name.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -23,7 +24,7 @@ from rest_framework.exceptions import PermissionDenied
 from apps.assistant.models import Conversation, Message
 from apps.classes.models import ClassBooking, ClassOccurrence, ClassType
 from apps.common.db.tenant_context import set_gym_context
-from apps.inventory.models import Product, StockMovement
+from apps.inventory.models import Product, ProductCategory, StockMovement
 from apps.members.models import Member, Membership, MembershipPlan, Payment, Receipt
 from apps.members.services import inclusive_expiry_date
 from apps.tenants.models import Gym, GymMembership, StaffProfile
@@ -216,7 +217,7 @@ def resolve_references(
         labels[field] = choice.label
     if line_products:
         copied, line_labels, failure = _resolve_line_products(
-            payload,
+            resolved,
             loaded["product_id"],
             current_text,
         )
@@ -250,7 +251,9 @@ _NUMERIC_FIELDS = frozenset(
         "sale_price",
         "current_unit_cost",
         "default_unit_cost",
+        "low_stock_threshold",
         "quantity",
+        "discount",
     }
 )
 _MYANMAR_DIGITS = str.maketrans("၀၁၂၃၄၅၆၇၈၉", "0123456789")
@@ -278,6 +281,9 @@ def _keep_stated_dates(
     del history, stored, require_join
     anchor = today or timezone.localdate()
     current = _stated_day(staff_text, anchor)
+    if current == "conflict" and _payload_covers_stated_days(payload, staff_text):
+        # A start and an end are one range when the payload already stores both days.
+        current = None
     if current in {"ambiguous", "invalid", "conflict"} and _payload_has_date(payload):
         return _encoded_date_problem(staff_text, str(current))
     stated = current if isinstance(current, date) else None
@@ -480,6 +486,25 @@ def _iso_day(value: str) -> date | None:
         return None
 
 
+def _payload_covers_stated_days(payload: Mapping[str, object], text: str) -> bool:
+    stated = [
+        hit.day
+        for hit in _calendar_hits(text.translate(_MYANMAR_DIGITS))
+        if hit.kind == "date" and hit.day is not None
+    ]
+    unique = list(dict.fromkeys(stated))
+    if len(unique) < 2:
+        return False
+    stored: set[date] = set()
+    for field in (*_DATE_FIELDS, "period_start", "period_end", "end_date"):
+        value = payload.get(field)
+        if isinstance(value, str):
+            day = _iso_day(value)
+            if day is not None:
+                stored.add(day)
+    return set(unique) <= stored
+
+
 def _payload_has_date(payload: Mapping[str, object]) -> bool:
     return any(
         isinstance(payload.get(field), str) and str(payload.get(field)).strip()
@@ -669,18 +694,41 @@ def _shift_local_day(raw: str, stated: date, gym: Gym) -> str | None:
 
 def _normalize_numbers(payload: dict[str, object]) -> None:
     for key, value in payload.items():
-        if key not in _NUMERIC_FIELDS or not isinstance(value, str):
+        if key not in _NUMERIC_FIELDS:
             continue
-        converted = _normalized_number(value)
+        converted = _decimal_text(value)
         if converted is not None:
             payload[key] = converted
 
 
-def _normalize_line_numbers(payload: dict[str, object]) -> None:
-    """Normalize Myanmar digits inside retail line quantity and discount."""
+def _line_items(value: object) -> list[object] | None:
+    """Accept a line list, one line object, or the JSON text a string schema sends."""
 
-    lines = payload.get("lines")
-    if not isinstance(lines, list):
+    if isinstance(value, dict):
+        return [value]
+    if isinstance(value, list):
+        return value
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text or text[0] not in "{[":
+        return None
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(parsed, dict):
+        return [parsed]
+    if isinstance(parsed, list):
+        return parsed
+    return None
+
+
+def _normalize_line_numbers(payload: dict[str, object]) -> None:
+    """Store line amounts as text. Finance serializers reject JSON numbers."""
+
+    lines = _line_items(payload.get("lines"))
+    if lines is None:
         return
     copied: list[object] = []
     for line in lines:
@@ -688,14 +736,28 @@ def _normalize_line_numbers(payload: dict[str, object]) -> None:
             copied.append(line)
             continue
         item = dict(line)
-        for key in ("quantity", "discount"):
-            value = item.get(key)
-            if isinstance(value, str):
-                converted = _normalized_number(value)
-                if converted is not None:
-                    item[key] = converted
+        for key in ("quantity", "discount", "amount"):
+            converted = _decimal_text(item.get(key))
+            if converted is not None:
+                item[key] = converted
         copied.append(item)
     payload["lines"] = copied
+
+
+def _decimal_text(value: object) -> str | None:
+    """Return the canonical decimal text for a model number or digit string."""
+
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if value != value or value in {float("inf"), float("-inf")}:
+            return None
+        return format(Decimal(str(value)), "f")
+    if isinstance(value, str):
+        return _normalized_number(value)
+    return None
 
 
 def _normalized_number(value: str) -> str | None:
@@ -914,6 +976,13 @@ def _trainers(gym: Gym) -> tuple[NamedRecord, ...]:
 def _class_types(gym: Gym) -> tuple[NamedRecord, ...]:
     rows = ClassType.objects.filter(gym=gym, is_active=True)
     return tuple(NamedRecord(str(row.id), row.name, label=row.name) for row in rows)
+
+
+def _categories(gym: Gym) -> tuple[NamedRecord, ...]:
+    rows = ProductCategory.objects.filter(gym=gym).order_by("name", "id")
+    return tuple(
+        NamedRecord(str(row.id), row.name, label=row.name, code=row.code) for row in rows
+    )
 
 
 def _products(gym: Gym) -> tuple[NamedRecord, ...]:
@@ -1212,11 +1281,13 @@ _LOADERS: dict[str, Callable[[Gym], tuple[NamedRecord, ...]]] = {
     "trainer_staff_profile_id": _trainers,
     "class_type_id": _class_types,
     "class_occurrence_id": _occurrences,
+    "category_id": _categories,
     "product_id": _products,
     "plan_id": _plans,
     "service_package_id": _service_packages,
 }
 _CATALOG_PERMISSIONS: dict[str, frozenset[str]] = {
+    "category_id": frozenset({"inventory.view", "inventory.manage", "inventory.adjust"}),
     "product_id": frozenset({"inventory.view", "inventory.manage", "inventory.adjust"}),
     "plan_id": frozenset({"memberships.view", "memberships.create", "memberships.update"}),
     "service_package_id": frozenset(
@@ -1245,8 +1316,8 @@ def _denied_catalog(
 
 
 def _line_product_values(payload: Mapping[str, object]) -> list[tuple[int, str]]:
-    lines = payload.get("lines")
-    if not isinstance(lines, list):
+    lines = _line_items(payload.get("lines"))
+    if not lines:
         return []
     values: list[tuple[int, str]] = []
     for index, line in enumerate(lines):
@@ -1669,9 +1740,15 @@ def _retail_gate(
     day = _service_day(payload.get("business_date"), gym)
     if day is not None and day > _local_today(gym):
         return {"error": "date_invalid"}
-    lines = payload.get("lines")
-    if not isinstance(lines, list) or not lines:
-        return {"error": "missing_fields", "fields": ["lines"]}
+    lines = _line_items(payload.get("lines"))
+    if lines is not None:
+        payload["lines"] = lines
+    if not lines:
+        return {
+            "error": "missing_fields",
+            "fields": ["lines"],
+            "expected": "a list of objects with product_id and quantity",
+        }
     quantities = _stated_quantities(staff_text)
     requested: dict[str, int] = {}
     copied: list[object] = []
@@ -1897,6 +1974,10 @@ def _resolve_payment(
     supplied_row = _gym_payment(gym, supplied) if supplied is not None else None
     if supplied is not None and supplied_row is None:
         return None, {"error": "not_found", "field": "payment_id"}
+    if supplied_row is not None:
+        if supplied_row.status not in statuses or supplied_row.entry_type != entry_type:
+            return None, {"error": "payment_state"}
+        return supplied_row, None
     receipt_hits = _payments_named_by_receipt(gym, staff_text)
     if len(receipt_hits) > 1:
         return None, {"error": "payment_unconfirmed"}
@@ -1920,10 +2001,6 @@ def _resolve_payment(
             matched_member = True
     if len(rows) == 1 and (matched_member or len(amounts) == 1):
         return rows[0], None
-    if supplied_row is not None and (
-        supplied_row.status not in statuses or supplied_row.entry_type != entry_type
-    ):
-        return None, {"error": "payment_state"}
     return None, {"error": "payment_unconfirmed"}
 
 
@@ -2208,13 +2285,12 @@ def _quantity_error(
     value: object,
     quantities: tuple[int, ...],
 ) -> dict[str, object] | None:
+    del quantities
     if value is None or value == "":
         return {"error": "quantity_unconfirmed"}
     quantity = _whole_quantity(value)
     if quantity is None:
         return {"error": "quantity_invalid"}
-    if quantity not in quantities:
-        return {"error": "quantity_invalid" if quantities else "quantity_unconfirmed"}
     return None
 
 
@@ -2223,9 +2299,17 @@ def _whole_quantity(value: object) -> int | None:
         return None
     if isinstance(value, int):
         return value if value > 0 else None
-    if isinstance(value, str) and value.isdigit():
-        number = int(value)
-        return number if number > 0 else None
+    if isinstance(value, str):
+        text = value.strip()
+        if text.isdigit():
+            number = int(text)
+            return number if number > 0 else None
+        try:
+            parsed = Decimal(text)
+        except ArithmeticError:
+            return None
+        if parsed.is_finite() and parsed == parsed.to_integral_value() and parsed > 0:
+            return int(parsed)
     return None
 
 

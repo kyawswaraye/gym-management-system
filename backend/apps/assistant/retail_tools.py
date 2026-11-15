@@ -664,7 +664,12 @@ _CREATE = RegisteredTool(
         (
             FieldRequirement("business_date", "Business date"),
             FieldRequirement("payment_method", "Payment method"),
-            FieldRequirement("lines", "Sale lines"),
+            FieldRequirement(
+                "lines",
+                "A list of sale lines. Each line has product_id (the product "
+                "name or SKU) and quantity as text, such as 2. Do not send a "
+                "unit price; the stored product price is used. Discount is optional.",
+            ),
         ),
         http_method="POST",
         route=CREATE_ROUTE,
@@ -728,7 +733,11 @@ _RETURN = RegisteredTool(
         (
             FieldRequirement("retail_sale_id", "Retail sale"),
             FieldRequirement("reason", "Reason"),
-            FieldRequirement("lines", "Return lines"),
+            FieldRequirement(
+                "lines",
+                "A list of return lines. Each line has line_id for one line of "
+                "this sale and quantity as text.",
+            ),
         ),
         http_method="POST",
         route=RETURN_ROUTE,

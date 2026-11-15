@@ -10,6 +10,8 @@ from rest_framework.views import APIView
 
 from apps.assistant.activity_tools import (
     ACTIVITY_TOOL_NAMES,
+    _announcement_fields,
+    activity_tool_contracts,
     activity_tool_definitions,
     execute_registered_tool,
 )
@@ -18,6 +20,21 @@ from apps.assistant.models import Goal
 from apps.assistant.registry import closed_production_names, production_registry
 from apps.tenants.models import Gym, GymMembership
 from apps.users.models import User
+
+
+def test_an_audience_code_uses_the_stored_value() -> None:
+    fields = _announcement_fields(
+        {"type": "general", "audience": "ACTIVE_MEMBERS", "title": "Saturday"}
+    )
+
+    assert fields["type"] == "GENERAL"
+    assert fields["audience"] == "ALL_ACTIVE_MEMBERS"
+    contract = activity_tool_contracts()["create_announcement"]
+    assert contract.prerequisite is not None
+    audience = next(
+        field.description for field in contract.prerequisite.fields if field.name == "audience"
+    )
+    assert "ALL_ACTIVE_MEMBERS" in audience
 
 
 def test_registered_activity_tools_are_confirmed_database_writes() -> None:

@@ -109,11 +109,41 @@ def _audit(call: ToolCall) -> dict[str, Any]:
     }
 
 
+_ANNOUNCEMENT_TYPES = {
+    "event": "EVENT",
+    "promotion": "PROMOTION",
+    "general": "GENERAL",
+}
+_ANNOUNCEMENT_AUDIENCES = {
+    "all_active_members": "ALL_ACTIVE_MEMBERS",
+    "active_members": "ALL_ACTIVE_MEMBERS",
+    "pt_clients": "PT_CLIENTS",
+    "expiring_within_7_days": "EXPIRING_WITHIN_7_DAYS",
+    "expiring_within_30_days": "EXPIRING_WITHIN_30_DAYS",
+}
+
+
+def _stored_choice(value: object, choices: dict[str, str]) -> object:
+    if not isinstance(value, str):
+        return value
+    key = value.strip().casefold().replace(" ", "_").replace("-", "_")
+    return choices.get(key, value)
+
+
+def _announcement_fields(payload: Mapping[str, object]) -> dict[str, object]:
+    data = dict(payload)
+    if "type" in data:
+        data["type"] = _stored_choice(data["type"], _ANNOUNCEMENT_TYPES)
+    if "audience" in data:
+        data["audience"] = _stored_choice(data["audience"], _ANNOUNCEMENT_AUDIENCES)
+    return data
+
+
 def _create_announcement(call: ToolCall) -> str:
     row = create_announcement(
         gym=call.gym,
         actor=call.actor,
-        fields=_validated(AnnouncementWriteSerializer, call.payload),
+        fields=_validated(AnnouncementWriteSerializer, _announcement_fields(call.payload)),
         **_audit(call),
     )
     return str(row.id)
@@ -125,7 +155,10 @@ def _update_announcement(call: ToolCall) -> str:
         gym=call.gym,
         actor=call.actor,
         announcement_id=announcement_id,
-        fields=_validated(AnnouncementPatchSerializer, _body(call.payload, "announcement_id")),
+        fields=_validated(
+            AnnouncementPatchSerializer,
+            _announcement_fields(_body(call.payload, "announcement_id")),
+        ),
         **_audit(call),
     )
     return str(row.id)
@@ -201,10 +234,14 @@ def _tools() -> tuple[RegisteredTool, ...]:
                 "announcements",
             ),
             (
-                FieldRequirement("type", "Announcement type"),
+                FieldRequirement("type", "EVENT, PROMOTION, or GENERAL"),
                 FieldRequirement("title", "Title"),
                 FieldRequirement("body", "Body"),
-                FieldRequirement("audience", "Audience"),
+                FieldRequirement(
+                    "audience",
+                    "ALL_ACTIVE_MEMBERS, PT_CLIENTS, EXPIRING_WITHIN_7_DAYS, "
+                    "or EXPIRING_WITHIN_30_DAYS",
+                ),
             ),
             _create_announcement,
         ),

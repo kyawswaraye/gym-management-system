@@ -608,7 +608,12 @@ def _command_prepare(command: Callable[[Mapping[str, object]], dict[str, object]
 
 _CREATE = RegisteredTool(
     contract=_contract(
-        _definition("create_salary_period", "Create a salary period draft", "salaries.create"),
+        _definition(
+            "create_salary_period",
+            "Create a salary period draft for staff wages over a date range. "
+            "This is not a member payment.",
+            "salaries.create",
+        ),
         (
             FieldRequirement("period_start", "Period start"),
             FieldRequirement("period_end", "Period end"),
@@ -637,7 +642,11 @@ _LINES = RegisteredTool(
         _definition("replace_salary_lines", "Replace salary period lines", "salaries.update"),
         (
             FieldRequirement("salary_period_id", "Salary period"),
-            FieldRequirement("lines", "Salary lines"),
+            FieldRequirement(
+                "lines",
+                "A list of staff wage lines. Each line has staff_profile_id, "
+                "amount as text, currency, payment_method, and description.",
+            ),
         ),
         http_method="PUT",
         route=LINES_ROUTE,

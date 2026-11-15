@@ -41,6 +41,9 @@ from apps.assistant.knowledge import (
     grounded_information_reply,
     grounded_read_reply,
     public_activity,
+    speaks_burmese,
+    staff_notice,
+    unconfirmed_notice,
     visible_reply,
 )
 from apps.assistant.lookups import (
@@ -93,8 +96,11 @@ from apps.assistant.workflow_state import (
 from apps.classes.exceptions import ClassFull, ScheduleConflict
 from apps.common.api.exceptions import CodedAPIException, RequestRejected
 from apps.common.db.tenant_context import set_gym_context
+from apps.common.finance.exceptions import FinanceStateConflict
 from apps.members.exceptions import (
+    CheckInDuplicate,
     CheckInIneligible,
+    CheckInOpen,
     MembershipOverlap,
     MembershipStateConflict,
 )
@@ -286,6 +292,7 @@ def _reply(
     marker = "Live gym brief"
     live_brief = context[context.find(marker) :] if marker in context else ""
     seen_errors: set[tuple[str, str]] = set()
+    last_error: Mapping[str, object] | None = None
     try:
         for _step in range(max_steps()):
             opened_now = False
@@ -334,6 +341,7 @@ def _reply(
                     opened_now = True
                 error_code = body.get("error")
                 if isinstance(error_code, str) and error_code:
+                    last_error = body
                     key = (call.name, error_code)
                     if key in seen_errors:
                         repeated_error = True
@@ -413,8 +421,13 @@ def _reply(
     )
     save_state(gym, conversation, workflow)
     if reply in {"", _LIMIT}:
-        summary = proposal["summary"] if proposal is not None else _LIMIT
-        reply = summary if isinstance(summary, str) else _LIMIT
+        summary = proposal["summary"] if proposal is not None else None
+        if isinstance(summary, str) and summary:
+            reply = summary
+        elif last_error is not None:
+            reply = staff_notice(last_error, staff_text) or _LIMIT
+        else:
+            reply = _LIMIT
     if not provider_down and reply not in {_LIMIT, _BLOCKED}:
         ground = _grounding_text(history, workflow, live_brief)
         if read_completed:
@@ -440,6 +453,21 @@ def _reply(
             proposed=proposal is not None,
             staff_text=staff_text,
         )
+    if not provider_down and opened_now and saved is not None:
+        # The previous write is stored. The card that is open now is a different step.
+        done = completion_sentence(workflow, staff_text)
+        if speaks_burmese(staff_text):
+            reply = f"{done} နောက်တစ်ချက်ကို အတည်ပြုပြီးမှ သိမ်းပါမယ်။".strip()
+        else:
+            reply = f"{done} The next change is not saved until you confirm.".strip()
+    elif not provider_down and proposal is None and saved is None and last_error is not None:
+        notice = staff_notice(last_error, staff_text)
+        if notice and notice not in reply:
+            reply = f"{notice} {reply}".strip()
+    elif not provider_down and proposal is not None and saved is None:
+        notice = unconfirmed_notice(staff_text)
+        if notice not in reply:
+            reply = f"{reply} {notice}".strip()
     reply = confirmation_reply(reply, proposal, staff_text, workflow)
     recorded = append_message(
         gym=gym,
@@ -521,9 +549,12 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
             {"confirmation": [_confirmation_text(gym, goal.conversation, "missing_record")]}
         ) from None
     except ValidationError as exc:
+        kind = _validation_kind(exc)
         logger.info("assistant confirmation invalid")
+        if kind == "already_saved":
+            return _closed_confirmation(gym, goal, step, kind)
         raise RequestRejected(
-            {"confirmation": [_confirmation_text(gym, goal.conversation, _validation_kind(exc))]}
+            {"confirmation": [_confirmation_text(gym, goal.conversation, kind)]}
         ) from exc
     except MembershipOverlap:
         logger.info("assistant confirmation membership overlap")
@@ -680,21 +711,16 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
         )
     except CheckInIneligible:
         logger.info("assistant confirmation check-in ineligible")
-        close_goal(
-            gym=gym,
-            goal=goal,
-            step=step,
-            status=Goal.Status.CANCELLED,
-            step_status=WorkflowStep.Status.CANCELLED,
-            summary="check_in_ineligible",
-        )
-        return _confirmation_result(
-            gym,
-            goal,
-            step,
-            "cancelled",
-            _confirmation_text(gym, goal.conversation, "check_in_ineligible"),
-        )
+        return _closed_confirmation(gym, goal, step, "check_in_ineligible")
+    except CheckInOpen:
+        logger.info("assistant confirmation check-in already open")
+        return _closed_confirmation(gym, goal, step, "check_in_open")
+    except FinanceStateConflict:
+        logger.info("assistant confirmation finance state")
+        return _closed_confirmation(gym, goal, step, "finance_state")
+    except CheckInDuplicate:
+        logger.info("assistant confirmation check-in duplicate")
+        return _closed_confirmation(gym, goal, step, "check_in_duplicate")
     if result.outcome in {"committed", "existing"}:
         workflow = load_state(gym, goal.conversation)
         remember_commit(gym, workflow, step.tool_name, payload, result.effect_reference)
@@ -1013,6 +1039,29 @@ def _public_read(result: Mapping[str, object]) -> dict[str, object]:
     if isinstance(parsed, dict):
         return cast(dict[str, object], parsed)
     return {"status": "completed"}
+
+
+def _closed_confirmation(
+    gym: Gym,
+    goal: Goal,
+    step: WorkflowStep,
+    kind: str,
+) -> dict[str, object]:
+    close_goal(
+        gym=gym,
+        goal=goal,
+        step=step,
+        status=Goal.Status.CANCELLED,
+        step_status=WorkflowStep.Status.CANCELLED,
+        summary=kind,
+    )
+    return _confirmation_result(
+        gym,
+        goal,
+        step,
+        "cancelled",
+        _confirmation_text(gym, goal.conversation, kind),
+    )
 
 
 def _confirmation_result(
@@ -1483,6 +1532,8 @@ def _validation_kind(exc: ValidationError) -> str:
         return "stock_short"
     if "business date" in blob or "future" in blob:
         return "date_invalid"
+    if "already exists" in blob or "already stored" in blob:
+        return "already_saved"
     if "currency" in blob:
         return "currency_mismatch"
     if "draft" in blob:

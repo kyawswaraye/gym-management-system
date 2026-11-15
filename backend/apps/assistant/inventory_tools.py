@@ -403,8 +403,15 @@ _ADJUST = RegisteredTool(
         _definition("adjust_stock", "Adjust stock", _ADJUST_PERMISSIONS),
         (
             FieldRequirement("product_id", "Product"),
-            FieldRequirement("quantity", "Quantity"),
-            FieldRequirement("movement_type", "Movement type"),
+            FieldRequirement(
+                "quantity",
+                "Quantity as text, such as 8 or 8.000",
+            ),
+            FieldRequirement(
+                "movement_type",
+                "OPENING, PURCHASE, DAMAGE, LOSS, ADJUSTMENT, or CORRECTION. "
+                "A purchase also needs unit_cost as text.",
+            ),
             FieldRequirement("business_date", "Business date"),
             FieldRequirement("reason", "Reason"),
         ),
