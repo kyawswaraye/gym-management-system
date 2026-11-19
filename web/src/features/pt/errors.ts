@@ -1,7 +1,15 @@
 import { OperationError } from "@/features/operations/client";
 
+export const PAID_PT_GRANT =
+  "This PT pack cannot be given as a paid grant. Choose Free pack, or sell it on PT sales and approve that sale.";
+
+export const TRAINER_LINK_NEEDED =
+  "This member is not linked to this trainer on the sale date. Link them here, then save again.";
+
 export function phase5Error(caught: unknown, fallback: string): string {
   if (caught instanceof OperationError) {
+    if (caught.code === "SALE_GRANT_REQUIRED") return PAID_PT_GRANT;
+    if (caught.code === "ASSIGNMENT_NOT_EFFECTIVE") return TRAINER_LINK_NEEDED;
     if (caught.code === "PACKAGE_CONSUMED") {
       return "PACKAGE_CONSUMED: This package has already been used, so the sale cannot be voided.";
     }

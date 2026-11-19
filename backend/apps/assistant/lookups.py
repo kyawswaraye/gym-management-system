@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from typing import Any, cast
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -2583,6 +2584,48 @@ def _submit_status(gym: Gym, tool_name: str, record_id: str) -> str | None:
         else:
             return None
     return status
+
+
+def finance_record(
+    gym: Gym,
+    tool_name: str,
+    record_id: str,
+) -> tuple[str, str | None, str | None] | None:
+    """Return status, creator, and submitter for one finance record."""
+
+    from apps.trainers.models import PTSale
+
+    model = {
+        "submit_payment": Payment,
+        "approve_payment": Payment,
+        "submit_expense": Expense,
+        "approve_expense": Expense,
+        "submit_salary_period": SalaryPeriod,
+        "approve_salary_period": SalaryPeriod,
+        "submit_retail_sale": RetailSale,
+        "approve_retail_sale": RetailSale,
+        "submit_pt_sale": PTSale,
+        "approve_pt_sale": PTSale,
+    }.get(tool_name)
+    if model is None:
+        return None
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        row = (
+            cast(Any, model)
+            .objects.filter(gym=gym, id=record_id)
+            .only("status", "created_by_membership_id", "submitted_by_membership_id")
+            .first()
+        )
+    if row is None:
+        return None
+    created = getattr(row, "created_by_membership_id", None)
+    submitted = getattr(row, "submitted_by_membership_id", None)
+    return (
+        str(row.status),
+        None if created is None else str(created),
+        None if submitted is None else str(submitted),
+    )
 
 
 def _open_charge(gym: Gym, payload: Mapping[str, object]) -> dict[str, object] | None:

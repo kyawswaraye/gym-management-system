@@ -443,43 +443,61 @@ _FIELD_QUESTIONS = {
     "quantity": ("What quantity?", "အရေအတွက် ဘယ်လောက်လဲ။"),
 }
 _GATE_SENTENCES = {
-    "rejected": ("That change was not saved.", "ဒီပြောင်းလဲမှုကို မသိမ်းပါ။"),
-    "invalid": ("The stored change was not accepted.", "သိမ်းထားတဲ့ ပြောင်းလဲမှုကို လက်မခံပါ။"),
+    "rejected": (
+        "That change was not saved. Say the step again with the record it applies to.",
+        "ဒီပြောင်းလဲမှုကို မသိမ်းပါ။ မှတ်တမ်းနဲ့ လုပ်ချင်တဲ့ အဆင့်ကို ပြန်ပြောပါ။",
+    ),
+    "invalid": (
+        "The stored change was not accepted. Say the step again with the values you want.",
+        "သိမ်းထားတဲ့ ပြောင်းလဲမှုကို လက်မခံပါ။ လိုချင်တဲ့ အချက်တွေကို ပြန်ပြောပါ။",
+    ),
     "assignment": (
-        "The trainer must be assigned to the member on that date before this change.",
-        "ဒီရက်မှာ သင်တန်းဆရာကို အဖွဲ့ဝင်နဲ့ တာဝန်မပေးရသေးပါ။",
+        "The trainer must be assigned to the member on that date before this change. "
+        "Assign the trainer first.",
+        "ဒီရက်မှာ သင်တန်းဆရာကို အဖွဲ့ဝင်နဲ့ တာဝန်မပေးရသေးပါ။ အရင် တာဝန်ပေးပါ။",
+    ),
+    "assignment_required": (
+        "That trainer is not assigned to this member on that date. Assign the trainer "
+        "before the sale.",
+        "ဒီရက်မှာ သင်တန်းဆရာကို အဖွဲ့ဝင်နဲ့ တာဝန်မပေးရသေးပါ။ အရောင်းမတိုင်ခင် တာဝန်ပေးပါ။",
     ),
     "package": (
-        "That booking needs an active PT package with sessions left.",
-        "ဒီဘိုကင်အတွက် လက်ကျန်ရှိတဲ့ PT ပက်ကေ့ လိုပါတယ်။",
+        "That booking needs an active PT package with sessions left. A posted PT sale comes first.",
+        "ဒီဘိုကင်အတွက် လက်ကျန်ရှိတဲ့ PT ပက်ကေ့ လိုပါတယ်။ PT အရောင်းကို အရင်တင်ပါ။",
     ),
     "package_required": (
         "That booking needs an active PT package with sessions left. A posted PT sale comes first.",
         "ဒီဘိုကင်အတွက် လက်ကျန်ရှိတဲ့ PT ပက်ကေ့ လိုပါတယ်။ PT အရောင်းကို အရင်တင်ပါ။",
     ),
     "class_package": (
-        "That class needs an active class package with sessions left.",
-        "ဒီအတန်းအတွက် လက်ကျန်ရှိတဲ့ အတန်းပက်ကေ့ လိုပါတယ်။",
+        "That class needs an active class package with sessions left. Sell a class package first.",
+        "ဒီအတန်းအတွက် လက်ကျန်ရှိတဲ့ အတန်းပက်ကေ့ လိုပါတယ်။ အတန်းပက်ကေ့ကို အရင် ရောင်းပါ။",
     ),
     "class_package_required": (
-        "That class needs an active class package with sessions left.",
-        "ဒီအတန်းအတွက် လက်ကျန်ရှိတဲ့ အတန်းပက်ကေ့ လိုပါတယ်။",
+        "That class needs an active class package with sessions left. Sell a class package first.",
+        "ဒီအတန်းအတွက် လက်ကျန်ရှိတဲ့ အတန်းပက်ကေ့ လိုပါတယ်။ အတန်းပက်ကေ့ကို အရင် ရောင်းပါ။",
     ),
-    "member_inactive": ("That member is not active.", "ဒီအဖွဲ့ဝင်က အသုံးမပြုနိုင်ပါ။"),
-    "plan_inactive": ("That plan is not active.", "ဒီအစီအစဉ်က အသုံးမပြုနိုင်ပါ။"),
+    "member_inactive": (
+        "That member is not active. Choose an active member.",
+        "ဒီအဖွဲ့ဝင်က အသုံးမပြုနိုင်ပါ။ အသုံးပြုနိုင်တဲ့ အဖွဲ့ဝင်ကို ပြောပါ။",
+    ),
+    "plan_inactive": (
+        "That plan is not active. Choose an active plan.",
+        "ဒီအစီအစဉ်က အသုံးမပြုနိုင်ပါ။ အသုံးပြုနိုင်တဲ့ အစီအစဉ်ကို ပြောပါ။",
+    ),
     "membership_overlap": (
-        "Those dates overlap another membership.",
-        "ဒီရက်တွေက အခြားအသင်းဝင်ကြေးနဲ့ ထပ်နေပါတယ်။",
+        "Those dates overlap another membership. Choose dates that do not overlap.",
+        "ဒီရက်တွေက အခြားအသင်းဝင်ကြေးနဲ့ ထပ်နေပါတယ်။ မထပ်တဲ့ ရက်ကို ပြောပါ။",
     ),
     "membership_required": ("Which membership?", "ဘယ်အသင်းဝင်ကြေးလဲ။"),
     "membership_mismatch": (
-        "That membership does not belong to this member.",
-        "ဒီအသင်းဝင်ကြေးက ဒီအဖွဲ့ဝင်ရဲ့ မဟုတ်ပါ။",
+        "That membership does not belong to this member. Choose one of this member's memberships.",
+        "ဒီအသင်းဝင်ကြေးက ဒီအဖွဲ့ဝင်ရဲ့ မဟုတ်ပါ။ ဒီအဖွဲ့ဝင်ရဲ့ အသင်းဝင်ကြေးကို ပြောပါ။",
     ),
     "amount_unconfirmed": ("What amount?", "ပမာဏ ဘယ်လောက်လဲ။"),
     "amount_mismatch": (
-        "That amount is not the amount you said.",
-        "ပြောထားတဲ့ ပမာဏနဲ့ မတူပါ။",
+        "That amount is not the amount you said. Repeat the amount you want.",
+        "ပြောထားတဲ့ ပမာဏနဲ့ မတူပါ။ လိုချင်တဲ့ ပမာဏကို ပြန်ပြောပါ။",
     ),
     "currency_mismatch": (
         "Use the gym currency.",
@@ -490,102 +508,149 @@ _GATE_SENTENCES = {
         "ဒီပက်ကေ့ကို အရောင်းအတွက် မသုံးနိုင်ပါ။ ဘယ်ပက်ကေ့လဲ။",
     ),
     "balance_exceeded": (
-        "That amount is more than the outstanding balance.",
-        "ပမာဏက ပေးရန်ကျန်ငွေထက် များနေပါတယ်။",
+        "That amount is more than the outstanding balance. Use an amount within the balance.",
+        "ပမာဏက ပေးရန်ကျန်ငွေထက် များနေပါတယ်။ ပေးရန်ကျန်ငွေထက် မပိုတဲ့ ပမာဏကို ပြောပါ။",
     ),
     "class_full": (
-        "That class has no remaining places.",
-        "ဒီအတန်းမှာ နေရာမကျန်ပါ။",
+        "That class has no remaining places. Choose another class.",
+        "ဒီအတန်းမှာ နေရာမကျန်ပါ။ အခြားအတန်းကို ရွေးပါ။",
     ),
     "duplicate_booking": (
-        "That member already has a booking for this class.",
-        "ဒီအဖွဲ့ဝင်က ဒီအတန်းမှာ ဘိုကင်ရှိပြီးပါပြီ။",
+        "That member already has a booking for this class. Choose another class.",
+        "ဒီအဖွဲ့ဝင်က ဒီအတန်းမှာ ဘိုကင်ရှိပြီးပါပြီ။ အခြားအတန်းကို ရွေးပါ။",
     ),
     "schedule_conflict": (
-        "That time is already booked.",
-        "ဒီအချိန်မှာ ဘိုကင်ရှိပြီးပါပြီ။",
+        "That time is already booked. Choose a different time.",
+        "ဒီအချိန်မှာ ဘိုကင်ရှိပြီးပါပြီ။ အခြားအချိန်ကို ပြောပါ။",
     ),
     "trainer_unavailable": (
-        "That trainer is already booked at that time.",
-        "ဒီသင်တန်းဆရာက ဒီအချိန်မှာ ဘိုကင်ရှိပြီးပါပြီ။",
+        "That trainer is already booked at that time. Choose a different time or trainer.",
+        "ဒီသင်တန်းဆရာက ဒီအချိန်မှာ ဘိုကင်ရှိပြီးပါပြီ။ အခြားအချိန် သို့မဟုတ် သင်တန်းဆရာကို ပြောပါ။",
     ),
     "time_order": (
         "The end time has to be after the start time.",
         "အဆုံးအချိန်က စတင်အချိန်ထက် နောက်ကျရပါမယ်။",
     ),
     "stock_short": (
-        "There is not enough stock for that quantity.",
-        "တောင်းတဲ့ အရေအတွက်အတွက် လက်ကျန်မလုံလောက်ပါ။",
+        "There is not enough stock for that quantity. Ask for a quantity that is in stock.",
+        "တောင်းတဲ့ အရေအတွက်အတွက် လက်ကျန်မလုံလောက်ပါ။ လက်ကျန်ထက် မပိုတဲ့ အရေအတွက်ကို ပြောပါ။",
     ),
-    "product_inactive": ("That product is not active.", "ဒီပစ္စည်းက အသုံးမပြုနိုင်ပါ။"),
+    "product_inactive": (
+        "That product is not active. Choose an active product.",
+        "ဒီပစ္စည်းက အသုံးမပြုနိုင်ပါ။ အသုံးပြုနိုင်တဲ့ ပစ္စည်းကို ပြောပါ။",
+    ),
     "quantity_invalid": (
         "Tell me a positive whole-number quantity.",
         "အရေအတွက်ကို ကိန်းပြည့် အပေါင်းနဲ့ ပြောပေးပါ။",
     ),
     "quantity_unconfirmed": ("What quantity?", "အရေအတွက် ဘယ်လောက်လဲ။"),
     "duplicate_product": (
-        "Each product can be on the sale once.",
+        "Each product can be on the sale once. Keep each product on one line.",
         "ပစ္စည်းတစ်ခုကို တစ်ကြောင်းပဲ ထည့်ပါ။",
     ),
     "payment_unconfirmed": ("Which payment?", "ဘယ်ငွေပေးချေမှုလဲ။"),
     "payment_state": (
-        "That payment cannot be changed in its current state.",
-        "ဒီငွေပေးချေမှုကို အခုအခြေအနေမှာ ပြင်လို့ မရပါ။",
+        "That payment cannot be changed in its current state. Say the next step that matches it.",
+        "ဒီငွေပေးချေမှုကို အခုအခြေအနေမှာ ပြင်လို့ မရပါ။ အခြေအနေနဲ့ ကိုက်တဲ့ နောက်တစ်ဆင့်ကို ပြောပါ။",
     ),
     "retail_charge": (
         "Use the retail return for that product sale.",
         "ဒီပစ္စည်းအရောင်းကို ပြန်အမ်းလမ်းကြောင်းကနေ လုပ်ပါ။",
     ),
     "refund_exceeds": (
-        "That refund is more than the refundable balance.",
-        "ပြန်အမ်းငွေက ပြန်အမ်းနိုင်တဲ့ ပမာဏထက် များနေပါတယ်။",
+        "That refund is more than the refundable balance. Use an amount within that balance.",
+        "ပြန်အမ်းငွေက ပြန်အမ်းနိုင်တဲ့ ပမာဏထက် များနေပါတယ်။ အဲဒီပမာဏထက် မပိုအောင် ပြောပါ။",
     ),
     "void_blocked": (
-        "That payment cannot be fully reversed.",
-        "ဒီငွေပေးချေမှုကို အပြည့်အဝ ပြန်လှန်လို့ မရပါ။",
+        "That payment cannot be fully reversed. Refund the remaining balance instead.",
+        "ဒီငွေပေးချေမှုကို အပြည့်အဝ ပြန်လှန်လို့ မရပါ။ ကျန်ငွေကို ပြန်အမ်းပါ။",
     ),
-    "date_invalid": ("That date cannot be used.", "ဒီရက်ကို အသုံးမပြုနိုင်ပါ။"),
+    "date_invalid": (
+        "That date cannot be used. Say a real date.",
+        "ဒီရက်ကို အသုံးမပြုနိုင်ပါ။ ရှိတဲ့ ရက်ကို ပြောပါ။",
+    ),
     "unmetered_denied": (
-        "An unmetered booking is not allowed for this account.",
-        "အထုပ်မဲ့ ဘိုကင်လုပ်ခွင့် မရှိပါ။",
+        "An unmetered booking is not allowed for this account. Use a package with sessions left.",
+        "အထုပ်မဲ့ ဘိုကင်လုပ်ခွင့် မရှိပါ။ လက်ကျန်ရှိတဲ့ ပက်ကေ့ကို သုံးပါ။",
     ),
     "unmetered_reason": (
         "Tell me the reason for the unmetered booking.",
         "အထုပ်မဲ့ ဘိုကင်အတွက် အကြောင်းပြချက် ပြောပေးပါ။",
     ),
     "missing_record": (
-        "That record was not found in this gym.",
-        "ဒီအားကစားခန်းမမှာ မှတ်တမ်း မတွေ့ပါ။",
+        "That record was not found in this gym. Say the name or number again.",
+        "ဒီအားကစားခန်းမမှာ မှတ်တမ်း မတွေ့ပါ။ နာမည် သို့မဟုတ် နံပါတ်ကို ပြန်ပြောပါ။",
     ),
     "check_in_ineligible": (
-        "This member does not have an eligible active membership.",
-        "ဒီအဖွဲ့ဝင်မှာ ဝင်ရောက်နိုင်တဲ့ အသင်းဝင်ကြေး မရှိပါ။",
+        "This member does not have an eligible active membership. "
+        "Use a member with an active paid membership, or record that payment first.",
+        "ဒီအဖွဲ့ဝင်မှာ ဝင်ရောက်နိုင်တဲ့ အသင်းဝင်ကြေး မရှိပါ။ "
+        "ပေးချေပြီးသား အသင်းဝင်ကြေးရှိတဲ့ အဖွဲ့ဝင်ကို သုံးပါ၊ သို့မဟုတ် ငွေပေးချေမှုကို အရင် မှတ်ပါ။",
     ),
     "check_in_open": (
         "This member is already checked in. Check out before checking in again.",
         "ဒီအဖွဲ့ဝင် ဝင်ထားပြီးသားပါ။ ပြန်ထွက်ပြီးမှ ပြန်ဝင်ပါ။",
     ),
     "check_in_duplicate": (
-        "This member was already checked in.",
-        "ဒီအဖွဲ့ဝင်ကို ဒီကာလမှာ ဝင်ထားပြီးသားပါ။",
+        "This member was already checked in. No further check-in is needed for this period.",
+        "ဒီအဖွဲ့ဝင်ကို ဒီကာလမှာ ဝင်ထားပြီးသားပါ။ ထပ်ဝင်စရာ မလိုပါ။",
     ),
     "already_saved": (
-        "That change is already stored.",
-        "ဒီပြောင်းလဲမှု ရှိပြီးသားပါ။",
+        "That change is already stored. Nothing else needs to be saved for it.",
+        "ဒီပြောင်းလဲမှု ရှိပြီးသားပါ။ ထပ်သိမ်းစရာ မလိုပါ။",
     ),
     "sale_state": (
         "That sale is not posted yet. Approve it before returning goods.",
         "အရောင်းကို မတင်ရသေးပါ။ ပြန်အမ်းဖို့ အရင် အတည်ပြုပါ။",
     ),
     "finance_state": (
-        "That record cannot take this step in its current state. Nothing new was saved.",
-        "ဒီအခြေအနေမှာ ဒီအဆင့်ကို လုပ်လို့ မရပါ။ အသစ် မသိမ်းရပါ။",
+        "This record cannot take this step yet. Say whether to submit it, approve it, or leave it.",
+        "ဒီမှတ်တမ်းက ဒီအဆင့်ကို မရသေးပါ။ တင်သွင်းမလား၊ အတည်ပြုမလား၊ ဒီအတိုင်းထားမလား ပြောပါ။",
+    ),
+    "not_pending": (
+        "This record is not waiting for approval. Submit a draft, or leave a posted record.",
+        "ဒီမှတ်တမ်းက အတည်ပြုဖို့ စောင့်မနေပါ။ မူကြမ်းဆိုရင် တင်သွင်းပါ။ တင်ပြီးသားဆိုရင် ဒီအတိုင်းထားပါ။",
     ),
     "cash_session_required": (
-        "A cash payment needs an open till.",
-        "ငွေသားပေးချေမှုအတွက် ငွေသားစာရင်း ဖွင့်ထားဖို့ လိုပါတယ်။",
+        "A cash payment needs an open till. Open the till, then continue this step.",
+        "ငွေသားပေးချေမှုအတွက် ငွေသားစာရင်း ဖွင့်ထားဖို့ လိုပါတယ်။ စာရင်းဖွင့်ပြီး ဒီအဆင့်ကို ဆက်လုပ်ပါ။",
     ),
 }
+_STATUS_NEXT = {
+    "DRAFT": (
+        "This record is still a draft. Submit it before it can be approved.",
+        "ဒီမှတ်တမ်းက မူကြမ်းဖြစ်နေပါသေးတယ်။ အတည်မပြုခင် အရင် တင်သွင်းပါ။",
+    ),
+    "PENDING_APPROVAL": (
+        "This record is already submitted and waiting for approval. Confirm that approval.",
+        "ဒီမှတ်တမ်းကို တင်ပြီးပါပြီ။ ဆက်လုပ်ဖို့ အတည်ပြုချက်ကို အတည်ပြုပါ။",
+    ),
+    "POSTED": (
+        "This record is already posted. Nothing else needs to be saved.",
+        "ဒီမှတ်တမ်းကို တင်ပြီးပါပြီ။ ထပ်သိမ်းစရာ မလိုပါ။",
+    ),
+    "REJECTED": (
+        "This record was rejected. Create a new draft if it should be recorded again.",
+        "ဒီမှတ်တမ်းကို ငြင်းပြီးပါပြီ။ ပြန်မှတ်ချင်ရင် မူကြမ်းအသစ် ပြောပါ။",
+    ),
+    "CANCELLED": (
+        "This record is cancelled. Create a new draft if it should be recorded again.",
+        "ဒီမှတ်တမ်းကို ပယ်ဖျက်ပြီးပါပြီ။ ပြန်မှတ်ချင်ရင် မူကြမ်းအသစ် ပြောပါ။",
+    ),
+    "VOID": (
+        "This record is already void. Nothing else needs to be saved.",
+        "ဒီမှတ်တမ်းကို ပြန်လှန်ပြီးပါပြီ။ ထပ်သိမ်းစရာ မလိုပါ။",
+    ),
+}
+_PENDING_OTHER = (
+    "This record is already submitted and waiting for approval. "
+    "Another staff member who can approve must confirm it.",
+    "ဒီမှတ်တမ်းကို တင်ပြီးပါပြီ။ အတည်ပြုခွင့်ရှိတဲ့ အခြားဝန်ထမ်းက အတည်ပြုရပါမယ်။",
+)
+_RECOVERY_FALLBACK = (
+    "This step cannot be done yet. Repeat the fact you want changed.",
+    "ဒီအဆင့်ကို မလုပ်နိုင်သေးပါ။ ပြောထားတဲ့ အချက်ကို ပြန်ပြောပေးပါ။",
+)
 _WRITE_WORDS = re.compile(
     r"\b(add|create|book|register|update|cancel|void|approve|reject|sell|"
     r"archive|restore|submit|adjust|reconcile|grant)\b",
@@ -793,6 +858,43 @@ def short_reply_kind(text: str) -> str:
     return ""
 
 
+def _notice_code(body: Mapping[str, object]) -> str:
+    error = body.get("error")
+    if isinstance(error, str) and error:
+        return error
+    status = body.get("status")
+    return status if isinstance(status, str) else ""
+
+
+def _stored_status(body: Mapping[str, object]) -> str:
+    if not isinstance(body.get("error"), str) or not body.get("error"):
+        return ""
+    status = body.get("status")
+    return status if isinstance(status, str) else ""
+
+
+def recovery_sentence(
+    body: Mapping[str, object],
+    staff_text: str,
+    *,
+    can_continue: bool = True,
+) -> str:
+    """Say what happened and the one next action. No tool name, id, or screen."""
+
+    code = _notice_code(body)
+    status = _stored_status(body)
+    if code in {"finance_state", "not_pending", "payment_state"} and status in _STATUS_NEXT:
+        pair = (
+            _PENDING_OTHER
+            if status == "PENDING_APPROVAL" and not can_continue
+            else _STATUS_NEXT[status]
+        )
+        return _sentence(pair, staff_text)
+    if code in _GATE_SENTENCES:
+        return gate_sentence(code, staff_text, body)
+    return _sentence(_RECOVERY_FALLBACK, staff_text)
+
+
 def gate_sentence(
     code: str,
     staff_text: str,
@@ -829,13 +931,25 @@ def staff_notice(body: Mapping[str, object], staff_text: str) -> str | None:
     if not isinstance(error, str):
         status = body.get("status")
         error = status if isinstance(status, str) else ""
+    if error in {"finance_state", "not_pending", "payment_state", "assignment_required"}:
+        return recovery_sentence(body, staff_text)
     if error not in _NOTICE_ERRORS:
-        return None
+        if not error:
+            return None
+        return recovery_sentence(body, staff_text)
     burmese = speaks_burmese(staff_text)
     if error == "permission_denied":
-        return "ဒီအချက်အလက်ကို ကြည့်ခွင့် မရှိပါ။" if burmese else "You cannot view that information."
+        return (
+            "ဒီအချက်အလက်ကို ကြည့်ခွင့် မရှိပါ။ ခွင့်ရှိတဲ့ အချက်ကို မေးပါ။"
+            if burmese
+            else "You cannot view that information. Ask for something you can view."
+        )
     if error == "unavailable":
-        return "မပြီးမြောက်ပါ။ ဘာမှ မပြောင်းရသေးပါ။" if burmese else "I could not complete that."
+        return (
+            "မပြီးမြောက်ပါ။ ဘာမှ မပြောင်းရသေးပါ။ နောက်တစ်ဆင့်ကို ပြန်ပြောပေးပါ။"
+            if burmese
+            else "I could not complete that. Nothing was changed. Repeat the step you want."
+        )
     if error == "not_found":
         return "သိမ်းထားတဲ့ မှတ်တမ်း မတွေ့ပါ။" if burmese else "No stored record matches that."
     if error == "already_saved":

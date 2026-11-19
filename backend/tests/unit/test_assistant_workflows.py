@@ -26,6 +26,7 @@ from apps.assistant.turns import (
     _plain_change,
     _remembered_saved_change,
     _reply,
+    _safe_followup,
     _same_saved_change,
     _select_declaration,
     _select_workflows,
@@ -694,3 +695,110 @@ def test_a_burmese_conversation_localizes_the_summary_and_notice(
     assert "That change is not saved until you confirm." not in interrupted_body
     assert interrupted_body.count("ဒီပြောင်းလဲမှုကို မသိမ်းရသေးပါ") == 1
     assert "အသုံးစရိတ်" in interrupted_body
+
+
+def _tool_turn(name: str, arguments: dict[str, object]) -> ModelTurn:
+    return ModelTurn(
+        "",
+        (FunctionCall(name, arguments),),
+        ({"functionCall": {"name": name, "args": arguments}},),
+    )
+
+
+def test_a_pending_submit_continues_to_approval(monkeypatch: pytest.MonkeyPatch) -> None:
+    called: list[str] = []
+
+    def handle(**kwargs: object) -> tuple[dict[str, object] | None, dict[str, object]]:
+        name = kwargs["name"]
+        assert isinstance(name, str)
+        called.append(name)
+        if name == "submit_payment":
+            return None, {"error": "finance_state", "status": "PENDING_APPROVAL"}
+        assert name == "approve_payment"
+        return (
+            {"summary": "Approve the payment.", "tool_name": "approve_payment"},
+            {"status": "confirmation_required"},
+        )
+
+    def generate(**kwargs: object) -> ModelTurn:
+        if not _responses(kwargs["contents"]):
+            return _tool_turn("submit_payment", {"payment_id": "pay-1"})
+        return ModelTurn("", (), ())
+
+    _install(monkeypatch, staff_text="ငွေချေမယ်", generate=generate)
+    monkeypatch.setattr("apps.assistant.turns._handle_call", handle)
+    monkeypatch.setattr("apps.assistant.turns._blocks_own_approval", lambda *_args: False)
+    result = _run()
+    body = str(result["message"]["body"])
+
+    assert called == ["submit_payment", "approve_payment"]
+    assert result["pending_confirmation"] == {
+        "summary": "Approve the payment.",
+        "tool_name": "approve_payment",
+    }
+    assert "ဆက်လုပ်ဖို့ အတည်ပြုချက်ကို အတည်ပြုပါ။" in body
+    assert "ဒီအခြေအနေမှာ ဒီအဆင့်ကို လုပ်လို့ မရပါ" not in body
+
+
+def test_a_posted_record_stops_without_another_card(monkeypatch: pytest.MonkeyPatch) -> None:
+    def handle(**kwargs: object) -> tuple[None, dict[str, object]]:
+        assert kwargs["name"] == "submit_payment"
+        return None, {"error": "finance_state", "status": "POSTED"}
+
+    def generate(**kwargs: object) -> ModelTurn:
+        if not _responses(kwargs["contents"]):
+            return _tool_turn("submit_payment", {"payment_id": "pay-1"})
+        return ModelTurn("", (), ())
+
+    _install(monkeypatch, staff_text="ငွေချေမယ်", generate=generate)
+    monkeypatch.setattr("apps.assistant.turns._handle_call", handle)
+    result = _run()
+    body = str(result["message"]["body"])
+
+    assert result["pending_confirmation"] is None
+    assert body == "ဒီမှတ်တမ်းကို တင်ပြီးပါပြီ။ ထပ်သိမ်းစရာ မလိုပါ။"
+
+
+def test_a_missing_amount_asks_without_a_refusal(monkeypatch: pytest.MonkeyPatch) -> None:
+    def handle(**_kwargs: object) -> tuple[None, dict[str, object]]:
+        return None, {"error": "amount_unconfirmed"}
+
+    def generate(**kwargs: object) -> ModelTurn:
+        if not _responses(kwargs["contents"]):
+            return _tool_turn("create_payment", {})
+        return ModelTurn("I cannot do that.", (), ({"text": "I cannot do that."},))
+
+    _install(monkeypatch, staff_text="ငွေချေမယ်", generate=generate)
+    monkeypatch.setattr("apps.assistant.turns._handle_call", handle)
+    result = _run()
+
+    assert result["pending_confirmation"] is None
+    assert result["message"]["body"] == "ပမာဏ ဘယ်လောက်လဲ။"
+
+
+def test_confirmation_followups_stay_on_the_safe_next_write() -> None:
+    pending = _safe_followup(
+        "submit_pt_sale",
+        {"error": "finance_state", "status": "PENDING_APPROVAL"},
+        {"pt_sale_id": "sale-1"},
+    )
+    posted = _safe_followup(
+        "approve_payment",
+        {"error": "not_pending", "status": "POSTED"},
+        {"payment_id": "pay-1"},
+    )
+    draft = _safe_followup(
+        "approve_payment",
+        {"error": "not_pending", "status": "DRAFT"},
+        {"payment_id": "pay-1"},
+    )
+    void = _safe_followup(
+        "void_payment",
+        {"error": "finance_state", "status": "POSTED"},
+        {"payment_id": "pay-1"},
+    )
+
+    assert pending == ("approve_pt_sale", {"pt_sale_id": "sale-1"})
+    assert posted is None
+    assert draft == ("submit_payment", {"payment_id": "pay-1"})
+    assert void is None

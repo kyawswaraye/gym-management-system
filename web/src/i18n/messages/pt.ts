@@ -40,8 +40,8 @@ export const ptEn = {
     "A different person must record this payout.",
   "A manager can cancel inside the cutoff with a reason.":
     "A manager can cancel inside the cutoff with a reason.",
-  "A PT package must be complimentary. A paid PT grant comes from sale approval.":
-    "A PT package must be complimentary. A paid PT grant comes from sale approval.",
+  "This PT pack cannot be given as a paid grant. Choose Free pack, or sell it on PT sales and approve that sale.":
+    "This PT pack cannot be given as a paid grant. Choose Free pack, or sell it on PT sales and approve that sale.",
   "Active assigned members": "Active assigned members",
   "All types": "All types",
   Any: "Any",
@@ -106,8 +106,8 @@ export const ptEn = {
     "Choose an active class type and the trainer who leads it.",
   "Choose an active member and package. A paid PT grant comes from sale approval.":
     "Choose an active member and package. A paid PT grant comes from sale approval.",
-  "Pick the member, trainer, and sale total. Record the member's money here before you save.":
-    "Pick the member, trainer, and sale total. Record the member's money here before you save.",
+  "Pick the member and trainer. If they are not linked on the sale date, link them here, then record the member's money and save.":
+    "Pick the member and trainer. If they are not linked on the sale date, link them here, then record the member's money and save.",
   Money: "Money",
   "Sale total splits into trainer pay and gym keep. Member money is separate.":
     "Sale total splits into trainer pay and gym keep. Member money is separate.",
@@ -392,6 +392,22 @@ export const ptEn = {
   "Select a sale to see its fee, package, payment, and commission.":
     "Select a sale to see its fee, package, payment, and commission.",
   "Select a trainer": "Select a trainer",
+  "Checking the trainer link.": "Checking the trainer link.",
+  "This member is linked to this trainer on the sale date.":
+    "This member is linked to this trainer on the sale date.",
+  "{member} is not linked to {trainer} on {date}. Link them here, then save the sale.":
+    "{member} is not linked to {trainer} on {date}. Link them here, then save the sale.",
+  "{member} is linked to {trainer} from {date}. Change the sale date to that day or later.":
+    "{member} is linked to {trainer} from {date}. Change the sale date to that day or later.",
+  "Use {date}": "Use {date}",
+  "Link this trainer": "Link this trainer",
+  "This save also links {trainer} to {member} from {date}.":
+    "This save also links {trainer} to {member} from {date}.",
+  "The trainer could not be linked.": "The trainer could not be linked.",
+  "The trainer link could not be checked.":
+    "The trainer link could not be checked.",
+  "This member is not linked to this trainer on the sale date. Link them here, then save again.":
+    "This member is not linked to this trainer on the sale date. Link them here, then save again.",
   "Select a trainer to view today's members.":
     "Select a trainer to view today's members.",
   "Select an entry": "Select an entry",
@@ -605,8 +621,8 @@ export const ptMm = {
     "အသုံးပြုနေသော အတန်း အမျိုးအစားနှင့် ၎င်းကို ဦးဆောင်သည့် Trainerကို ရွေးပါ။",
   "Choose an active member and package. A paid PT grant comes from sale approval.":
     "အသုံးပြုနေသော အဖွဲ့ဝင်နှင့် ပက်ကေ့ဂျ်ကို ရွေးပါ။ အခပေး PT ပေးအပ်ချက်သည် အရောင်း အတည်ပြုမှုမှ ရရှိသည်။",
-  "Pick the member, trainer, and sale total. Record the member's money here before you save.":
-    "Member၊ Trainerနှင့် အရောင်းစုစုပေါင်းကို ရွေးပါ။ သိမ်းမီ Member ငွေကို ဤနေရာမှာ မှတ်ပါ။",
+  "Pick the member and trainer. If they are not linked on the sale date, link them here, then record the member's money and save.":
+    "Member နဲ့ trainer ရွေးပါ။ ရောင်းမယ့်ရက်မှာ မချိတ်ရသေးရင် ဒီဖောင်မှာ ချိတ်ပါ။ ပြီးမှ member ငွေကို မှတ်ပြီး သိမ်းပါ။",
   Money: "ငွေ",
   "Sale total splits into trainer pay and gym keep. Member money is separate.":
     "အရောင်းစုစုပေါင်းကို Trainer ပေးငွေနှင့် Gym ထားငွေ ခွဲသည်။ Member ငွေက သီးခြားဖြစ်သည်။",
@@ -896,6 +912,21 @@ export const ptMm = {
   "Select a sale to see its fee, package, payment, and commission.":
     "ကြေး၊ ပက်ကေ့ဂျ်၊ ငွေပေးချေမှုနှင့် ကော်မရှင်ကို ကြည့်ရန် အရောင်းတစ်ခု ရွေးပါ။",
   "Select a trainer": "Trainer ရွေးပါ",
+  "Checking the trainer link.": "Trainer ချိတ်ဆက်မှုကို စစ်နေသည်။",
+  "This member is linked to this trainer on the sale date.":
+    "ဒီ member ကို ဒီ trainer နဲ့ ရောင်းမယ့်ရက်မှာ ချိတ်ပြီးပါပြီ။",
+  "{member} is not linked to {trainer} on {date}. Link them here, then save the sale.":
+    "{member} ကို {trainer} နဲ့ {date} မှာ မချိတ်ရသေးပါ။ ဒီမှာ ချိတ်ပြီးမှ ရောင်းတာကို သိမ်းပါ။",
+  "{member} is linked to {trainer} from {date}. Change the sale date to that day or later.":
+    "{member} ကို {trainer} နဲ့ {date} ကနေ ချိတ်ထားသည်။ ရောင်းမယ့်ရက်ကို အဲဒီရက် သို့မဟုတ် နောက်ရက်ပြောင်းပါ။",
+  "Use {date}": "{date} ကို သုံးပါ",
+  "Link this trainer": "ဒီ trainer ကို ချိတ်ပါ",
+  "This save also links {trainer} to {member} from {date}.":
+    "ဒီသိမ်းတာက {trainer} ကို {member} နဲ့ {date} ကနေ ချိတ်ပါမယ်။",
+  "The trainer could not be linked.": "Trainer ချိတ်လို့ မရပါ။",
+  "The trainer link could not be checked.": "Trainer ချိတ်ဆက်မှုကို စစ်လို့ မရပါ။",
+  "This member is not linked to this trainer on the sale date. Link them here, then save again.":
+    "ဒီ member ကို ဒီ trainer နဲ့ ရောင်းမယ့်ရက်မှာ မချိတ်ရသေးပါ။ ဒီမှာ ချိတ်ပြီး ပြန်သိမ်းပါ။",
   "Select a trainer to view today's members.":
     "ယနေ့ အဖွဲ့ဝင်များကို ကြည့်ရန် Trainerတစ်ဦး ရွေးပါ။",
   "Select an entry": "စာရင်းချက် ရွေးပါ",

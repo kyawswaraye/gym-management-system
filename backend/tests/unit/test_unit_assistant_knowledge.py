@@ -19,6 +19,7 @@ from apps.assistant.knowledge import (
     included_sections,
     localized_summary,
     public_activity,
+    recovery_sentence,
     reply_needs_fresh_read,
     staff_notice,
     states_stored_facts,
@@ -180,7 +181,7 @@ def test_permission_denial_and_raw_exceptions_stay_off_the_reply(monkeypatch) ->
     notice = staff_notice(hidden, "ငွေပေးချေမှု ပြပါ")
 
     assert hidden == {"error": "permission_denied"}
-    assert notice == "ဒီအချက်အလက်ကို ကြည့်ခွင့် မရှိပါ။"
+    assert notice == "ဒီအချက်အလက်ကို ကြည့်ခွင့် မရှိပါ။ ခွင့်ရှိတဲ့ အချက်ကို မေးပါ။"
     assert "payments.view" not in str(hidden)
     assert notice is not None
     assert "payments.view" not in notice
@@ -286,16 +287,16 @@ def test_missing_or_ambiguous_facts_ask_without_internal_names() -> None:
 def test_known_validation_errors_are_staff_sentences() -> None:
     burmese = "အဖွဲ့ဝင်ကို ငွေချေမယ်"
     notices = {
-        "member_inactive": "ဒီအဖွဲ့ဝင်က အသုံးမပြုနိုင်ပါ။",
-        "plan_inactive": "ဒီအစီအစဉ်က အသုံးမပြုနိုင်ပါ။",
-        "class_full": "ဒီအတန်းမှာ နေရာမကျန်ပါ။",
-        "duplicate_booking": "ဒီအဖွဲ့ဝင်က ဒီအတန်းမှာ ဘိုကင်ရှိပြီးပါပြီ။",
-        "class_package_required": "ဒီအတန်းအတွက် လက်ကျန်ရှိတဲ့ အတန်းပက်ကေ့ လိုပါတယ်။",
-        "stock_short": "တောင်းတဲ့ အရေအတွက်အတွက် လက်ကျန်မလုံလောက်ပါ။",
+        "member_inactive": "ဒီအဖွဲ့ဝင်က အသုံးမပြုနိုင်ပါ။ အသုံးပြုနိုင်တဲ့ အဖွဲ့ဝင်ကို ပြောပါ။",
+        "plan_inactive": "ဒီအစီအစဉ်က အသုံးမပြုနိုင်ပါ။ အသုံးပြုနိုင်တဲ့ အစီအစဉ်ကို ပြောပါ။",
+        "class_full": "ဒီအတန်းမှာ နေရာမကျန်ပါ။ အခြားအတန်းကို ရွေးပါ။",
+        "duplicate_booking": "ဒီအဖွဲ့ဝင်က ဒီအတန်းမှာ ဘိုကင်ရှိပြီးပါပြီ။ အခြားအတန်းကို ရွေးပါ။",
+        "class_package_required": ("ဒီအတန်းအတွက် လက်ကျန်ရှိတဲ့ အတန်းပက်ကေ့ လိုပါတယ်။ အတန်းပက်ကေ့ကို အရင် ရောင်းပါ။"),
+        "stock_short": ("တောင်းတဲ့ အရေအတွက်အတွက် လက်ကျန်မလုံလောက်ပါ။ လက်ကျန်ထက် မပိုတဲ့ အရေအတွက်ကို ပြောပါ။"),
         "quantity_unconfirmed": "အရေအတွက် ဘယ်လောက်လဲ။",
         "quantity_invalid": "အရေအတွက်ကို ကိန်းပြည့် အပေါင်းနဲ့ ပြောပေးပါ။",
-        "refund_exceeds": "ပြန်အမ်းငွေက ပြန်အမ်းနိုင်တဲ့ ပမာဏထက် များနေပါတယ်။",
-        "payment_state": "ဒီငွေပေးချေမှုကို အခုအခြေအနေမှာ ပြင်လို့ မရပါ။",
+        "refund_exceeds": ("ပြန်အမ်းငွေက ပြန်အမ်းနိုင်တဲ့ ပမာဏထက် များနေပါတယ်။ အဲဒီပမာဏထက် မပိုအောင် ပြောပါ။"),
+        "payment_state": ("ဒီငွေပေးချေမှုကို အခုအခြေအနေမှာ ပြင်လို့ မရပါ။ အခြေအနေနဲ့ ကိုက်တဲ့ နောက်တစ်ဆင့်ကို ပြောပါ။"),
         "retail_charge": "ဒီပစ္စည်းအရောင်းကို ပြန်အမ်းလမ်းကြောင်းကနေ လုပ်ပါ။",
         "amount_unconfirmed": "ပမာဏ ဘယ်လောက်လဲ။",
         "time_order": "အဆုံးအချိန်က စတင်အချိန်ထက် နောက်ကျရပါမယ်။",
@@ -328,8 +329,46 @@ def test_known_validation_errors_are_staff_sentences() -> None:
     assert package == "ဒီဘိုကင်အတွက် လက်ကျန်ရှိတဲ့ PT ပက်ကေ့ လိုပါတယ်။ PT အရောင်းကို အရင်တင်ပါ။"
     assert "PT" not in (staff_notice({"error": "class_package_required"}, burmese) or "")
     assert missing_plan == "ဘယ်အစီအစဉ်လဲ။"
-    assert english == "That class has no remaining places."
+    assert english == "That class has no remaining places. Choose another class."
     assert "create_class_booking" not in english
+
+
+def test_a_failed_step_names_the_state_and_the_next_action() -> None:
+    burmese = "ငွေချေမယ်"
+    pending = recovery_sentence(
+        {"error": "finance_state", "status": "PENDING_APPROVAL"},
+        burmese,
+    )
+    own = recovery_sentence(
+        {"error": "finance_state", "status": "PENDING_APPROVAL"},
+        burmese,
+        can_continue=False,
+    )
+    posted = recovery_sentence(
+        {"error": "not_pending", "status": "POSTED"},
+        burmese,
+    )
+    draft = staff_notice({"error": "not_pending", "status": "DRAFT"}, burmese)
+    amount = staff_notice({"error": "amount_unconfirmed"}, burmese)
+    assignment = staff_notice({"error": "assignment_required"}, burmese)
+    unknown = recovery_sentence({"error": "something_else"}, burmese)
+    rejected = recovery_sentence({"error": "rejected"}, "Confirm the payment")
+
+    assert pending == "ဒီမှတ်တမ်းကို တင်ပြီးပါပြီ။ ဆက်လုပ်ဖို့ အတည်ပြုချက်ကို အတည်ပြုပါ။"
+    assert own == "ဒီမှတ်တမ်းကို တင်ပြီးပါပြီ။ အတည်ပြုခွင့်ရှိတဲ့ အခြားဝန်ထမ်းက အတည်ပြုရပါမယ်။"
+    assert posted == "ဒီမှတ်တမ်းကို တင်ပြီးပါပြီ။ ထပ်သိမ်းစရာ မလိုပါ။"
+    assert draft == "ဒီမှတ်တမ်းက မူကြမ်းဖြစ်နေပါသေးတယ်။ အတည်မပြုခင် အရင် တင်သွင်းပါ။"
+    assert amount == "ပမာဏ ဘယ်လောက်လဲ။"
+    assert "မရပါ" not in (amount or "")
+    assert assignment == "ဒီရက်မှာ သင်တန်းဆရာကို အဖွဲ့ဝင်နဲ့ တာဝန်မပေးရသေးပါ။ အရောင်းမတိုင်ခင် တာဝန်ပေးပါ။"
+    assert unknown == "ဒီအဆင့်ကို မလုပ်နိုင်သေးပါ။ ပြောထားတဲ့ အချက်ကို ပြန်ပြောပေးပါ။"
+    assert rejected == (
+        "That change was not saved. Say the step again with the record it applies to."
+    )
+    for sentence in (pending, own, posted, draft, amount, assignment, unknown, rejected):
+        assert sentence is not None
+        assert "submit_payment" not in sentence
+        assert "approve_payment" not in sentence
 
 
 def test_a_change_is_not_called_saved_before_the_server_confirms() -> None:

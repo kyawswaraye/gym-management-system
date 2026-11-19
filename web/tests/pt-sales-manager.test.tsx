@@ -14,9 +14,11 @@ import { listMembers } from "@/features/operations/client";
 import {
   approvePtSale,
   cancelPtSale,
+  createAssignment,
   createPtSale,
   getPtCommission,
   getPtSale,
+  listAssignments,
   listPtCommissions,
   listPtSales,
   listServicePackages,
@@ -31,6 +33,8 @@ import type { PTSale } from "@/types/api";
 
 vi.mock("@/features/pt/client", () => ({
   listTrainers: vi.fn(),
+  listAssignments: vi.fn(),
+  createAssignment: vi.fn(),
   listServicePackages: vi.fn(),
   listPtSales: vi.fn(),
   getPtSale: vi.fn(),
@@ -139,6 +143,7 @@ function renderSales(
     canUpdate: boolean;
     canSubmit: boolean;
     canApprove: boolean;
+    canLinkTrainer: boolean;
     canViewReceipts: boolean;
     canVoid: boolean;
     membershipId: string;
@@ -148,6 +153,10 @@ function renderSales(
     <SalesManager
       canApprove={props.canApprove ?? false}
       canCreate={props.canCreate ?? false}
+      canSubmit={props.canSubmit ?? false}
+      canUpdate={props.canUpdate ?? false}
+      canViewReceipts={props.canViewReceipts ?? false}
+      canLinkTrainer={props.canLinkTrainer ?? false}
       canSubmit={props.canSubmit ?? false}
       canUpdate={props.canUpdate ?? false}
       canViewReceipts={props.canViewReceipts ?? false}
@@ -244,9 +253,9 @@ async function chooseMember(
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listTrainers).mockResolvedValue(empty);
+  vi.mocked(listAssignments).mockResolvedValue(empty);
   vi.mocked(listServicePackages).mockResolvedValue(empty);
   vi.mocked(listPtSales).mockResolvedValue(empty);
-  vi.mocked(listPtCommissions).mockResolvedValue(empty);
   vi.mocked(listMembers).mockResolvedValue(empty);
   vi.mocked(listCashSessions).mockResolvedValue(empty);
   vi.mocked(listReceipts).mockResolvedValue(empty);
@@ -729,6 +738,48 @@ describe("create and edit draft dialogs", () => {
         name: "Remove member money from this draft",
       }),
     ).not.toBeInTheDocument();
+  });
+
+  it("links the trainer while saving the draft", async () => {
+    vi.mocked(listAssignments).mockResolvedValue(empty);
+    vi.mocked(createAssignment).mockResolvedValue({
+      status: "ACTIVE",
+      trainer_staff_profile_id: TRAINER,
+      member_id: MEMBER,
+      effective_from: "2026-10-19",
+      effective_until: null,
+    } as never);
+    vi.mocked(createPtSale).mockResolvedValue(sale("DRAFT"));
+    vi.mocked(listTrainers).mockResolvedValue(
+      page([{ id: TRAINER, staff_code: "TR-1", display_name: "Ada" }]),
+    );
+    renderSales({ canCreate: true, canLinkTrainer: true });
+    fireEvent.click(screen.getByRole("button", { name: "Create draft" }));
+    const dialog = await screen.findByRole("dialog", { name: "Create draft" });
+    await within(dialog).findByRole("option", { name: /Ada/ });
+    await fillDraft(dialog);
+    expect(
+      await within(dialog).findByText(
+        "This save also links Ada to Grace Hopper (M-1) from 19-10-2026.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: "Link this trainer" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save draft" }));
+    await waitFor(() => expect(createPtSale).toHaveBeenCalledTimes(1));
+    expect(createAssignment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        member_id: MEMBER,
+        trainer_staff_profile_id: TRAINER,
+        effective_from: "2026-10-19",
+        effective_until: null,
+        reason: "Linked for a PT sale.",
+      }),
+    );
+    expect(createAssignment.mock.invocationCallOrder[0]).toBeLessThan(
+      createPtSale.mock.invocationCallOrder[0] ?? 0,
+    );
   });
 
   it("locks the create dialog while the save is pending and then shows success", async () => {

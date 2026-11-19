@@ -15,6 +15,7 @@ import {
   type ToolActivity,
   type TurnResult,
 } from "@/features/assistant/client";
+import { plainAssistantText } from "@/features/assistant/plain-text";
 import { OperationError } from "@/features/operations/client";
 import { useTx } from "@/i18n/use-tx";
 
@@ -591,7 +592,7 @@ export function AssistantChat({ membershipId }: { membershipId: string }) {
                     key={message.id}
                     className="text-[16px] leading-7 break-words whitespace-pre-wrap text-[#0d0d0d]"
                   >
-                    {message.body}
+                    {plainAssistantText(message.body)}
                   </p>
                 );
               })}

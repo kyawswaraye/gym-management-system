@@ -9,7 +9,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemberPackagesManager } from "@/features/pt/member-packages-manager";
-import { listMembers } from "@/features/operations/client";
+import { listMembers, OperationError } from "@/features/operations/client";
 import {
   adjustPackageLedger,
   grantMemberPackage,
@@ -668,6 +668,63 @@ describe("grant package dialog", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     const reopened = await openGrantDialog();
     expect(within(reopened).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("gives a PT pack free and does not offer a paid grant", async () => {
+    vi.mocked(grantMemberPackage).mockResolvedValue({} as never);
+    renderManager();
+    await screen.findByText("Ten sessions");
+    const dialog = await openGrantDialog();
+    await fillGrant(dialog);
+    expect(
+      within(dialog).queryByLabelText("Free pack?"),
+    ).not.toBeInTheDocument();
+    expect(dialog).not.toHaveTextContent("SALE_GRANT_REQUIRED");
+    expect(dialog).not.toHaveTextContent("cannot be given as a paid grant");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save grant" }));
+    await waitFor(() => expect(grantMemberPackage).toHaveBeenCalledTimes(1));
+    expect(grantMemberPackage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        service_package_id: PACKAGE,
+        complimentary: true,
+      }),
+      expect.stringMatching(KEY),
+    );
+  });
+
+  it("turns a sale-grant rejection into the next step", async () => {
+    vi.mocked(listServicePackages).mockResolvedValue(
+      page([{ id: CLASS_PACKAGE, code: "C1", name: "Yoga", type: "CLASS" }]),
+    );
+    vi.mocked(grantMemberPackage).mockRejectedValue(
+      new OperationError(
+        "A PT package is granted by an approved sale.",
+        {},
+        "SALE_GRANT_REQUIRED",
+      ),
+    );
+    renderManager();
+    await screen.findByText("Ten sessions");
+    const dialog = await openGrantDialog();
+    fireEvent.change(within(dialog).getByLabelText("Search active members"), {
+      target: { value: "Grace" },
+    });
+    fireEvent.click(
+      await within(dialog).findByRole("button", { name: "Grace Hopper (M-1)" }),
+    );
+    await within(dialog).findByRole("option", { name: /CLASS · C1/ });
+    fireEvent.change(within(dialog).getByLabelText("Which pack?"), {
+      target: { value: CLASS_PACKAGE },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Free pack?"), {
+      target: { value: "false" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save grant" }));
+    const failure = await within(dialog).findByRole("alert");
+    expect(failure).toHaveTextContent(
+      "Choose Free pack, or sell it on PT sales and approve that sale.",
+    );
+    expect(failure).not.toHaveTextContent("SALE_GRANT_REQUIRED");
   });
 
   it("reuses an idempotency key until the grant succeeds", async () => {

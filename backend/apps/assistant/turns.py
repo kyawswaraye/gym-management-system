@@ -46,6 +46,7 @@ from apps.assistant.knowledge import (
     grounded_read_reply,
     localized_summary,
     public_activity,
+    recovery_sentence,
     reply_needs_fresh_read,
     speaks_burmese,
     staff_notice,
@@ -61,6 +62,7 @@ from apps.assistant.lookups import (
     bind_latest_ledger_entry,
     booking_package_gap,
     existing_assignment,
+    finance_record,
     member_has_class_booking,
     membership_conflict,
     prepare_cash_reconcile,
@@ -363,6 +365,7 @@ def _reply(
     )
     seen_errors: set[tuple[str, str]] = set()
     last_error: Mapping[str, object] | None = None
+    failures: list[tuple[str, dict[str, object], dict[str, object]]] = []
     try:
         steps_used = 0
         free_selects = 0
@@ -471,6 +474,7 @@ def _reply(
                 error_code = body.get("error")
                 if isinstance(error_code, str) and error_code:
                     last_error = body
+                    failures.append((call.name, dict(body), dict(call.arguments)))
                     key = (call.name, error_code)
                     if key in seen_errors:
                         repeated_error = True
@@ -553,6 +557,20 @@ def _reply(
         opening_card=_OPENING,
     )
     save_state(gym, conversation, workflow)
+    explained = False
+    if not provider_down and proposal is None and saved is None and failures:
+        reply, proposal, opened_now = _explain_failure(
+            request=request,
+            view=view,
+            gym=gym,
+            actor=actor,
+            conversation=conversation,
+            offered=offered,
+            staff_text=staff_text,
+            workflow=workflow,
+            failures=failures,
+        )
+        explained = True
     if reply in {"", _LIMIT}:
         summary = proposal["summary"] if proposal is not None else None
         if isinstance(summary, str) and summary:
@@ -561,7 +579,7 @@ def _reply(
             reply = staff_notice(last_error, staff_text) or _LIMIT
         else:
             reply = _LIMIT
-    if not provider_down and reply not in {_LIMIT, _BLOCKED}:
+    if not explained and not provider_down and reply not in {_LIMIT, _BLOCKED}:
         ground = _grounding_text(history, workflow, live_brief)
         if read_completed:
             corrected = grounded_read_reply(
@@ -585,7 +603,7 @@ def _reply(
         )
     burmese = _conversation_burmese(history, staff_text, reply)
     language = "မြန်မာ" if burmese else staff_text
-    if not provider_down:
+    if not explained and not provider_down:
         reply = visible_reply(
             reply,
             confirmed=saved is not None,
@@ -599,7 +617,13 @@ def _reply(
             reply = f"{done} နောက်တစ်ချက်ကို အတည်ပြုပြီးမှ သိမ်းပါမယ်။".strip()
         else:
             reply = f"{done} The next change is not saved until you confirm.".strip()
-    elif not provider_down and proposal is None and saved is None and last_error is not None:
+    elif (
+        not explained
+        and not provider_down
+        and proposal is None
+        and saved is None
+        and last_error is not None
+    ):
         notice = staff_notice(last_error, language)
         if notice and notice not in reply:
             reply = f"{notice} {reply}".strip()
@@ -682,9 +706,23 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
         )
     except ExecutionRejected as exc:
         logger.info("assistant confirmation rejected: %s", exc.code)
-        raise RequestRejected(
-            {"confirmation": [_confirmation_text(gym, goal.conversation, "rejected")]}
-        ) from exc
+        code = _safe_error_code(exc.code)
+        detail: dict[str, object] = {"error": code}
+        record_status = _finance_status(gym, step.tool_name, payload)
+        if record_status:
+            detail["status"] = record_status
+            if code == "rejected":
+                detail["error"] = "finance_state"
+        return _recovered_confirmation(
+            request=request,
+            view=view,
+            gym=gym,
+            actor=actor,
+            goal=goal,
+            step=step,
+            body=detail,
+            follow=_safe_followup(step.tool_name, detail, payload),
+        )
     except PermissionDenied:
         raise
     except Http404:
@@ -768,6 +806,18 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
             {"confirmation": [_confirmation_text(gym, goal.conversation, "retail_charge")]}
         ) from None
     except AssignmentNotEffective:
+        assignment = _assignment_arguments(step.tool_name, payload)
+        if assignment is not None:
+            return _recovered_confirmation(
+                request=request,
+                view=view,
+                gym=gym,
+                actor=actor,
+                goal=goal,
+                step=step,
+                body={"error": "assignment_required"},
+                follow=("create_assignment", assignment),
+            )
         close_goal(
             gym=gym,
             goal=goal,
@@ -871,7 +921,20 @@ def confirm_step(*, request: Request, view: APIView, step_id: UUID) -> dict[str,
         return _closed_confirmation(gym, goal, step, "check_in_open")
     except FinanceStateConflict:
         logger.info("assistant confirmation finance state")
-        return _closed_confirmation(gym, goal, step, "finance_state")
+        detail = {"error": "finance_state"}
+        record_status = _finance_status(gym, step.tool_name, payload)
+        if record_status:
+            detail["status"] = record_status
+        return _recovered_confirmation(
+            request=request,
+            view=view,
+            gym=gym,
+            actor=actor,
+            goal=goal,
+            step=step,
+            body=detail,
+            follow=_safe_followup(step.tool_name, detail, payload),
+        )
     except CheckInDuplicate:
         logger.info("assistant confirmation check-in duplicate")
         return _closed_confirmation(gym, goal, step, "check_in_duplicate")
@@ -2057,6 +2120,277 @@ def _safe_error_code(code: str) -> str:
     if code.isascii() and code.replace("_", "").isalnum() and code.islower() and len(code) <= 40:
         return code
     return "unavailable"
+
+
+_APPROVE_AFTER_SUBMIT = {
+    "submit_payment": ("approve_payment", "payment_id"),
+    "submit_expense": ("approve_expense", "expense_id"),
+    "submit_salary_period": ("approve_salary_period", "salary_period_id"),
+    "submit_retail_sale": ("approve_retail_sale", "retail_sale_id"),
+    "submit_pt_sale": ("approve_pt_sale", "pt_sale_id"),
+}
+_SUBMIT_AFTER_APPROVE = {
+    "approve_payment": ("submit_payment", "payment_id"),
+    "approve_expense": ("submit_expense", "expense_id"),
+    "approve_salary_period": ("submit_salary_period", "salary_period_id"),
+    "approve_retail_sale": ("submit_retail_sale", "retail_sale_id"),
+    "approve_pt_sale": ("submit_pt_sale", "pt_sale_id"),
+}
+_Failure = tuple[str, dict[str, object], dict[str, object]]
+
+
+def _safe_followup(
+    name: str,
+    body: Mapping[str, object],
+    arguments: Mapping[str, object],
+) -> tuple[str, dict[str, object]] | None:
+    """The next confirmation, when it is one safe write and the ids are already known."""
+
+    error = body.get("error")
+    status = body.get("status") if isinstance(error, str) else ""
+    if not isinstance(status, str):
+        status = ""
+    if error == "finance_state" and status == "PENDING_APPROVAL":
+        pair = _APPROVE_AFTER_SUBMIT.get(name)
+        if pair is not None:
+            tool_name, field = pair
+            record = arguments.get(field)
+            if isinstance(record, str) and record:
+                return tool_name, {field: record}
+    if error == "not_pending" and status == "DRAFT":
+        pair = _SUBMIT_AFTER_APPROVE.get(name)
+        if pair is not None:
+            tool_name, field = pair
+            record = arguments.get(field)
+            if isinstance(record, str) and record:
+                return tool_name, {field: record}
+    if error == "assignment_required":
+        member = body.get("member_id")
+        trainer = body.get("trainer_staff_profile_id")
+        day = body.get("effective_from")
+        if isinstance(member, str) and isinstance(trainer, str) and isinstance(day, str):
+            return "create_assignment", {
+                "member_id": member,
+                "trainer_staff_profile_id": trainer,
+                "effective_from": day,
+            }
+    return None
+
+
+def _primary_failure(failures: list[_Failure]) -> _Failure:
+    for item in failures:
+        if _safe_followup(item[0], item[1], item[2]) is not None:
+            return item
+    for item in failures:
+        status = item[1].get("status")
+        if isinstance(item[1].get("error"), str) and isinstance(status, str) and status:
+            return item
+    return failures[-1]
+
+
+def _finance_status(gym: Gym, tool_name: str, payload: Mapping[str, object]) -> str:
+    pair = _APPROVE_AFTER_SUBMIT.get(tool_name) or _SUBMIT_AFTER_APPROVE.get(tool_name)
+    if pair is None:
+        return ""
+    record = payload.get(pair[1])
+    if not isinstance(record, str) or not record:
+        return ""
+    found = finance_record(gym, tool_name, record)
+    return "" if found is None else found[0]
+
+
+def _assignment_arguments(
+    tool_name: str,
+    payload: Mapping[str, object],
+) -> dict[str, object] | None:
+    if tool_name not in {"create_pt_sale", "create_pt_booking"}:
+        return None
+    member = payload.get("member_id")
+    trainer = payload.get("trainer_staff_profile_id")
+    raw = payload.get("service_date") if tool_name == "create_pt_sale" else payload.get("starts_at")
+    if not isinstance(member, str) or not isinstance(trainer, str) or not isinstance(raw, str):
+        return None
+    day = raw[:10]
+    if len(day) != 10:
+        return None
+    return {
+        "member_id": member,
+        "trainer_staff_profile_id": trainer,
+        "effective_from": day,
+    }
+
+
+def _actor_may_self_approve(gym: Gym, actor: GymMembership) -> bool:
+    from apps.tenants.models import GymMembershipRole
+
+    with transaction.atomic():
+        set_gym_context(gym_id=gym.id)
+        rows = GymMembershipRole.objects.filter(
+            gym=gym,
+            gym_membership=actor,
+            role__is_active=True,
+        ).select_related("role__source_template")
+        keys = {
+            row.role.key
+            for row in rows
+            if row.role.source_template is not None and row.role.source_template.key == row.role.key
+        }
+    return "OWNER" in keys or ("MANAGER" in keys and "RECEPTIONIST" in keys)
+
+
+def _blocks_own_approval(
+    gym: Gym,
+    actor: GymMembership,
+    tool_name: str,
+    arguments: Mapping[str, object],
+) -> bool:
+    record = next((value for value in arguments.values() if isinstance(value, str)), None)
+    if record is None:
+        return False
+    found = finance_record(gym, tool_name, record)
+    if found is None:
+        return False
+    _status, created, submitted = found
+    actor_id = str(actor.id)
+    if actor_id not in {created, submitted}:
+        return False
+    return not _actor_may_self_approve(gym, actor)
+
+
+def _allowed_followup(
+    *,
+    gym: Gym,
+    actor: GymMembership,
+    offered: frozenset[str],
+    follow: tuple[str, dict[str, object]] | None,
+) -> tuple[tuple[str, dict[str, object]] | None, bool]:
+    if follow is None:
+        return None, True
+    tool_name, arguments = follow
+    if tool_name.startswith("approve_") and (
+        tool_name not in offered or _blocks_own_approval(gym, actor, tool_name, arguments)
+    ):
+        return None, False
+    if tool_name not in offered:
+        return None, True
+    return follow, True
+
+
+def _explain_failure(
+    *,
+    request: Request,
+    view: APIView,
+    gym: Gym,
+    actor: GymMembership,
+    conversation: Conversation,
+    offered: frozenset[str],
+    staff_text: str,
+    workflow: dict[str, str],
+    failures: list[_Failure],
+) -> tuple[str, dict[str, object] | None, bool]:
+    name, body, arguments = _primary_failure(failures)
+    follow, can_continue = _allowed_followup(
+        gym=gym,
+        actor=actor,
+        offered=offered,
+        follow=_safe_followup(name, body, arguments),
+    )
+    proposal: dict[str, object] | None = None
+    opened = False
+    if follow is not None:
+        card, _follow_body = _handle_call(
+            request=request,
+            view=view,
+            gym=gym,
+            actor=actor,
+            conversation=conversation,
+            name=follow[0],
+            arguments=follow[1],
+            offered=offered,
+            proposal=None,
+            saved=None,
+            staff_text=staff_text,
+            workflow=workflow,
+        )
+        if card is not None:
+            proposal = card
+            opened = True
+    status = body.get("status")
+    if (
+        body.get("error") in {"finance_state", "not_pending", "payment_state"}
+        and isinstance(status, str)
+        and status
+    ):
+        text = recovery_sentence(body, staff_text, can_continue=can_continue)
+    else:
+        text = staff_notice(body, staff_text) or recovery_sentence(
+            body,
+            staff_text,
+            can_continue=can_continue,
+        )
+    return text, proposal, opened
+
+
+def _recovered_confirmation(
+    *,
+    request: Request,
+    view: APIView,
+    gym: Gym,
+    actor: GymMembership,
+    goal: Goal,
+    step: WorkflowStep,
+    body: dict[str, object],
+    follow: tuple[str, dict[str, object]] | None,
+) -> dict[str, object]:
+    error = body.get("error")
+    summary = error if isinstance(error, str) else "rejected"
+    close_goal(
+        gym=gym,
+        goal=goal,
+        step=step,
+        status=Goal.Status.CANCELLED,
+        step_status=WorkflowStep.Status.CANCELLED,
+        summary=summary,
+    )
+    staff_text = _staff_text(_history(gym, goal.conversation))
+    chosen, can_continue = _allowed_followup(
+        gym=gym,
+        actor=actor,
+        offered=_offered(request),
+        follow=follow,
+    )
+    pending = None
+    if chosen is not None:
+        pending, _follow_body = _handle_call(
+            request=request,
+            view=view,
+            gym=gym,
+            actor=actor,
+            conversation=goal.conversation,
+            name=chosen[0],
+            arguments=chosen[1],
+            offered=_offered(request),
+            proposal=None,
+            saved=None,
+            staff_text=staff_text,
+            workflow=load_state(gym, goal.conversation),
+        )
+    text = recovery_sentence(body, staff_text, can_continue=can_continue)
+    saved = append_message(
+        gym=gym,
+        conversation=goal.conversation,
+        actor=None,
+        role=Message.Role.ASSISTANT,
+        body=text,
+        goal=goal,
+    )
+    return {
+        "conversation_id": goal.conversation_id,
+        "message": message_data(saved),
+        "pending_confirmation": pending,
+        "tool_activity": [public_activity(step.tool_name, "cancelled")],
+        "outcome": "cancelled",
+    }
 
 
 def _confirmation_text(

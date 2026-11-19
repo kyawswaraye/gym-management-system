@@ -336,6 +336,7 @@ export function MemberPackagesManager({
   const [reversesId, setReversesId] = useState("");
   const [pending, setPending] = useState(false);
   const [grantFreePack, setGrantFreePack] = useState(true);
+  const [grantPackageId, setGrantPackageId] = useState("");
   const [grantNote, setGrantNote] = useState("Free pack grant");
   const [mode, setMode] = useState<"grant" | "correct" | null>(null);
   const key = useRef<{ fingerprint: string; value: string } | null>(null);
@@ -451,6 +452,7 @@ export function MemberPackagesManager({
     if (pendingRef.current || mode !== null) return;
     setGrantError("");
     setGrantFreePack(true);
+    setGrantPackageId("");
     setGrantNote("Free pack grant");
     setNotice((current) => (current?.scope === "grant" ? null : current));
     setMode("grant");
@@ -459,6 +461,19 @@ export function MemberPackagesManager({
   function chooseFreePack(next: boolean) {
     setGrantFreePack(next);
     setGrantNote(next ? "Free pack grant" : "Paid pack grant");
+  }
+
+  function chooseGrantPackage(packageId: string) {
+    setGrantPackageId(packageId);
+    if (
+      catalog.items.find((row) => row.id === packageId)?.type !== "PT"
+    ) {
+      return;
+    }
+    setGrantFreePack(true);
+    setGrantNote((current) =>
+      current === "Paid pack grant" ? "Free pack grant" : current,
+    );
   }
 
   function openCorrect() {
@@ -473,11 +488,15 @@ export function MemberPackagesManager({
     event.preventDefault();
     if (pendingRef.current) return;
     const form = new FormData(event.currentTarget);
+    const packageId = String(form.get("service_package_id") ?? "");
+    const packageType =
+      catalog.items.find((row) => row.id === packageId)?.type ?? "";
     const body: GrantBody = {
       member_id: member?.id ?? "",
-      service_package_id: String(form.get("service_package_id") ?? ""),
+      service_package_id: packageId,
       business_date: String(form.get("business_date") ?? ""),
-      complimentary: form.get("complimentary") === "true",
+      complimentary:
+        packageType === "PT" || form.get("complimentary") === "true",
       reason: String(form.get("reason") ?? ""),
     };
     const problem = grantProblem(member, body);
@@ -994,7 +1013,12 @@ export function MemberPackagesManager({
           ) : null}
           <Alert message={catalog.error} />
           <Field label="Which pack?">
-            <SelectInput name="service_package_id" required>
+            <SelectInput
+              name="service_package_id"
+              onChange={(event) => chooseGrantPackage(event.target.value)}
+              required
+              value={grantPackageId}
+            >
               <option value="">{tx("Select a package")}</option>
               {catalog.items.map((row) => (
                 <option key={row.id} value={row.id}>
@@ -1011,26 +1035,31 @@ export function MemberPackagesManager({
               type="date"
             />
           </Field>
-          <Field label="Free pack?">
-            <SelectInput
-              name="complimentary"
-              onChange={(event) =>
-                chooseFreePack(event.target.value === "true")
-              }
-              value={grantFreePack ? "true" : "false"}
-            >
-              <option value="true">{tx("Yes")}</option>
-              <option value="false">{tx("No")}</option>
-            </SelectInput>
-          </Field>
-          <p className="text-sm text-slate-500">
-            {" "}
-            {grantFreePack
-              ? tx("Yes = give the pack for free.")
-              : tx(
-                  "No = member already paid. Record the payment in Payments first. Paid PT packs still come from a PT sale.",
-                )}{" "}
-          </p>
+          {catalog.items.find((row) => row.id === grantPackageId)?.type ===
+          "PT" ? null : (
+            <>
+              <Field label="Free pack?">
+                <SelectInput
+                  name="complimentary"
+                  onChange={(event) =>
+                    chooseFreePack(event.target.value === "true")
+                  }
+                  value={grantFreePack ? "true" : "false"}
+                >
+                  <option value="true">{tx("Yes")}</option>
+                  <option value="false">{tx("No")}</option>
+                </SelectInput>
+              </Field>
+              <p className="text-sm text-slate-500">
+                {" "}
+                {grantFreePack
+                  ? tx("Yes = give the pack for free.")
+                  : tx(
+                      "No = member already paid. Record the payment in Payments first. Paid PT packs still come from a PT sale.",
+                    )}{" "}
+              </p>
+            </>
+          )}
           <Field label="Short note" required>
             <textarea
               className="input min-h-24"

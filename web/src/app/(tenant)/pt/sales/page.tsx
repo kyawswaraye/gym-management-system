@@ -9,6 +9,7 @@ import {
   hasTenantCapability,
   maySelfCloseOwnFinance,
   tenantHomePath,
+  trainerAssignmentRestricted,
 } from "@/lib/auth/authorization";
 import { requireTenantSession } from "@/lib/auth/session";
 import { todayInTimezone } from "@/lib/date";
@@ -29,6 +30,10 @@ export default async function PtSalesPage() {
         canApprove={canApprovePtSale(session)}
         canApproveOwn={maySelfCloseOwnFinance(session)}
         canCreate={hasPermission(session, "pt.sales.create")}
+        canLinkTrainer={
+          hasPermission(session, "pt.assignments.manage") &&
+          !trainerAssignmentRestricted(session)
+        }
         canSubmit={hasPermission(session, "pt.sales.submit")}
         canUpdate={hasPermission(session, "pt.sales.update")}
         canViewReceipts={hasTenantCapability(

@@ -30,9 +30,11 @@ import { SaleCommandDialog } from "@/features/pt/sale-command-dialog";
 import {
   approvePtSale,
   cancelPtSale,
+  createAssignment,
   createPtSale,
   getPtCommission,
   getPtSale,
+  listAssignments,
   listPtCommissions,
   listPtSales,
   listServicePackages,
@@ -44,7 +46,11 @@ import {
 } from "@/features/pt/client";
 import { phase5Error } from "@/features/pt/errors";
 import { collectLookupPages, useLookupOptions } from "@/features/pt/lookup";
-import { MemberSearch, type PickedMember } from "@/features/pt/member-search";
+import {
+  MemberSearch,
+  memberLabel,
+  type PickedMember,
+} from "@/features/pt/member-search";
 import { IdentifierValue } from "@/lib/ui/identifier";
 import type {
   PTCommissionDetail,
@@ -52,6 +58,7 @@ import type {
   PTSalePaymentDraftRequest,
   PTSaleWriteRequest,
   ServicePackage,
+  TrainerAssignment,
   TrainerIdentity,
 } from "@/types/api";
 
@@ -76,6 +83,35 @@ const cardClass =
   "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm";
 
 type SaleMode = "create" | "edit" | "reject" | "cancel" | "approve" | "void";
+
+function assignmentCovers(
+  row: TrainerAssignment,
+  trainerId: string,
+  day: string,
+): boolean {
+  if (row.status !== "ACTIVE" || row.trainer_staff_profile_id !== trainerId) {
+    return false;
+  }
+  if (row.effective_from > day) return false;
+  if (row.effective_until && row.effective_until < day) return false;
+  return true;
+}
+
+function laterTrainerLink(
+  rows: TrainerAssignment[],
+  trainerId: string,
+  day: string,
+): TrainerAssignment | null {
+  return (
+    rows.find(
+      (row) =>
+        row.status === "ACTIVE" &&
+        row.trainer_staff_profile_id === trainerId &&
+        row.effective_from > day &&
+        (row.effective_until === null || row.effective_until >= day),
+    ) ?? null
+  );
+}
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
@@ -115,6 +151,64 @@ function saleLabel(
     ? ` ${tx("payment")} ${tx(row.payment.method)}`
     : "";
   return `${formatAppDate(row.service_date)} ${row.description} ${row.gross_fee} ${tx(row.currency)} ${tx("member")} ${member} ${tx("trainer")} ${trainer}${packagePart}${paymentPart} ${tx(row.status)}`;
+}
+
+function TrainerLinkNotice({
+  memberName,
+  trainerName,
+  date,
+  linked,
+  later,
+  pending,
+  onUseDate,
+}: {
+  memberName: string;
+  trainerName: string;
+  date: string;
+  linked: boolean;
+  later: TrainerAssignment | null;
+  pending: boolean;
+  onUseDate: (day: string) => void;
+}) {
+  const tx = useTx();
+  if (linked) return null;
+  if (later) {
+    const start = formatAppDate(later.effective_from);
+    return (
+      <div className="grid gap-3">
+        <p className="text-sm text-slate-600">
+          {tx(
+            "{member} is linked to {trainer} from {date}. Change the sale date to that day or later.",
+            { member: memberName, trainer: trainerName, date: start },
+          )}
+        </p>
+        <button
+          className="button button-edit w-fit"
+          disabled={pending}
+          onClick={() => onUseDate(later.effective_from)}
+          type="button"
+        >
+          {tx("Use {date}", { date: start })}
+        </button>
+      </div>
+    );
+  }
+  if (pending) {
+    return (
+      <p className="text-sm text-slate-600" role="status">
+        {tx("Checking the trainer link.")}
+      </p>
+    );
+  }
+  return (
+    <p className="text-sm text-slate-600">
+      {tx("This save also links {trainer} to {member} from {date}.", {
+        trainer: trainerName,
+        member: memberName,
+        date: formatAppDate(date),
+      })}
+    </p>
+  );
 }
 
 function SaleStatusBadge({ status }: { status: string }) {
@@ -167,6 +261,7 @@ function NoticeBanner({ message }: { message: string }) {
 
 export function SalesManager({
   canCreate,
+  canLinkTrainer = false,
   canUpdate,
   canSubmit,
   canApprove,
@@ -178,6 +273,7 @@ export function SalesManager({
   membershipId,
 }: {
   canCreate: boolean;
+  canLinkTrainer?: boolean;
   canUpdate: boolean;
   canSubmit: boolean;
   canApprove: boolean;
@@ -197,6 +293,10 @@ export function SalesManager({
     "set" | "omit" | "clear"
   >("set");
   const [draftPaymentDescription, setDraftPaymentDescription] = useState("");
+  const [draftTrainerId, setDraftTrainerId] = useState("");
+  const [draftServiceDate, setDraftServiceDate] = useState(today);
+  const [memberLinks, setMemberLinks] = useState<TrainerAssignment[]>([]);
+  const [linksPending, setLinksPending] = useState(false);
   const [memberFilter, setMemberFilter] = useState<PickedMember | null>(null);
   const [selected, setSelected] = useState<PTSale | null>(null);
   const [commission, setCommission] = useState<PTCommissionDetail | null>(null);
@@ -363,6 +463,9 @@ export function SalesManager({
       setDraftDescription("");
       setDraftPaymentChoice("set");
       setDraftPaymentDescription("");
+      setDraftTrainerId("");
+      setDraftServiceDate(today);
+      setMemberLinks([]);
     } else if (next === "edit" && selected) {
       paymentDescriptionTouched.current = false;
       setDraftAmount(selected.payment?.amount ?? selected.gross_fee ?? "");
@@ -372,6 +475,9 @@ export function SalesManager({
       setDraftPaymentDescription(
         selected.payment?.description ?? selected.description ?? "",
       );
+      setDraftTrainerId(selected.trainer_staff_profile_id);
+      setDraftServiceDate(selected.service_date);
+      setMemberLinks([]);
     }
     setMode(next);
   }
@@ -494,13 +600,60 @@ export function SalesManager({
       setDialogError("Enter the service date, description, and gross fee.");
       return;
     }
+    const later =
+      canLinkTrainer && member
+        ? laterTrainerLink(
+            memberLinks,
+            body.trainer_staff_profile_id,
+            body.service_date,
+          )
+        : null;
+    if (later && member) {
+      const trainerName =
+        trainers.items.find((row) => row.id === body.trainer_staff_profile_id)
+          ?.display_name ?? tx("Current trainer");
+      setDialogError(
+        tx(
+          "{member} is linked to {trainer} from {date}. Change the sale date to that day or later.",
+          {
+            member: memberLabel(member),
+            trainer: trainerName,
+            date: formatAppDate(later.effective_from),
+          },
+        ),
+      );
+      return;
+    }
+    const shouldLink =
+      canLinkTrainer &&
+      member !== null &&
+      !linksPending &&
+      !memberLinks.some((row) =>
+        assignmentCovers(
+          row,
+          body.trainer_staff_profile_id,
+          body.service_date,
+        ),
+      );
     const fingerprint = JSON.stringify(body);
     const token = beginCommand();
     setDialogError("");
-    const request =
-      mode === "edit" && selected
-        ? updatePtSale(selected.id, body, commandKey(fingerprint))
-        : createPtSale(body, commandKey(fingerprint));
+    const request = (async () => {
+      if (shouldLink && member) {
+        const created = await createAssignment({
+          trainer_staff_profile_id: body.trainer_staff_profile_id,
+          member_id: member.id,
+          effective_from: body.service_date,
+          effective_until: null,
+          reason: "Linked for a PT sale.",
+        });
+        setMemberLinks((rows) => [...rows, created]);
+      }
+      const keyValue = commandKey(fingerprint);
+      return mode === "edit" && selected
+        ? updatePtSale(selected.id, body, keyValue)
+        : createPtSale(body, keyValue);
+    })();
     void request
       .then(async (sale) => {
         key.current = null;
@@ -719,6 +872,29 @@ export function SalesManager({
   const draftOpen =
     (mode === "create" && canCreate) ||
     (mode === "edit" && canUpdate && selected !== null);
+
+  useEffect(() => {
+    if (!canLinkTrainer || !draftOpen || !member) return undefined;
+    let cancel = false;
+    setLinksPending(true);
+    void listAssignments({
+      member_id: member.id,
+      status: "ACTIVE",
+      limit: "100",
+    })
+      .then((result) => {
+        if (!cancel) setMemberLinks(result.data);
+      })
+      .catch(() => {
+        if (!cancel) setMemberLinks([]);
+      })
+      .finally(() => {
+        if (!cancel) setLinksPending(false);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [canLinkTrainer, draftOpen, member, tx]);
   const detailNotice = notice && selected ? notice : "";
   const printableReceiptIds = canViewReceipts
     ? [
@@ -1440,7 +1616,7 @@ export function SalesManager({
                   "Update the draft. Leave the payment draft unchanged, replace it, or remove it.",
                 )
               : tx(
-                  "Pick the member, trainer, and sale total. Record the member's money here before you save.",
+                  "Pick the member and trainer. If they are not linked on the sale date, link them here, then record the member's money and save.",
                 )
           }
           descriptionId="sale-form-description"
@@ -1471,9 +1647,10 @@ export function SalesManager({
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Trainer">
               <SelectInput
-                defaultValue={selected?.trainer_staff_profile_id ?? ""}
                 name="trainer_staff_profile_id"
+                onChange={(event) => setDraftTrainerId(event.target.value)}
                 required
+                value={draftTrainerId}
               >
                 <option value="">{tx("Select a trainer")}</option>
                 {selected?.trainer_staff_profile_id &&
@@ -1494,13 +1671,34 @@ export function SalesManager({
             </Field>
             <Field label="Service date">
               <TextInput
-                defaultValue={selected?.service_date ?? today}
                 name="service_date"
+                onChange={(event) => setDraftServiceDate(event.target.value)}
                 required
                 type="date"
+                value={draftServiceDate}
               />
             </Field>
           </div>
+          {canLinkTrainer && member && draftTrainerId && draftServiceDate ? (
+            <TrainerLinkNotice
+              date={draftServiceDate}
+              later={laterTrainerLink(
+                memberLinks,
+                draftTrainerId,
+                draftServiceDate,
+              )}
+              linked={memberLinks.some((row) =>
+                assignmentCovers(row, draftTrainerId, draftServiceDate),
+              )}
+              memberName={memberLabel(member)}
+              onUseDate={setDraftServiceDate}
+              pending={linksPending}
+              trainerName={
+                trainers.items.find((row) => row.id === draftTrainerId)
+                  ?.display_name ?? tx("Current trainer")
+              }
+            />
+          ) : null}
           <Field label="Description">
             <TextInput
               name="description"

@@ -925,16 +925,16 @@ function GymLogoPicker({
         {tx("Max 1 MB · PNG, JPEG, WebP.")}
       </p>
       {preview && canUpdate ? (
-        <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="mt-2 flex flex-col gap-2">
           <label
-            className={`button button-sm relative w-full ${pending ? "pointer-events-none opacity-55" : ""}`}
+            className={`button relative w-full min-w-0 ${pending ? "pointer-events-none opacity-55" : ""}`}
           >
             <UploadArrowIcon />
             {tx("Change")}
             <LogoFileInput pending={pending} onFile={onFile} />
           </label>
           <button
-            className="button button-delete button-sm w-full"
+            className="button button-delete w-full min-w-0"
             disabled={pending}
             type="button"
             onClick={onRemove}
