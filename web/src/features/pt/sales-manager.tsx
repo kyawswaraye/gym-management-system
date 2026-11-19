@@ -296,7 +296,8 @@ export function SalesManager({
   const [draftTrainerId, setDraftTrainerId] = useState("");
   const [draftServiceDate, setDraftServiceDate] = useState(today);
   const [memberLinks, setMemberLinks] = useState<TrainerAssignment[]>([]);
-  const [linksPending, setLinksPending] = useState(false);
+  const [linkEpoch, setLinkEpoch] = useState(0);
+  const [settledLinkKey, setSettledLinkKey] = useState("");
   const [memberFilter, setMemberFilter] = useState<PickedMember | null>(null);
   const [selected, setSelected] = useState<PTSale | null>(null);
   const [commission, setCommission] = useState<PTCommissionDetail | null>(null);
@@ -466,6 +467,7 @@ export function SalesManager({
       setDraftTrainerId("");
       setDraftServiceDate(today);
       setMemberLinks([]);
+      setLinkEpoch((current) => current + 1);
     } else if (next === "edit" && selected) {
       paymentDescriptionTouched.current = false;
       setDraftAmount(selected.payment?.amount ?? selected.gross_fee ?? "");
@@ -478,6 +480,7 @@ export function SalesManager({
       setDraftTrainerId(selected.trainer_staff_profile_id);
       setDraftServiceDate(selected.service_date);
       setMemberLinks([]);
+      setLinkEpoch((current) => current + 1);
     }
     setMode(next);
   }
@@ -629,11 +632,7 @@ export function SalesManager({
       member !== null &&
       !linksPending &&
       !memberLinks.some((row) =>
-        assignmentCovers(
-          row,
-          body.trainer_staff_profile_id,
-          body.service_date,
-        ),
+        assignmentCovers(row, body.trainer_staff_profile_id, body.service_date),
       );
     const fingerprint = JSON.stringify(body);
     const token = beginCommand();
@@ -872,11 +871,17 @@ export function SalesManager({
   const draftOpen =
     (mode === "create" && canCreate) ||
     (mode === "edit" && canUpdate && selected !== null);
+  const linkKey = `${linkEpoch}:${member?.id ?? ""}`;
+  const linksPending =
+    canLinkTrainer &&
+    draftOpen &&
+    member !== null &&
+    settledLinkKey !== linkKey;
 
   useEffect(() => {
     if (!canLinkTrainer || !draftOpen || !member) return undefined;
+    const key = `${linkEpoch}:${member.id}`;
     let cancel = false;
-    setLinksPending(true);
     void listAssignments({
       member_id: member.id,
       status: "ACTIVE",
@@ -889,12 +894,12 @@ export function SalesManager({
         if (!cancel) setMemberLinks([]);
       })
       .finally(() => {
-        if (!cancel) setLinksPending(false);
+        if (!cancel) setSettledLinkKey(key);
       });
     return () => {
       cancel = true;
     };
-  }, [canLinkTrainer, draftOpen, member, tx]);
+  }, [canLinkTrainer, draftOpen, linkEpoch, member]);
   const detailNotice = notice && selected ? notice : "";
   const printableReceiptIds = canViewReceipts
     ? [
@@ -1634,7 +1639,10 @@ export function SalesManager({
         >
           <MemberSearch
             disabled={commandPending}
-            onSelect={setMember}
+            onSelect={(next) => {
+              setMember(next);
+              setLinkEpoch((current) => current + 1);
+            }}
             selected={member}
           />
           <Alert message={trainers.error || packages.error} />

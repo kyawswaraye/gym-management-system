@@ -555,8 +555,6 @@ export const ptMm = {
     "ဤထုတ်ပေးငွေကို အခြားသူတစ်ဦးက မှတ်တမ်းတင်ရမည်။",
   "A manager can cancel inside the cutoff with a reason.":
     "စီမံခန့်ခွဲသူသည် ကန့်သတ်ချိန်အတွင်း အကြောင်းပြချက်ဖြင့် ပယ်ဖျက်နိုင်သည်။",
-  "A PT package must be complimentary. A paid PT grant comes from sale approval.":
-    "PT ပက်ကေ့ဂျ်သည် အခမဲ့ ဖြစ်ရမည်။ အခပေး PT ပေးအပ်ချက်သည် အရောင်း အတည်ပြုမှုမှ ရရှိသည်။",
   "Active assigned members": "အသုံးပြုနေသော တာဝန်ပေးထားသော အဖွဲ့ဝင်များ",
   "All types": "အမျိုးအစား အားလုံး",
   Any: "မရွေး",
@@ -924,7 +922,8 @@ export const ptMm = {
   "This save also links {trainer} to {member} from {date}.":
     "ဒီသိမ်းတာက {trainer} ကို {member} နဲ့ {date} ကနေ ချိတ်ပါမယ်။",
   "The trainer could not be linked.": "Trainer ချိတ်လို့ မရပါ။",
-  "The trainer link could not be checked.": "Trainer ချိတ်ဆက်မှုကို စစ်လို့ မရပါ။",
+  "The trainer link could not be checked.":
+    "Trainer ချိတ်ဆက်မှုကို စစ်လို့ မရပါ။",
   "This member is not linked to this trainer on the sale date. Link them here, then save again.":
     "ဒီ member ကို ဒီ trainer နဲ့ ရောင်းမယ့်ရက်မှာ မချိတ်ရသေးပါ။ ဒီမှာ ချိတ်ပြီး ပြန်သိမ်းပါ။",
   "Select a trainer to view today's members.":
@@ -999,6 +998,8 @@ export const ptMm = {
   "This grant has no ledger rows.": "ဤပေးအပ်ချက်တွင် စာရင်းကြောင်း မရှိပါ။",
   "This method is not cash, so no cash session is sent.":
     "ဤနည်းလမ်းသည် ငွေသား မဟုတ်သဖြင့် ငွေသားစာရင်းကာလကို မပို့ပါ။",
+  "This PT pack cannot be given as a paid grant. Choose Free pack, or sell it on PT sales and approve that sale.":
+    "ဤ PT pack ကို ပိုက်ဆံယူပြီး ပေး၍ မရပါ။ Free pack ကို ရွေးပါ၊ သို့မဟုတ် PT sales တွင် ရောင်းပြီး ထိုအရောင်းကို အတည်ပြုပါ။",
   "This occurrence will no longer accept bookings.":
     "ဤအတန်းချိန်သည် ကြိုတင်စာရင်းများကို ထပ်မံ လက်ခံမည် မဟုတ်ပါ။",
   "This sale has no cash payment, so no cash session is sent.":

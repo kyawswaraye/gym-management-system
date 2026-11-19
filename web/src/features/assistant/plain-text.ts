@@ -24,7 +24,11 @@ export function plainAssistantText(body: string): string {
       const value = line.slice(line.indexOf(":") + 1).trim();
       return line.indexOf(":") === -1 || !RECORD_ID.test(value);
     });
-  let text = lines.filter(Boolean).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  let text = lines
+    .filter(Boolean)
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   const posted = /POSTED|အတည်ပြုပြီး/.test(text);
   const aboutPackage = /package|ပက်ကေ့/i.test(text);
   if (!posted || !aboutPackage || !asksToGrant(text)) return text;

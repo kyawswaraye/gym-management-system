@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date, time
+from datetime import date, time, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -544,7 +544,7 @@ def test_attend_consumes_one_session_and_caches_a_repeat(
             owner,
             class_type.id,
             profile.id,
-            on=date(2026, 11, 16),
+            on=date.today() + timedelta(days=14),
             start=time(18, 0),
             end=time(18, 45),
             capacity=8,

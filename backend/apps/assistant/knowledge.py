@@ -934,9 +934,7 @@ def staff_notice(body: Mapping[str, object], staff_text: str) -> str | None:
     if error in {"finance_state", "not_pending", "payment_state", "assignment_required"}:
         return recovery_sentence(body, staff_text)
     if error not in _NOTICE_ERRORS:
-        if not error:
-            return None
-        return recovery_sentence(body, staff_text)
+        return None
     burmese = speaks_burmese(staff_text)
     if error == "permission_denied":
         return (

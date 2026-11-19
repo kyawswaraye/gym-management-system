@@ -319,7 +319,10 @@ def test_approval_confirmation_uses_the_stored_amount_and_rechecks_permission(
         message="Approve the payment",
         conversation_id=None,
     )
-    assert refused["pending_confirmation"] is None
+    draft_card = refused["pending_confirmation"]
+    assert isinstance(draft_card, dict)
+    assert draft_card["approval"] is None
+    assert "1.00" not in str(draft_card)
     with transaction.atomic():
         set_gym_context(gym_id=gym.id)
         submit_payment(

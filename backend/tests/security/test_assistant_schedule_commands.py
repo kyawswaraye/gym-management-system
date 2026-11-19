@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, time
+from datetime import date, time, timedelta
 from threading import Barrier
 from uuid import UUID, uuid4
 
@@ -124,6 +124,13 @@ def _completed(gym: Gym) -> int:
         gym=gym,
         state=IdempotencyRecord.State.COMPLETED,
     ).count()
+
+
+def _future_monday() -> date:
+    """A Monday far enough ahead that its class is still in the future."""
+
+    start = date.today() + timedelta(days=14)
+    return start + timedelta(days=(7 - start.weekday()) % 7)
 
 
 def _schedule(
@@ -321,7 +328,15 @@ def test_update_replay_hash_scope_conflict_and_stale_version(
     foreign_profile = _profile(other, foreign_trainer, code="CY", name="Cy")
     class_type = _type(gym, owner)
     foreign_type = _type(other, other_owner)
-    schedule = _schedule(gym, owner, class_type.id, profile.id)
+    upcoming = _future_monday()
+    schedule = _schedule(
+        gym,
+        owner,
+        class_type.id,
+        profile.id,
+        effective_from=upcoming,
+        effective_until=upcoming,
+    )
     other_schedule = _schedule(
         gym,
         owner,
@@ -330,6 +345,8 @@ def test_update_replay_hash_scope_conflict_and_stale_version(
         location="Room",
         local_start_time=time(19, 0),
         local_end_time=time(19, 45),
+        effective_from=upcoming,
+        effective_until=upcoming,
     )
     foreign = _schedule(other, other_owner, foreign_type.id, foreign_profile.id, location="Away")
     command = {"schedule_id": str(schedule.id).upper(), "capacity": 5}
@@ -440,8 +457,8 @@ def test_update_keeps_booked_and_cancelled_occurrence_snapshots() -> None:
             weekdays=[0, 2],
             local_start_time=time(18, 0),
             local_end_time=time(18, 45),
-            effective_from=date(2026, 11, 16),
-            effective_until=date(2026, 11, 18),
+            effective_from=_future_monday(),
+            effective_until=_future_monday() + timedelta(days=2),
             location="Studio",
             location_is_exclusive=True,
             capacity=8,
@@ -449,10 +466,10 @@ def test_update_keeps_booked_and_cancelled_occurrence_snapshots() -> None:
             ip_address=None,
             user_agent="",
         )
-        monday = ClassOccurrence.objects.get(class_schedule=schedule, local_date=date(2026, 11, 16))
+        monday = ClassOccurrence.objects.get(class_schedule=schedule, local_date=_future_monday())
         wednesday = ClassOccurrence.objects.get(
             class_schedule=schedule,
-            local_date=date(2026, 11, 18),
+            local_date=_future_monday() + timedelta(days=2),
         )
         member = Member.objects.create(
             gym=gym,
@@ -494,19 +511,24 @@ def test_update_keeps_booked_and_cancelled_occurrence_snapshots() -> None:
         owner,
         goal,
         _UPDATE,
-        {"schedule_id": str(schedule.id), "effective_until": "2026-11-23"},
+        {
+            "schedule_id": str(schedule.id),
+            "effective_until": (_future_monday() + timedelta(days=7)).isoformat(),
+        },
         1,
     )
     schedule.refresh_from_db()
     monday.refresh_from_db()
     wednesday.refresh_from_db()
     booking.refresh_from_db()
-    added = ClassOccurrence.objects.get(class_schedule=schedule, local_date=date(2026, 11, 23))
+    added = ClassOccurrence.objects.get(
+        class_schedule=schedule, local_date=_future_monday() + timedelta(days=7)
+    )
     assert updated.outcome == "committed"
     assert updated.effect_reference == str(schedule.id)
     assert schedule.location == "Studio"
     assert schedule.capacity == 8
-    assert schedule.effective_until == date(2026, 11, 23)
+    assert schedule.effective_until == _future_monday() + timedelta(days=7)
     assert (monday.id, monday.location, monday.capacity, monday.status, monday.starts_at) == (
         booked_before
     )

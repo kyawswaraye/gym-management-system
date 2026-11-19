@@ -465,9 +465,7 @@ export function MemberPackagesManager({
 
   function chooseGrantPackage(packageId: string) {
     setGrantPackageId(packageId);
-    if (
-      catalog.items.find((row) => row.id === packageId)?.type !== "PT"
-    ) {
+    if (catalog.items.find((row) => row.id === packageId)?.type !== "PT") {
       return;
     }
     setGrantFreePack(true);

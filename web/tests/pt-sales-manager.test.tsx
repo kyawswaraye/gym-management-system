@@ -157,9 +157,6 @@ function renderSales(
       canUpdate={props.canUpdate ?? false}
       canViewReceipts={props.canViewReceipts ?? false}
       canLinkTrainer={props.canLinkTrainer ?? false}
-      canSubmit={props.canSubmit ?? false}
-      canUpdate={props.canUpdate ?? false}
-      canViewReceipts={props.canViewReceipts ?? false}
       canVoid={props.canVoid ?? false}
       currency="MMK"
       membershipId={props.membershipId ?? "approver"}
@@ -777,9 +774,9 @@ describe("create and edit draft dialogs", () => {
         reason: "Linked for a PT sale.",
       }),
     );
-    expect(createAssignment.mock.invocationCallOrder[0]).toBeLessThan(
-      createPtSale.mock.invocationCallOrder[0] ?? 0,
-    );
+    expect(
+      vi.mocked(createAssignment).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(createPtSale).mock.invocationCallOrder[0] ?? 0);
   });
 
   it("locks the create dialog while the save is pending and then shows success", async () => {

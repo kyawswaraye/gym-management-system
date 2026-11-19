@@ -558,7 +558,13 @@ def _reply(
     )
     save_state(gym, conversation, workflow)
     explained = False
-    if not provider_down and proposal is None and saved is None and failures:
+    if (
+        not provider_down
+        and proposal is None
+        and saved is None
+        and failures
+        and _explains_failure(_primary_failure(failures), contracts)
+    ):
         reply, proposal, opened_now = _explain_failure(
             request=request,
             view=view,
@@ -2274,6 +2280,16 @@ def _allowed_followup(
     if tool_name not in offered:
         return None, True
     return follow, True
+
+
+def _explains_failure(failure: _Failure, contracts: Mapping[str, ToolContract]) -> bool:
+    """A write failure is explained. A lookup miss stays on the grounding path."""
+
+    name, body, arguments = failure
+    if _safe_followup(name, body, arguments) is not None:
+        return True
+    contract = contracts.get(name)
+    return contract is not None and contract.definition.operation == "write"
 
 
 def _explain_failure(
